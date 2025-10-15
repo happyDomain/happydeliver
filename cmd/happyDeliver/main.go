@@ -22,14 +22,25 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+
+	"github.com/gin-gonic/gin"
+
+	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/receiver"
+	"git.happydns.org/happyDeliver/internal/storage"
 )
 
+const version = "0.1.0-dev"
+
 func main() {
-	fmt.Println("Mail Tester - Email Deliverability Testing Platform")
-	fmt.Println("Version: 0.1.0-dev")
+	fmt.Println("happyDeliver - Email Deliverability Testing Platform")
+	fmt.Printf("Version: %s\n", version)
 
 	cfg, err := config.ConsolidateConfig()
 	if err != nil {
@@ -40,18 +51,98 @@ func main() {
 
 	switch command {
 	case "server":
-		log.Println("Starting API server...")
-		// TODO: Start API server
+		runServer(cfg)
 	case "analyze":
-		log.Println("Starting email analyzer...")
-		// TODO: Start email analyzer (LMTP/pipe mode)
+		runAnalyzer(cfg)
 	case "version":
-		fmt.Println("0.1.0-dev")
+		fmt.Println(version)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
 		os.Exit(1)
 	}
+}
+
+func runServer(cfg *config.Config) {
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	// Initialize storage
+	store, err := storage.NewStorage(cfg.Database.Type, cfg.Database.DSN)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+	defer store.Close()
+
+	log.Printf("Connected to %s database", cfg.Database.Type)
+
+	// Create API handler
+	handler := api.NewAPIHandler(store, cfg)
+
+	// Set up Gin router
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	router := gin.Default()
+
+	// Register API routes
+	apiGroup := router.Group("/api")
+	api.RegisterHandlers(apiGroup, handler)
+
+	// Start server
+	log.Printf("Starting API server on %s", cfg.Bind)
+	log.Printf("Test email domain: %s", cfg.Email.Domain)
+
+	if err := router.Run(cfg.Bind); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+func runAnalyzer(cfg *config.Config) {
+	// Parse command-line flags
+	fs := flag.NewFlagSet("analyze", flag.ExitOnError)
+	recipientEmail := fs.String("recipient", "", "Recipient email address (optional, will be extracted from headers if not provided)")
+	fs.Parse(flag.Args()[1:])
+
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
+	// Initialize storage
+	store, err := storage.NewStorage(cfg.Database.Type, cfg.Database.DSN)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+	defer store.Close()
+
+	log.Printf("Email analyzer ready, reading from stdin...")
+
+	// Read email from stdin
+	emailData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatalf("Failed to read email from stdin: %v", err)
+	}
+
+	// If recipient not provided, try to extract from headers
+	var recipient string
+	if *recipientEmail != "" {
+		recipient = *recipientEmail
+	} else {
+		recipient, err = receiver.ExtractRecipientFromHeaders(emailData)
+		if err != nil {
+			log.Fatalf("Failed to extract recipient: %v", err)
+		}
+		log.Printf("Extracted recipient: %s", recipient)
+	}
+
+	// Process the email
+	recv := receiver.NewEmailReceiver(store, cfg)
+	if err := recv.ProcessEmailBytes(emailData, recipient); err != nil {
+		log.Fatalf("Failed to process email: %v", err)
+	}
+
+	log.Println("Email processed successfully")
 }
 
 func printUsage() {
