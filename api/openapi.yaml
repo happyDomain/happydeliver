@@ -1,0 +1,507 @@
+openapi: 3.0.3
+info:
+  title: happyDeliver API
+  description: Email Deliverability Testing Platform API
+  version: 0.1.0
+  contact:
+    name: happyDomain team
+    url: https://github.com/happyDomain/happydeliver
+    email: contact+api@happydomain.org
+  license:
+    name: GNU Affero General Public License v3.0 or later
+    url: https://spdx.org/licenses/AGPL-3.0-or-later.html
+
+servers:
+  - url: http://localhost:8080/api
+    description: Local development server
+  - url: https://api.example.com/api
+    description: Production server
+
+tags:
+  - name: tests
+    description: Test management operations
+  - name: reports
+    description: Report retrieval operations
+  - name: health
+    description: Service health and status
+
+paths:
+  /test:
+    post:
+      tags:
+        - tests
+      summary: Create a new deliverability test
+      description: Generates a unique test email address for sending test emails
+      operationId: createTest
+      responses:
+        '201':
+          description: Test created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /test/{id}:
+    get:
+      tags:
+        - tests
+      summary: Get test metadata
+      description: Retrieve test status and metadata
+      operationId: getTest
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Test metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Test'
+        '404':
+          description: Test not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /report/{id}:
+    get:
+      tags:
+        - reports
+      summary: Get detailed report
+      description: Retrieve comprehensive deliverability analysis report
+      operationId: getReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Report retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /report/{id}/raw:
+    get:
+      tags:
+        - reports
+      summary: Get raw annotated email
+      description: Retrieve the original email with headers added by filters
+      operationId: getRawEmail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Raw email retrieved successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Email not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /status:
+    get:
+      tags:
+        - health
+      summary: Service health check
+      description: Get service health status and component versions
+      operationId: getStatus
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+
+components:
+  schemas:
+    Test:
+      type: object
+      required:
+        - id
+        - email
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique test identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          description: Unique test email address
+          example: "test-550e8400@example.com"
+        status:
+          type: string
+          enum: [pending, received, analyzed, failed]
+          description: Current test status
+          example: "analyzed"
+        created_at:
+          type: string
+          format: date-time
+          description: Test creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    TestResponse:
+      type: object
+      required:
+        - id
+        - email
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "test-550e8400@example.com"
+        status:
+          type: string
+          enum: [pending]
+          example: "pending"
+        message:
+          type: string
+          example: "Send your test email to the address above"
+
+    Report:
+      type: object
+      required:
+        - id
+        - test_id
+        - score
+        - checks
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Report identifier
+        test_id:
+          type: string
+          format: uuid
+          description: Associated test ID
+        score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          description: Overall deliverability score (0-10)
+          example: 8.5
+        summary:
+          $ref: '#/components/schemas/ScoreSummary'
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Check'
+        authentication:
+          $ref: '#/components/schemas/AuthenticationResults'
+        spamassassin:
+          $ref: '#/components/schemas/SpamAssassinResult'
+        dns_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DNSRecord'
+        blacklists:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlacklistCheck'
+        raw_headers:
+          type: string
+          description: Raw email headers
+        created_at:
+          type: string
+          format: date-time
+
+    ScoreSummary:
+      type: object
+      required:
+        - authentication_score
+        - spam_score
+        - blacklist_score
+        - content_score
+        - header_score
+      properties:
+        authentication_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 3
+          description: SPF/DKIM/DMARC score (max 3 pts)
+          example: 2.8
+        spam_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          description: SpamAssassin score (max 2 pts)
+          example: 1.5
+        blacklist_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          description: Blacklist check score (max 2 pts)
+          example: 2.0
+        content_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          description: Content quality score (max 2 pts)
+          example: 1.8
+        header_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Header quality score (max 1 pt)
+          example: 0.9
+
+    Check:
+      type: object
+      required:
+        - category
+        - name
+        - status
+        - score
+        - message
+      properties:
+        category:
+          type: string
+          enum: [authentication, dns, content, blacklist, headers, spam]
+          description: Check category
+          example: "authentication"
+        name:
+          type: string
+          description: Check name
+          example: "DKIM Signature"
+        status:
+          type: string
+          enum: [pass, fail, warn, info, error]
+          description: Check result status
+          example: "pass"
+        score:
+          type: number
+          format: float
+          description: Points contributed to total score
+          example: 1.0
+        message:
+          type: string
+          description: Human-readable result message
+          example: "DKIM signature is valid"
+        details:
+          type: string
+          description: Additional details (may be JSON)
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+          description: Issue severity
+          example: "info"
+        advice:
+          type: string
+          description: Remediation advice
+          example: "Your DKIM configuration is correct"
+
+    AuthenticationResults:
+      type: object
+      properties:
+        spf:
+          $ref: '#/components/schemas/AuthResult'
+        dkim:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthResult'
+        dmarc:
+          $ref: '#/components/schemas/AuthResult'
+
+    AuthResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [pass, fail, none, neutral, softfail, temperror, permerror]
+          description: Authentication result
+          example: "pass"
+        domain:
+          type: string
+          description: Domain being authenticated
+          example: "example.com"
+        selector:
+          type: string
+          description: DKIM selector (for DKIM only)
+          example: "default"
+        details:
+          type: string
+          description: Additional details about the result
+
+    SpamAssassinResult:
+      type: object
+      required:
+        - score
+        - required_score
+        - is_spam
+      properties:
+        score:
+          type: number
+          format: float
+          description: SpamAssassin spam score
+          example: 2.3
+        required_score:
+          type: number
+          format: float
+          description: Threshold for spam classification
+          example: 5.0
+        is_spam:
+          type: boolean
+          description: Whether message is classified as spam
+          example: false
+        tests:
+          type: array
+          items:
+            type: string
+          description: List of triggered SpamAssassin tests
+          example: ["BAYES_00", "DKIM_SIGNED"]
+        report:
+          type: string
+          description: Full SpamAssassin report
+
+    DNSRecord:
+      type: object
+      required:
+        - domain
+        - record_type
+        - status
+      properties:
+        domain:
+          type: string
+          description: Domain name
+          example: "example.com"
+        record_type:
+          type: string
+          enum: [MX, SPF, DKIM, DMARC]
+          description: DNS record type
+          example: "SPF"
+        status:
+          type: string
+          enum: [found, missing, invalid]
+          description: Record status
+          example: "found"
+        value:
+          type: string
+          description: Record value
+          example: "v=spf1 include:_spf.example.com ~all"
+
+    BlacklistCheck:
+      type: object
+      required:
+        - ip
+        - rbl
+        - listed
+      properties:
+        ip:
+          type: string
+          description: IP address checked
+          example: "192.0.2.1"
+        rbl:
+          type: string
+          description: RBL/DNSBL name
+          example: "zen.spamhaus.org"
+        listed:
+          type: boolean
+          description: Whether IP is listed
+          example: false
+        response:
+          type: string
+          description: RBL response code or message
+          example: "127.0.0.2"
+
+    Status:
+      type: object
+      required:
+        - status
+        - version
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Overall service status
+          example: "healthy"
+        version:
+          type: string
+          description: Service version
+          example: "0.1.0-dev"
+        components:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+              example: "up"
+            mta:
+              type: string
+              enum: [up, down]
+              example: "up"
+        uptime:
+          type: integer
+          description: Service uptime in seconds
+          example: 3600
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "not_found"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Test not found"
+        details:
+          type: string
+          description: Additional error details

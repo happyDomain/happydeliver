@@ -21,3 +21,7 @@ vendor/
 *.db
 *.sqlite
 *.sqlite3
+
+# OpenAPI generated files
+internal/api/models.gen.go
+internal/api/server.gen.go
