@@ -1,0 +1,23 @@
+# Binaries
+/happydeliver
+cmd/happyDeliver/happyDeliver
+
+# Dependency directories
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
