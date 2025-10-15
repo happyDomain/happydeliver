@@ -21,6 +21,10 @@
 
 package api
 
+func stringPtr(s string) *string {
+	return &s
+}
+
 // PtrTo returns a pointer to the provided value
 func PtrTo[T any](v T) *T {
 	return &v
