@@ -1,0 +1,41 @@
+# Postfix main configuration for happyDeliver
+# This configuration receives emails and routes them through authentication filters
+
+# Basic settings
+compatibility_level = 3.6
+myhostname = __HOSTNAME__
+mydomain = __DOMAIN__
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+
+# Recipient settings
+mydestination = $myhostname, localhost.$mydomain, localhost
+mynetworks = 127.0.0.0/8 [::1]/128
+
+# Relay settings - accept mail for our test domain
+relay_domains = $mydomain
+
+# Queue and size limits
+message_size_limit = 10485760
+mailbox_size_limit = 0
+queue_minfree = 50000000
+
+# Transport maps - route test emails to happyDeliver analyzer
+transport_maps = pcre:/etc/postfix/transport_maps
+
+# Authentication milters
+# OpenDKIM for DKIM verification
+milter_default_action = accept
+milter_protocol = 6
+smtpd_milters = unix:/var/spool/postfix/opendkim/opendkim.sock, unix:/var/spool/postfix/opendmarc/opendmarc.sock
+non_smtpd_milters = $smtpd_milters
+
+# SPF policy checking
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    reject_unauth_destination,
+    check_policy_service unix:private/policy-spf
+
+# Logging
+debug_peer_level = 2

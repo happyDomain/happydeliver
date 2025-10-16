@@ -1,0 +1,50 @@
+# SpamAssassin configuration for happyDeliver
+# Scores emails for spam characteristics
+
+# Network tests
+# Enable network tests for RBL checks, Razor, Pyzor, etc.
+use_network_tests 1
+
+# RBL checks
+# Enable DNS-based blacklist checks
+use_rbls 1
+
+# SPF checking
+use_spf 1
+
+# DKIM checking
+use_dkim 1
+
+# Bayes filtering
+# Disable bayes learning (we're not maintaining a persistent spam database)
+use_bayes 0
+bayes_auto_learn 0
+
+# Scoring thresholds
+# Lower thresholds for testing purposes
+required_score 5.0
+
+# Report settings
+# Add detailed spam report to headers
+add_header all Status "_YESNO_, score=_SCORE_ required=_REQD_ tests=_TESTS_ autolearn=_AUTOLEARN_ version=_VERSION_"
+add_header all Level _STARS(*)_
+add_header all Report _REPORT_
+
+# Rewrite subject line
+rewrite_header Subject [SPAM:_SCORE_]
+
+# Whitelisting and blacklisting
+# Accept all mail for analysis (don't reject)
+skip_rbl_checks 0
+
+# Language settings
+# Accept all languages
+ok_languages all
+
+# Network timeout
+rbl_timeout 5
+
+# User preferences
+# Don't use user-specific rules
+user_scores_dsn_timeout 3
+user_scores_sql_override 0

@@ -1,0 +1,27 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Build artifacts
+happyDeliver
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs files
+logs/
+
+# Test files
+*_test.go
+testdata/

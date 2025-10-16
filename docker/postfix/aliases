@@ -1,0 +1,10 @@
+# Postfix aliases for happyDeliver
+# This file is processed by postalias to create aliases.db
+
+# Standard aliases
+postmaster: root
+abuse: root
+mailer-daemon: postmaster
+
+# Root mail can be redirected if needed
+# root: admin@example.com

@@ -17,6 +17,9 @@ vendor/
 .env.local
 *.local
 
+# Logs files
+logs/
+
 # Database files
 *.db
 *.sqlite

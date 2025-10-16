@@ -13,7 +13,62 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ## Quick Start
 
-### 1. Build
+### With Docker (Recommended)
+
+The easiest way to run happyDeliver is using the all-in-one Docker container that includes Postfix, OpenDKIM, OpenDMARC, SpamAssassin, and the happyDeliver application.
+
+#### What's included in the Docker container:
+
+- **Postfix MTA**: Receives emails on port 25
+- **OpenDKIM**: DKIM signature verification
+- **OpenDMARC**: DMARC policy validation
+- **SpamAssassin**: Spam scoring and analysis
+- **happyDeliver API**: REST API server on port 8080
+- **SQLite Database**: Persistent storage for tests and reports
+
+#### 1. Using docker-compose
+
+```bash
+# Clone the repository
+git clone https://git.nemunai.re/happyDomain/happyDeliver.git
+cd happydeliver
+
+# Edit docker-compose.yml to set your domain
+# Change HAPPYDELIVER_DOMAIN and HOSTNAME environment variables
+
+# Build and start
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+The API will be available at `http://localhost:8080` and SMTP at `localhost:25`.
+
+#### 2. Using docker build directly
+
+```bash
+# Build the image
+docker build -t happydeliver:latest .
+
+# Run the container
+docker run -d \
+  --name happydeliver \
+  -p 25:25 \
+  -p 8080:8080 \
+  -e HAPPYDELIVER_DOMAIN=yourdomain.com \
+  -e HOSTNAME=mail.yourdomain.com \
+  -v $(pwd)/data:/var/lib/happydeliver \
+  -v $(pwd)/logs:/var/log/happydeliver \
+  happydeliver:latest
+```
+
+### Manual Build
+
+#### 1. Build
 
 ```bash
 go generate
@@ -28,7 +83,7 @@ go build -o happyDeliver ./cmd/happyDeliver
 
 The server will start on `http://localhost:8080` by default.
 
-### 3. Integrate with your existing e-mail setup
+#### 3. Integrate with your existing e-mail setup
 
 It is expected your setup annotate the email with eg. opendkim, spamassassin, ...
 happyDeliver will not perform thoses checks, it relies instead on standard software to have real world annotations.
@@ -84,7 +139,7 @@ Add the following line in your `/etc/postfix/aliases`:
 
 Note that the recipient address has to be present in header.
 
-### 4. Create a Test
+#### 4. Create a Test
 
 ```bash
 curl -X POST http://localhost:8080/api/test
@@ -100,11 +155,11 @@ Response:
 }
 ```
 
-### 5. Send Test Email
+#### 5. Send Test Email
 
 Send a test email to the address provided (you'll need to configure your MTA to route emails to the analyzer - see MTA Integration below).
 
-### 6. Get Report
+#### 6. Get Report
 
 ```bash
 curl http://localhost:8080/api/report/550e8400-e29b-41d4-a716-446655440000
