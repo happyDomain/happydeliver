@@ -1,0 +1,38 @@
+services:
+  happydeliver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: happydeliver:latest
+    container_name: happydeliver
+    hostname: mail.happydeliver.local
+
+    environment:
+      # Set your domain and hostname
+      DOMAIN: happydeliver.local
+      HOSTNAME: mail.happydeliver.local
+
+    ports:
+      # SMTP port
+      - "25:25"
+      # API port
+      - "8080:8080"
+
+    volumes:
+      # Persistent database storage
+      - ./data:/var/lib/happydeliver
+      # Log files
+      - ./logs:/var/log/happydeliver
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  data:
+  logs:

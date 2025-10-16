@@ -1,0 +1,4 @@
+# Transport map - route test emails to happyDeliver analyzer
+# Pattern: test-<uuid>@domain.com -> happydeliver pipe
+
+/^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@.*$/  happydeliver:
