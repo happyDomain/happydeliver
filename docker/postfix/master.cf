@@ -1,0 +1,87 @@
+# Postfix master process configuration for happyDeliver
+
+# SMTP service
+smtp      inet  n       -       n       -       -       smtpd
+  -o content_filter=spamassassin
+
+# Pickup service
+pickup    unix  n       -       n       60      1       pickup
+
+# Cleanup service
+cleanup   unix  n       -       n       -       0       cleanup
+
+# Queue manager
+qmgr      unix  n       -       n       300     1       qmgr
+
+# Rewrite service
+rewrite   unix  -       -       n       -       -       trivial-rewrite
+
+# Bounce service
+bounce    unix  -       -       n       -       0       bounce
+
+# Defer service
+defer     unix  -       -       n       -       0       bounce
+
+# Trace service
+trace     unix  -       -       n       -       0       bounce
+
+# Verify service
+verify    unix  -       -       n       -       1       verify
+
+# Flush service
+flush     unix  n       -       n       1000?   0       flush
+
+# Proxymap service
+proxymap  unix  -       -       n       -       -       proxymap
+
+# Proxywrite service
+proxywrite unix -       -       n       -       1       proxymap
+
+# SMTP client
+smtp      unix  -       -       n       -       -       smtp
+
+# Relay service
+relay     unix  -       -       n       -       -       smtp
+
+# Showq service
+showq     unix  n       -       n       -       -       showq
+
+# Error service
+error     unix  -       -       n       -       -       error
+
+# Retry service
+retry     unix  -       -       n       -       -       error
+
+# Discard service
+discard   unix  -       -       n       -       -       discard
+
+# Local delivery
+local     unix  -       n       n       -       -       local
+
+# Virtual delivery
+virtual   unix  -       n       n       -       -       virtual
+
+# LMTP delivery
+lmtp      unix  -       -       n       -       -       lmtp
+
+# Anvil service
+anvil     unix  -       -       n       -       1       anvil
+
+# Scache service
+scache    unix  -       -       n       -       1       scache
+
+# Maildrop service
+maildrop  unix  -       n       n       -       -       pipe
+  flags=DRXhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
+
+# SPF policy service
+policy-spf unix -       n       n       -       0       spawn
+  user=nobody argv=/usr/bin/postfix-policyd-spf-perl
+
+# SpamAssassin content filter
+spamassassin unix -     n       n       -       -       pipe
+  user=mail argv=/usr/bin/spamc -f -e /usr/sbin/sendmail -oi -f ${sender} ${recipient}
+
+# happyDeliver analyzer - receives emails matching transport_maps
+happydeliver unix -     n       n       -       -       pipe
+  flags=DRXhu user=happydeliver argv=/usr/local/bin/happyDeliver analyze -config /etc/happydeliver/config.yaml -recipient ${recipient}
