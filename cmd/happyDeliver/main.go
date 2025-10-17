@@ -34,6 +34,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/receiver"
 	"git.happydns.org/happyDeliver/internal/storage"
+	"git.happydns.org/happyDeliver/web"
 )
 
 const version = "0.1.0-dev"
@@ -89,6 +90,7 @@ func runServer(cfg *config.Config) {
 	// Register API routes
 	apiGroup := router.Group("/api")
 	api.RegisterHandlers(apiGroup, handler)
+	web.DeclareRoutes(cfg, router)
 
 	// Start server
 	log.Printf("Starting API server on %s", cfg.Bind)
