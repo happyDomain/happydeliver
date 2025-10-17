@@ -1,5 +1,17 @@
 # Multi-stage Dockerfile for happyDeliver with integrated MTA
-# Stage 1: Build the Go application
+# Stage 1: Build the Svelte application
+FROM node:22-alpine AS nodebuild
+
+WORKDIR /build
+
+COPY api/ api/
+COPY web/ web/
+
+RUN yarn --cwd web install && \
+    yarn --cwd web run generate:api && \
+    yarn --cwd web --offline build
+
+# Stage 2: Build the Go application
 FROM golang:1-alpine AS builder
 
 WORKDIR /build
@@ -13,12 +25,13 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+COPY --from=nodebuild /build/web/build/ ./web/build/
 
 # Build the application
 RUN go generate ./... && \
     CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o happyDeliver ./cmd/happyDeliver
 
-# Stage 2: Runtime image with Postfix and all filters
+# Stage 3: Runtime image with Postfix and all filters
 FROM alpine:3
 
 # Install all required packages

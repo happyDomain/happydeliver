@@ -1,0 +1,43 @@
+{
+    "name": "happyDeliver",
+    "version": "0.1.0",
+    "type": "module",
+    "license": "AGPL-3.0-or-later",
+    "scripts": {
+        "dev": "vite dev",
+        "build": "vite build",
+        "preview": "vite preview",
+        "prepare": "svelte-kit sync || echo ''",
+        "test": "vitest",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+        "format": "prettier --write .",
+        "lint": "prettier --check . && eslint .",
+        "generate:api": "openapi-ts"
+    },
+    "devDependencies": {
+        "@eslint/compat": "^1.4.0",
+        "@eslint/js": "^9.36.0",
+        "@hey-api/openapi-ts": "0.80.0",
+        "@sveltejs/adapter-static": "^3.0.9",
+        "@sveltejs/kit": "^2.43.2",
+        "@sveltejs/vite-plugin-svelte": "^6.2.0",
+        "@types/node": "^22",
+        "eslint": "^9.36.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-svelte": "^3.12.4",
+        "globals": "^16.4.0",
+        "prettier": "^3.6.2",
+        "prettier-plugin-svelte": "^3.4.0",
+        "svelte": "^5.39.5",
+        "svelte-check": "^4.3.2",
+        "typescript": "^5.9.2",
+        "typescript-eslint": "^8.44.1",
+        "vite": "^7.1.10",
+        "vitest": "^3.2.4"
+    },
+    "dependencies": {
+        "bootstrap": "^5.3.8",
+        "bootstrap-icons": "^1.13.1"
+    }
+}
