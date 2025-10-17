@@ -1,0 +1,152 @@
+:root {
+    --bs-primary: #1cb487;
+    --bs-primary-rgb: 28, 180, 135;
+}
+
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Score styling */
+.score-excellent {
+    color: #198754;
+}
+
+.score-good {
+    color: #20c997;
+}
+
+.score-warning {
+    color: #ffc107;
+}
+
+.score-poor {
+    color: #fd7e14;
+}
+
+.score-bad {
+    color: #dc3545;
+}
+
+/* Custom card styling */
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Check status badges */
+.check-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.check-pass {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.check-fail {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.check-warn {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.check-info {
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+/* Clipboard button */
+.clipboard-btn {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clipboard-btn:hover {
+    transform: scale(1.1);
+}
+
+.clipboard-btn:active {
+    transform: scale(0.95);
+}
+
+/* Progress bar animation */
+.progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Hero section */
+.hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* Feature icons */
+.feature-icon {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
