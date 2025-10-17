@@ -19,46 +19,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package main
+package config
 
 import (
+	"bufio"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 )
 
-func main() {
-	fmt.Println("Mail Tester - Email Deliverability Testing Platform")
-	fmt.Println("Version: 0.1.0-dev")
-
-	cfg, err := config.ConsolidateConfig()
+// parseFile opens the file at the given filename path, then treat each line
+// not starting with '#' as a configuration statement.
+func parseFile(o *Config, filename string) error {
+	fp, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
+	}
+	defer fp.Close()
+
+	scanner := bufio.NewScanner(fp)
+	n := 0
+	for scanner.Scan() {
+		n += 1
+		line := strings.TrimSpace(scanner.Text())
+		if len(line) > 0 && !strings.HasPrefix(line, "#") && strings.Index(line, "=") > 0 {
+			err := parseLine(o, line)
+			if err != nil {
+				return fmt.Errorf("%v:%d: error in configuration: %w", filename, n, err)
+			}
+		}
 	}
 
-	command := flag.Arg(0)
-
-	switch command {
-	case "server":
-		log.Println("Starting API server...")
-		// TODO: Start API server
-	case "analyze":
-		log.Println("Starting email analyzer...")
-		// TODO: Start email analyzer (LMTP/pipe mode)
-	case "version":
-		fmt.Println("0.1.0-dev")
-	default:
-		fmt.Printf("Unknown command: %s\n", command)
-		printUsage()
-		os.Exit(1)
-	}
-}
-
-func printUsage() {
-	fmt.Println("\nCommand availables:")
-	fmt.Println("  happyDeliver server                     - Start the API server")
-	fmt.Println("  happyDeliver analyze [-recipient EMAIL] - Analyze email from stdin (MDA mode)")
-	fmt.Println("  happyDeliver version                    - Print version information")
-	fmt.Println("")
-	flag.Usage()
+	return nil
 }
