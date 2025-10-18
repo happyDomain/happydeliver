@@ -38,14 +38,10 @@ var (
 
 // Storage interface defines operations for persisting and retrieving data
 type Storage interface {
-	// Test operations
-	CreateTest(id uuid.UUID) (*Test, error)
-	GetTest(id uuid.UUID) (*Test, error)
-	UpdateTestStatus(id uuid.UUID, status TestStatus) error
-
 	// Report operations
 	CreateReport(testID uuid.UUID, rawEmail []byte, reportJSON []byte) (*Report, error)
 	GetReport(testID uuid.UUID) (reportJSON []byte, rawEmail []byte, err error)
+	ReportExists(testID uuid.UUID) (bool, error)
 
 	// Close closes the database connection
 	Close() error
@@ -75,49 +71,11 @@ func NewStorage(dbType, dsn string) (Storage, error) {
 	}
 
 	// Auto-migrate the schema
-	if err := db.AutoMigrate(&Test{}, &Report{}); err != nil {
+	if err := db.AutoMigrate(&Report{}); err != nil {
 		return nil, fmt.Errorf("failed to migrate database schema: %w", err)
 	}
 
 	return &DBStorage{db: db}, nil
-}
-
-// CreateTest creates a new test with pending status
-func (s *DBStorage) CreateTest(id uuid.UUID) (*Test, error) {
-	test := &Test{
-		ID:     id,
-		Status: StatusPending,
-	}
-
-	if err := s.db.Create(test).Error; err != nil {
-		return nil, fmt.Errorf("failed to create test: %w", err)
-	}
-
-	return test, nil
-}
-
-// GetTest retrieves a test by ID
-func (s *DBStorage) GetTest(id uuid.UUID) (*Test, error) {
-	var test Test
-	if err := s.db.First(&test, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to get test: %w", err)
-	}
-	return &test, nil
-}
-
-// UpdateTestStatus updates the status of a test
-func (s *DBStorage) UpdateTestStatus(id uuid.UUID, status TestStatus) error {
-	result := s.db.Model(&Test{}).Where("id = ?", id).Update("status", status)
-	if result.Error != nil {
-		return fmt.Errorf("failed to update test status: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return nil
 }
 
 // CreateReport creates a new report for a test
@@ -132,12 +90,16 @@ func (s *DBStorage) CreateReport(testID uuid.UUID, rawEmail []byte, reportJSON [
 		return nil, fmt.Errorf("failed to create report: %w", err)
 	}
 
-	// Update test status to analyzed
-	if err := s.UpdateTestStatus(testID, StatusAnalyzed); err != nil {
-		return nil, fmt.Errorf("failed to update test status: %w", err)
-	}
-
 	return dbReport, nil
+}
+
+// ReportExists checks if a report exists for the given test ID
+func (s *DBStorage) ReportExists(testID uuid.UUID) (bool, error) {
+	var count int64
+	if err := s.db.Model(&Report{}).Where("test_id = ?", testID).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("failed to check report existence: %w", err)
+	}
+	return count > 0, nil
 }
 
 // GetReport retrieves a report by test ID, returning the raw JSON and email bytes

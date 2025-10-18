@@ -31,11 +31,11 @@ paths:
       tags:
         - tests
       summary: Create a new deliverability test
-      description: Generates a unique test email address for sending test emails
+      description: Generates a unique test email address for sending test emails. No database record is created until an email is received.
       operationId: createTest
       responses:
         '201':
-          description: Test created successfully
+          description: Test email address generated successfully
           content:
             application/json:
               schema:
@@ -51,8 +51,8 @@ paths:
     get:
       tags:
         - tests
-      summary: Get test metadata
-      description: Retrieve test status and metadata
+      summary: Get test status
+      description: Check if a report exists for the given test ID. Returns pending if no report exists, analyzed if a report is available.
       operationId: getTest
       parameters:
         - name: id
@@ -63,13 +63,13 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Test metadata retrieved successfully
+          description: Test status retrieved successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Test'
-        '404':
-          description: Test not found
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -154,7 +154,6 @@ components:
         - id
         - email
         - status
-        - created_at
       properties:
         id:
           type: string
@@ -168,17 +167,9 @@ components:
           example: "test-550e8400@example.com"
         status:
           type: string
-          enum: [pending, received, analyzed, failed]
-          description: Current test status
+          enum: [pending, analyzed]
+          description: Current test status (pending = no report yet, analyzed = report available)
           example: "analyzed"
-        created_at:
-          type: string
-          format: date-time
-          description: Test creation timestamp
-        updated_at:
-          type: string
-          format: date-time
-          description: Last update timestamp
 
     TestResponse:
       type: object

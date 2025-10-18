@@ -53,7 +53,7 @@ func NewAPIHandler(store storage.Storage, cfg *config.Config) *APIHandler {
 // CreateTest creates a new deliverability test
 // (POST /test)
 func (h *APIHandler) CreateTest(c *gin.Context) {
-	// Generate a unique test ID
+	// Generate a unique test ID (no database record created)
 	testID := uuid.New()
 
 	// Generate test email address
@@ -63,20 +63,9 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 		h.config.Email.Domain,
 	)
 
-	// Create test in database
-	test, err := h.storage.CreateTest(testID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, Error{
-			Error:   "internal_error",
-			Message: "Failed to create test",
-			Details: stringPtr(err.Error()),
-		})
-		return
-	}
-
 	// Return response
 	c.JSON(http.StatusCreated, TestResponse{
-		Id:      test.ID,
+		Id:      testID,
 		Email:   openapi_types.Email(email),
 		Status:  TestResponseStatusPending,
 		Message: stringPtr("Send your test email to the given address"),
@@ -86,51 +75,36 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 // GetTest retrieves test metadata
 // (GET /test/{id})
 func (h *APIHandler) GetTest(c *gin.Context, id openapi_types.UUID) {
-	test, err := h.storage.GetTest(id)
+	// Check if a report exists for this test ID
+	reportExists, err := h.storage.ReportExists(id)
 	if err != nil {
-		if err == storage.ErrNotFound {
-			c.JSON(http.StatusNotFound, Error{
-				Error:   "not_found",
-				Message: "Test not found",
-			})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, Error{
 			Error:   "internal_error",
-			Message: "Failed to retrieve test",
+			Message: "Failed to check test status",
 			Details: stringPtr(err.Error()),
 		})
 		return
 	}
 
-	// Convert storage status to API status
+	// Determine status based on report existence
 	var apiStatus TestStatus
-	switch test.Status {
-	case storage.StatusPending:
-		apiStatus = TestStatusPending
-	case storage.StatusReceived:
-		apiStatus = TestStatusReceived
-	case storage.StatusAnalyzed:
+	if reportExists {
 		apiStatus = TestStatusAnalyzed
-	case storage.StatusFailed:
-		apiStatus = TestStatusFailed
-	default:
+	} else {
 		apiStatus = TestStatusPending
 	}
 
 	// Generate test email address
 	email := fmt.Sprintf("%s%s@%s",
 		h.config.Email.TestAddressPrefix,
-		test.ID.String(),
+		id.String(),
 		h.config.Email.Domain,
 	)
 
 	c.JSON(http.StatusOK, Test{
-		Id:        test.ID,
-		Email:     openapi_types.Email(email),
-		Status:    apiStatus,
-		CreatedAt: test.CreatedAt,
-		UpdatedAt: &test.UpdatedAt,
+		Id:     id,
+		Email:  openapi_types.Email(email),
+		Status: apiStatus,
 	})
 }
 
@@ -187,9 +161,9 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 	// Calculate uptime
 	uptime := int(time.Since(h.startTime).Seconds())
 
-	// Check database connectivity
+	// Check database connectivity by trying to check if a report exists
 	dbStatus := StatusComponentsDatabaseUp
-	if _, err := h.storage.GetTest(uuid.New()); err != nil && err != storage.ErrNotFound {
+	if _, err := h.storage.ReportExists(uuid.New()); err != nil {
 		dbStatus = StatusComponentsDatabaseDown
 	}
 
