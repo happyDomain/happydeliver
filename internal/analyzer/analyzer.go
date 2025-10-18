@@ -1,0 +1,87 @@
+// This file is part of the happyDeliver (R) project.
+// Copyright (c) 2025 happyDomain
+// Authors: Pierre-Olivier Mercier, et al.
+//
+// This program is offered under a commercial and under the AGPL license.
+// For commercial licensing, contact us at <contact@happydomain.org>.
+//
+// For AGPL licensing:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package analyzer
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/google/uuid"
+
+	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/config"
+)
+
+// EmailAnalyzer provides high-level email analysis functionality
+// This is the main entry point for analyzing emails from both LMTP and CLI
+type EmailAnalyzer struct {
+	generator *ReportGenerator
+}
+
+// NewEmailAnalyzer creates a new email analyzer with the given configuration
+func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
+	generator := NewReportGenerator(
+		cfg.Analysis.DNSTimeout,
+		cfg.Analysis.HTTPTimeout,
+		cfg.Analysis.RBLs,
+	)
+
+	return &EmailAnalyzer{
+		generator: generator,
+	}
+}
+
+// AnalysisResult contains the complete analysis result
+type AnalysisResult struct {
+	Email   *EmailMessage
+	Results *AnalysisResults
+	Report  *api.Report
+}
+
+// AnalyzeEmailBytes performs complete email analysis from raw bytes
+func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (*AnalysisResult, error) {
+	// Parse the email
+	emailMsg, err := ParseEmail(bytes.NewReader(rawEmail))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse email: %w", err)
+	}
+
+	// Analyze the email
+	results := a.generator.AnalyzeEmail(emailMsg)
+
+	// Generate the report
+	report := a.generator.GenerateReport(testID, results)
+
+	return &AnalysisResult{
+		Email:   emailMsg,
+		Results: results,
+		Report:  report,
+	}, nil
+}
+
+// GetScoreSummaryText returns a human-readable score summary
+func (a *EmailAnalyzer) GetScoreSummaryText(result *AnalysisResult) string {
+	if result == nil || result.Results == nil {
+		return ""
+	}
+	return a.generator.GetScoreSummaryText(result.Results)
+}
