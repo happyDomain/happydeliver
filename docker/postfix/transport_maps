@@ -1,4 +1,4 @@
-# Transport map - route test emails to happyDeliver analyzer
-# Pattern: test-<uuid>@domain.com -> happydeliver pipe
+# Transport map - route test emails to happyDeliver LMTP server
+# Pattern: test-<uuid>@domain.com -> LMTP on localhost:2525
 
-/^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@.*$/  happydeliver:
+/^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@.*$/  lmtp:inet:127.0.0.1:2525

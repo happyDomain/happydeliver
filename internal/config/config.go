@@ -52,6 +52,7 @@ type DatabaseConfig struct {
 type EmailConfig struct {
 	Domain            string
 	TestAddressPrefix string
+	LMTPAddr          string
 }
 
 // AnalysisConfig contains timeout and behavior settings for email analysis
@@ -73,6 +74,7 @@ func DefaultConfig() *Config {
 		Email: EmailConfig{
 			Domain:            "happydeliver.local",
 			TestAddressPrefix: "test-",
+			LMTPAddr:          "127.0.0.1:2525",
 		},
 		Analysis: AnalysisConfig{
 			DNSTimeout:  5 * time.Second,

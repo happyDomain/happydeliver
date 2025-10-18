@@ -81,7 +81,3 @@ policy-spf unix -       n       n       -       0       spawn
 # SpamAssassin content filter
 spamassassin unix -     n       n       -       -       pipe
   user=mail argv=/usr/bin/spamc -f -e /usr/sbin/sendmail -oi -f ${sender} ${recipient}
-
-# happyDeliver analyzer - receives emails matching transport_maps
-happydeliver unix -     n       n       -       -       pipe
-  flags=DRXhu user=happydeliver argv=/usr/local/bin/happyDeliver analyze -config /etc/happydeliver/config.yaml -recipient ${recipient}
