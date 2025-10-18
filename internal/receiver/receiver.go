@@ -22,7 +22,6 @@
 package receiver
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,15 +38,17 @@ import (
 
 // EmailReceiver handles incoming emails from the MTA
 type EmailReceiver struct {
-	storage storage.Storage
-	config  *config.Config
+	storage  storage.Storage
+	config   *config.Config
+	analyzer *analyzer.EmailAnalyzer
 }
 
 // NewEmailReceiver creates a new email receiver
 func NewEmailReceiver(store storage.Storage, cfg *config.Config) *EmailReceiver {
 	return &EmailReceiver{
-		storage: store,
-		config:  cfg,
+		storage:  store,
+		config:   cfg,
+		analyzer: analyzer.NewEmailAnalyzer(cfg),
 	}
 }
 
@@ -92,33 +93,20 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 
 	log.Printf("Analyzing email for test %s", testID)
 
-	// Parse the email
-	emailMsg, err := analyzer.ParseEmail(bytes.NewReader(rawEmail))
+	// Analyze the email using the shared analyzer
+	result, err := r.analyzer.AnalyzeEmailBytes(rawEmail, testID)
 	if err != nil {
 		// Update test status to failed
 		if updateErr := r.storage.UpdateTestStatus(testID, storage.StatusFailed); updateErr != nil {
 			log.Printf("Failed to update test status to failed: %v", updateErr)
 		}
-		return fmt.Errorf("failed to parse email: %w", err)
+		return fmt.Errorf("failed to analyze email: %w", err)
 	}
 
-	// Create report generator with configuration
-	generator := analyzer.NewReportGenerator(
-		r.config.Analysis.DNSTimeout,
-		r.config.Analysis.HTTPTimeout,
-		r.config.Analysis.RBLs,
-	)
-
-	// Analyze the email
-	results := generator.AnalyzeEmail(emailMsg)
-
-	// Generate the report
-	report := generator.GenerateReport(testID, results)
-
-	log.Printf("Analysis complete. Score: %.2f/10", report.Score)
+	log.Printf("Analysis complete. Score: %.2f/10", result.Report.Score)
 
 	// Marshal report to JSON
-	reportJSON, err := json.Marshal(report)
+	reportJSON, err := json.Marshal(result.Report)
 	if err != nil {
 		// Update test status to failed
 		if updateErr := r.storage.UpdateTestStatus(testID, storage.StatusFailed); updateErr != nil {

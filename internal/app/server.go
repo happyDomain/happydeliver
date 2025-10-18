@@ -19,54 +19,56 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package main
+package app
 
 import (
-	"flag"
-	"fmt"
 	"log"
 	"os"
 
-	"git.happydns.org/happyDeliver/internal/app"
+	"github.com/gin-gonic/gin"
+
+	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/storage"
+	"git.happydns.org/happyDeliver/web"
 )
 
-const version = "0.1.0-dev"
+// RunServer starts the API server server
+func RunServer(cfg *config.Config) error {
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
 
-func main() {
-	fmt.Println("happyDeliver - Email Deliverability Testing Platform")
-	fmt.Printf("Version: %s\n", version)
-
-	cfg, err := config.ConsolidateConfig()
+	// Initialize storage
+	store, err := storage.NewStorage(cfg.Database.Type, cfg.Database.DSN)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
+	}
+	defer store.Close()
+
+	log.Printf("Connected to %s database", cfg.Database.Type)
+
+	// Create API handler
+	handler := api.NewAPIHandler(store, cfg)
+
+	// Set up Gin router
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	router := gin.Default()
+
+	// Register API routes
+	apiGroup := router.Group("/api")
+	api.RegisterHandlers(apiGroup, handler)
+	web.DeclareRoutes(cfg, router)
+
+	// Start API server
+	log.Printf("Starting API server on %s", cfg.Bind)
+	log.Printf("Test email domain: %s", cfg.Email.Domain)
+
+	if err := router.Run(cfg.Bind); err != nil {
+		return err
 	}
 
-	command := flag.Arg(0)
-
-	switch command {
-	case "server":
-		if err := app.RunServer(cfg); err != nil {
-			log.Fatalf("Server error: %v", err)
-		}
-	case "analyze":
-		if err := app.RunAnalyzer(cfg, flag.Args()[1:], os.Stdin, os.Stdout); err != nil {
-			log.Fatalf("Analyzer error: %v", err)
-		}
-	case "version":
-		fmt.Println(version)
-	default:
-		fmt.Printf("Unknown command: %s\n", command)
-		printUsage()
-		os.Exit(1)
-	}
-}
-
-func printUsage() {
-	fmt.Println("\nCommand availables:")
-	fmt.Println("  happyDeliver server          - Start the API server")
-	fmt.Println("  happyDeliver analyze [-json] - Analyze email from stdin and output results to terminal")
-	fmt.Println("  happyDeliver version         - Print version information")
-	fmt.Println("")
-	flag.Usage()
+	return nil
 }
