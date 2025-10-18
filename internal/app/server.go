@@ -29,11 +29,12 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/lmtp"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/web"
 )
 
-// RunServer starts the API server server
+// RunServer starts the API server and LMTP server
 func RunServer(cfg *config.Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
@@ -47,6 +48,13 @@ func RunServer(cfg *config.Config) error {
 	defer store.Close()
 
 	log.Printf("Connected to %s database", cfg.Database.Type)
+
+	// Start LMTP server in background
+	go func() {
+		if err := lmtp.StartServer(cfg.Email.LMTPAddr, store, cfg); err != nil {
+			log.Fatalf("Failed to start LMTP server: %v", err)
+		}
+	}()
 
 	// Create API handler
 	handler := api.NewAPIHandler(store, cfg)

@@ -6,7 +6,7 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 - **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, SpamAssassin scores, DNS records, blacklist status, content quality, and more
 - **REST API**: Full-featured API for creating tests and retrieving reports
-- **Email Receiver**: MDA (Mail Delivery Agent) mode for processing incoming test emails
+- **LMTP Server**: Built-in LMTP server for seamless MTA integration
 - **Scoring System**: 0-10 scoring with weighted factors across authentication, spam, blacklists, content, and headers
 - **Database Storage**: SQLite or PostgreSQL support
 - **Configurable**: via environment or config file for all settings
@@ -90,54 +90,47 @@ happyDeliver will not perform thoses checks, it relies instead on standard softw
 
 Choose one of the following way to integrate happyDeliver in your existing setup:
 
-#### Postfix Transport rule
+#### Postfix LMTP Transport
 
-You'll obtains the best results with a custom [transport tule](https://www.postfix.org/transport.5.html).
+You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.
 
-1. Append the following lines at the end of your `master.cf` file:
+1. Start the happyDeliver server with LMTP enabled (default listens on `127.0.0.1:2525`):
 
-  ```diff
-  +
-  +# happyDeliver analyzer - receives emails matching transport_maps
-  +happydeliver unix -     n       n       -       -       pipe
-  +  flags=DRXhu user=happydeliver argv=/path/to/happyDeliver analyze -recipient ${recipient}
+  ```bash
+  ./happyDeliver server
   ```
 
-2. Create the file `/etc/postfix/transport_happyDeliver` with the following content:
+  You can customize the LMTP address with the `-lmtp-addr` flag or in the config file.
+
+2. Create the file `/etc/postfix/transport_happydeliver` with the following content:
 
   ```
-  # Transport map - route test emails to happyDeliver analyzer
-  # Pattern: test-<uuid>@yourdomain.com -> happydeliver pipe
+  # Transport map - route test emails to happyDeliver LMTP server
+  # Pattern: test-<uuid>@yourdomain.com -> LMTP on localhost:2525
 
-  /^test-[a-f0-9-]+@yourdomain\.com$/  happydeliver:
+  /^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@yourdomain\.com$/  lmtp:inet:127.0.0.1:2525
   ```
 
 3. Append the created file to `transport_maps` in your `main.cf`:
 
   ```diff
   -transport_maps = texthash:/etc/postfix/transport
-  +transport_maps = texthash:/etc/postfix/transport, pcre:/etc/postfix/transport_maps
+  +transport_maps = texthash:/etc/postfix/transport, pcre:/etc/postfix/transport_happydeliver
   ```
 
   If your `transport_maps` option is not set, just append this line:
 
   ```
-  transport_maps = pcre:/etc/postfix/transport_maps
+  transport_maps = pcre:/etc/postfix/transport_happydeliver
   ```
 
   Note: to use the `pcre:` type, you need to have `postfix-pcre` installed.
 
-#### Postfix Aliases
+4. Reload Postfix configuration:
 
-You can dedicate an alias to the tool using your `recipient_delimiter` (most likely `+`).
-
-Add the following line in your `/etc/postfix/aliases`:
-
-```diff
-+test: "|/path/to/happyDeliver analyze"
-```
-
-Note that the recipient address has to be present in header.
+  ```bash
+  postfix reload
+  ```
 
 #### 4. Create a Test
 
@@ -175,9 +168,9 @@ curl http://localhost:8080/api/report/550e8400-e29b-41d4-a716-446655440000
 | `/api/report/{id}/raw` | GET | Get raw annotated email |
 | `/api/status` | GET | Service health and status |
 
-## Email Analyzer (MDA Mode)
+## Email Analyzer (CLI Mode)
 
-To process an email from an MTA pipe:
+For manual testing or debugging, you can analyze emails from the command line:
 
 ```bash
 cat email.eml | ./happyDeliver analyze
@@ -188,6 +181,8 @@ Or specify recipient explicitly:
 ```bash
 cat email.eml | ./happyDeliver analyze -recipient test-uuid@yourdomain.com
 ```
+
+**Note:** In production, emails are delivered via LMTP (see integration instructions above).
 
 ## Scoring System
 
