@@ -76,19 +76,15 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 
 	log.Printf("Extracted test ID: %s", testID)
 
-	// Verify test exists and is in pending status
-	test, err := r.storage.GetTest(testID)
+	// Check if a report already exists for this test ID
+	reportExists, err := r.storage.ReportExists(testID)
 	if err != nil {
-		return fmt.Errorf("test not found: %w", err)
+		return fmt.Errorf("failed to check report existence: %w", err)
 	}
 
-	if test.Status != storage.StatusPending {
-		return fmt.Errorf("test is not in pending status (current: %s)", test.Status)
-	}
-
-	// Update test status to received
-	if err := r.storage.UpdateTestStatus(testID, storage.StatusReceived); err != nil {
-		return fmt.Errorf("failed to update test status: %w", err)
+	if reportExists {
+		log.Printf("Report already exists for test %s, skipping analysis", testID)
+		return nil
 	}
 
 	log.Printf("Analyzing email for test %s", testID)
@@ -96,10 +92,6 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 	// Analyze the email using the shared analyzer
 	result, err := r.analyzer.AnalyzeEmailBytes(rawEmail, testID)
 	if err != nil {
-		// Update test status to failed
-		if updateErr := r.storage.UpdateTestStatus(testID, storage.StatusFailed); updateErr != nil {
-			log.Printf("Failed to update test status to failed: %v", updateErr)
-		}
 		return fmt.Errorf("failed to analyze email: %w", err)
 	}
 
@@ -108,19 +100,11 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 	// Marshal report to JSON
 	reportJSON, err := json.Marshal(result.Report)
 	if err != nil {
-		// Update test status to failed
-		if updateErr := r.storage.UpdateTestStatus(testID, storage.StatusFailed); updateErr != nil {
-			log.Printf("Failed to update test status to failed: %v", updateErr)
-		}
 		return fmt.Errorf("failed to marshal report: %w", err)
 	}
 
 	// Store the report
 	if _, err := r.storage.CreateReport(testID, rawEmail, reportJSON); err != nil {
-		// Update test status to failed
-		if updateErr := r.storage.UpdateTestStatus(testID, storage.StatusFailed); updateErr != nil {
-			log.Printf("Failed to update test status to failed: %v", updateErr)
-		}
 		return fmt.Errorf("failed to store report: %w", err)
 	}
 

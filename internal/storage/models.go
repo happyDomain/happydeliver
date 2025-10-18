@@ -28,39 +28,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// TestStatus represents the status of a deliverability test
-type TestStatus string
-
-const (
-	StatusPending  TestStatus = "pending"
-	StatusReceived TestStatus = "received"
-	StatusAnalyzed TestStatus = "analyzed"
-	StatusFailed   TestStatus = "failed"
-)
-
-// Test represents a deliverability test instance
-type Test struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	Status    TestStatus `gorm:"type:varchar(20);not null;index"`
-	CreatedAt time.Time  `gorm:"not null"`
-	UpdatedAt time.Time  `gorm:"not null"`
-	Report    *Report    `gorm:"foreignKey:TestID;constraint:OnDelete:CASCADE"`
-}
-
-// BeforeCreate is a GORM hook that generates a UUID before creating a test
-func (t *Test) BeforeCreate(tx *gorm.DB) error {
-	if t.ID == uuid.Nil {
-		t.ID = uuid.New()
-	}
-	return nil
-}
-
 // Report represents the analysis report for a test
 type Report struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TestID     uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
-	RawEmail   []byte    `gorm:"type:bytea;not null"` // Full raw email with headers
-	ReportJSON []byte    `gorm:"type:bytea;not null"` // JSON-encoded report data
+	TestID     uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"` // The test ID extracted from email address
+	RawEmail   []byte    `gorm:"type:bytea;not null"`            // Full raw email with headers
+	ReportJSON []byte    `gorm:"type:bytea;not null"`            // JSON-encoded report data
 	CreatedAt  time.Time `gorm:"not null"`
 }
 
