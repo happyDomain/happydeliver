@@ -35,11 +35,12 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DevProxy string
-	Bind     string
-	Database DatabaseConfig
-	Email    EmailConfig
-	Analysis AnalysisConfig
+	DevProxy        string
+	Bind            string
+	Database        DatabaseConfig
+	Email           EmailConfig
+	Analysis        AnalysisConfig
+	ReportRetention time.Duration // How long to keep reports. 0 = keep forever
 }
 
 // DatabaseConfig contains database connection settings
@@ -65,8 +66,9 @@ type AnalysisConfig struct {
 // DefaultConfig returns a configuration with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		DevProxy: "",
-		Bind:     ":8080",
+		DevProxy:        "",
+		Bind:            ":8080",
+		ReportRetention: 0, // Keep reports forever by default
 		Database: DatabaseConfig{
 			Type: "sqlite",
 			DSN:  "happydeliver.db",
