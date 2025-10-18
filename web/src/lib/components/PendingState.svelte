@@ -30,13 +30,6 @@
                     transactional emails, etc.) for the most accurate results.
                 </div>
 
-                {#if test.status === "received"}
-                    <div class="alert alert-success" role="alert">
-                        <i class="bi bi-check-circle me-2"></i>
-                        Email received! Analyzing...
-                    </div>
-                {/if}
-
                 <div class="d-flex align-items-center justify-content-center gap-2 text-muted">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
                     <small>Checking for email every 3 seconds...</small>
