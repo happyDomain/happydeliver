@@ -33,6 +33,7 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.Database.DSN, "database-dsn", o.Database.DSN, "Database DSN or path")
 	flag.StringVar(&o.Email.Domain, "domain", o.Email.Domain, "Domain used to receive emails")
 	flag.StringVar(&o.Email.TestAddressPrefix, "address-prefix", o.Email.TestAddressPrefix, "Expected email adress prefix (deny address that doesn't start with this prefix)")
+	flag.StringVar(&o.Email.LMTPAddr, "lmtp-addr", o.Email.LMTPAddr, "LMTP server listen address")
 	flag.DurationVar(&o.Analysis.DNSTimeout, "dns-timeout", o.Analysis.DNSTimeout, "Timeout when performing DNS query")
 	flag.DurationVar(&o.Analysis.HTTPTimeout, "http-timeout", o.Analysis.HTTPTimeout, "Timeout when performing HTTP query")
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
