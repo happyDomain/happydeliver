@@ -24,6 +24,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
@@ -42,6 +43,7 @@ type Storage interface {
 	CreateReport(testID uuid.UUID, rawEmail []byte, reportJSON []byte) (*Report, error)
 	GetReport(testID uuid.UUID) (reportJSON []byte, rawEmail []byte, err error)
 	ReportExists(testID uuid.UUID) (bool, error)
+	DeleteOldReports(olderThan time.Time) (int64, error)
 
 	// Close closes the database connection
 	Close() error
@@ -113,6 +115,15 @@ func (s *DBStorage) GetReport(testID uuid.UUID) ([]byte, []byte, error) {
 	}
 
 	return dbReport.ReportJSON, dbReport.RawEmail, nil
+}
+
+// DeleteOldReports deletes reports older than the specified time
+func (s *DBStorage) DeleteOldReports(olderThan time.Time) (int64, error) {
+	result := s.db.Where("created_at < ?", olderThan).Delete(&Report{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to delete old reports: %w", result.Error)
+	}
+	return result.RowsAffected, nil
 }
 
 // Close closes the database connection

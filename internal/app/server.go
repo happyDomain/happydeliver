@@ -22,6 +22,7 @@
 package app
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -48,6 +49,12 @@ func RunServer(cfg *config.Config) error {
 	defer store.Close()
 
 	log.Printf("Connected to %s database", cfg.Database.Type)
+
+	// Start cleanup service for old reports
+	ctx := context.Background()
+	cleanupSvc := NewCleanupService(store, cfg.ReportRetention)
+	cleanupSvc.Start(ctx)
+	defer cleanupSvc.Stop()
 
 	// Start LMTP server in background
 	go func() {
