@@ -217,7 +217,7 @@ func (a *SpamAssassinAnalyzer) GenerateSpamAssassinChecks(result *SpamAssassinRe
 			Status:   api.CheckStatusWarn,
 			Score:    0.0,
 			Message:  "No SpamAssassin headers found",
-			Severity: api.PtrTo(api.Medium),
+			Severity: api.PtrTo(api.CheckSeverityMedium),
 			Advice:   api.PtrTo("Ensure your MTA is configured to run SpamAssassin checks"),
 		})
 		return checks
@@ -260,27 +260,27 @@ func (a *SpamAssassinAnalyzer) generateMainSpamCheck(result *SpamAssassinResult)
 	if score <= 0 {
 		check.Status = api.CheckStatusPass
 		check.Message = fmt.Sprintf("Excellent spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your email has a negative spam score, indicating good email practices")
 	} else if score < required {
 		check.Status = api.CheckStatusPass
 		check.Message = fmt.Sprintf("Good spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your email passes spam filters")
 	} else if score < required*1.5 {
 		check.Status = api.CheckStatusWarn
 		check.Message = fmt.Sprintf("Borderline spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("Your email is close to being marked as spam. Review the triggered spam tests below")
 	} else if score < required*2 {
 		check.Status = api.CheckStatusWarn
 		check.Message = fmt.Sprintf("High spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Your email is likely to be marked as spam. Address the issues identified in spam tests")
 	} else {
 		check.Status = api.CheckStatusFail
 		check.Message = fmt.Sprintf("Very high spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.Critical)
+		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		check.Advice = api.PtrTo("Your email will almost certainly be marked as spam. Urgently address the spam test failures")
 	}
 
@@ -307,10 +307,10 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 		// Negative indicator (increases spam score)
 		if detail.Score > 2.0 {
 			check.Status = api.CheckStatusFail
-			check.Severity = api.PtrTo(api.High)
+			check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		} else {
 			check.Status = api.CheckStatusWarn
-			check.Severity = api.PtrTo(api.Medium)
+			check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		}
 		check.Score = 0.0
 		check.Message = fmt.Sprintf("Test failed with score +%.1f", detail.Score)
@@ -320,7 +320,7 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 		// Positive indicator (decreases spam score)
 		check.Status = api.CheckStatusPass
 		check.Score = 1.0
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Test passed with score %.1f", detail.Score)
 		advice := fmt.Sprintf("%s. This test reduces your spam score by %.1f", detail.Description, -detail.Score)
 		check.Advice = &advice

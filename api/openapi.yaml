@@ -346,6 +346,8 @@ components:
           $ref: '#/components/schemas/AuthResult'
         bimi:
           $ref: '#/components/schemas/AuthResult'
+        arc:
+          $ref: '#/components/schemas/ARCResult'
 
     AuthResult:
       type: object
@@ -368,6 +370,29 @@ components:
         details:
           type: string
           description: Additional details about the result
+
+    ARCResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [pass, fail, none]
+          description: Overall ARC chain validation result
+          example: "pass"
+        chain_valid:
+          type: boolean
+          description: Whether the ARC chain signatures are valid
+          example: true
+        chain_length:
+          type: integer
+          description: Number of ARC sets in the chain
+          example: 2
+        details:
+          type: string
+          description: Additional details about ARC validation
+          example: "ARC chain valid with 2 intermediaries"
 
     SpamAssassinResult:
       type: object

@@ -351,13 +351,13 @@ func (s *DeliverabilityScorer) generateRequiredHeadersCheck(email *EmailMessage)
 	if len(missing) == 0 {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.4
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "All required headers are present"
 		check.Advice = api.PtrTo("Your email has proper RFC 5322 headers")
 	} else {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Critical)
+		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		check.Message = fmt.Sprintf("Missing required header(s): %s", strings.Join(missing, ", "))
 		check.Advice = api.PtrTo("Add all required headers to ensure email deliverability")
 		details := fmt.Sprintf("Missing: %s", strings.Join(missing, ", "))
@@ -386,13 +386,13 @@ func (s *DeliverabilityScorer) generateRecommendedHeadersCheck(email *EmailMessa
 	if len(missing) == 0 {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "All recommended headers are present"
 		check.Advice = api.PtrTo("Your email includes all recommended headers")
 	} else if len(missing) < len(recommendedHeaders) {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.15
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = fmt.Sprintf("Missing some recommended header(s): %s", strings.Join(missing, ", "))
 		check.Advice = api.PtrTo("Consider adding recommended headers for better deliverability")
 		details := fmt.Sprintf("Missing: %s", strings.Join(missing, ", "))
@@ -400,7 +400,7 @@ func (s *DeliverabilityScorer) generateRecommendedHeadersCheck(email *EmailMessa
 	} else {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "Missing all recommended headers"
 		check.Advice = api.PtrTo("Add recommended headers (Subject, To, Reply-To) for better email presentation")
 	}
@@ -420,20 +420,20 @@ func (s *DeliverabilityScorer) generateMessageIDCheck(email *EmailMessage) api.C
 	if messageID == "" {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Message = "Message-ID header is missing"
 		check.Advice = api.PtrTo("Add a unique Message-ID header to your email")
 	} else if !s.isValidMessageID(messageID) {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.05
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "Message-ID format is invalid"
 		check.Advice = api.PtrTo("Use proper Message-ID format: <unique-id@domain.com>")
 		check.Details = &messageID
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.1
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "Message-ID is properly formatted"
 		check.Advice = api.PtrTo("Your Message-ID follows RFC 5322 standards")
 		check.Details = &messageID
@@ -452,13 +452,13 @@ func (s *DeliverabilityScorer) generateMIMEStructureCheck(email *EmailMessage) a
 	if len(email.Parts) == 0 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = "No MIME parts detected"
 		check.Advice = api.PtrTo("Consider using multipart MIME for better compatibility")
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.2
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Proper MIME structure with %d part(s)", len(email.Parts))
 		check.Advice = api.PtrTo("Your email has proper MIME structure")
 
