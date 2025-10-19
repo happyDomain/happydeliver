@@ -72,8 +72,7 @@ func (s *DeliverabilityScorer) CalculateScore(
 	}
 
 	// Calculate individual scores
-	authAnalyzer := NewAuthenticationAnalyzer()
-	result.AuthScore = authAnalyzer.GetAuthenticationScore(authResults)
+	result.AuthScore = s.GetAuthenticationScore(authResults)
 
 	spamAnalyzer := NewSpamAssassinAnalyzer()
 	result.SpamScore = spamAnalyzer.GetSpamAssassinScore(spamResult)
@@ -503,4 +502,44 @@ func (s *DeliverabilityScorer) GetScoreSummary(result *ScoringResult) string {
 	}
 
 	return summary.String()
+}
+
+// GetAuthenticationScore calculates the authentication score (0-3 points)
+func (s *DeliverabilityScorer) GetAuthenticationScore(results *api.AuthenticationResults) float32 {
+	var score float32 = 0.0
+
+	// SPF: 1 point for pass, 0.5 for neutral/softfail, 0 for fail
+	if results.Spf != nil {
+		switch results.Spf.Result {
+		case api.AuthResultResultPass:
+			score += 1.0
+		case api.AuthResultResultNeutral, api.AuthResultResultSoftfail:
+			score += 0.5
+		}
+	}
+
+	// DKIM: 1 point for at least one pass
+	if results.Dkim != nil && len(*results.Dkim) > 0 {
+		for _, dkim := range *results.Dkim {
+			if dkim.Result == api.AuthResultResultPass {
+				score += 1.0
+				break
+			}
+		}
+	}
+
+	// DMARC: 1 point for pass
+	if results.Dmarc != nil {
+		switch results.Dmarc.Result {
+		case api.AuthResultResultPass:
+			score += 1.0
+		}
+	}
+
+	// Cap at 3 points maximum
+	if score > 3.0 {
+		score = 3.0
+	}
+
+	return score
 }
