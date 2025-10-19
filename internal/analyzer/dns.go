@@ -58,6 +58,7 @@ type DNSResults struct {
 	SPFRecord   *SPFRecord
 	DKIMRecords []DKIMRecord
 	DMARCRecord *DMARCRecord
+	BIMIRecord  *BIMIRecord
 	Errors      []string
 }
 
@@ -91,6 +92,17 @@ type DMARCRecord struct {
 	Policy string // none, quarantine, reject
 	Valid  bool
 	Error  string
+}
+
+// BIMIRecord represents a BIMI record
+type BIMIRecord struct {
+	Selector string
+	Domain   string
+	Record   string
+	LogoURL  string // URL to the brand logo (SVG)
+	VMCURL   string // URL to Verified Mark Certificate (optional)
+	Valid    bool
+	Error    string
 }
 
 // AnalyzeDNS performs DNS validation for the email's domain
@@ -127,6 +139,9 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 
 	// Check DMARC record
 	results.DMARCRecord = d.checkDMARCRecord(domain)
+
+	// Check BIMI record (using default selector)
+	results.BIMIRecord = d.checkBIMIRecord(domain, "default")
 
 	return results
 }
@@ -395,6 +410,89 @@ func (d *DNSAnalyzer) validateDMARC(record string) bool {
 	return true
 }
 
+// checkBIMIRecord looks up and validates BIMI record for a domain and selector
+func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *BIMIRecord {
+	// BIMI records are at: selector._bimi.domain
+	bimiDomain := fmt.Sprintf("%s._bimi.%s", selector, domain)
+
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	txtRecords, err := d.resolver.LookupTXT(ctx, bimiDomain)
+	if err != nil {
+		return &BIMIRecord{
+			Selector: selector,
+			Domain:   domain,
+			Valid:    false,
+			Error:    fmt.Sprintf("Failed to lookup BIMI record: %v", err),
+		}
+	}
+
+	if len(txtRecords) == 0 {
+		return &BIMIRecord{
+			Selector: selector,
+			Domain:   domain,
+			Valid:    false,
+			Error:    "No BIMI record found",
+		}
+	}
+
+	// Concatenate all TXT record parts (BIMI can be split)
+	bimiRecord := strings.Join(txtRecords, "")
+
+	// Extract logo URL and VMC URL
+	logoURL := d.extractBIMITag(bimiRecord, "l")
+	vmcURL := d.extractBIMITag(bimiRecord, "a")
+
+	// Basic validation - should contain "v=BIMI1" and "l=" (logo URL)
+	if !d.validateBIMI(bimiRecord) {
+		return &BIMIRecord{
+			Selector: selector,
+			Domain:   domain,
+			Record:   bimiRecord,
+			LogoURL:  logoURL,
+			VMCURL:   vmcURL,
+			Valid:    false,
+			Error:    "BIMI record appears malformed",
+		}
+	}
+
+	return &BIMIRecord{
+		Selector: selector,
+		Domain:   domain,
+		Record:   bimiRecord,
+		LogoURL:  logoURL,
+		VMCURL:   vmcURL,
+		Valid:    true,
+	}
+}
+
+// extractBIMITag extracts a tag value from a BIMI record
+func (d *DNSAnalyzer) extractBIMITag(record, tag string) string {
+	// Look for tag=value pattern
+	re := regexp.MustCompile(tag + `=([^;]+)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		return strings.TrimSpace(matches[1])
+	}
+	return ""
+}
+
+// validateBIMI performs basic BIMI record validation
+func (d *DNSAnalyzer) validateBIMI(record string) bool {
+	// Must start with v=BIMI1
+	if !strings.HasPrefix(record, "v=BIMI1") {
+		return false
+	}
+
+	// Must have a logo URL tag (l=)
+	if !strings.Contains(record, "l=") {
+		return false
+	}
+
+	return true
+}
+
 // GenerateDNSChecks generates check results for DNS validation
 func (d *DNSAnalyzer) GenerateDNSChecks(results *DNSResults) []api.Check {
 	var checks []api.Check
@@ -419,6 +517,11 @@ func (d *DNSAnalyzer) GenerateDNSChecks(results *DNSResults) []api.Check {
 	// DMARC record check
 	if results.DMARCRecord != nil {
 		checks = append(checks, d.generateDMARCCheck(results.DMARCRecord))
+	}
+
+	// BIMI record check (optional)
+	if results.BIMIRecord != nil {
+		checks = append(checks, d.generateBIMICheck(results.BIMIRecord))
 	}
 
 	return checks
@@ -560,6 +663,56 @@ func (d *DNSAnalyzer) generateDMARCCheck(dmarc *DMARCRecord) api.Check {
 			advice := "Your DMARC record is properly configured"
 			check.Advice = &advice
 		}
+	}
+
+	return check
+}
+
+// generateBIMICheck creates a check for BIMI records
+func (d *DNSAnalyzer) generateBIMICheck(bimi *BIMIRecord) api.Check {
+	check := api.Check{
+		Category: api.Dns,
+		Name:     "BIMI Record",
+	}
+
+	if !bimi.Valid {
+		// BIMI is optional, so missing record is just informational
+		if bimi.Record == "" {
+			check.Status = api.CheckStatusInfo
+			check.Score = 0.0
+			check.Message = "No BIMI record found (optional)"
+			check.Severity = api.PtrTo(api.Low)
+			check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients. Requires enforced DMARC policy (p=quarantine or p=reject)")
+		} else {
+			// If record exists but is invalid
+			check.Status = api.CheckStatusWarn
+			check.Score = 0.0
+			check.Message = fmt.Sprintf("BIMI record found but invalid: %s", bimi.Error)
+			check.Severity = api.PtrTo(api.Low)
+			check.Advice = api.PtrTo("Review and fix your BIMI record syntax. Ensure it contains v=BIMI1 and a valid logo URL (l=)")
+			check.Details = &bimi.Record
+		}
+	} else {
+		check.Status = api.CheckStatusPass
+		check.Score = 0.0 // BIMI doesn't contribute to score (branding feature)
+		check.Message = "Valid BIMI record found"
+		check.Severity = api.PtrTo(api.Info)
+
+		// Build details with logo and VMC URLs
+		var detailsParts []string
+		detailsParts = append(detailsParts, fmt.Sprintf("Selector: %s", bimi.Selector))
+		if bimi.LogoURL != "" {
+			detailsParts = append(detailsParts, fmt.Sprintf("Logo URL: %s", bimi.LogoURL))
+		}
+		if bimi.VMCURL != "" {
+			detailsParts = append(detailsParts, fmt.Sprintf("VMC URL: %s", bimi.VMCURL))
+			check.Advice = api.PtrTo("Your BIMI record is properly configured with a Verified Mark Certificate")
+		} else {
+			check.Advice = api.PtrTo("Your BIMI record is properly configured. Consider adding a Verified Mark Certificate (VMC) for enhanced trust")
+		}
+
+		details := strings.Join(detailsParts, ", ")
+		check.Details = &details
 	}
 
 	return check

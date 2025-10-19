@@ -631,3 +631,190 @@ func TestAnalyzeDNS_NoDomain(t *testing.T) {
 		t.Error("Expected error when no domain can be extracted")
 	}
 }
+
+func TestExtractBIMITag(t *testing.T) {
+	tests := []struct {
+		name          string
+		record        string
+		tag           string
+		expectedValue string
+	}{
+		{
+			name:          "Extract logo URL (l tag)",
+			record:        "v=BIMI1; l=https://example.com/logo.svg",
+			tag:           "l",
+			expectedValue: "https://example.com/logo.svg",
+		},
+		{
+			name:          "Extract VMC URL (a tag)",
+			record:        "v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem",
+			tag:           "a",
+			expectedValue: "https://example.com/vmc.pem",
+		},
+		{
+			name:          "Tag not found",
+			record:        "v=BIMI1; l=https://example.com/logo.svg",
+			tag:           "a",
+			expectedValue: "",
+		},
+		{
+			name:          "Tag with spaces",
+			record:        "v=BIMI1; l= https://example.com/logo.svg ",
+			tag:           "l",
+			expectedValue: "https://example.com/logo.svg",
+		},
+		{
+			name:          "Empty record",
+			record:        "",
+			tag:           "l",
+			expectedValue: "",
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractBIMITag(tt.record, tt.tag)
+			if result != tt.expectedValue {
+				t.Errorf("extractBIMITag(%q, %q) = %q, want %q", tt.record, tt.tag, result, tt.expectedValue)
+			}
+		})
+	}
+}
+
+func TestValidateBIMI(t *testing.T) {
+	tests := []struct {
+		name     string
+		record   string
+		expected bool
+	}{
+		{
+			name:     "Valid BIMI with logo URL",
+			record:   "v=BIMI1; l=https://example.com/logo.svg",
+			expected: true,
+		},
+		{
+			name:     "Valid BIMI with logo and VMC",
+			record:   "v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem",
+			expected: true,
+		},
+		{
+			name:     "Invalid BIMI - no version",
+			record:   "l=https://example.com/logo.svg",
+			expected: false,
+		},
+		{
+			name:     "Invalid BIMI - wrong version",
+			record:   "v=BIMI2; l=https://example.com/logo.svg",
+			expected: false,
+		},
+		{
+			name:     "Invalid BIMI - no logo URL",
+			record:   "v=BIMI1",
+			expected: false,
+		},
+		{
+			name:     "Invalid BIMI - empty",
+			record:   "",
+			expected: false,
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.validateBIMI(tt.record)
+			if result != tt.expected {
+				t.Errorf("validateBIMI(%q) = %v, want %v", tt.record, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGenerateBIMICheck(t *testing.T) {
+	tests := []struct {
+		name           string
+		bimi           *BIMIRecord
+		expectedStatus api.CheckStatus
+		expectedScore  float32
+	}{
+		{
+			name: "Valid BIMI with logo only",
+			bimi: &BIMIRecord{
+				Selector: "default",
+				Domain:   "example.com",
+				Record:   "v=BIMI1; l=https://example.com/logo.svg",
+				LogoURL:  "https://example.com/logo.svg",
+				Valid:    true,
+			},
+			expectedStatus: api.CheckStatusPass,
+			expectedScore:  0.0, // BIMI doesn't contribute to score
+		},
+		{
+			name: "Valid BIMI with VMC",
+			bimi: &BIMIRecord{
+				Selector: "default",
+				Domain:   "example.com",
+				Record:   "v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem",
+				LogoURL:  "https://example.com/logo.svg",
+				VMCURL:   "https://example.com/vmc.pem",
+				Valid:    true,
+			},
+			expectedStatus: api.CheckStatusPass,
+			expectedScore:  0.0,
+		},
+		{
+			name: "No BIMI record (optional)",
+			bimi: &BIMIRecord{
+				Selector: "default",
+				Domain:   "example.com",
+				Valid:    false,
+				Error:    "No BIMI record found",
+			},
+			expectedStatus: api.CheckStatusInfo,
+			expectedScore:  0.0,
+		},
+		{
+			name: "Invalid BIMI record",
+			bimi: &BIMIRecord{
+				Selector: "default",
+				Domain:   "example.com",
+				Record:   "v=BIMI1",
+				Valid:    false,
+				Error:    "BIMI record appears malformed",
+			},
+			expectedStatus: api.CheckStatusWarn,
+			expectedScore:  0.0,
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check := analyzer.generateBIMICheck(tt.bimi)
+
+			if check.Status != tt.expectedStatus {
+				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
+			}
+			if check.Score != tt.expectedScore {
+				t.Errorf("Score = %v, want %v", check.Score, tt.expectedScore)
+			}
+			if check.Category != api.Dns {
+				t.Errorf("Category = %v, want %v", check.Category, api.Dns)
+			}
+			if check.Name != "BIMI Record" {
+				t.Errorf("Name = %q, want %q", check.Name, "BIMI Record")
+			}
+
+			// Check details for valid BIMI with VMC
+			if tt.bimi.Valid && tt.bimi.VMCURL != "" && check.Details != nil {
+				if !strings.Contains(*check.Details, "VMC URL") {
+					t.Error("Details should contain VMC URL for valid BIMI with VMC")
+				}
+			}
+		})
+	}
+}

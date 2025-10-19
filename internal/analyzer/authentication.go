@@ -104,6 +104,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.Dmarc = a.parseDMARCResult(part)
 			}
 		}
+
+		// Parse BIMI
+		if strings.HasPrefix(part, "bimi=") {
+			if results.Bimi == nil {
+				results.Bimi = a.parseBIMIResult(part)
+			}
+		}
 	}
 }
 
@@ -209,6 +216,44 @@ func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *api.AuthResult {
 	if len(detailsParts) > 0 {
 		details := strings.Join(detailsParts, " ")
 		result.Details = &details
+	}
+
+	return result
+}
+
+// parseBIMIResult parses BIMI result from Authentication-Results
+// Example: bimi=pass header.d=example.com header.selector=default
+func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *api.AuthResult {
+	result := &api.AuthResult{}
+
+	// Extract result (pass, fail, etc.)
+	re := regexp.MustCompile(`bimi=(\w+)`)
+	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
+		resultStr := strings.ToLower(matches[1])
+		result.Result = api.AuthResultResult(resultStr)
+	}
+
+	// Extract domain (header.d or d)
+	domainRe := regexp.MustCompile(`(?:header\.)?d=([^\s;]+)`)
+	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
+		domain := matches[1]
+		result.Domain = &domain
+	}
+
+	// Extract selector (header.selector or selector)
+	selectorRe := regexp.MustCompile(`(?:header\.)?selector=([^\s;]+)`)
+	if matches := selectorRe.FindStringSubmatch(part); len(matches) > 1 {
+		selector := matches[1]
+		result.Selector = &selector
+	}
+
+	// Extract details
+	if idx := strings.Index(part, "("); idx != -1 {
+		endIdx := strings.Index(part[idx:], ")")
+		if endIdx != -1 {
+			details := strings.TrimSpace(part[idx+1 : idx+endIdx])
+			result.Details = &details
+		}
 	}
 
 	return result
@@ -383,6 +428,12 @@ func (a *AuthenticationAnalyzer) GenerateAuthenticationChecks(results *api.Authe
 		})
 	}
 
+	// BIMI check (optional, informational only)
+	if results.Bimi != nil {
+		check := a.generateBIMICheck(results.Bimi)
+		checks = append(checks, check)
+	}
+
 	return checks
 }
 
@@ -504,6 +555,41 @@ func (a *AuthenticationAnalyzer) generateDMARCCheck(dmarc *api.AuthResult) api.C
 
 	if dmarc.Domain != nil {
 		details := fmt.Sprintf("Domain: %s", *dmarc.Domain)
+		check.Details = &details
+	}
+
+	return check
+}
+
+func (a *AuthenticationAnalyzer) generateBIMICheck(bimi *api.AuthResult) api.Check {
+	check := api.Check{
+		Category: api.Authentication,
+		Name:     "BIMI (Brand Indicators)",
+	}
+
+	switch bimi.Result {
+	case api.AuthResultResultPass:
+		check.Status = api.CheckStatusPass
+		check.Score = 0.0 // BIMI doesn't contribute to score (branding feature)
+		check.Message = "BIMI validation passed"
+		check.Severity = api.PtrTo(api.Info)
+		check.Advice = api.PtrTo("Your brand logo is properly configured via BIMI")
+	case api.AuthResultResultFail:
+		check.Status = api.CheckStatusInfo
+		check.Score = 0.0
+		check.Message = "BIMI validation failed"
+		check.Severity = api.PtrTo(api.Low)
+		check.Advice = api.PtrTo("BIMI is optional but can improve brand recognition. Ensure DMARC is enforced (p=quarantine or p=reject) and configure a valid BIMI record")
+	default:
+		check.Status = api.CheckStatusInfo
+		check.Score = 0.0
+		check.Message = fmt.Sprintf("BIMI validation result: %s", bimi.Result)
+		check.Severity = api.PtrTo(api.Low)
+		check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients")
+	}
+
+	if bimi.Domain != nil {
+		details := fmt.Sprintf("Domain: %s", *bimi.Domain)
 		check.Details = &details
 	}
 

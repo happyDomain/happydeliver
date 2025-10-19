@@ -4,7 +4,7 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ## Features
 
-- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, SpamAssassin scores, DNS records, blacklist status, content quality, and more
+- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, BIMI, SpamAssassin scores, DNS records, blacklist status, content quality, and more
 - **REST API**: Full-featured API for creating tests and retrieving reports
 - **LMTP Server**: Built-in LMTP server for seamless MTA integration
 - **Scoring System**: 0-10 scoring with weighted factors across authentication, spam, blacklists, content, and headers
@@ -193,6 +193,8 @@ The deliverability score is calculated from 0 to 10 based on:
 - **Blacklist (2 pts)**: RBL/DNSBL checks
 - **Content (2 pts)**: HTML quality, links, images, unsubscribe
 - **Headers (1 pt)**: Required headers, MIME structure
+
+**Note:** BIMI (Brand Indicators for Message Identification) is also checked and reported but does not contribute to the score, as it's a branding feature rather than a deliverability factor.
 
 **Ratings:**
 - 9-10: Excellent
