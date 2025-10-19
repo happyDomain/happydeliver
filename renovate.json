@@ -1,0 +1,7 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>iac/renovate-config",
+    "local>iac/renovate-config//automerge-common"
+  ]
+}
