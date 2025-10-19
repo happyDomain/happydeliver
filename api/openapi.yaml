@@ -344,6 +344,8 @@ components:
             $ref: '#/components/schemas/AuthResult'
         dmarc:
           $ref: '#/components/schemas/AuthResult'
+        bimi:
+          $ref: '#/components/schemas/AuthResult'
 
     AuthResult:
       type: object
@@ -411,7 +413,7 @@ components:
           example: "example.com"
         record_type:
           type: string
-          enum: [MX, SPF, DKIM, DMARC]
+          enum: [MX, SPF, DKIM, DMARC, BIMI]
           description: DNS record type
           example: "SPF"
         status:

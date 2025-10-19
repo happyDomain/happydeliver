@@ -26,13 +26,20 @@
             icon: "bi-shield-check",
             title: "Authentication",
             description:
-                "SPF, DKIM, and DMARC validation with detailed results and recommendations.",
+                "SPF, DKIM, DMARC, and BIMI validation with detailed results and recommendations.",
             variant: "primary" as const,
+        },
+        {
+            icon: "bi-patch-check",
+            title: "BIMI Support",
+            description:
+                "Brand Indicators for Message Identification - verify your brand logo configuration.",
+            variant: "info" as const,
         },
         {
             icon: "bi-globe",
             title: "DNS Records",
-            description: "Verify MX, SPF, DKIM, and DMARC records are properly configured.",
+            description: "Verify MX, SPF, DKIM, DMARC, and BIMI records are properly configured.",
             variant: "success" as const,
         },
         {

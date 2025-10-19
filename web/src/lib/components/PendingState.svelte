@@ -47,7 +47,7 @@
                     <div class="col-md-6">
                         <ul class="list-unstyled mb-0">
                             <li class="mb-2">
-                                <i class="bi bi-check2 text-success me-2"></i> SPF, DKIM, DMARC
+                                <i class="bi bi-check2 text-success me-2"></i> SPF, DKIM, DMARC, BIMI
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check2 text-success me-2"></i> DNS Records
