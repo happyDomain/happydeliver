@@ -419,7 +419,7 @@ func TestGenerateListingCheck(t *testing.T) {
 				Response: "127.0.0.2",
 			},
 			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.Critical,
+			expectedSeverity: api.CheckSeverityCritical,
 		},
 		{
 			name: "SpamCop listing",
@@ -430,7 +430,7 @@ func TestGenerateListingCheck(t *testing.T) {
 				Response: "127.0.0.2",
 			},
 			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.High,
+			expectedSeverity: api.CheckSeverityHigh,
 		},
 		{
 			name: "Other RBL listing",
@@ -441,7 +441,7 @@ func TestGenerateListingCheck(t *testing.T) {
 				Response: "127.0.0.2",
 			},
 			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.High,
+			expectedSeverity: api.CheckSeverityHigh,
 		},
 	}
 

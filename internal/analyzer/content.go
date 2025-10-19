@@ -507,7 +507,7 @@ func (c *ContentAnalyzer) generateHTMLValidityCheck(results *ContentResults) api
 	if !results.HTMLValid {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "HTML structure is invalid"
 		if len(results.HTMLErrors) > 0 {
 			details := strings.Join(results.HTMLErrors, "; ")
@@ -517,7 +517,7 @@ func (c *ContentAnalyzer) generateHTMLValidityCheck(results *ContentResults) api
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.2
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "HTML structure is valid"
 		check.Advice = api.PtrTo("Your HTML is well-formed")
 	}
@@ -552,7 +552,7 @@ func (c *ContentAnalyzer) generateLinkChecks(results *ContentResults) []api.Chec
 	if brokenLinks > 0 {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Message = fmt.Sprintf("Found %d broken link(s)", brokenLinks)
 		check.Advice = api.PtrTo("Fix or remove broken links to improve deliverability")
 		details := fmt.Sprintf("Total links: %d, Broken: %d", len(results.Links), brokenLinks)
@@ -560,7 +560,7 @@ func (c *ContentAnalyzer) generateLinkChecks(results *ContentResults) []api.Chec
 	} else if warningLinks > 0 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = fmt.Sprintf("Found %d link(s) that could not be verified", warningLinks)
 		check.Advice = api.PtrTo("Review links that could not be verified")
 		details := fmt.Sprintf("Total links: %d, Unverified: %d", len(results.Links), warningLinks)
@@ -568,7 +568,7 @@ func (c *ContentAnalyzer) generateLinkChecks(results *ContentResults) []api.Chec
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.4
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("All %d link(s) are valid", len(results.Links))
 		check.Advice = api.PtrTo("Your links are working properly")
 	}
@@ -601,7 +601,7 @@ func (c *ContentAnalyzer) generateImageChecks(results *ContentResults) []api.Che
 	if noAltCount == len(results.Images) {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "No images have alt attributes"
 		check.Advice = api.PtrTo("Add alt text to all images for accessibility and deliverability")
 		details := fmt.Sprintf("Images without alt: %d/%d", noAltCount, len(results.Images))
@@ -609,7 +609,7 @@ func (c *ContentAnalyzer) generateImageChecks(results *ContentResults) []api.Che
 	} else if noAltCount > 0 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.2
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = fmt.Sprintf("%d image(s) missing alt attributes", noAltCount)
 		check.Advice = api.PtrTo("Add alt text to all images for better accessibility")
 		details := fmt.Sprintf("Images without alt: %d/%d", noAltCount, len(results.Images))
@@ -617,7 +617,7 @@ func (c *ContentAnalyzer) generateImageChecks(results *ContentResults) []api.Che
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "All images have alt attributes"
 		check.Advice = api.PtrTo("Your images are properly tagged for accessibility")
 	}
@@ -636,13 +636,13 @@ func (c *ContentAnalyzer) generateUnsubscribeCheck(results *ContentResults) api.
 	if !results.HasUnsubscribe {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = "No unsubscribe link found"
 		check.Advice = api.PtrTo("Add an unsubscribe link for marketing emails (RFC 8058)")
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Found %d unsubscribe link(s)", len(results.UnsubscribeLinks))
 		check.Advice = api.PtrTo("Your email includes an unsubscribe option")
 	}
@@ -662,7 +662,7 @@ func (c *ContentAnalyzer) generateTextConsistencyCheck(results *ContentResults) 
 	if consistency < 0.3 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = "Plain text and HTML versions differ significantly"
 		check.Advice = api.PtrTo("Ensure plain text and HTML versions convey the same content")
 		details := fmt.Sprintf("Consistency: %.0f%%", consistency*100)
@@ -670,7 +670,7 @@ func (c *ContentAnalyzer) generateTextConsistencyCheck(results *ContentResults) 
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "Plain text and HTML versions are consistent"
 		check.Advice = api.PtrTo("Your multipart email is well-structured")
 		details := fmt.Sprintf("Consistency: %.0f%%", consistency*100)
@@ -693,7 +693,7 @@ func (c *ContentAnalyzer) generateImageRatioCheck(results *ContentResults) api.C
 	if ratio > 10.0 {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "Email is excessively image-heavy"
 		check.Advice = api.PtrTo("Reduce the number of images relative to text content")
 		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
@@ -701,7 +701,7 @@ func (c *ContentAnalyzer) generateImageRatioCheck(results *ContentResults) api.C
 	} else if ratio > 5.0 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.2
-		check.Severity = api.PtrTo(api.Low)
+		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = "Email has high image-to-text ratio"
 		check.Advice = api.PtrTo("Consider adding more text content relative to images")
 		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
@@ -709,7 +709,7 @@ func (c *ContentAnalyzer) generateImageRatioCheck(results *ContentResults) api.C
 	} else {
 		check.Status = api.CheckStatusPass
 		check.Score = 0.3
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "Image-to-text ratio is reasonable"
 		check.Advice = api.PtrTo("Your content has a good balance of images and text")
 		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
@@ -730,7 +730,7 @@ func (c *ContentAnalyzer) generateSuspiciousURLCheck(results *ContentResults) ap
 
 	check.Status = api.CheckStatusWarn
 	check.Score = 0.0
-	check.Severity = api.PtrTo(api.Medium)
+	check.Severity = api.PtrTo(api.CheckSeverityMedium)
 	check.Message = fmt.Sprintf("Found %d suspicious URL(s)", count)
 	check.Advice = api.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails")
 

@@ -279,7 +279,7 @@ func (r *RBLChecker) GenerateRBLChecks(results *RBLResults) []api.Check {
 			Status:   api.CheckStatusWarn,
 			Score:    1.0,
 			Message:  "No public IP addresses found to check",
-			Severity: api.PtrTo(api.Low),
+			Severity: api.PtrTo(api.CheckSeverityLow),
 			Advice:   api.PtrTo("Unable to extract sender IP from email headers"),
 		})
 		return checks
@@ -316,22 +316,22 @@ func (r *RBLChecker) generateSummaryCheck(results *RBLResults) api.Check {
 	if listedCount == 0 {
 		check.Status = api.CheckStatusPass
 		check.Message = fmt.Sprintf("Not listed on any blacklists (%d RBLs checked)", len(r.RBLs))
-		check.Severity = api.PtrTo(api.Info)
+		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your sending IP has a good reputation")
 	} else if listedCount == 1 {
 		check.Status = api.CheckStatusWarn
 		check.Message = fmt.Sprintf("Listed on 1 blacklist (out of %d checked)", totalChecks)
-		check.Severity = api.PtrTo(api.Medium)
+		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("You're listed on one blacklist. Review the specific listing and request delisting if appropriate")
 	} else if listedCount <= 3 {
 		check.Status = api.CheckStatusWarn
 		check.Message = fmt.Sprintf("Listed on %d blacklists (out of %d checked)", listedCount, totalChecks)
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Multiple blacklist listings detected. This will significantly impact deliverability. Review each listing and take corrective action")
 	} else {
 		check.Status = api.CheckStatusFail
 		check.Message = fmt.Sprintf("Listed on %d blacklists (out of %d checked)", listedCount, totalChecks)
-		check.Severity = api.PtrTo(api.Critical)
+		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		check.Advice = api.PtrTo("Your IP is listed on multiple blacklists. This will severely impact email deliverability. Investigate the cause and request delisting from each RBL")
 	}
 
@@ -357,15 +357,15 @@ func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
 
 	// Determine severity based on which RBL
 	if strings.Contains(rblCheck.RBL, "spamhaus") {
-		check.Severity = api.PtrTo(api.Critical)
+		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		advice := fmt.Sprintf("Listed on Spamhaus, a widely-used blocklist. Visit https://check.spamhaus.org/ to check details and request delisting")
 		check.Advice = &advice
 	} else if strings.Contains(rblCheck.RBL, "spamcop") {
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		advice := fmt.Sprintf("Listed on SpamCop. Visit http://www.spamcop.net/bl.shtml to request delisting")
 		check.Advice = &advice
 	} else {
-		check.Severity = api.PtrTo(api.High)
+		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		advice := fmt.Sprintf("Listed on %s. Contact the RBL operator for delisting procedures", rblCheck.RBL)
 		check.Advice = &advice
 	}
