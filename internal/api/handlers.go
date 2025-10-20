@@ -32,6 +32,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/storage"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -56,16 +57,19 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 	// Generate a unique test ID (no database record created)
 	testID := uuid.New()
 
-	// Generate test email address
+	// Convert UUID to base32 string for the API response
+	base32ID := utils.UUIDToBase32(testID)
+
+	// Generate test email address using Base32-encoded UUID
 	email := fmt.Sprintf("%s%s@%s",
 		h.config.Email.TestAddressPrefix,
-		testID.String(),
+		base32ID,
 		h.config.Email.Domain,
 	)
 
 	// Return response
 	c.JSON(http.StatusCreated, TestResponse{
-		Id:      testID,
+		Id:      base32ID,
 		Email:   openapi_types.Email(email),
 		Status:  TestResponseStatusPending,
 		Message: stringPtr("Send your test email to the given address"),
@@ -74,9 +78,20 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 
 // GetTest retrieves test metadata
 // (GET /test/{id})
-func (h *APIHandler) GetTest(c *gin.Context, id openapi_types.UUID) {
+func (h *APIHandler) GetTest(c *gin.Context, id string) {
+	// Convert base32 ID to UUID
+	testUUID, err := utils.Base32ToUUID(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_id",
+			Message: "Invalid test ID format",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
 	// Check if a report exists for this test ID
-	reportExists, err := h.storage.ReportExists(id)
+	reportExists, err := h.storage.ReportExists(testUUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Error{
 			Error:   "internal_error",
@@ -94,10 +109,10 @@ func (h *APIHandler) GetTest(c *gin.Context, id openapi_types.UUID) {
 		apiStatus = TestStatusPending
 	}
 
-	// Generate test email address
+	// Generate test email address using Base32-encoded UUID
 	email := fmt.Sprintf("%s%s@%s",
 		h.config.Email.TestAddressPrefix,
-		id.String(),
+		id,
 		h.config.Email.Domain,
 	)
 
@@ -110,8 +125,19 @@ func (h *APIHandler) GetTest(c *gin.Context, id openapi_types.UUID) {
 
 // GetReport retrieves the detailed analysis report
 // (GET /report/{id})
-func (h *APIHandler) GetReport(c *gin.Context, id openapi_types.UUID) {
-	reportJSON, _, err := h.storage.GetReport(id)
+func (h *APIHandler) GetReport(c *gin.Context, id string) {
+	// Convert base32 ID to UUID
+	testUUID, err := utils.Base32ToUUID(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_id",
+			Message: "Invalid test ID format",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	reportJSON, _, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			c.JSON(http.StatusNotFound, Error{
@@ -134,8 +160,19 @@ func (h *APIHandler) GetReport(c *gin.Context, id openapi_types.UUID) {
 
 // GetRawEmail retrieves the raw annotated email
 // (GET /report/{id}/raw)
-func (h *APIHandler) GetRawEmail(c *gin.Context, id openapi_types.UUID) {
-	_, rawEmail, err := h.storage.GetReport(id)
+func (h *APIHandler) GetRawEmail(c *gin.Context, id string) {
+	// Convert base32 ID to UUID
+	testUUID, err := utils.Base32ToUUID(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_id",
+			Message: "Invalid test ID format",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	_, rawEmail, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			c.JSON(http.StatusNotFound, Error{

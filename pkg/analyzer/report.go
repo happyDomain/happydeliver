@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 )
 
@@ -96,8 +97,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	now := time.Now()
 
 	report := &api.Report{
-		Id:        reportID,
-		TestId:    testID,
+		Id:        utils.UUIDToBase32(reportID),
+		TestId:    utils.UUIDToBase32(testID),
 		Score:     results.Score.OverallScore,
 		CreatedAt: now,
 	}

@@ -73,7 +73,7 @@
 </script>
 
 <svelte:head>
-    <title>{test ? `Test ${test.id.slice(0, 8)} - happyDeliver` : "Loading..."}</title>
+    <title>{test ? `Test ${test.id.slice(0, 7)} - happyDeliver` : "Loading..."}</title>
 </svelte:head>
 
 <div class="container py-5">

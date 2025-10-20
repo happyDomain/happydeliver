@@ -108,9 +108,9 @@ You'll obtain the best results with a custom [transport rule](https://www.postfi
 
   ```
   # Transport map - route test emails to happyDeliver LMTP server
-  # Pattern: test-<uuid>@yourdomain.com -> LMTP on localhost:2525
+  # Pattern: test-<base32-uuid>@yourdomain.com -> LMTP on localhost:2525
 
-  /^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@yourdomain\.com$/  lmtp:inet:127.0.0.1:2525
+  /^test-[a-zA-Z2-7-]{26,30}@yourdomain\.com$/  lmtp:inet:127.0.0.1:2525
   ```
 
 3. Append the created file to `transport_maps` in your `main.cf`:
@@ -144,7 +144,7 @@ Response:
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "test-550e8400@localhost",
+  "email": "test-kfauqaao-ukj2if3n-fgrfkiafaa@localhost",
   "status": "pending",
   "message": "Send your test email to the address above"
 }

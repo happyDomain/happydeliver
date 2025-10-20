@@ -1,4 +1,4 @@
 # Transport map - route test emails to happyDeliver LMTP server
-# Pattern: test-<uuid>@domain.com -> LMTP on localhost:2525
+# Pattern: test-<base32-uuid>@domain.com -> LMTP on localhost:2525
 
-/^test-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}@.*$/  lmtp:inet:127.0.0.1:2525
+/^test-[a-zA-Z2-7-]{26,30}@.*$/  lmtp:inet:127.0.0.1:2525

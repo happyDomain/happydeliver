@@ -22,6 +22,7 @@
 package receiver
 
 import (
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,8 +113,34 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 	return nil
 }
 
+// base32ToUUID converts a URL-safe Base32 string (without padding) to a UUID
+// Hyphens are ignored during decoding
+func base32ToUUID(encoded string) (uuid.UUID, error) {
+	// Remove hyphens for decoding
+	encoded = strings.ReplaceAll(encoded, "-", "")
+
+	// Convert to uppercase for Base32 decoding
+	encoded = strings.ToUpper(encoded)
+
+	// Decode from Base32
+	decoded, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(encoded)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to decode base32: %w", err)
+	}
+
+	// Ensure we have exactly 16 bytes for UUID
+	if len(decoded) != 16 {
+		return uuid.Nil, fmt.Errorf("decoded bytes length is %d, expected 16", len(decoded))
+	}
+
+	// Convert bytes to UUID
+	var id uuid.UUID
+	copy(id[:], decoded)
+	return id, nil
+}
+
 // extractTestID extracts the UUID from the test email address
-// Expected format: test-<uuid>@domain.com
+// Expected format: test-<base32-uuid>@domain.com
 func (r *EmailReceiver) extractTestID(email string) (uuid.UUID, error) {
 	// Remove angle brackets if present (e.g., <test-uuid@domain.com>)
 	email = strings.Trim(email, "<>")
@@ -133,10 +160,10 @@ func (r *EmailReceiver) extractTestID(email string) (uuid.UUID, error) {
 
 	uuidStr := strings.TrimPrefix(localPart, r.config.Email.TestAddressPrefix)
 
-	// Parse UUID
-	testID, err := uuid.Parse(uuidStr)
+	// Decode Base32 to UUID
+	testID, err := base32ToUUID(uuidStr)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid UUID in email address: %s", uuidStr)
+		return uuid.Nil, fmt.Errorf("invalid Base32 encoding in email address: %s - %w", uuidStr, err)
 	}
 
 	return testID, nil

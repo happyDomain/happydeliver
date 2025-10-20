@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 )
 
@@ -106,12 +107,14 @@ func TestGenerateReport(t *testing.T) {
 	}
 
 	// Verify required fields
-	if report.Id == uuid.Nil {
+	if report.Id == "" {
 		t.Error("Report ID should not be empty")
 	}
 
-	if report.TestId != testID {
-		t.Errorf("TestId = %s, want %s", report.TestId, testID)
+	// Convert testID to base32 for comparison
+	expectedTestID := utils.UUIDToBase32(testID)
+	if report.TestId != expectedTestID {
+		t.Errorf("TestId = %s, want %s", report.TestId, expectedTestID)
 	}
 
 	if report.Score < 0 || report.Score > 10 {

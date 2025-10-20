@@ -52,7 +52,7 @@ paths:
       tags:
         - tests
       summary: Get test status
-      description: Check if a report exists for the given test ID. Returns pending if no report exists, analyzed if a report is available.
+      description: Check if a report exists for the given test ID (base32-encoded). Returns pending if no report exists, analyzed if a report is available.
       operationId: getTest
       parameters:
         - name: id
@@ -60,7 +60,8 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+            pattern: '^[a-z0-9-]+$'
+            description: Base32-encoded test ID (with hyphens)
       responses:
         '200':
           description: Test status retrieved successfully
@@ -88,7 +89,8 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+            pattern: '^[a-z0-9-]+$'
+            description: Base32-encoded test ID (with hyphens)
       responses:
         '200':
           description: Report retrieved successfully
@@ -116,7 +118,8 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+            pattern: '^[a-z0-9-]+$'
+            description: Base32-encoded test ID (with hyphens)
       responses:
         '200':
           description: Raw email retrieved successfully
@@ -157,14 +160,14 @@ components:
       properties:
         id:
           type: string
-          format: uuid
-          description: Unique test identifier
-          example: "550e8400-e29b-41d4-a716-446655440000"
+          pattern: '^[a-z0-9-]+$'
+          description: Unique test identifier (base32-encoded with hyphens)
+          example: "krfwg4z-amrqw4z-zmorsw2-djmfzgk-3a"
         email:
           type: string
           format: email
           description: Unique test email address
-          example: "test-550e8400@example.com"
+          example: "test-krfwg4z-amrqw4z-zmorsw2-djmfzgk-3a@example.com"
         status:
           type: string
           enum: [pending, analyzed]
@@ -180,12 +183,13 @@ components:
       properties:
         id:
           type: string
-          format: uuid
-          example: "550e8400-e29b-41d4-a716-446655440000"
+          pattern: '^[a-z0-9-]+$'
+          description: Unique test identifier (base32-encoded with hyphens)
+          example: "krfwg4z-amrqw4z-zmorsw2-djmfzgk-3a"
         email:
           type: string
           format: email
-          example: "test-550e8400@example.com"
+          example: "test-krfwg4z-amrqw4z-zmorsw2-djmfzgk-3a@example.com"
         status:
           type: string
           enum: [pending]
@@ -205,12 +209,12 @@ components:
       properties:
         id:
           type: string
-          format: uuid
-          description: Report identifier
+          pattern: '^[a-z0-9-]+$'
+          description: Report identifier (base32-encoded with hyphens)
         test_id:
           type: string
-          format: uuid
-          description: Associated test ID
+          pattern: '^[a-z0-9-]+$'
+          description: Associated test ID (base32-encoded with hyphens)
         score:
           type: number
           format: float
