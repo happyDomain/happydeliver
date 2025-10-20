@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"bytes"
 	"net/mail"
 	"strings"
 	"testing"
@@ -477,6 +478,176 @@ func TestGenerateTestCheck(t *testing.T) {
 				t.Errorf("Check name should contain test name %s", tt.detail.Name)
 			}
 		})
+	}
+}
+
+const sampleEmailWithSpamassassinHeader = `X-Spam-Checker-Version: SpamAssassin 4.0.1 (2024-03-26) on e4a8b8eb87ec
+X-Spam-Status: No, score=-0.1 required=5.0 tests=DKIM_SIGNED,DKIM_VALID,
+	DKIM_VALID_AU,RCVD_IN_VALIDITY_CERTIFIED_BLOCKED,
+	RCVD_IN_VALIDITY_RPBL_BLOCKED,RCVD_IN_VALIDITY_SAFE_BLOCKED,
+	SPF_HELO_NONE,SPF_PASS autolearn=disabled version=4.0.1
+X-Spam-Level:
+X-Spam-Report:
+	*  0.0 RCVD_IN_VALIDITY_SAFE_BLOCKED RBL: ADMINISTRATOR NOTICE: The query
+	*      to Validity was blocked.  See
+	*      https://knowledge.validity.com/hc/en-us/articles/20961730681243 for
+	*      more information.
+	*      [80.67.179.207 listed in sa-accredit.habeas.com]
+	*  0.0 RCVD_IN_VALIDITY_RPBL_BLOCKED RBL: ADMINISTRATOR NOTICE: The query
+	*      to Validity was blocked.  See
+	*      https://knowledge.validity.com/hc/en-us/articles/20961730681243 for
+	*      more information.
+	*      [80.67.179.207 listed in bl.score.senderscore.com]
+	*  0.0 RCVD_IN_VALIDITY_CERTIFIED_BLOCKED RBL: ADMINISTRATOR NOTICE: The
+	*      query to Validity was blocked.  See
+	*      https://knowledge.validity.com/hc/en-us/articles/20961730681243 for
+	*      more information.
+	*      [80.67.179.207 listed in sa-trusted.bondedsender.org]
+	* -0.0 SPF_PASS SPF: sender matches SPF record
+	*  0.0 SPF_HELO_NONE SPF: HELO does not publish an SPF Record
+	* -0.1 DKIM_VALID Message has at least one valid DKIM or DK signature
+	*  0.1 DKIM_SIGNED Message has a DKIM or DK signature, not necessarily
+	*      valid
+	* -0.1 DKIM_VALID_AU Message has a valid DKIM or DK signature from author's
+	*       domain
+Date: Sun, 19 Oct 2025 08:37:30 +0000
+Message-ID: <aPSjR57mUnCAt7sp@happydomain.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+
+BODY`
+
+// TestAnalyzeRealEmailExample tests the analyzer with the real example email file
+func TestAnalyzeRealEmailExample(t *testing.T) {
+	// Parse the email using the standard net/mail package
+	email, err := ParseEmail(bytes.NewBufferString(sampleEmailWithSpamassassinHeader))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	// Create analyzer and analyze SpamAssassin headers
+	analyzer := NewSpamAssassinAnalyzer()
+	result := analyzer.AnalyzeSpamAssassin(email)
+
+	// Validate that we got a result
+	if result == nil {
+		t.Fatal("Expected SpamAssassin result, got nil")
+	}
+
+	// Validate IsSpam flag (should be false for this email)
+	if result.IsSpam {
+		t.Error("IsSpam should be false for real_example.eml")
+	}
+
+	// Validate score (should be -0.1)
+	expectedScore := -0.1
+	if result.Score != expectedScore {
+		t.Errorf("Score = %v, want %v", result.Score, expectedScore)
+	}
+
+	// Validate required score (should be 5.0)
+	expectedRequired := 5.0
+	if result.RequiredScore != expectedRequired {
+		t.Errorf("RequiredScore = %v, want %v", result.RequiredScore, expectedRequired)
+	}
+
+	// Validate version
+	if !strings.Contains(result.Version, "SpamAssassin") {
+		t.Errorf("Version should contain 'SpamAssassin', got: %s", result.Version)
+	}
+
+	// Validate that tests were extracted
+	if len(result.Tests) == 0 {
+		t.Error("Expected tests to be extracted, got none")
+	}
+
+	// Check for expected tests from the real email
+	expectedTests := map[string]bool{
+		"DKIM_SIGNED":   true,
+		"DKIM_VALID":    true,
+		"DKIM_VALID_AU": true,
+		"SPF_PASS":      true,
+		"SPF_HELO_NONE": true,
+	}
+
+	for _, testName := range result.Tests {
+		if expectedTests[testName] {
+			t.Logf("Found expected test: %s", testName)
+		}
+	}
+
+	// Validate that test details were parsed from X-Spam-Report
+	if len(result.TestDetails) == 0 {
+		t.Error("Expected test details to be parsed from X-Spam-Report, got none")
+	}
+
+	// Log what we actually got for debugging
+	t.Logf("Parsed %d test details from X-Spam-Report", len(result.TestDetails))
+	for name, detail := range result.TestDetails {
+		t.Logf("  %s: score=%v, description=%s", name, detail.Score, detail.Description)
+	}
+
+	// Define expected test details with their scores
+	expectedTestDetails := map[string]float64{
+		"SPF_PASS":                           -0.0,
+		"SPF_HELO_NONE":                      0.0,
+		"DKIM_VALID":                         -0.1,
+		"DKIM_SIGNED":                        0.1,
+		"DKIM_VALID_AU":                      -0.1,
+		"RCVD_IN_VALIDITY_SAFE_BLOCKED":      0.0,
+		"RCVD_IN_VALIDITY_RPBL_BLOCKED":      0.0,
+		"RCVD_IN_VALIDITY_CERTIFIED_BLOCKED": 0.0,
+	}
+
+	// Iterate over expected tests and verify they exist in TestDetails
+	for testName, expectedScore := range expectedTestDetails {
+		detail, ok := result.TestDetails[testName]
+		if !ok {
+			t.Errorf("Expected test %s not found in TestDetails", testName)
+			continue
+		}
+		if detail.Score != expectedScore {
+			t.Errorf("Test %s score = %v, want %v", testName, detail.Score, expectedScore)
+		}
+		if detail.Description == "" {
+			t.Errorf("Test %s should have a description", testName)
+		}
+	}
+
+	// Test GetSpamAssassinScore
+	score := analyzer.GetSpamAssassinScore(result)
+	if score != 2.0 {
+		t.Errorf("GetSpamAssassinScore() = %v, want 2.0 (excellent score for negative spam score)", score)
+	}
+
+	// Test GenerateSpamAssassinChecks
+	checks := analyzer.GenerateSpamAssassinChecks(result)
+	if len(checks) < 1 {
+		t.Fatal("Expected at least 1 check, got none")
+	}
+
+	// Main check should be PASS with excellent score
+	mainCheck := checks[0]
+	if mainCheck.Status != api.CheckStatusPass {
+		t.Errorf("Main check status = %v, want %v", mainCheck.Status, api.CheckStatusPass)
+	}
+	if mainCheck.Category != api.Spam {
+		t.Errorf("Main check category = %v, want %v", mainCheck.Category, api.Spam)
+	}
+	if !strings.Contains(mainCheck.Message, "spam score") {
+		t.Errorf("Main check message should contain 'spam score', got: %s", mainCheck.Message)
+	}
+	if mainCheck.Score != 2.0 {
+		t.Errorf("Main check score = %v, want 2.0", mainCheck.Score)
+	}
+
+	// Log all checks for debugging
+	t.Logf("Generated %d checks:", len(checks))
+	for i, check := range checks {
+		t.Logf("  Check %d: %s - %s (score: %.1f, status: %s)",
+			i+1, check.Name, check.Message, check.Score, check.Status)
 	}
 }
 

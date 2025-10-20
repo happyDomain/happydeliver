@@ -86,7 +86,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAss
 
 	// Parse X-Spam-Report header for detailed test results
 	if reportHeader, ok := headers["X-Spam-Report"]; ok {
-		result.RawReport = reportHeader
+		result.RawReport = strings.Replace(reportHeader, " *  ", "\n *  ", -1)
 		a.parseSpamReport(reportHeader, result)
 	}
 
@@ -140,20 +140,25 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *SpamAssass
 // Format varies, but typically:
 // * 1.5 TEST_NAME Description of test
 // * 0.0 TEST_NAME2 Description
+// Note: mail.Header.Get() joins continuation lines, so newlines are removed.
+// We split on '*' to separate individual tests.
 func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *SpamAssassinResult) {
-	// Split by lines
-	lines := strings.Split(report, "\n")
+	// The report header has been joined by mail.Header.Get(), so we split on '*'
+	// Each segment starting with '*' is either a test line or continuation
+	segments := strings.Split(report, "*")
 
-	// Regex to match test lines: * score TEST_NAME Description
-	testRe := regexp.MustCompile(`^\s*\*\s+(-?\d+\.?\d*)\s+(\S+)\s+(.*)$`)
+	// Regex to match test lines: score TEST_NAME Description
+	// Format: "  0.0 TEST_NAME Description" or " -0.1 TEST_NAME Description"
+	testRe := regexp.MustCompile(`^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)$`)
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	for _, segment := range segments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
 			continue
 		}
 
-		matches := testRe.FindStringSubmatch(line)
+		// Try to match as a test line
+		matches := testRe.FindStringSubmatch(segment)
 		if len(matches) > 3 {
 			testName := matches[2]
 			score, _ := strconv.ParseFloat(matches[1], 64)
