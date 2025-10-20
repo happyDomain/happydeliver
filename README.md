@@ -1,4 +1,6 @@
-# happyDeliver
+# happyDeliver - Email Deliverability Tester
+
+![banner](banner.webp)
 
 An open-source email deliverability testing platform that analyzes test emails and provides detailed deliverability reports with scoring.
 
