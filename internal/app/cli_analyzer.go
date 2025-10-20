@@ -31,9 +31,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"git.happydns.org/happyDeliver/internal/analyzer"
 	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
 
 // RunAnalyzer runs the standalone email analyzer (from stdin)

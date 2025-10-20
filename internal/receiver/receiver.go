@@ -31,9 +31,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"git.happydns.org/happyDeliver/internal/analyzer"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/storage"
+	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
 
 // EmailReceiver handles incoming emails from the MTA
