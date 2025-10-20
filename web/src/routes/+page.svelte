@@ -101,11 +101,11 @@
 </script>
 
 <svelte:head>
-    <title>happyDeliver - Email Deliverability Testing</title>
+    <title>happyDeliver. Test Your Email Deliverability.</title>
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="hero py-5">
+<section class="hero py-5" id="hero">
     <div class="container py-5">
         <div class="row align-items-center">
             <div class="col-lg-8 mx-auto text-center fade-in">
@@ -115,7 +115,7 @@
                     and more. Open-source, self-hosted, and privacy-focused.
                 </p>
                 <button
-                    class="btn btn-light btn-lg px-5 py-3 shadow"
+                    class="btn btn-success btn-lg px-5 py-3 shadow"
                     onclick={createTest}
                     disabled={loading}
                 >
@@ -140,7 +140,7 @@
 </section>
 
 <!-- Features Section -->
-<section class="py-5">
+<section class="py-5" id="features">
     <div class="container py-4">
         <div class="row text-center mb-5">
             <div class="col-lg-8 mx-auto">
@@ -163,7 +163,7 @@
 </section>
 
 <!-- How It Works -->
-<section class="bg-light py-5">
+<section class="bg-light py-5" id="steps">
     <div class="container py-4">
         <div class="row text-center mb-5">
             <div class="col-lg-8 mx-auto">
