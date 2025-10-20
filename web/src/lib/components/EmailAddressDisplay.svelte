@@ -5,6 +5,7 @@
 
     let { email }: Props = $props();
     let copied = $state(false);
+    let inputElement: HTMLInputElement;
 
     async function copyToClipboard() {
         try {
@@ -15,13 +16,26 @@
             console.error("Failed to copy:", err);
         }
     }
+
+    function handleFocus(event: FocusEvent) {
+        const target = event.target as HTMLInputElement;
+        target.select();
+        copyToClipboard();
+    }
 </script>
 
-<div class="bg-light rounded p-4">
-    <div class="d-flex align-items-center justify-content-center gap-3">
-        <code class="fs-5 text-primary fw-bold">{email}</code>
+<div class="bg-light rounded rounded-4 p-4">
+    <div class="input-group">
+        <input
+            bind:this={inputElement}
+            type="text"
+            class="form-control text-center fs-5 text-primary fw-bold font-monospace"
+            value={email}
+            readonly
+            onfocus={handleFocus}
+        />
         <button
-            class="btn btn-sm btn-outline-primary clipboard-btn"
+            class="btn btn-outline-primary clipboard-btn"
             onclick={copyToClipboard}
             title="Copy to clipboard"
         >
@@ -29,7 +43,7 @@
         </button>
     </div>
     {#if copied}
-        <small class="text-success d-block mt-2">
+        <small class="text-success d-block mt-2 text-center">
             <i class="bi bi-check2"></i> Copied to clipboard!
         </small>
     {/if}
