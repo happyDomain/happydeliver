@@ -32,6 +32,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/lmtp"
 	"git.happydns.org/happyDeliver/internal/storage"
+	"git.happydns.org/happyDeliver/pkg/analyzer"
 	"git.happydns.org/happyDeliver/web"
 )
 
@@ -63,8 +64,11 @@ func RunServer(cfg *config.Config) error {
 		}
 	}()
 
+	// Create analyzer adapter for API
+	analyzerAdapter := analyzer.NewAPIAdapter(cfg)
+
 	// Create API handler
-	handler := api.NewAPIHandler(store, cfg)
+	handler := api.NewAPIHandler(store, cfg, analyzerAdapter)
 
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") == "" {

@@ -35,18 +35,26 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
+// EmailAnalyzer defines the interface for email analysis
+// This interface breaks the circular dependency with pkg/analyzer
+type EmailAnalyzer interface {
+	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
+}
+
 // APIHandler implements the ServerInterface for handling API requests
 type APIHandler struct {
 	storage   storage.Storage
 	config    *config.Config
+	analyzer  EmailAnalyzer
 	startTime time.Time
 }
 
 // NewAPIHandler creates a new API handler
-func NewAPIHandler(store storage.Storage, cfg *config.Config) *APIHandler {
+func NewAPIHandler(store storage.Storage, cfg *config.Config, analyzer EmailAnalyzer) *APIHandler {
 	return &APIHandler{
 		storage:   store,
 		config:    cfg,
+		analyzer:  analyzer,
 		startTime: time.Now(),
 	}
 }
@@ -190,6 +198,63 @@ func (h *APIHandler) GetRawEmail(c *gin.Context, id string) {
 	}
 
 	c.Data(http.StatusOK, "text/plain", rawEmail)
+}
+
+// ReanalyzeReport re-analyzes an existing email and regenerates the report
+// (POST /report/{id}/reanalyze)
+func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
+	// Convert base32 ID to UUID
+	testUUID, err := utils.Base32ToUUID(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_id",
+			Message: "Invalid test ID format",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Retrieve the existing report (mainly to get the raw email)
+	_, rawEmail, err := h.storage.GetReport(testUUID)
+	if err != nil {
+		if err == storage.ErrNotFound {
+			c.JSON(http.StatusNotFound, Error{
+				Error:   "not_found",
+				Message: "Email not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, Error{
+			Error:   "internal_error",
+			Message: "Failed to retrieve email",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Re-analyze the email using the current analyzer
+	reportJSON, err := h.analyzer.AnalyzeEmailBytes(rawEmail, testUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Error{
+			Error:   "analysis_error",
+			Message: "Failed to re-analyze email",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Update the report in storage
+	if err := h.storage.UpdateReport(testUUID, reportJSON); err != nil {
+		c.JSON(http.StatusInternalServerError, Error{
+			Error:   "internal_error",
+			Message: "Failed to update report",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Return the updated report JSON directly
+	c.Data(http.StatusOK, "application/json", reportJSON)
 }
 
 // GetStatus retrieves service health status

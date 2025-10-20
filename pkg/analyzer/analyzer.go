@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -84,4 +85,33 @@ func (a *EmailAnalyzer) GetScoreSummaryText(result *AnalysisResult) string {
 		return ""
 	}
 	return a.generator.GetScoreSummaryText(result.Results)
+}
+
+// APIAdapter adapts the EmailAnalyzer to work with the API package
+// This adapter implements the interface expected by the API handler
+type APIAdapter struct {
+	analyzer *EmailAnalyzer
+}
+
+// NewAPIAdapter creates a new API adapter for the email analyzer
+func NewAPIAdapter(cfg *config.Config) *APIAdapter {
+	return &APIAdapter{
+		analyzer: NewEmailAnalyzer(cfg),
+	}
+}
+
+// AnalyzeEmailBytes performs analysis and returns JSON bytes directly
+func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) ([]byte, error) {
+	result, err := a.analyzer.AnalyzeEmailBytes(rawEmail, testID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal report to JSON
+	reportJSON, err := json.Marshal(result.Report)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal report: %w", err)
+	}
+
+	return reportJSON, nil
 }

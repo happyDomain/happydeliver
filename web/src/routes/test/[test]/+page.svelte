@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { page } from "$app/state";
-    import { getTest, getReport } from "$lib/api";
+    import { getTest, getReport, reanalyzeReport } from "$lib/api";
     import type { Test, Report } from "$lib/api/types.gen";
     import { ScoreCard, CheckCard, SpamAssassinCard, PendingState } from "$lib/components";
 
@@ -10,6 +10,7 @@
     let report = $state<Report | null>(null);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let reanalyzing = $state(false);
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     let nextfetch = $state(23);
     let nbfetch = $state(0);
@@ -134,6 +135,24 @@
         if (percentage >= 50) return "text-warning";
         return "text-danger";
     }
+
+    async function handleReanalyze() {
+        if (!testId || reanalyzing) return;
+
+        reanalyzing = true;
+        error = null;
+
+        try {
+            const response = await reanalyzeReport({ path: { id: testId } });
+            if (response.data) {
+                report = response.data;
+            }
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Failed to reanalyze report";
+        } finally {
+            reanalyzing = false;
+        }
+    }
 </script>
 
 <svelte:head>
@@ -208,9 +227,22 @@
                 </div>
             {/if}
 
-            <!-- Test Again Button -->
+            <!-- Action Buttons -->
             <div class="row">
                 <div class="col-12 text-center">
+                    <button
+                        class="btn btn-outline-secondary btn-lg me-3"
+                        onclick={handleReanalyze}
+                        disabled={reanalyzing}
+                    >
+                        {#if reanalyzing}
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Reanalyzing...
+                        {:else}
+                            <i class="bi bi-arrow-clockwise me-2"></i>
+                            Reanalyze with Latest Version
+                        {/if}
+                    </button>
                     <a href="/test/" class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-repeat me-2"></i>
                         Test Another Email

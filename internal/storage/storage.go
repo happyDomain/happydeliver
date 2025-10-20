@@ -43,6 +43,7 @@ type Storage interface {
 	CreateReport(testID uuid.UUID, rawEmail []byte, reportJSON []byte) (*Report, error)
 	GetReport(testID uuid.UUID) (reportJSON []byte, rawEmail []byte, err error)
 	ReportExists(testID uuid.UUID) (bool, error)
+	UpdateReport(testID uuid.UUID, reportJSON []byte) error
 	DeleteOldReports(olderThan time.Time) (int64, error)
 
 	// Close closes the database connection
@@ -115,6 +116,18 @@ func (s *DBStorage) GetReport(testID uuid.UUID) ([]byte, []byte, error) {
 	}
 
 	return dbReport.ReportJSON, dbReport.RawEmail, nil
+}
+
+// UpdateReport updates the report JSON for an existing test ID
+func (s *DBStorage) UpdateReport(testID uuid.UUID, reportJSON []byte) error {
+	result := s.db.Model(&Report{}).Where("test_id = ?", testID).Update("report_json", reportJSON)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update report: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // DeleteOldReports deletes reports older than the specified time

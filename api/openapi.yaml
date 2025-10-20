@@ -134,6 +134,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /report/{id}/reanalyze:
+    post:
+      tags:
+        - reports
+      summary: Reanalyze email and regenerate report
+      description: Re-run the analysis on the stored raw email to regenerate the report with the latest analyzer version. This is useful after analyzer improvements or bug fixes.
+      operationId: reanalyzeReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9-]+$'
+            description: Base32-encoded test ID (with hyphens)
+      responses:
+        '200':
+          description: Report regenerated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          description: Email not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error during reanalysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /status:
     get:
       tags:
