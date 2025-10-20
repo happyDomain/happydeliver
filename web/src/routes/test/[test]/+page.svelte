@@ -132,7 +132,7 @@
             <!-- Test Again Button -->
             <div class="row">
                 <div class="col-12 text-center">
-                    <a href="/" class="btn btn-primary btn-lg">
+                    <a href="/test/" class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-repeat me-2"></i>
                         Test Another Email
                     </a>
