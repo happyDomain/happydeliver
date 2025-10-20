@@ -23,6 +23,7 @@ package web
 
 import (
 	"encoding/json"
+	"flag"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -41,8 +42,14 @@ import (
 
 var (
 	indexTpl       *template.Template
+	CustomBodyHTML = ""
 	CustomHeadHTML = ""
 )
+
+func init() {
+	flag.StringVar(&CustomHeadHTML, "custom-head-html", CustomHeadHTML, "Add custom HTML right before </head>")
+	flag.StringVar(&CustomBodyHTML, "custom-body-html", CustomBodyHTML, "Add custom HTML right before </body>")
+}
 
 func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	appConfig := map[string]interface{}{}
@@ -116,11 +123,12 @@ func serveOrReverse(forced_url string, cfg *config.Config) gin.HandlerFunc {
 
 						v, _ := ioutil.ReadAll(resp.Body)
 
-						v2 := strings.Replace(string(v), "</head>", "{{ .Head }}</head>", 1)
+						v2 := strings.Replace(strings.Replace(string(v), "</head>", "{{ .Head }}</head>", 1), "</body>", "{{ .Body }}</body>", 1)
 
 						indexTpl = template.Must(template.New("index.html").Parse(v2))
 
 						if err := indexTpl.ExecuteTemplate(c.Writer, "index.html", map[string]string{
+							"Body": CustomBodyHTML,
 							"Head": CustomHeadHTML,
 						}); err != nil {
 							log.Println("Unable to return index.html:", err.Error())
