@@ -1,12 +1,22 @@
 <script lang="ts">
+    import { createEventDispatcher } from "svelte";
+
     import type { Test } from "$lib/api/types.gen";
     import EmailAddressDisplay from "./EmailAddressDisplay.svelte";
+
+    const dispatch = createEventDispatcher();
 
     interface Props {
         test: Test;
     }
 
-    let { test }: Props = $props();
+    let { test, nbfetch, nextfetch }: Props = $props();
+
+    let lastForcedCheck = $state(Date.now() - 12345);
+    function forceCheck() {
+        lastForcedCheck = Date.now();
+        dispatch("force-inbox-check");
+    }
 </script>
 
 <div class="row justify-content-center">
@@ -32,7 +42,16 @@
 
                 <div class="d-flex align-items-center justify-content-center gap-2 text-muted">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <small>Checking for email every 3 seconds...</small>
+                    {#if nextfetch}
+                        <small>Next inbox check in {nextfetch} second{#if nextfetch > 1}s{/if}...</small>
+                        {#if nbfetch > 0}
+                            <button type="button" class="btn btn-sm btn-link" onclick={forceCheck} disabled={nbfetch + Date.now() < lastForcedCheck + 10000}>
+                                <i class="bi bi-mailbox me-1"></i>Check now
+                            </button>
+                        {/if}
+                    {:else}
+                        <small>Checking for email every 3 seconds...</small>
+                    {/if}
                 </div>
             </div>
         </div>

@@ -11,8 +11,15 @@
     let loading = $state(true);
     let error = $state<string | null>(null);
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let nextfetch = $state(23);
+    let nbfetch = $state(0);
 
     async function fetchTest() {
+        if (nbfetch > 0) {
+            nextfetch = Math.max(nextfetch, Math.floor(3 + nbfetch * 0.5));
+        }
+        nbfetch += 1;
+
         try {
             const testResponse = await getTest({ path: { id: testId } });
             if (testResponse.data) {
@@ -35,7 +42,17 @@
     }
 
     function startPolling() {
-        pollInterval = setInterval(fetchTest, 3000);
+        pollInterval = setInterval(() => {
+            nextfetch -= 1;
+
+            if (nextfetch <= 0) {
+                if (!document.hidden) {
+                    fetchTest();
+                } else {
+                    nextfetch = 1;
+                }
+            }
+        }, 1000);
     }
 
     function stopPolling() {
@@ -82,7 +99,7 @@
         </div>
     {:else if test && test.status !== "analyzed"}
         <!-- Pending State -->
-        <PendingState {test} />
+        <PendingState {nextfetch} {nbfetch} {test} on:force-inbox-check={() => fetchTest()} />
     {:else if report}
         <!-- Results State -->
         <div class="fade-in">
