@@ -36,33 +36,72 @@
         {#if summary}
             <div class="row g-3 text-start">
                 <div class="col-md-6 col-lg">
-                    <div class="p-3 bg-light rounded">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.authentication_score >= 3}
+                            class:text-warning={summary.authentication_score < 3 &&
+                                summary.authentication_score >= 1.5}
+                            class:text-danger={summary.authentication_score < 1.5}
+                        >
+                            {summary.authentication_score.toFixed(1)}/3
+                        </strong>
                         <small class="text-muted d-block">Authentication</small>
-                        <strong class="fs-5">{summary.authentication_score.toFixed(1)}/3</strong>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg">
-                    <div class="p-3 bg-light rounded">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.spam_score >= 2}
+                            class:text-warning={summary.spam_score < 2 && summary.spam_score >= 1}
+                            class:text-danger={summary.spam_score < 1}
+                        >
+                            {summary.spam_score.toFixed(1)}/2
+                        </strong>
                         <small class="text-muted d-block">Spam Score</small>
-                        <strong class="fs-5">{summary.spam_score.toFixed(1)}/2</strong>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg">
-                    <div class="p-3 bg-light rounded">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.blacklist_score >= 2}
+                            class:text-warning={summary.blacklist_score < 2 &&
+                                summary.blacklist_score >= 1}
+                            class:text-danger={summary.blacklist_score < 1}
+                        >
+                            {summary.blacklist_score.toFixed(1)}/2
+                        </strong>
                         <small class="text-muted d-block">Blacklists</small>
-                        <strong class="fs-5">{summary.blacklist_score.toFixed(1)}/2</strong>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg">
-                    <div class="p-3 bg-light rounded">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.content_score >= 2}
+                            class:text-warning={summary.content_score < 2 &&
+                                summary.content_score >= 1}
+                            class:text-danger={summary.content_score < 1}
+                        >
+                            {summary.content_score.toFixed(1)}/2
+                        </strong>
                         <small class="text-muted d-block">Content</small>
-                        <strong class="fs-5">{summary.content_score.toFixed(1)}/2</strong>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg">
-                    <div class="p-3 bg-light rounded">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.header_score >= 1}
+                            class:text-warning={summary.header_score < 1 &&
+                                summary.header_score >= 0.5}
+                            class:text-danger={summary.header_score < 0.5}
+                        >
+                            {summary.header_score.toFixed(1)}/1
+                        </strong>
                         <small class="text-muted d-block">Headers</small>
-                        <strong class="fs-5">{summary.header_score.toFixed(1)}/1</strong>
                     </div>
                 </div>
             </div>
