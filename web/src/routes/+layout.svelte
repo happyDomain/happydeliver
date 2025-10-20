@@ -19,7 +19,7 @@
                 <i class="bi bi-envelope-check me-2"></i>
                 <Logo />
             </a>
-            <span class="navbar-text text-primary small">
+            <span class="d-none d-md-inline navbar-text text-primary small">
                 Open-Source Email Deliverability Tester
             </span>
         </div>

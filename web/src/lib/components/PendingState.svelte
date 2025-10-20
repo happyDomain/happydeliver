@@ -43,12 +43,21 @@
                 <div class="d-flex align-items-center justify-content-center gap-2 text-muted">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
                     {#if nextfetch}
-                        <small>Next inbox check in {nextfetch} second{#if nextfetch > 1}s{/if}...</small>
-                        {#if nbfetch > 0}
-                            <button type="button" class="btn btn-sm btn-link" onclick={forceCheck} disabled={nbfetch + Date.now() < lastForcedCheck + 10000}>
-                                <i class="bi bi-mailbox me-1"></i>Check now
-                            </button>
-                        {/if}
+                        <div>
+                            <small
+                                >Next inbox check in {nextfetch} second{#if nextfetch > 1}s{/if}...</small
+                            >
+                            {#if nbfetch > 0}
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-link"
+                                    onclick={forceCheck}
+                                    disabled={nbfetch + Date.now() < lastForcedCheck + 10000}
+                                >
+                                    <i class="bi bi-mailbox me-1"></i>Check now
+                                </button>
+                            {/if}
+                        </div>
                     {:else}
                         <small>Checking for email every 3 seconds...</small>
                     {/if}
@@ -62,7 +71,7 @@
                 <h5 class="fw-bold mb-3">
                     <i class="bi bi-info-circle me-2"></i>What we'll check:
                 </h5>
-                <div class="row g-3">
+                <div class="row">
                     <div class="col-md-6">
                         <ul class="list-unstyled mb-0">
                             <li class="mb-2">
