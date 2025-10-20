@@ -204,6 +204,7 @@ components:
         - id
         - test_id
         - score
+        - grade
         - checks
         - created_at
       properties:
@@ -219,9 +220,14 @@ components:
           type: number
           format: float
           minimum: 0
-          maximum: 10
-          description: Overall deliverability score (0-10)
-          example: 8.5
+          maximum: 100
+          description: Overall deliverability score as percentage (0-100)
+          example: 85
+        grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         summary:
           $ref: '#/components/schemas/ScoreSummary'
         checks:
@@ -260,37 +266,37 @@ components:
           type: number
           format: float
           minimum: 0
-          maximum: 3
-          description: SPF/DKIM/DMARC score (max 3 pts)
-          example: 2.8
+          maximum: 100
+          description: SPF/DKIM/DMARC score (in percentage)
+          example: 28
         spam_score:
           type: number
           format: float
           minimum: 0
-          maximum: 2
-          description: SpamAssassin score (max 2 pts)
-          example: 1.5
+          maximum: 100
+          description: SpamAssassin score (in percentage)
+          example: 15
         blacklist_score:
           type: number
           format: float
           minimum: 0
-          maximum: 2
-          description: Blacklist check score (max 2 pts)
-          example: 2.0
+          maximum: 100
+          description: Blacklist check score (in percentage)
+          example: 20
         content_score:
           type: number
           format: float
           minimum: 0
-          maximum: 2
-          description: Content quality score (max 2 pts)
-          example: 1.8
+          maximum: 100
+          description: Content quality score (in percentage)
+          example: 18
         header_score:
           type: number
           format: float
           minimum: 0
-          maximum: 1
-          description: Header quality score (max 1 pt)
-          example: 0.9
+          maximum: 100
+          description: Header quality score (in percentage)
+          example: 9
 
     Check:
       type: object
@@ -299,6 +305,7 @@ components:
         - name
         - status
         - score
+        - grade
         - message
       properties:
         category:
@@ -319,7 +326,12 @@ components:
           type: number
           format: float
           description: Points contributed to total score
-          example: 1.0
+          example: 10
+        grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         message:
           type: string
           description: Human-readable result message

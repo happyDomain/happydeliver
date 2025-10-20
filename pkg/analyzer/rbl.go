@@ -238,26 +238,26 @@ func (r *RBLChecker) reverseIP(ipStr string) string {
 	return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 }
 
-// GetBlacklistScore calculates the blacklist contribution to deliverability (0-2 points)
+// GetBlacklistScore calculates the blacklist contribution to deliverability (0-20 points)
 // Scoring:
-// - Not listed on any RBL: 2 points (excellent)
-// - Listed on 1 RBL: 1 point (warning)
-// - Listed on 2-3 RBLs: 0.5 points (poor)
+// - Not listed on any RBL: 20 points (excellent)
+// - Listed on 1 RBL: 10 points (warning)
+// - Listed on 2-3 RBLs: 5 points (poor)
 // - Listed on 4+ RBLs: 0 points (critical)
 func (r *RBLChecker) GetBlacklistScore(results *RBLResults) float32 {
 	if results == nil || len(results.IPsChecked) == 0 {
 		// No IPs to check, give benefit of doubt
-		return 2.0
+		return 20.0
 	}
 
 	listedCount := results.ListedCount
 
 	if listedCount == 0 {
-		return 2.0
+		return 20.0
 	} else if listedCount == 1 {
-		return 1.0
+		return 10.0
 	} else if listedCount <= 3 {
-		return 0.5
+		return 5.0
 	}
 
 	return 0.0
@@ -277,7 +277,8 @@ func (r *RBLChecker) GenerateRBLChecks(results *RBLResults) []api.Check {
 			Category: api.Blacklist,
 			Name:     "RBL Check",
 			Status:   api.CheckStatusWarn,
-			Score:    1.0,
+			Score:    10.0,
+			Grade:    ScoreToCheckGrade((10.0 / 20.0) * 100),
 			Message:  "No public IP addresses found to check",
 			Severity: api.PtrTo(api.CheckSeverityLow),
 			Advice:   api.PtrTo("Unable to extract sender IP from email headers"),
@@ -309,6 +310,7 @@ func (r *RBLChecker) generateSummaryCheck(results *RBLResults) api.Check {
 
 	score := r.GetBlacklistScore(results)
 	check.Score = score
+	check.Grade = ScoreToCheckGrade((score / 20.0) * 100)
 
 	totalChecks := len(results.Checks)
 	listedCount := results.ListedCount
@@ -351,6 +353,7 @@ func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
 		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
 		Status:   api.CheckStatusFail,
 		Score:    0.0,
+		Grade:    ScoreToCheckGrade(0.0),
 	}
 
 	check.Message = fmt.Sprintf("IP %s is listed on %s", rblCheck.IP, rblCheck.RBL)

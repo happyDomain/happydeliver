@@ -14,6 +14,20 @@
     let nextfetch = $state(23);
     let nbfetch = $state(0);
 
+    // Group checks by category
+    let groupedChecks = $derived(() => {
+        if (!report) return {};
+
+        const groups: Record<string, typeof report.checks> = {};
+        for (const check of report.checks) {
+            if (!groups[check.category]) {
+                groups[check.category] = [];
+            }
+            groups[check.category].push(check);
+        }
+        return groups;
+    });
+
     async function fetchTest() {
         if (nbfetch > 0) {
             nextfetch = Math.max(nextfetch, Math.floor(3 + nbfetch * 0.5));
@@ -70,6 +84,56 @@
     onDestroy(() => {
         stopPolling();
     });
+
+    function getCategoryIcon(category: string): string {
+        switch (category) {
+            case "authentication":
+                return "bi-shield-check";
+            case "dns":
+                return "bi-diagram-3";
+            case "content":
+                return "bi-file-text";
+            case "blacklist":
+                return "bi-shield-exclamation";
+            case "headers":
+                return "bi-list-ul";
+            case "spam":
+                return "bi-filter";
+            default:
+                return "bi-question-circle";
+        }
+    }
+
+    function getCategoryScore(checks: typeof report.checks): number {
+        return checks.reduce((sum, check) => sum + check.score, 0);
+    }
+
+    function getCategoryMaxScore(category: string): number {
+        switch (category) {
+            case "authentication":
+                return 3;
+            case "spam":
+                return 2;
+            case "blacklist":
+                return 2;
+            case "content":
+                return 2;
+            case "headers":
+                return 1;
+            case "dns":
+                return 0; // DNS checks contribute to other categories
+            default:
+                return 0;
+        }
+    }
+
+    function getScoreColorClass(score: number, maxScore: number): string {
+        if (maxScore === 0) return "text-muted";
+        const percentage = (score / maxScore) * 100;
+        if (percentage >= 80) return "text-success";
+        if (percentage >= 50) return "text-warning";
+        return "text-danger";
+    }
 </script>
 
 <svelte:head>
@@ -114,8 +178,23 @@
             <div class="row mb-4">
                 <div class="col-12">
                     <h3 class="fw-bold mb-3">Detailed Checks</h3>
-                    {#each report.checks as check}
-                        <CheckCard {check} />
+                    {#each Object.entries(groupedChecks()) as [category, checks]}
+                        {@const categoryScore = getCategoryScore(checks)}
+                        {@const maxScore = getCategoryMaxScore(category)}
+                        <div class="category-section mb-4">
+                            <h4 class="category-title text-capitalize mb-3 d-flex justify-content-between align-items-center">
+                                <span>
+                                    <i class="bi {getCategoryIcon(category)} me-2"></i>
+                                    {category}
+                                </span>
+                                <span class="category-score {getScoreColorClass(categoryScore, maxScore)}">
+                                    {categoryScore.toFixed(1)}{#if maxScore > 0} / {maxScore}{/if} pts
+                                </span>
+                            </h4>
+                            {#each checks as check}
+                                <CheckCard {check} />
+                            {/each}
+                        </div>
                     {/each}
                 </div>
             </div>
@@ -156,5 +235,22 @@
             opacity: 1;
             transform: translateY(0);
         }
+    }
+
+    .category-section {
+        margin-bottom: 2rem;
+    }
+
+    .category-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #495057;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .category-score {
+        font-size: 1rem;
+        font-weight: 700;
     }
 </style>

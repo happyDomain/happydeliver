@@ -88,7 +88,7 @@ func TestAnalyzeEmail(t *testing.T) {
 	}
 
 	// Verify score is within bounds
-	if results.Score.OverallScore < 0 || results.Score.OverallScore > 10 {
+	if results.Score.OverallScore < 0 || results.Score.OverallScore > 100 {
 		t.Errorf("Overall score %v is out of bounds", results.Score.OverallScore)
 	}
 }
@@ -117,7 +117,7 @@ func TestGenerateReport(t *testing.T) {
 		t.Errorf("TestId = %s, want %s", report.TestId, expectedTestID)
 	}
 
-	if report.Score < 0 || report.Score > 10 {
+	if report.Score < 0 || report.Score > 100 {
 		t.Errorf("Score %v is out of bounds", report.Score)
 	}
 
@@ -137,13 +137,13 @@ func TestGenerateReport(t *testing.T) {
 		if report.Summary.SpamScore < 0 || report.Summary.SpamScore > 2 {
 			t.Errorf("SpamScore %v is out of bounds", report.Summary.SpamScore)
 		}
-		if report.Summary.BlacklistScore < 0 || report.Summary.BlacklistScore > 2 {
+		if report.Summary.BlacklistScore < 0 || report.Summary.BlacklistScore > 20 {
 			t.Errorf("BlacklistScore %v is out of bounds", report.Summary.BlacklistScore)
 		}
-		if report.Summary.ContentScore < 0 || report.Summary.ContentScore > 2 {
+		if report.Summary.ContentScore < 0 || report.Summary.ContentScore > 20 {
 			t.Errorf("ContentScore %v is out of bounds", report.Summary.ContentScore)
 		}
-		if report.Summary.HeaderScore < 0 || report.Summary.HeaderScore > 1 {
+		if report.Summary.HeaderScore < 0 || report.Summary.HeaderScore > 10 {
 			t.Errorf("HeaderScore %v is out of bounds", report.Summary.HeaderScore)
 		}
 	}

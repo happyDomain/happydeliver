@@ -29,6 +29,36 @@ import (
 	"git.happydns.org/happyDeliver/internal/api"
 )
 
+// ScoreToGrade converts a percentage score (0-100) to a letter grade
+func ScoreToGrade(score float32) string {
+	switch {
+	case score >= 97:
+		return "A+"
+	case score >= 93:
+		return "A"
+	case score >= 85:
+		return "B"
+	case score >= 75:
+		return "C"
+	case score >= 65:
+		return "D"
+	case score >= 50:
+		return "E"
+	default:
+		return "F"
+	}
+}
+
+// ScoreToCheckGrade converts a percentage score to an api.CheckGrade
+func ScoreToCheckGrade(score float32) api.CheckGrade {
+	return api.CheckGrade(ScoreToGrade(score))
+}
+
+// ScoreToReportGrade converts a percentage score to an api.ReportGrade
+func ScoreToReportGrade(score float32) api.ReportGrade {
+	return api.ReportGrade(ScoreToGrade(score))
+}
+
 // DeliverabilityScorer aggregates all analysis results and computes overall score
 type DeliverabilityScorer struct{}
 
@@ -86,12 +116,12 @@ func (s *DeliverabilityScorer) CalculateScore(
 	// Calculate header quality score
 	result.HeaderScore = s.calculateHeaderScore(email)
 
-	// Calculate overall score (out of 10)
+	// Calculate overall score (out of 100)
 	result.OverallScore = result.AuthScore + result.SpamScore + result.BlacklistScore + result.ContentScore + result.HeaderScore
 
 	// Ensure score is within bounds
-	if result.OverallScore > 10.0 {
-		result.OverallScore = 10.0
+	if result.OverallScore > 100.0 {
+		result.OverallScore = 100.0
 	}
 	if result.OverallScore < 0.0 {
 		result.OverallScore = 0.0
@@ -103,37 +133,37 @@ func (s *DeliverabilityScorer) CalculateScore(
 	// Build category breakdown
 	result.CategoryBreakdown["Authentication"] = CategoryScore{
 		Score:      result.AuthScore,
-		MaxScore:   3.0,
-		Percentage: (result.AuthScore / 3.0) * 100,
-		Status:     s.getCategoryStatus(result.AuthScore, 3.0),
+		MaxScore:   30.0,
+		Percentage: result.AuthScore,
+		Status:     s.getCategoryStatus(result.AuthScore, 30.0),
 	}
 
 	result.CategoryBreakdown["Spam Filters"] = CategoryScore{
 		Score:      result.SpamScore,
-		MaxScore:   2.0,
-		Percentage: (result.SpamScore / 2.0) * 100,
-		Status:     s.getCategoryStatus(result.SpamScore, 2.0),
+		MaxScore:   20.0,
+		Percentage: result.SpamScore,
+		Status:     s.getCategoryStatus(result.SpamScore, 20.0),
 	}
 
 	result.CategoryBreakdown["Blacklists"] = CategoryScore{
 		Score:      result.BlacklistScore,
-		MaxScore:   2.0,
-		Percentage: (result.BlacklistScore / 2.0) * 100,
-		Status:     s.getCategoryStatus(result.BlacklistScore, 2.0),
+		MaxScore:   20.0,
+		Percentage: result.BlacklistScore,
+		Status:     s.getCategoryStatus(result.BlacklistScore, 20.0),
 	}
 
 	result.CategoryBreakdown["Content Quality"] = CategoryScore{
 		Score:      result.ContentScore,
-		MaxScore:   2.0,
-		Percentage: (result.ContentScore / 2.0) * 100,
-		Status:     s.getCategoryStatus(result.ContentScore, 2.0),
+		MaxScore:   20.0,
+		Percentage: result.ContentScore,
+		Status:     s.getCategoryStatus(result.ContentScore, 20.0),
 	}
 
 	result.CategoryBreakdown["Email Structure"] = CategoryScore{
 		Score:      result.HeaderScore,
-		MaxScore:   1.0,
-		Percentage: (result.HeaderScore / 1.0) * 100,
-		Status:     s.getCategoryStatus(result.HeaderScore, 1.0),
+		MaxScore:   10.0,
+		Percentage: result.HeaderScore,
+		Status:     s.getCategoryStatus(result.HeaderScore, 10.0),
 	}
 
 	// Generate recommendations
@@ -142,7 +172,7 @@ func (s *DeliverabilityScorer) CalculateScore(
 	return result
 }
 
-// calculateHeaderScore evaluates email structural quality (0-1 point)
+// calculateHeaderScore evaluates email structural quality (0-10 points)
 func (s *DeliverabilityScorer) calculateHeaderScore(email *EmailMessage) float32 {
 	if email == nil {
 		return 0.0
@@ -167,14 +197,14 @@ func (s *DeliverabilityScorer) calculateHeaderScore(email *EmailMessage) float32
 		}
 	}
 
-	// Score based on required headers (0.4 points)
+	// Score based on required headers (4 points)
 	if presentHeaders == requiredHeaders {
-		score += 0.4
+		score += 4.0
 	} else {
-		score += 0.4 * (float32(presentHeaders) / float32(requiredHeaders))
+		score += 4.0 * (float32(presentHeaders) / float32(requiredHeaders))
 	}
 
-	// Check recommended headers (0.3 points)
+	// Check recommended headers (3 points)
 	recommendedHeaders := []string{"Subject", "To", "Reply-To"}
 	recommendedPresent := 0
 	for _, header := range recommendedHeaders {
@@ -182,23 +212,23 @@ func (s *DeliverabilityScorer) calculateHeaderScore(email *EmailMessage) float32
 			recommendedPresent++
 		}
 	}
-	score += 0.3 * (float32(recommendedPresent) / float32(len(recommendedHeaders)))
+	score += 3.0 * (float32(recommendedPresent) / float32(len(recommendedHeaders)))
 
-	// Check for proper MIME structure (0.2 points)
+	// Check for proper MIME structure (2 points)
 	if len(email.Parts) > 0 {
-		score += 0.2
+		score += 2.0
 	}
 
-	// Check Message-ID format (0.1 points)
+	// Check Message-ID format (1 point)
 	if messageID := email.GetHeaderValue("Message-ID"); messageID != "" {
 		if s.isValidMessageID(messageID) {
-			score += 0.1
+			score += 1.0
 		}
 	}
 
-	// Ensure score doesn't exceed 1.0
-	if score > 1.0 {
-		score = 1.0
+	// Ensure score doesn't exceed 10.0
+	if score > 10.0 {
+		score = 10.0
 	}
 
 	return score
@@ -229,16 +259,16 @@ func (s *DeliverabilityScorer) isValidMessageID(messageID string) bool {
 	return len(parts[0]) > 0 && len(parts[1]) > 0
 }
 
-// determineRating determines the rating based on overall score
+// determineRating determines the rating based on overall score (0-100)
 func (s *DeliverabilityScorer) determineRating(score float32) string {
 	switch {
-	case score >= 9.0:
+	case score >= 90.0:
 		return "Excellent"
-	case score >= 7.0:
+	case score >= 70.0:
 		return "Good"
-	case score >= 5.0:
+	case score >= 50.0:
 		return "Fair"
-	case score >= 3.0:
+	case score >= 30.0:
 		return "Poor"
 	default:
 		return "Critical"
@@ -263,38 +293,38 @@ func (s *DeliverabilityScorer) getCategoryStatus(score, maxScore float32) string
 func (s *DeliverabilityScorer) generateRecommendations(result *ScoringResult) []string {
 	var recommendations []string
 
-	// Authentication recommendations
-	if result.AuthScore < 2.0 {
+	// Authentication recommendations (0-30 points)
+	if result.AuthScore < 20.0 {
 		recommendations = append(recommendations, "🔐 Improve email authentication by configuring SPF, DKIM, and DMARC records")
-	} else if result.AuthScore < 3.0 {
+	} else if result.AuthScore < 30.0 {
 		recommendations = append(recommendations, "🔐 Fine-tune your email authentication setup for optimal deliverability")
 	}
 
-	// Spam recommendations
-	if result.SpamScore < 1.0 {
+	// Spam recommendations (0-20 points)
+	if result.SpamScore < 10.0 {
 		recommendations = append(recommendations, "⚠️  Reduce spam triggers by reviewing email content and avoiding spam-like patterns")
-	} else if result.SpamScore < 1.5 {
+	} else if result.SpamScore < 15.0 {
 		recommendations = append(recommendations, "⚠️  Monitor spam score and address any flagged content issues")
 	}
 
-	// Blacklist recommendations
-	if result.BlacklistScore < 1.0 {
+	// Blacklist recommendations (0-20 points)
+	if result.BlacklistScore < 10.0 {
 		recommendations = append(recommendations, "🚫 Your IP is listed on blacklists - take immediate action to delist and improve sender reputation")
-	} else if result.BlacklistScore < 2.0 {
+	} else if result.BlacklistScore < 20.0 {
 		recommendations = append(recommendations, "🚫 Monitor your IP reputation and ensure clean sending practices")
 	}
 
-	// Content recommendations
-	if result.ContentScore < 1.0 {
+	// Content recommendations (0-20 points)
+	if result.ContentScore < 10.0 {
 		recommendations = append(recommendations, "📝 Improve email content quality: fix broken links, add alt text to images, and ensure proper HTML structure")
-	} else if result.ContentScore < 1.5 {
+	} else if result.ContentScore < 15.0 {
 		recommendations = append(recommendations, "📝 Enhance email content by optimizing images and ensuring text/HTML consistency")
 	}
 
-	// Header recommendations
-	if result.HeaderScore < 0.5 {
+	// Header recommendations (0-10 points)
+	if result.HeaderScore < 5.0 {
 		recommendations = append(recommendations, "📧 Fix email structure by adding required headers (From, Date, Message-ID)")
-	} else if result.HeaderScore < 1.0 {
+	} else if result.HeaderScore < 10.0 {
 		recommendations = append(recommendations, "📧 Improve email headers by ensuring all recommended fields are present")
 	}
 
@@ -349,13 +379,15 @@ func (s *DeliverabilityScorer) generateRequiredHeadersCheck(email *EmailMessage)
 
 	if len(missing) == 0 {
 		check.Status = api.CheckStatusPass
-		check.Score = 0.4
+		check.Score = 4.0
+		check.Grade = ScoreToCheckGrade((4.0 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "All required headers are present"
 		check.Advice = api.PtrTo("Your email has proper RFC 5322 headers")
 	} else {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
+		check.Grade = ScoreToCheckGrade(0.0)
 		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		check.Message = fmt.Sprintf("Missing required header(s): %s", strings.Join(missing, ", "))
 		check.Advice = api.PtrTo("Add all required headers to ensure email deliverability")
@@ -384,13 +416,15 @@ func (s *DeliverabilityScorer) generateRecommendedHeadersCheck(email *EmailMessa
 
 	if len(missing) == 0 {
 		check.Status = api.CheckStatusPass
-		check.Score = 0.3
+		check.Score = 3.0
+		check.Grade = ScoreToCheckGrade((3.0 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "All recommended headers are present"
 		check.Advice = api.PtrTo("Your email includes all recommended headers")
 	} else if len(missing) < len(recommendedHeaders) {
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.15
+		check.Score = 1.5
+		check.Grade = ScoreToCheckGrade((1.5 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = fmt.Sprintf("Missing some recommended header(s): %s", strings.Join(missing, ", "))
 		check.Advice = api.PtrTo("Consider adding recommended headers for better deliverability")
@@ -399,6 +433,7 @@ func (s *DeliverabilityScorer) generateRecommendedHeadersCheck(email *EmailMessa
 	} else {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
+		check.Grade = ScoreToCheckGrade(0.0)
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "Missing all recommended headers"
 		check.Advice = api.PtrTo("Add recommended headers (Subject, To, Reply-To) for better email presentation")
@@ -419,19 +454,22 @@ func (s *DeliverabilityScorer) generateMessageIDCheck(email *EmailMessage) api.C
 	if messageID == "" {
 		check.Status = api.CheckStatusFail
 		check.Score = 0.0
+		check.Grade = ScoreToCheckGrade(0.0)
 		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Message = "Message-ID header is missing"
 		check.Advice = api.PtrTo("Add a unique Message-ID header to your email")
 	} else if !s.isValidMessageID(messageID) {
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.05
+		check.Score = 0.5
+		check.Grade = ScoreToCheckGrade((0.5 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Message = "Message-ID format is invalid"
 		check.Advice = api.PtrTo("Use proper Message-ID format: <unique-id@domain.com>")
 		check.Details = &messageID
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 0.1
+		check.Score = 1.0
+		check.Grade = ScoreToCheckGrade((1.0 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = "Message-ID is properly formatted"
 		check.Advice = api.PtrTo("Your Message-ID follows RFC 5322 standards")
@@ -451,12 +489,14 @@ func (s *DeliverabilityScorer) generateMIMEStructureCheck(email *EmailMessage) a
 	if len(email.Parts) == 0 {
 		check.Status = api.CheckStatusWarn
 		check.Score = 0.0
+		check.Grade = ScoreToCheckGrade(0.0)
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Message = "No MIME parts detected"
 		check.Advice = api.PtrTo("Consider using multipart MIME for better compatibility")
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 0.2
+		check.Score = 2.0
+		check.Grade = ScoreToCheckGrade((2.0 / 10.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Proper MIME structure with %d part(s)", len(email.Parts))
 		check.Advice = api.PtrTo("Your email has proper MIME structure")
@@ -481,17 +521,17 @@ func (s *DeliverabilityScorer) generateMIMEStructureCheck(email *EmailMessage) a
 func (s *DeliverabilityScorer) GetScoreSummary(result *ScoringResult) string {
 	var summary strings.Builder
 
-	summary.WriteString(fmt.Sprintf("Overall Score: %.1f/10 (%s)\n\n", result.OverallScore, result.Rating))
+	summary.WriteString(fmt.Sprintf("Overall Score: %.1f/100 (%s) - Grade: %s\n\n", result.OverallScore, result.Rating, ScoreToGrade(result.OverallScore)))
 	summary.WriteString("Category Breakdown:\n")
-	summary.WriteString(fmt.Sprintf("  • Authentication:    %.1f/3.0 (%.0f%%) - %s\n",
+	summary.WriteString(fmt.Sprintf("  • Authentication:    %.1f/30.0 (%.0f%%) - %s\n",
 		result.AuthScore, result.CategoryBreakdown["Authentication"].Percentage, result.CategoryBreakdown["Authentication"].Status))
-	summary.WriteString(fmt.Sprintf("  • Spam Filters:      %.1f/2.0 (%.0f%%) - %s\n",
+	summary.WriteString(fmt.Sprintf("  • Spam Filters:      %.1f/20.0 (%.0f%%) - %s\n",
 		result.SpamScore, result.CategoryBreakdown["Spam Filters"].Percentage, result.CategoryBreakdown["Spam Filters"].Status))
-	summary.WriteString(fmt.Sprintf("  • Blacklists:        %.1f/2.0 (%.0f%%) - %s\n",
+	summary.WriteString(fmt.Sprintf("  • Blacklists:        %.1f/20.0 (%.0f%%) - %s\n",
 		result.BlacklistScore, result.CategoryBreakdown["Blacklists"].Percentage, result.CategoryBreakdown["Blacklists"].Status))
-	summary.WriteString(fmt.Sprintf("  • Content Quality:   %.1f/2.0 (%.0f%%) - %s\n",
+	summary.WriteString(fmt.Sprintf("  • Content Quality:   %.1f/20.0 (%.0f%%) - %s\n",
 		result.ContentScore, result.CategoryBreakdown["Content Quality"].Percentage, result.CategoryBreakdown["Content Quality"].Status))
-	summary.WriteString(fmt.Sprintf("  • Email Structure:   %.1f/1.0 (%.0f%%) - %s\n",
+	summary.WriteString(fmt.Sprintf("  • Email Structure:   %.1f/10.0 (%.0f%%) - %s\n",
 		result.HeaderScore, result.CategoryBreakdown["Email Structure"].Percentage, result.CategoryBreakdown["Email Structure"].Status))
 
 	if len(result.Recommendations) > 0 {
@@ -504,41 +544,41 @@ func (s *DeliverabilityScorer) GetScoreSummary(result *ScoringResult) string {
 	return summary.String()
 }
 
-// GetAuthenticationScore calculates the authentication score (0-3 points)
+// GetAuthenticationScore calculates the authentication score (0-30 points)
 func (s *DeliverabilityScorer) GetAuthenticationScore(results *api.AuthenticationResults) float32 {
 	var score float32 = 0.0
 
-	// SPF: 1 point for pass, 0.5 for neutral/softfail, 0 for fail
+	// SPF: 10 points for pass, 5 for neutral/softfail, 0 for fail
 	if results.Spf != nil {
 		switch results.Spf.Result {
 		case api.AuthResultResultPass:
-			score += 1.0
+			score += 10.0
 		case api.AuthResultResultNeutral, api.AuthResultResultSoftfail:
-			score += 0.5
+			score += 5.0
 		}
 	}
 
-	// DKIM: 1 point for at least one pass
+	// DKIM: 10 points for at least one pass
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		for _, dkim := range *results.Dkim {
 			if dkim.Result == api.AuthResultResultPass {
-				score += 1.0
+				score += 10.0
 				break
 			}
 		}
 	}
 
-	// DMARC: 1 point for pass
+	// DMARC: 10 points for pass
 	if results.Dmarc != nil {
 		switch results.Dmarc.Result {
 		case api.AuthResultResultPass:
-			score += 1.0
+			score += 10.0
 		}
 	}
 
-	// Cap at 3 points maximum
-	if score > 3.0 {
-		score = 3.0
+	// Cap at 30 points maximum
+	if score > 30.0 {
+		score = 30.0
 	}
 
 	return score

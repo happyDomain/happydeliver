@@ -745,7 +745,7 @@ func (c *ContentAnalyzer) generateSuspiciousURLCheck(results *ContentResults) ap
 	return check
 }
 
-// GetContentScore calculates the content score (0-2 points)
+// GetContentScore calculates the content score (0-20 points)
 func (c *ContentAnalyzer) GetContentScore(results *ContentResults) float32 {
 	if results == nil {
 		return 0.0
@@ -753,12 +753,12 @@ func (c *ContentAnalyzer) GetContentScore(results *ContentResults) float32 {
 
 	var score float32 = 0.0
 
-	// HTML validity (0.2 points)
+	// HTML validity (2 points)
 	if results.HTMLValid {
-		score += 0.2
+		score += 2.0
 	}
 
-	// Links (0.4 points)
+	// Links (4 points)
 	if len(results.Links) > 0 {
 		brokenLinks := 0
 		for _, link := range results.Links {
@@ -767,14 +767,14 @@ func (c *ContentAnalyzer) GetContentScore(results *ContentResults) float32 {
 			}
 		}
 		if brokenLinks == 0 {
-			score += 0.4
+			score += 4.0
 		}
 	} else {
 		// No links is neutral, give partial score
-		score += 0.2
+		score += 2.0
 	}
 
-	// Images (0.3 points)
+	// Images (3 points)
 	if len(results.Images) > 0 {
 		noAltCount := 0
 		for _, img := range results.Images {
@@ -783,47 +783,47 @@ func (c *ContentAnalyzer) GetContentScore(results *ContentResults) float32 {
 			}
 		}
 		if noAltCount == 0 {
-			score += 0.3
+			score += 3.0
 		} else if noAltCount < len(results.Images) {
-			score += 0.15
+			score += 1.5
 		}
 	} else {
 		// No images is neutral
-		score += 0.15
+		score += 1.5
 	}
 
-	// Unsubscribe link (0.3 points)
+	// Unsubscribe link (3 points)
 	if results.HasUnsubscribe {
-		score += 0.3
+		score += 3.0
 	}
 
-	// Text consistency (0.3 points)
+	// Text consistency (3 points)
 	if results.TextPlainRatio >= 0.3 {
-		score += 0.3
+		score += 3.0
 	}
 
-	// Image ratio (0.3 points)
+	// Image ratio (3 points)
 	if results.ImageTextRatio <= 5.0 {
-		score += 0.3
+		score += 3.0
 	} else if results.ImageTextRatio <= 10.0 {
-		score += 0.15
+		score += 1.5
 	}
 
-	// Penalize suspicious URLs (deduct up to 0.5 points)
+	// Penalize suspicious URLs (deduct up to 5 points)
 	if len(results.SuspiciousURLs) > 0 {
-		penalty := float32(len(results.SuspiciousURLs)) * 0.1
-		if penalty > 0.5 {
-			penalty = 0.5
+		penalty := float32(len(results.SuspiciousURLs)) * 1.0
+		if penalty > 5.0 {
+			penalty = 5.0
 		}
 		score -= penalty
 	}
 
-	// Ensure score is between 0 and 2
+	// Ensure score is between 0 and 20
 	if score < 0 {
 		score = 0
 	}
-	if score > 2.0 {
-		score = 2.0
+	if score > 20.0 {
+		score = 20.0
 	}
 
 	return score

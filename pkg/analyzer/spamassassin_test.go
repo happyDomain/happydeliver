@@ -169,7 +169,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         -2.5,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 2.0,
+			expectedScore: 20.0,
 		},
 		{
 			name: "Good score (below threshold)",
@@ -177,8 +177,8 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
-			minScore: 1.5,
-			maxScore: 2.0,
+			minScore: 15.0,
+			maxScore: 20.0,
 		},
 		{
 			name: "Borderline (just above threshold)",
@@ -186,7 +186,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         6.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 1.0,
+			expectedScore: 10.0,
 		},
 		{
 			name: "High spam score",
@@ -194,7 +194,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         12.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0.5,
+			expectedScore: 5.0,
 		},
 		{
 			name: "Very high spam score",
@@ -618,7 +618,7 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 
 	// Test GetSpamAssassinScore
 	score := analyzer.GetSpamAssassinScore(result)
-	if score != 2.0 {
+	if score != 20.0 {
 		t.Errorf("GetSpamAssassinScore() = %v, want 2.0 (excellent score for negative spam score)", score)
 	}
 
@@ -639,8 +639,8 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 	if !strings.Contains(mainCheck.Message, "spam score") {
 		t.Errorf("Main check message should contain 'spam score', got: %s", mainCheck.Message)
 	}
-	if mainCheck.Score != 2.0 {
-		t.Errorf("Main check score = %v, want 2.0", mainCheck.Score)
+	if mainCheck.Score != 20.0 {
+		t.Errorf("Main check score = %v, want 20.0", mainCheck.Score)
 	}
 
 	// Log all checks for debugging

@@ -31,10 +31,7 @@
             </div>
             <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h5 class="fw-bold mb-1">{check.name}</h5>
-                        <span class="badge bg-secondary text-capitalize">{check.category}</span>
-                    </div>
+                    <h5 class="fw-bold mb-1">{check.name}</h5>
                     <span class="badge bg-light text-dark">{check.score.toFixed(1)} pts</span>
                 </div>
 

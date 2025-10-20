@@ -174,12 +174,12 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *SpamAssass
 	}
 }
 
-// GetSpamAssassinScore calculates the SpamAssassin contribution to deliverability (0-2 points)
+// GetSpamAssassinScore calculates the SpamAssassin contribution to deliverability (0-20 points)
 // Scoring:
-// - Score <= 0: 2 points (excellent)
-// - Score < required: 1.5 points (good)
-// - Score slightly above required (< 2x): 1 point (borderline)
-// - Score moderately high (< 3x required): 0.5 points (poor)
+// - Score <= 0: 20 points (excellent)
+// - Score < required: 15 points (good)
+// - Score slightly above required (< 2x): 10 points (borderline)
+// - Score moderately high (< 3x required): 5 points (poor)
 // - Score very high: 0 points (spam)
 func (a *SpamAssassinAnalyzer) GetSpamAssassinScore(result *SpamAssassinResult) float32 {
 	if result == nil {
@@ -194,17 +194,17 @@ func (a *SpamAssassinAnalyzer) GetSpamAssassinScore(result *SpamAssassinResult) 
 
 	// Calculate deliverability score
 	if score <= 0 {
-		return 2.0
+		return 20.0
 	} else if score < required {
-		// Linear scaling from 1.5 to 2.0 based on how negative/low the score is
+		// Linear scaling from 15 to 20 based on how negative/low the score is
 		ratio := score / required
-		return 1.5 + (0.5 * (1.0 - float32(ratio)))
+		return 15.0 + (5.0 * (1.0 - float32(ratio)))
 	} else if score < required*2 {
 		// Slightly above threshold
-		return 1.0
+		return 10.0
 	} else if score < required*3 {
 		// Moderately high
-		return 0.5
+		return 5.0
 	}
 
 	// Very high spam score
@@ -221,6 +221,7 @@ func (a *SpamAssassinAnalyzer) GenerateSpamAssassinChecks(result *SpamAssassinRe
 			Name:     "SpamAssassin Analysis",
 			Status:   api.CheckStatusWarn,
 			Score:    0.0,
+			Grade:    ScoreToCheckGrade(0.0),
 			Message:  "No SpamAssassin headers found",
 			Severity: api.PtrTo(api.CheckSeverityMedium),
 			Advice:   api.PtrTo("Ensure your MTA is configured to run SpamAssassin checks"),
@@ -260,6 +261,7 @@ func (a *SpamAssassinAnalyzer) generateMainSpamCheck(result *SpamAssassinResult)
 
 	delivScore := a.GetSpamAssassinScore(result)
 	check.Score = delivScore
+	check.Grade = ScoreToCheckGrade((delivScore / 20.0) * 100)
 
 	// Determine status and message based on score
 	if score <= 0 {
@@ -318,6 +320,7 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 			check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		}
 		check.Score = 0.0
+		check.Grade = ScoreToCheckGrade(0.0)
 		check.Message = fmt.Sprintf("Test failed with score +%.1f", detail.Score)
 		advice := fmt.Sprintf("%s. This test adds %.1f to your spam score", detail.Description, detail.Score)
 		check.Advice = &advice
@@ -325,6 +328,7 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 		// Positive indicator (decreases spam score)
 		check.Status = api.CheckStatusPass
 		check.Score = 1.0
+		check.Grade = ScoreToCheckGrade((1.0 / 20.0) * 100)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Test passed with score %.1f", detail.Score)
 		advice := fmt.Sprintf("%s. This test reduces your spam score by %.1f", detail.Description, -detail.Score)

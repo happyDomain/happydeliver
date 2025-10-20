@@ -946,8 +946,8 @@ func TestGetContentScore(t *testing.T) {
 				TextPlainRatio: 0.8,
 				ImageTextRatio: 3.0,
 			},
-			minScore: 1.8,
-			maxScore: 2.0,
+			minScore: 18.0,
+			maxScore: 20.0,
 		},
 		{
 			name: "Poor content",
@@ -961,7 +961,7 @@ func TestGetContentScore(t *testing.T) {
 				SuspiciousURLs: []string{"url1", "url2"},
 			},
 			minScore: 0.0,
-			maxScore: 0.5,
+			maxScore: 5.0,
 		},
 		{
 			name: "Average content",
@@ -973,8 +973,8 @@ func TestGetContentScore(t *testing.T) {
 				TextPlainRatio: 0.5,
 				ImageTextRatio: 4.0,
 			},
-			minScore: 1.0,
-			maxScore: 1.8,
+			minScore: 10.0,
+			maxScore: 18.0,
 		},
 	}
 
@@ -988,9 +988,9 @@ func TestGetContentScore(t *testing.T) {
 				t.Errorf("GetContentScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
 
-			// Ensure score is capped at 2.0
-			if score > 2.0 {
-				t.Errorf("Score %v exceeds maximum of 2.0", score)
+			// Ensure score is capped at 20.0
+			if score > 20.0 {
+				t.Errorf("Score %v exceeds maximum of 20.0", score)
 			}
 
 			// Ensure score is not negative

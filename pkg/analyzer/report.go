@@ -100,6 +100,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		Id:        utils.UUIDToBase32(reportID),
 		TestId:    utils.UUIDToBase32(testID),
 		Score:     results.Score.OverallScore,
+		Grade:     ScoreToReportGrade(results.Score.OverallScore),
 		CreatedAt: now,
 	}
 

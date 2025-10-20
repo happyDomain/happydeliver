@@ -125,8 +125,8 @@ func TestCalculateHeaderScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore: 0.7,
-			maxScore: 1.0,
+			minScore: 7.0,
+			maxScore: 10.0,
 		},
 		{
 			name: "Missing required headers",
@@ -136,7 +136,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 				}),
 			},
 			minScore: 0.0,
-			maxScore: 0.4,
+			maxScore: 4.0,
 		},
 		{
 			name: "Required only, no recommended",
@@ -150,8 +150,8 @@ func TestCalculateHeaderScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore: 0.4,
-			maxScore: 0.8,
+			minScore: 4.0,
+			maxScore: 8.0,
 		},
 		{
 			name: "Invalid Message-ID format",
@@ -168,8 +168,8 @@ func TestCalculateHeaderScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore: 0.7,
-			maxScore: 1.0,
+			minScore: 7.0,
+			maxScore: 10.0,
 		},
 	}
 
@@ -191,16 +191,16 @@ func TestDetermineRating(t *testing.T) {
 		score    float32
 		expected string
 	}{
-		{name: "Excellent - 10.0", score: 10.0, expected: "Excellent"},
-		{name: "Excellent - 9.5", score: 9.5, expected: "Excellent"},
-		{name: "Excellent - 9.0", score: 9.0, expected: "Excellent"},
-		{name: "Good - 8.5", score: 8.5, expected: "Good"},
-		{name: "Good - 7.0", score: 7.0, expected: "Good"},
-		{name: "Fair - 6.5", score: 6.5, expected: "Fair"},
-		{name: "Fair - 5.0", score: 5.0, expected: "Fair"},
-		{name: "Poor - 4.5", score: 4.5, expected: "Poor"},
-		{name: "Poor - 3.0", score: 3.0, expected: "Poor"},
-		{name: "Critical - 2.5", score: 2.5, expected: "Critical"},
+		{name: "Excellent - 10.0", score: 100.0, expected: "Excellent"},
+		{name: "Excellent - 9.5", score: 95.0, expected: "Excellent"},
+		{name: "Excellent - 9.0", score: 90.0, expected: "Excellent"},
+		{name: "Good - 8.5", score: 85.0, expected: "Good"},
+		{name: "Good - 7.0", score: 70.0, expected: "Good"},
+		{name: "Fair - 6.5", score: 65.0, expected: "Fair"},
+		{name: "Fair - 5.0", score: 50.0, expected: "Fair"},
+		{name: "Poor - 4.5", score: 45.0, expected: "Poor"},
+		{name: "Poor - 3.0", score: 30.0, expected: "Poor"},
+		{name: "Critical - 2.5", score: 25.0, expected: "Critical"},
 		{name: "Critical - 0.0", score: 0.0, expected: "Critical"},
 	}
 
@@ -294,8 +294,8 @@ func TestCalculateScore(t *testing.T) {
 				MessageID: "<abc123@example.com>",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore:       9.0,
-			maxScore:       10.0,
+			minScore:       90.0,
+			maxScore:       100.0,
 			expectedRating: "Excellent",
 		},
 		{
@@ -330,7 +330,7 @@ func TestCalculateScore(t *testing.T) {
 				}),
 			},
 			minScore:       0.0,
-			maxScore:       5.0,
+			maxScore:       50.0,
 			expectedRating: "Poor",
 		},
 		{
@@ -366,8 +366,8 @@ func TestCalculateScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore:       6.0,
-			maxScore:       9.0,
+			minScore:       60.0,
+			maxScore:       90.0,
 			expectedRating: "Good",
 		},
 	}
@@ -399,8 +399,8 @@ func TestCalculateScore(t *testing.T) {
 			}
 
 			// Verify score is within bounds
-			if result.OverallScore < 0.0 || result.OverallScore > 10.0 {
-				t.Errorf("OverallScore %v is out of bounds [0.0, 10.0]", result.OverallScore)
+			if result.OverallScore < 0.0 || result.OverallScore > 100.0 {
+				t.Errorf("OverallScore %v is out of bounds [0.0, 100.0]", result.OverallScore)
 			}
 
 			// Verify category breakdown exists
@@ -535,7 +535,7 @@ func TestGenerateRequiredHeadersCheck(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.4,
+			expectedScore:  4.0,
 		},
 		{
 			name: "Missing all required headers",

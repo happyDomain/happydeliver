@@ -272,14 +272,14 @@ func TestGetBlacklistScore(t *testing.T) {
 		{
 			name:          "Nil results",
 			results:       nil,
-			expectedScore: 2.0,
+			expectedScore: 20.0,
 		},
 		{
 			name: "No IPs checked",
 			results: &RBLResults{
 				IPsChecked: []string{},
 			},
-			expectedScore: 2.0,
+			expectedScore: 20.0,
 		},
 		{
 			name: "Not listed on any RBL",
@@ -287,7 +287,7 @@ func TestGetBlacklistScore(t *testing.T) {
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 0,
 			},
-			expectedScore: 2.0,
+			expectedScore: 20.0,
 		},
 		{
 			name: "Listed on 1 RBL",
@@ -295,7 +295,7 @@ func TestGetBlacklistScore(t *testing.T) {
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 1,
 			},
-			expectedScore: 1.0,
+			expectedScore: 10.0,
 		},
 		{
 			name: "Listed on 2 RBLs",
@@ -303,7 +303,7 @@ func TestGetBlacklistScore(t *testing.T) {
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 2,
 			},
-			expectedScore: 0.5,
+			expectedScore: 5.0,
 		},
 		{
 			name: "Listed on 3 RBLs",
@@ -311,7 +311,7 @@ func TestGetBlacklistScore(t *testing.T) {
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 3,
 			},
-			expectedScore: 0.5,
+			expectedScore: 5.0,
 		},
 		{
 			name: "Listed on 4+ RBLs",
@@ -350,7 +350,7 @@ func TestGenerateSummaryCheck(t *testing.T) {
 				Checks:      make([]RBLCheck, 6), // 6 default RBLs
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  2.0,
+			expectedScore:  20.0,
 		},
 		{
 			name: "Listed on 1 RBL",
@@ -360,7 +360,7 @@ func TestGenerateSummaryCheck(t *testing.T) {
 				Checks:      make([]RBLCheck, 6),
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  1.0,
+			expectedScore:  10.0,
 		},
 		{
 			name: "Listed on 2 RBLs",
@@ -370,7 +370,7 @@ func TestGenerateSummaryCheck(t *testing.T) {
 				Checks:      make([]RBLCheck, 6),
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.5,
+			expectedScore:  5.0,
 		},
 		{
 			name: "Listed on 4+ RBLs",
