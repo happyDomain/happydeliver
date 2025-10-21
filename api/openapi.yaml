@@ -277,9 +277,18 @@ components:
           items:
             $ref: '#/components/schemas/DNSRecord'
         blacklists:
-          type: array
-          items:
-            $ref: '#/components/schemas/BlacklistCheck'
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/BlacklistCheck'
+          description: Map of IP addresses to their blacklist check results (array of checks per IP)
+          example:
+            "192.0.2.1":
+              - rbl: "zen.spamhaus.org"
+                listed: false
+              - rbl: "bl.spamcop.net"
+                listed: false
         raw_headers:
           type: string
           description: Raw email headers
@@ -498,14 +507,9 @@ components:
     BlacklistCheck:
       type: object
       required:
-        - ip
         - rbl
         - listed
       properties:
-        ip:
-          type: string
-          description: IP address checked
-          example: "192.0.2.1"
         rbl:
           type: string
           description: RBL/DNSBL name

@@ -347,7 +347,9 @@ func TestGenerateSummaryCheck(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 0,
-				Checks:      make([]RBLCheck, 6), // 6 default RBLs
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": make([]RBLCheck, 6), // 6 default RBLs
+				},
 			},
 			expectedStatus: api.CheckStatusPass,
 			expectedScore:  200,
@@ -357,7 +359,9 @@ func TestGenerateSummaryCheck(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 1,
-				Checks:      make([]RBLCheck, 6),
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": make([]RBLCheck, 6),
+				},
 			},
 			expectedStatus: api.CheckStatusWarn,
 			expectedScore:  100,
@@ -367,7 +371,9 @@ func TestGenerateSummaryCheck(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 2,
-				Checks:      make([]RBLCheck, 6),
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": make([]RBLCheck, 6),
+				},
 			},
 			expectedStatus: api.CheckStatusWarn,
 			expectedScore:  50,
@@ -377,7 +383,9 @@ func TestGenerateSummaryCheck(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 4,
-				Checks:      make([]RBLCheck, 6),
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": make([]RBLCheck, 6),
+				},
 			},
 			expectedStatus: api.CheckStatusFail,
 			expectedScore:  0,
@@ -413,7 +421,6 @@ func TestGenerateListingCheck(t *testing.T) {
 		{
 			name: "Spamhaus listing",
 			rblCheck: &RBLCheck{
-				IP:       "198.51.100.1",
 				RBL:      "zen.spamhaus.org",
 				Listed:   true,
 				Response: "127.0.0.2",
@@ -424,7 +431,6 @@ func TestGenerateListingCheck(t *testing.T) {
 		{
 			name: "SpamCop listing",
 			rblCheck: &RBLCheck{
-				IP:       "198.51.100.1",
 				RBL:      "bl.spamcop.net",
 				Listed:   true,
 				Response: "127.0.0.2",
@@ -435,7 +441,6 @@ func TestGenerateListingCheck(t *testing.T) {
 		{
 			name: "Other RBL listing",
 			rblCheck: &RBLCheck{
-				IP:       "198.51.100.1",
 				RBL:      "dnsbl.sorbs.net",
 				Listed:   true,
 				Response: "127.0.0.2",
@@ -449,7 +454,7 @@ func TestGenerateListingCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			check := checker.generateListingCheck(tt.rblCheck)
+			check := checker.generateListingCheck("198.51.100.1", tt.rblCheck)
 
 			if check.Status != tt.expectedStatus {
 				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
@@ -490,9 +495,11 @@ func TestGenerateRBLChecks(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 0,
-				Checks: []RBLCheck{
-					{IP: "198.51.100.1", RBL: "zen.spamhaus.org", Listed: false},
-					{IP: "198.51.100.1", RBL: "bl.spamcop.net", Listed: false},
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": {
+						{RBL: "zen.spamhaus.org", Listed: false},
+						{RBL: "bl.spamcop.net", Listed: false},
+					},
 				},
 			},
 			minChecks: 1, // Summary check only
@@ -502,10 +509,12 @@ func TestGenerateRBLChecks(t *testing.T) {
 			results: &RBLResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 2,
-				Checks: []RBLCheck{
-					{IP: "198.51.100.1", RBL: "zen.spamhaus.org", Listed: true},
-					{IP: "198.51.100.1", RBL: "bl.spamcop.net", Listed: true},
-					{IP: "198.51.100.1", RBL: "dnsbl.sorbs.net", Listed: false},
+				Checks: map[string][]RBLCheck{
+					"198.51.100.1": {
+						{RBL: "zen.spamhaus.org", Listed: true},
+						{RBL: "bl.spamcop.net", Listed: true},
+						{RBL: "dnsbl.sorbs.net", Listed: false},
+					},
 				},
 			},
 			minChecks: 3, // Summary + 2 listing checks
@@ -534,12 +543,18 @@ func TestGenerateRBLChecks(t *testing.T) {
 
 func TestGetUniqueListedIPs(t *testing.T) {
 	results := &RBLResults{
-		Checks: []RBLCheck{
-			{IP: "198.51.100.1", RBL: "zen.spamhaus.org", Listed: true},
-			{IP: "198.51.100.1", RBL: "bl.spamcop.net", Listed: true},
-			{IP: "198.51.100.2", RBL: "zen.spamhaus.org", Listed: true},
-			{IP: "198.51.100.2", RBL: "bl.spamcop.net", Listed: false},
-			{IP: "198.51.100.3", RBL: "zen.spamhaus.org", Listed: false},
+		Checks: map[string][]RBLCheck{
+			"198.51.100.1": {
+				{RBL: "zen.spamhaus.org", Listed: true},
+				{RBL: "bl.spamcop.net", Listed: true},
+			},
+			"198.51.100.2": {
+				{RBL: "zen.spamhaus.org", Listed: true},
+				{RBL: "bl.spamcop.net", Listed: false},
+			},
+			"198.51.100.3": {
+				{RBL: "zen.spamhaus.org", Listed: false},
+			},
 		},
 	}
 
@@ -556,11 +571,15 @@ func TestGetUniqueListedIPs(t *testing.T) {
 
 func TestGetRBLsForIP(t *testing.T) {
 	results := &RBLResults{
-		Checks: []RBLCheck{
-			{IP: "198.51.100.1", RBL: "zen.spamhaus.org", Listed: true},
-			{IP: "198.51.100.1", RBL: "bl.spamcop.net", Listed: true},
-			{IP: "198.51.100.1", RBL: "dnsbl.sorbs.net", Listed: false},
-			{IP: "198.51.100.2", RBL: "zen.spamhaus.org", Listed: true},
+		Checks: map[string][]RBLCheck{
+			"198.51.100.1": {
+				{RBL: "zen.spamhaus.org", Listed: true},
+				{RBL: "bl.spamcop.net", Listed: true},
+				{RBL: "dnsbl.sorbs.net", Listed: false},
+			},
+			"198.51.100.2": {
+				{RBL: "zen.spamhaus.org", Listed: true},
+			},
 		},
 	}
 

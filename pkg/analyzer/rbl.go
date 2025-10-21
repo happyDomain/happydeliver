@@ -68,14 +68,14 @@ func NewRBLChecker(timeout time.Duration, rbls []string) *RBLChecker {
 
 // RBLResults represents the results of RBL checks
 type RBLResults struct {
-	Checks      []RBLCheck
+	Checks      map[string][]RBLCheck // Map of IP -> list of RBL checks for that IP
 	IPsChecked  []string
 	ListedCount int
 }
 
 // RBLCheck represents a single RBL check result
+// Note: IP is not included here as it's used as the map key in the API
 type RBLCheck struct {
-	IP       string
 	RBL      string
 	Listed   bool
 	Response string
@@ -84,7 +84,9 @@ type RBLCheck struct {
 
 // CheckEmail checks all IPs found in the email headers against RBLs
 func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
-	results := &RBLResults{}
+	results := &RBLResults{
+		Checks: make(map[string][]RBLCheck),
+	}
 
 	// Extract IPs from Received headers
 	ips := r.extractIPs(email)
@@ -98,7 +100,7 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 	for _, ip := range ips {
 		for _, rbl := range r.RBLs {
 			check := r.checkIP(ip, rbl)
-			results.Checks = append(results.Checks, check)
+			results.Checks[ip] = append(results.Checks[ip], check)
 			if check.Listed {
 				results.ListedCount++
 			}
@@ -179,7 +181,6 @@ func (r *RBLChecker) isPublicIP(ipStr string) bool {
 // checkIP checks a single IP against a single RBL
 func (r *RBLChecker) checkIP(ip, rbl string) RBLCheck {
 	check := RBLCheck{
-		IP:  ip,
 		RBL: rbl,
 	}
 
@@ -285,14 +286,16 @@ func (r *RBLChecker) GenerateRBLChecks(results *RBLResults) []api.Check {
 	checks = append(checks, summaryCheck)
 
 	// Create individual checks for each listing and RBL errors
-	for _, check := range results.Checks {
-		if check.Listed {
-			detailCheck := r.generateListingCheck(&check)
-			checks = append(checks, detailCheck)
-		} else if check.Error != "" && strings.Contains(check.Error, "RBL operational issue") {
-			// Generate info check for RBL errors
-			detailCheck := r.generateRBLErrorCheck(&check)
-			checks = append(checks, detailCheck)
+	for ip, rblChecks := range results.Checks {
+		for _, check := range rblChecks {
+			if check.Listed {
+				detailCheck := r.generateListingCheck(ip, &check)
+				checks = append(checks, detailCheck)
+			} else if check.Error != "" && strings.Contains(check.Error, "RBL operational issue") {
+				// Generate info check for RBL errors
+				detailCheck := r.generateRBLErrorCheck(ip, &check)
+				checks = append(checks, detailCheck)
+			}
 		}
 	}
 
@@ -310,7 +313,11 @@ func (r *RBLChecker) generateSummaryCheck(results *RBLResults) api.Check {
 	check.Score = score
 	check.Grade = ScoreToCheckGrade(score)
 
-	totalChecks := len(results.Checks)
+	// Calculate total checks across all IPs
+	totalChecks := 0
+	for _, rblChecks := range results.Checks {
+		totalChecks += len(rblChecks)
+	}
 	listedCount := results.ListedCount
 
 	if listedCount == 0 {
@@ -345,7 +352,7 @@ func (r *RBLChecker) generateSummaryCheck(results *RBLResults) api.Check {
 }
 
 // generateListingCheck creates a check for a specific RBL listing
-func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
+func (r *RBLChecker) generateListingCheck(ip string, rblCheck *RBLCheck) api.Check {
 	check := api.Check{
 		Category: api.Blacklist,
 		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
@@ -354,7 +361,7 @@ func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
 		Grade:    ScoreToCheckGrade(0),
 	}
 
-	check.Message = fmt.Sprintf("IP %s is listed on %s", rblCheck.IP, rblCheck.RBL)
+	check.Message = fmt.Sprintf("IP %s is listed on %s", ip, rblCheck.RBL)
 
 	// Determine severity based on which RBL
 	if strings.Contains(rblCheck.RBL, "spamhaus") {
@@ -381,7 +388,7 @@ func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
 }
 
 // generateRBLErrorCheck creates an info-level check for RBL operational errors
-func (r *RBLChecker) generateRBLErrorCheck(rblCheck *RBLCheck) api.Check {
+func (r *RBLChecker) generateRBLErrorCheck(ip string, rblCheck *RBLCheck) api.Check {
 	check := api.Check{
 		Category: api.Blacklist,
 		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
@@ -391,7 +398,7 @@ func (r *RBLChecker) generateRBLErrorCheck(rblCheck *RBLCheck) api.Check {
 		Severity: api.PtrTo(api.CheckSeverityInfo),
 	}
 
-	check.Message = fmt.Sprintf("RBL %s returned an error code for IP %s", rblCheck.RBL, rblCheck.IP)
+	check.Message = fmt.Sprintf("RBL %s returned an error code for IP %s", rblCheck.RBL, ip)
 
 	advice := fmt.Sprintf("The RBL %s is experiencing operational issues (error code: %s).", rblCheck.RBL, rblCheck.Response)
 	check.Advice = &advice
@@ -406,13 +413,14 @@ func (r *RBLChecker) generateRBLErrorCheck(rblCheck *RBLCheck) api.Check {
 
 // GetUniqueListedIPs returns a list of unique IPs that are listed on at least one RBL
 func (r *RBLChecker) GetUniqueListedIPs(results *RBLResults) []string {
-	seenIPs := make(map[string]bool)
 	var listedIPs []string
 
-	for _, check := range results.Checks {
-		if check.Listed && !seenIPs[check.IP] {
-			listedIPs = append(listedIPs, check.IP)
-			seenIPs[check.IP] = true
+	for ip, rblChecks := range results.Checks {
+		for _, check := range rblChecks {
+			if check.Listed {
+				listedIPs = append(listedIPs, ip)
+				break // Only add the IP once
+			}
 		}
 	}
 
@@ -423,9 +431,11 @@ func (r *RBLChecker) GetUniqueListedIPs(results *RBLResults) []string {
 func (r *RBLChecker) GetRBLsForIP(results *RBLResults, ip string) []string {
 	var rbls []string
 
-	for _, check := range results.Checks {
-		if check.IP == ip && check.Listed {
-			rbls = append(rbls, check.RBL)
+	if rblChecks, exists := results.Checks[ip]; exists {
+		for _, check := range rblChecks {
+			if check.Listed {
+				rbls = append(rbls, check.RBL)
+			}
 		}
 	}
 

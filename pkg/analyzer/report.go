@@ -190,21 +190,29 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		}
 	}
 
-	// Add blacklist checks
+	// Add blacklist checks as a map of IP -> array of BlacklistCheck
 	if results.RBL != nil && len(results.RBL.Checks) > 0 {
-		blacklistChecks := make([]api.BlacklistCheck, 0, len(results.RBL.Checks))
-		for _, check := range results.RBL.Checks {
-			blCheck := api.BlacklistCheck{
-				Ip:     check.IP,
-				Rbl:    check.RBL,
-				Listed: check.Listed,
+		blacklistMap := make(map[string][]api.BlacklistCheck)
+
+		// Convert internal RBL checks to API format
+		for ip, rblChecks := range results.RBL.Checks {
+			apiChecks := make([]api.BlacklistCheck, 0, len(rblChecks))
+			for _, check := range rblChecks {
+				blCheck := api.BlacklistCheck{
+					Rbl:    check.RBL,
+					Listed: check.Listed,
+				}
+				if check.Response != "" {
+					blCheck.Response = &check.Response
+				}
+				apiChecks = append(apiChecks, blCheck)
 			}
-			if check.Response != "" {
-				blCheck.Response = &check.Response
-			}
-			blacklistChecks = append(blacklistChecks, blCheck)
+			blacklistMap[ip] = apiChecks
 		}
-		report.Blacklists = &blacklistChecks
+
+		if len(blacklistMap) > 0 {
+			report.Blacklists = &blacklistMap
+		}
 	}
 
 	// Add raw headers
