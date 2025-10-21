@@ -251,7 +251,7 @@ func TestGenerateAuthSPFCheck(t *testing.T) {
 		name           string
 		spf            *api.AuthResult
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "SPF pass",
@@ -260,7 +260,7 @@ func TestGenerateAuthSPFCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "SPF fail",
@@ -269,7 +269,7 @@ func TestGenerateAuthSPFCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "SPF softfail",
@@ -278,7 +278,7 @@ func TestGenerateAuthSPFCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.5,
+			expectedScore:  5,
 		},
 		{
 			name: "SPF neutral",
@@ -287,7 +287,7 @@ func TestGenerateAuthSPFCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.5,
+			expectedScore:  5,
 		},
 	}
 
@@ -319,7 +319,7 @@ func TestGenerateAuthDKIMCheck(t *testing.T) {
 		dkim           *api.AuthResult
 		index          int
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "DKIM pass",
@@ -330,7 +330,7 @@ func TestGenerateAuthDKIMCheck(t *testing.T) {
 			},
 			index:          0,
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "DKIM fail",
@@ -341,7 +341,7 @@ func TestGenerateAuthDKIMCheck(t *testing.T) {
 			},
 			index:          0,
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "DKIM none",
@@ -352,7 +352,7 @@ func TestGenerateAuthDKIMCheck(t *testing.T) {
 			},
 			index:          0,
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -383,7 +383,7 @@ func TestGenerateAuthDMARCCheck(t *testing.T) {
 		name           string
 		dmarc          *api.AuthResult
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "DMARC pass",
@@ -392,7 +392,7 @@ func TestGenerateAuthDMARCCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "DMARC fail",
@@ -401,7 +401,7 @@ func TestGenerateAuthDMARCCheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -432,7 +432,7 @@ func TestGenerateAuthBIMICheck(t *testing.T) {
 		name           string
 		bimi           *api.AuthResult
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "BIMI pass",
@@ -441,7 +441,7 @@ func TestGenerateAuthBIMICheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.0, // BIMI doesn't contribute to score
+			expectedScore:  0, // BIMI doesn't contribute to score
 		},
 		{
 			name: "BIMI fail",
@@ -450,7 +450,7 @@ func TestGenerateAuthBIMICheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusInfo,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "BIMI none",
@@ -459,7 +459,7 @@ func TestGenerateAuthBIMICheck(t *testing.T) {
 				Domain: api.PtrTo("example.com"),
 			},
 			expectedStatus: api.CheckStatusInfo,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -494,7 +494,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 	tests := []struct {
 		name          string
 		results       *api.AuthenticationResults
-		expectedScore float32
+		expectedScore int
 	}{
 		{
 			name: "Perfect authentication (SPF + DKIM + DMARC)",
@@ -509,7 +509,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 30.0,
+			expectedScore: 30,
 		},
 		{
 			name: "SPF and DKIM only",
@@ -521,7 +521,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 20.0,
+			expectedScore: 20,
 		},
 		{
 			name: "SPF fail, DKIM pass",
@@ -533,7 +533,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 10.0,
+			expectedScore: 10,
 		},
 		{
 			name: "SPF softfail",
@@ -542,12 +542,12 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultSoftfail,
 				},
 			},
-			expectedScore: 5.0,
+			expectedScore: 5,
 		},
 		{
 			name:          "No authentication",
 			results:       &api.AuthenticationResults{},
-			expectedScore: 0.0,
+			expectedScore: 0,
 		},
 		{
 			name: "BIMI doesn't affect score",
@@ -559,7 +559,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 10.0, // Only SPF counted, not BIMI
+			expectedScore: 10, // Only SPF counted, not BIMI
 		},
 	}
 
@@ -789,7 +789,7 @@ func TestGenerateARCCheck(t *testing.T) {
 		name           string
 		arc            *api.ARCResult
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "ARC pass",
@@ -799,7 +799,7 @@ func TestGenerateARCCheck(t *testing.T) {
 				ChainValid:  api.PtrTo(true),
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.0, // ARC doesn't contribute to score
+			expectedScore:  0, // ARC doesn't contribute to score
 		},
 		{
 			name: "ARC fail",
@@ -809,7 +809,7 @@ func TestGenerateARCCheck(t *testing.T) {
 				ChainValid:  api.PtrTo(false),
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "ARC none",
@@ -819,7 +819,7 @@ func TestGenerateARCCheck(t *testing.T) {
 				ChainValid:  api.PtrTo(true),
 			},
 			expectedStatus: api.CheckStatusInfo,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 

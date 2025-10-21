@@ -613,7 +613,7 @@ func TestGenerateHTMLValidityCheck(t *testing.T) {
 		name           string
 		results        *ContentResults
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid HTML",
@@ -621,7 +621,7 @@ func TestGenerateHTMLValidityCheck(t *testing.T) {
 				HTMLValid: true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.2,
+			expectedScore:  2,
 		},
 		{
 			name: "Invalid HTML",
@@ -630,7 +630,7 @@ func TestGenerateHTMLValidityCheck(t *testing.T) {
 				HTMLErrors: []string{"Parse error"},
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -658,7 +658,7 @@ func TestGenerateLinkChecks(t *testing.T) {
 		name           string
 		results        *ContentResults
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "All links valid",
@@ -669,7 +669,7 @@ func TestGenerateLinkChecks(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.4,
+			expectedScore:  4,
 		},
 		{
 			name: "Broken links",
@@ -679,7 +679,7 @@ func TestGenerateLinkChecks(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "Links with warnings",
@@ -689,7 +689,7 @@ func TestGenerateLinkChecks(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.3,
+			expectedScore:  3,
 		},
 		{
 			name:    "No links",
@@ -927,14 +927,14 @@ func TestGetContentScore(t *testing.T) {
 	tests := []struct {
 		name     string
 		results  *ContentResults
-		minScore float32
-		maxScore float32
+		minScore int
+		maxScore int
 	}{
 		{
 			name:     "Nil results",
 			results:  nil,
-			minScore: 0.0,
-			maxScore: 0.0,
+			minScore: 0,
+			maxScore: 0,
 		},
 		{
 			name: "Perfect content",
@@ -946,8 +946,8 @@ func TestGetContentScore(t *testing.T) {
 				TextPlainRatio: 0.8,
 				ImageTextRatio: 3.0,
 			},
-			minScore: 18.0,
-			maxScore: 20.0,
+			minScore: 90,
+			maxScore: 100,
 		},
 		{
 			name: "Poor content",
@@ -960,8 +960,8 @@ func TestGetContentScore(t *testing.T) {
 				ImageTextRatio: 15.0,
 				SuspiciousURLs: []string{"url1", "url2"},
 			},
-			minScore: 0.0,
-			maxScore: 5.0,
+			minScore: 0,
+			maxScore: 25,
 		},
 		{
 			name: "Average content",
@@ -973,8 +973,8 @@ func TestGetContentScore(t *testing.T) {
 				TextPlainRatio: 0.5,
 				ImageTextRatio: 4.0,
 			},
-			minScore: 10.0,
-			maxScore: 18.0,
+			minScore: 50,
+			maxScore: 90,
 		},
 	}
 
@@ -988,13 +988,13 @@ func TestGetContentScore(t *testing.T) {
 				t.Errorf("GetContentScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
 
-			// Ensure score is capped at 20.0
-			if score > 20.0 {
-				t.Errorf("Score %v exceeds maximum of 20.0", score)
+			// Ensure score is capped at 100
+			if score > 100 {
+				t.Errorf("Score %v exceeds maximum of 100", score)
 			}
 
 			// Ensure score is not negative
-			if score < 0.0 {
+			if score < 0 {
 				t.Errorf("Score %v is negative", score)
 			}
 		})

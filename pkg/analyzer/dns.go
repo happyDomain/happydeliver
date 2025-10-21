@@ -521,7 +521,7 @@ func (d *DNSAnalyzer) GenerateDNSChecks(results *DNSResults) []api.Check {
 
 	// BIMI record check (optional)
 	if results.BIMIRecord != nil {
-		checks = append(checks, d.generateBIMICheck(results.BIMIRecord))
+		checks = append(checks, d.generateBIMICheck(results.BIMIRecord, results.DMARCRecord))
 	}
 
 	return checks
@@ -536,7 +536,7 @@ func (d *DNSAnalyzer) generateMXCheck(results *DNSResults) api.Check {
 
 	if len(results.MXRecords) == 0 || !results.MXRecords[0].Valid {
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 
 		if len(results.MXRecords) > 0 && results.MXRecords[0].Error != "" {
@@ -547,7 +547,7 @@ func (d *DNSAnalyzer) generateMXCheck(results *DNSResults) api.Check {
 		check.Advice = api.PtrTo("Configure MX records for your domain to receive email")
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 100
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Message = fmt.Sprintf("Found %d valid MX record(s)", len(results.MXRecords))
 
@@ -572,25 +572,25 @@ func (d *DNSAnalyzer) generateSPFCheck(spf *SPFRecord) api.Check {
 	}
 
 	if !spf.Valid {
-		// If no record exists at all, it's a failure
 		if spf.Record == "" {
+			// If no record exists at all, it's a failure
 			check.Status = api.CheckStatusFail
-			check.Score = 0.0
+			check.Score = 0
 			check.Message = spf.Error
-			check.Severity = api.PtrTo(api.CheckSeverityHigh)
+			check.Severity = api.PtrTo(api.CheckSeverityMedium)
 			check.Advice = api.PtrTo("Configure an SPF record for your domain to improve deliverability")
 		} else {
-			// If record exists but is invalid, it's a warning
-			check.Status = api.CheckStatusWarn
-			check.Score = 0.5
+			// If record exists but is invalid, it's a failure
+			check.Status = api.CheckStatusFail
+			check.Score = 5
 			check.Message = "SPF record found but appears invalid"
-			check.Severity = api.PtrTo(api.CheckSeverityMedium)
+			check.Severity = api.PtrTo(api.CheckSeverityHigh)
 			check.Advice = api.PtrTo("Review and fix your SPF record syntax")
 			check.Details = &spf.Record
 		}
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 100
 		check.Message = "Valid SPF record found"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Details = &spf.Record
@@ -609,7 +609,7 @@ func (d *DNSAnalyzer) generateDKIMCheck(dkim *DKIMRecord) api.Check {
 
 	if !dkim.Valid {
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = fmt.Sprintf("DKIM record not found or invalid: %s", dkim.Error)
 		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Ensure DKIM record is published in DNS for the selector used")
@@ -617,7 +617,7 @@ func (d *DNSAnalyzer) generateDKIMCheck(dkim *DKIMRecord) api.Check {
 		check.Details = &details
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 100
 		check.Message = "Valid DKIM record found"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		details := fmt.Sprintf("Selector: %s, Domain: %s", dkim.Selector, dkim.Domain)
@@ -637,13 +637,13 @@ func (d *DNSAnalyzer) generateDMARCCheck(dmarc *DMARCRecord) api.Check {
 
 	if !dmarc.Valid {
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = dmarc.Error
 		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Configure a DMARC record for your domain to improve deliverability and prevent spoofing")
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 100
 		check.Message = fmt.Sprintf("Valid DMARC record found with policy: %s", dmarc.Policy)
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Details = &dmarc.Record
@@ -669,7 +669,7 @@ func (d *DNSAnalyzer) generateDMARCCheck(dmarc *DMARCRecord) api.Check {
 }
 
 // generateBIMICheck creates a check for BIMI records
-func (d *DNSAnalyzer) generateBIMICheck(bimi *BIMIRecord) api.Check {
+func (d *DNSAnalyzer) generateBIMICheck(bimi *BIMIRecord, dmarc *DMARCRecord) api.Check {
 	check := api.Check{
 		Category: api.Dns,
 		Name:     "BIMI Record",
@@ -679,14 +679,18 @@ func (d *DNSAnalyzer) generateBIMICheck(bimi *BIMIRecord) api.Check {
 		// BIMI is optional, so missing record is just informational
 		if bimi.Record == "" {
 			check.Status = api.CheckStatusInfo
-			check.Score = 0.0
+			check.Score = 0
 			check.Message = "No BIMI record found (optional)"
 			check.Severity = api.PtrTo(api.CheckSeverityLow)
-			check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients. Requires enforced DMARC policy (p=quarantine or p=reject)")
+			if dmarc.Policy != "quarantine" && dmarc.Policy != "reject" {
+				check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients. Requires enforced DMARC policy (p=quarantine or p=reject)")
+			} else {
+				check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients.")
+			}
 		} else {
 			// If record exists but is invalid
 			check.Status = api.CheckStatusWarn
-			check.Score = 0.0
+			check.Score = 5
 			check.Message = fmt.Sprintf("BIMI record found but invalid: %s", bimi.Error)
 			check.Severity = api.PtrTo(api.CheckSeverityLow)
 			check.Advice = api.PtrTo("Review and fix your BIMI record syntax. Ensure it contains v=BIMI1 and a valid logo URL (l=)")
@@ -694,7 +698,7 @@ func (d *DNSAnalyzer) generateBIMICheck(bimi *BIMIRecord) api.Check {
 		}
 	} else {
 		check.Status = api.CheckStatusPass
-		check.Score = 0.0 // BIMI doesn't contribute to score (branding feature)
+		check.Score = 100 // BIMI doesn't contribute to score (branding feature)
 		check.Message = "Valid BIMI record found"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 

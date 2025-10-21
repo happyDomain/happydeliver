@@ -154,14 +154,14 @@ func TestGetSpamAssassinScore(t *testing.T) {
 	tests := []struct {
 		name          string
 		result        *SpamAssassinResult
-		expectedScore float32
-		minScore      float32
-		maxScore      float32
+		expectedScore int
+		minScore      int
+		maxScore      int
 	}{
 		{
 			name:          "Nil result",
 			result:        nil,
-			expectedScore: 0.0,
+			expectedScore: 0,
 		},
 		{
 			name: "Excellent score (negative)",
@@ -169,7 +169,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         -2.5,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 20.0,
+			expectedScore: 100,
 		},
 		{
 			name: "Good score (below threshold)",
@@ -177,8 +177,8 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
-			minScore: 15.0,
-			maxScore: 20.0,
+			minScore: 80,
+			maxScore: 100,
 		},
 		{
 			name: "Borderline (just above threshold)",
@@ -186,7 +186,8 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         6.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 10.0,
+			minScore: 60,
+			maxScore: 80,
 		},
 		{
 			name: "High spam score",
@@ -194,7 +195,8 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         12.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 5.0,
+			minScore: 20,
+			maxScore: 50,
 		},
 		{
 			name: "Very high spam score",
@@ -202,7 +204,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         20.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0.0,
+			expectedScore: 0,
 		},
 	}
 
@@ -618,8 +620,8 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 
 	// Test GetSpamAssassinScore
 	score := analyzer.GetSpamAssassinScore(result)
-	if score != 20.0 {
-		t.Errorf("GetSpamAssassinScore() = %v, want 2.0 (excellent score for negative spam score)", score)
+	if score != 100 {
+		t.Errorf("GetSpamAssassinScore() = %v, want 100 (excellent score for negative spam score)", score)
 	}
 
 	// Test GenerateSpamAssassinChecks
@@ -639,14 +641,14 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 	if !strings.Contains(mainCheck.Message, "spam score") {
 		t.Errorf("Main check message should contain 'spam score', got: %s", mainCheck.Message)
 	}
-	if mainCheck.Score != 20.0 {
-		t.Errorf("Main check score = %v, want 20.0", mainCheck.Score)
+	if mainCheck.Score != 100 {
+		t.Errorf("Main check score = %v, want 100", mainCheck.Score)
 	}
 
 	// Log all checks for debugging
 	t.Logf("Generated %d checks:", len(checks))
 	for i, check := range checks {
-		t.Logf("  Check %d: %s - %s (score: %.1f, status: %s)",
+		t.Logf("  Check %d: %s - %s (score: %d, status: %s)",
 			i+1, check.Name, check.Message, check.Score, check.Status)
 	}
 }

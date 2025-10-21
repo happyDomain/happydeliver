@@ -17,9 +17,9 @@
 
     // Group checks by category
     let groupedChecks = $derived(() => {
-        if (!report) return {};
+        if (!report) return { };
 
-        const groups: Record<string, typeof report.checks> = {};
+        const groups: Record<string, typeof report.checks> = { };
         for (const check of report.checks) {
             if (!groups[check.category]) {
                 groups[check.category] = [];
@@ -106,31 +106,10 @@
     }
 
     function getCategoryScore(checks: typeof report.checks): number {
-        return checks.reduce((sum, check) => sum + check.score, 0);
+        return Math.round(checks.reduce((sum, check) => sum + check.score, 0) / checks.filter((c) => c.status != "info").length);
     }
 
-    function getCategoryMaxScore(category: string): number {
-        switch (category) {
-            case "authentication":
-                return 3;
-            case "spam":
-                return 2;
-            case "blacklist":
-                return 2;
-            case "content":
-                return 2;
-            case "headers":
-                return 1;
-            case "dns":
-                return 0; // DNS checks contribute to other categories
-            default:
-                return 0;
-        }
-    }
-
-    function getScoreColorClass(score: number, maxScore: number): string {
-        if (maxScore === 0) return "text-muted";
-        const percentage = (score / maxScore) * 100;
+    function getScoreColorClass(percentage: number): string {
         if (percentage >= 80) return "text-success";
         if (percentage >= 50) return "text-warning";
         return "text-danger";
@@ -189,7 +168,7 @@
             <!-- Score Header -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <ScoreCard score={report.score} summary={report.summary} />
+                    <ScoreCard grade={report.grade} score={report.score} summary={report.summary} />
                 </div>
             </div>
 
@@ -199,15 +178,14 @@
                     <h3 class="fw-bold mb-3">Detailed Checks</h3>
                     {#each Object.entries(groupedChecks()) as [category, checks]}
                         {@const categoryScore = getCategoryScore(checks)}
-                        {@const maxScore = getCategoryMaxScore(category)}
                         <div class="category-section mb-4">
                             <h4 class="category-title text-capitalize mb-3 d-flex justify-content-between align-items-center">
                                 <span>
                                     <i class="bi {getCategoryIcon(category)} me-2"></i>
                                     {category}
                                 </span>
-                                <span class="category-score {getScoreColorClass(categoryScore, maxScore)}">
-                                    {categoryScore.toFixed(1)}{#if maxScore > 0} / {maxScore}{/if} pts
+                                <span class="category-score {getScoreColorClass(categoryScore)}">
+                                    {categoryScore}%
                                 </span>
                             </h4>
                             {#each checks as check}

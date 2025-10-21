@@ -305,7 +305,7 @@ func TestGenerateMXCheck(t *testing.T) {
 		name           string
 		results        *DNSResults
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid MX records",
@@ -317,7 +317,7 @@ func TestGenerateMXCheck(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "No MX records",
@@ -328,7 +328,7 @@ func TestGenerateMXCheck(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "MX lookup failed",
@@ -339,7 +339,7 @@ func TestGenerateMXCheck(t *testing.T) {
 				},
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -367,7 +367,7 @@ func TestGenerateSPFCheck(t *testing.T) {
 		name           string
 		spf            *SPFRecord
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid SPF",
@@ -376,7 +376,7 @@ func TestGenerateSPFCheck(t *testing.T) {
 				Valid:  true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "Invalid SPF",
@@ -386,7 +386,7 @@ func TestGenerateSPFCheck(t *testing.T) {
 				Error:  "SPF record appears malformed",
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.5,
+			expectedScore:  5,
 		},
 		{
 			name: "No SPF record",
@@ -395,7 +395,7 @@ func TestGenerateSPFCheck(t *testing.T) {
 				Error: "No SPF record found",
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -423,7 +423,7 @@ func TestGenerateDKIMCheck(t *testing.T) {
 		name           string
 		dkim           *DKIMRecord
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid DKIM",
@@ -434,7 +434,7 @@ func TestGenerateDKIMCheck(t *testing.T) {
 				Valid:    true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "Invalid DKIM",
@@ -445,7 +445,7 @@ func TestGenerateDKIMCheck(t *testing.T) {
 				Error:    "No DKIM record found",
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -476,7 +476,7 @@ func TestGenerateDMARCCheck(t *testing.T) {
 		name           string
 		dmarc          *DMARCRecord
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid DMARC - reject",
@@ -486,7 +486,7 @@ func TestGenerateDMARCCheck(t *testing.T) {
 				Valid:  true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "Valid DMARC - quarantine",
@@ -496,7 +496,7 @@ func TestGenerateDMARCCheck(t *testing.T) {
 				Valid:  true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "Valid DMARC - none",
@@ -506,7 +506,7 @@ func TestGenerateDMARCCheck(t *testing.T) {
 				Valid:  true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  1.0,
+			expectedScore:  10,
 		},
 		{
 			name: "No DMARC record",
@@ -515,7 +515,7 @@ func TestGenerateDMARCCheck(t *testing.T) {
 				Error: "No DMARC record found",
 			},
 			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 
@@ -738,7 +738,7 @@ func TestGenerateBIMICheck(t *testing.T) {
 		name           string
 		bimi           *BIMIRecord
 		expectedStatus api.CheckStatus
-		expectedScore  float32
+		expectedScore  int
 	}{
 		{
 			name: "Valid BIMI with logo only",
@@ -750,7 +750,7 @@ func TestGenerateBIMICheck(t *testing.T) {
 				Valid:    true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.0, // BIMI doesn't contribute to score
+			expectedScore:  0, // BIMI doesn't contribute to score
 		},
 		{
 			name: "Valid BIMI with VMC",
@@ -763,7 +763,7 @@ func TestGenerateBIMICheck(t *testing.T) {
 				Valid:    true,
 			},
 			expectedStatus: api.CheckStatusPass,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "No BIMI record (optional)",
@@ -774,7 +774,7 @@ func TestGenerateBIMICheck(t *testing.T) {
 				Error:    "No BIMI record found",
 			},
 			expectedStatus: api.CheckStatusInfo,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 		{
 			name: "Invalid BIMI record",
@@ -786,7 +786,7 @@ func TestGenerateBIMICheck(t *testing.T) {
 				Error:    "BIMI record appears malformed",
 			},
 			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  0.0,
+			expectedScore:  0,
 		},
 	}
 

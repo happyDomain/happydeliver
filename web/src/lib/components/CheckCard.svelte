@@ -32,7 +32,7 @@
             <div class="flex-grow-1">
                 <div class="d-flex justify-content-between align-items-start">
                     <h5 class="fw-bold mb-1">{check.name}</h5>
-                    <span class="badge bg-light text-dark">{check.score.toFixed(1)} pts</span>
+                    <span class="badge bg-light text-dark">{check.score}%</span>
                 </div>
 
                 <p class="mt-2 mb-2">{check.message}</p>
@@ -48,7 +48,7 @@
                 {#if check.details}
                     <details class="small text-muted">
                         <summary class="cursor-pointer">Technical Details</summary>
-                        <pre class="mt-2 mb-0 small bg-light p-2 rounded">{check.details}</pre>
+                        <pre class="mt-2 mb-0 small bg-light p-2 rounded" style="white-space: pre-wrap;">{check.details}</pre>
                     </details>
                 {/if}
             </div>

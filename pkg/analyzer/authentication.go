@@ -24,6 +24,7 @@ package analyzer
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -190,14 +191,7 @@ func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	// Extract details
-	if idx := strings.Index(part, "("); idx != -1 {
-		endIdx := strings.Index(part[idx:], ")")
-		if endIdx != -1 {
-			details := strings.TrimSpace(part[idx+1 : idx+endIdx])
-			result.Details = &details
-		}
-	}
+	result.Details = &part
 
 	return result
 }
@@ -221,17 +215,7 @@ func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *api.AuthResult {
 		result.Domain = &domain
 	}
 
-	// Extract details (action, policy, etc.)
-	var detailsParts []string
-	actionRe := regexp.MustCompile(`action=([^\s;]+)`)
-	if matches := actionRe.FindStringSubmatch(part); len(matches) > 1 {
-		detailsParts = append(detailsParts, fmt.Sprintf("action=%s", matches[1]))
-	}
-
-	if len(detailsParts) > 0 {
-		details := strings.Join(detailsParts, " ")
-		result.Details = &details
-	}
+	result.Details = &part
 
 	return result
 }
@@ -262,14 +246,7 @@ func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	// Extract details
-	if idx := strings.Index(part, "("); idx != -1 {
-		endIdx := strings.Index(part[idx:], ")")
-		if endIdx != -1 {
-			details := strings.TrimSpace(part[idx+1 : idx+endIdx])
-			result.Details = &details
-		}
-	}
+	result.Details = &part
 
 	return result
 }
@@ -286,14 +263,7 @@ func (a *AuthenticationAnalyzer) parseARCResult(part string) *api.ARCResult {
 		result.Result = api.ARCResultResult(resultStr)
 	}
 
-	// Extract details
-	if idx := strings.Index(part, "("); idx != -1 {
-		endIdx := strings.Index(part[idx:], ")")
-		if endIdx != -1 {
-			details := strings.TrimSpace(part[idx+1 : idx+endIdx])
-			result.Details = &details
-		}
-	}
+	result.Details = &part
 
 	return result
 }
@@ -389,7 +359,7 @@ func (a *AuthenticationAnalyzer) validateARCChain(arcAuthResults, arcMessageSig,
 
 	// Verify instances are sequential from 1 to N
 	for i := 1; i <= len(sealInstances); i++ {
-		if !contains(sealInstances, i) || !contains(sigInstances, i) || !contains(authInstances, i) {
+		if !slices.Contains(sealInstances, i) || !slices.Contains(sigInstances, i) || !slices.Contains(authInstances, i) {
 			return false
 		}
 	}
@@ -411,16 +381,6 @@ func (a *AuthenticationAnalyzer) extractARCInstances(headers []string) []int {
 	}
 
 	return instances
-}
-
-// contains checks if a slice contains an integer
-func contains(slice []int, val int) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
 }
 
 // pluralize returns "y" or "ies" based on count
@@ -447,8 +407,10 @@ func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *api.AuthRe
 		result.Result = api.AuthResultResult(resultStr)
 	}
 
+	result.Details = &receivedSPF
+
 	// Try to extract domain
-	domainRe := regexp.MustCompile(`(?:envelope-from|sender)=([^\s;]+)`)
+	domainRe := regexp.MustCompile(`(?:envelope-from|sender)="?([^\s;"]+)`)
 	if matches := domainRe.FindStringSubmatch(receivedSPF); len(matches) > 1 {
 		email := matches[1]
 		if idx := strings.Index(email, "@"); idx != -1 {

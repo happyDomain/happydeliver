@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -174,41 +175,28 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *SpamAssass
 	}
 }
 
-// GetSpamAssassinScore calculates the SpamAssassin contribution to deliverability (0-20 points)
-// Scoring:
-// - Score <= 0: 20 points (excellent)
-// - Score < required: 15 points (good)
-// - Score slightly above required (< 2x): 10 points (borderline)
-// - Score moderately high (< 3x required): 5 points (poor)
-// - Score very high: 0 points (spam)
-func (a *SpamAssassinAnalyzer) GetSpamAssassinScore(result *SpamAssassinResult) float32 {
+// GetSpamAssassinScore calculates the SpamAssassin contribution to deliverability
+func (a *SpamAssassinAnalyzer) GetSpamAssassinScore(result *SpamAssassinResult) int {
 	if result == nil {
-		return 0.0
+		return 0
 	}
 
 	score := result.Score
 	required := result.RequiredScore
 	if required == 0 {
-		required = 5.0 // Default SpamAssassin threshold
+		required = 5 // Default SpamAssassin threshold
 	}
 
 	// Calculate deliverability score
 	if score <= 0 {
-		return 20.0
-	} else if score < required {
-		// Linear scaling from 15 to 20 based on how negative/low the score is
-		ratio := score / required
-		return 15.0 + (5.0 * (1.0 - float32(ratio)))
-	} else if score < required*2 {
-		// Slightly above threshold
-		return 10.0
-	} else if score < required*3 {
-		// Moderately high
-		return 5.0
+		return 100
+	}
+	if score <= required*4 {
+		return 0
 	}
 
-	// Very high spam score
-	return 0.0
+	// Linear scaling based on how negative/low the score is
+	return 100 - int(math.Round(25*score/required))
 }
 
 // GenerateSpamAssassinChecks generates check results for SpamAssassin analysis
@@ -259,9 +247,8 @@ func (a *SpamAssassinAnalyzer) generateMainSpamCheck(result *SpamAssassinResult)
 		required = 5.0
 	}
 
-	delivScore := a.GetSpamAssassinScore(result)
-	check.Score = delivScore
-	check.Grade = ScoreToCheckGrade((delivScore / 20.0) * 100)
+	check.Score = a.GetSpamAssassinScore(result)
+	check.Grade = ScoreToCheckGrade(check.Score)
 
 	// Determine status and message based on score
 	if score <= 0 {
@@ -320,7 +307,7 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 			check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		}
 		check.Score = 0.0
-		check.Grade = ScoreToCheckGrade(0.0)
+		check.Grade = ScoreToCheckGrade(0)
 		check.Message = fmt.Sprintf("Test failed with score +%.1f", detail.Score)
 		advice := fmt.Sprintf("%s. This test adds %.1f to your spam score", detail.Description, detail.Score)
 		check.Advice = &advice
@@ -338,12 +325,4 @@ func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Chec
 	check.Details = &detail.Description
 
 	return check
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

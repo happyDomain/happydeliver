@@ -22,9 +22,6 @@
 package analyzer
 
 import (
-	"net/mail"
-	"net/textproto"
-	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -97,153 +94,6 @@ func TestIsValidMessageID(t *testing.T) {
 	}
 }
 
-func TestCalculateHeaderScore(t *testing.T) {
-	tests := []struct {
-		name     string
-		email    *EmailMessage
-		minScore float32
-		maxScore float32
-	}{
-		{
-			name:     "Nil email",
-			email:    nil,
-			minScore: 0.0,
-			maxScore: 0.0,
-		},
-		{
-			name: "Perfect headers",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"To":         "recipient@example.com",
-					"Subject":    "Test",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-					"Reply-To":   "reply@example.com",
-				}),
-				MessageID: "<abc123@example.com>",
-				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
-			},
-			minScore: 7.0,
-			maxScore: 10.0,
-		},
-		{
-			name: "Missing required headers",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"Subject": "Test",
-				}),
-			},
-			minScore: 0.0,
-			maxScore: 4.0,
-		},
-		{
-			name: "Required only, no recommended",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-				}),
-				MessageID: "<abc123@example.com>",
-				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
-			},
-			minScore: 4.0,
-			maxScore: 8.0,
-		},
-		{
-			name: "Invalid Message-ID format",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "invalid-message-id",
-					"Subject":    "Test",
-					"To":         "recipient@example.com",
-					"Reply-To":   "reply@example.com",
-				}),
-				MessageID: "invalid-message-id",
-				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
-			},
-			minScore: 7.0,
-			maxScore: 10.0,
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.calculateHeaderScore(tt.email)
-			if score < tt.minScore || score > tt.maxScore {
-				t.Errorf("calculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
-			}
-		})
-	}
-}
-
-func TestDetermineRating(t *testing.T) {
-	tests := []struct {
-		name     string
-		score    float32
-		expected string
-	}{
-		{name: "Excellent - 10.0", score: 100.0, expected: "Excellent"},
-		{name: "Excellent - 9.5", score: 95.0, expected: "Excellent"},
-		{name: "Excellent - 9.0", score: 90.0, expected: "Excellent"},
-		{name: "Good - 8.5", score: 85.0, expected: "Good"},
-		{name: "Good - 7.0", score: 70.0, expected: "Good"},
-		{name: "Fair - 6.5", score: 65.0, expected: "Fair"},
-		{name: "Fair - 5.0", score: 50.0, expected: "Fair"},
-		{name: "Poor - 4.5", score: 45.0, expected: "Poor"},
-		{name: "Poor - 3.0", score: 30.0, expected: "Poor"},
-		{name: "Critical - 2.5", score: 25.0, expected: "Critical"},
-		{name: "Critical - 0.0", score: 0.0, expected: "Critical"},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := scorer.determineRating(tt.score)
-			if result != tt.expected {
-				t.Errorf("determineRating(%v) = %q, want %q", tt.score, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestGetCategoryStatus(t *testing.T) {
-	tests := []struct {
-		name     string
-		score    float32
-		maxScore float32
-		expected string
-	}{
-		{name: "Pass - 100%", score: 3.0, maxScore: 3.0, expected: "Pass"},
-		{name: "Pass - 90%", score: 2.7, maxScore: 3.0, expected: "Pass"},
-		{name: "Pass - 80%", score: 2.4, maxScore: 3.0, expected: "Pass"},
-		{name: "Warn - 75%", score: 2.25, maxScore: 3.0, expected: "Warn"},
-		{name: "Warn - 50%", score: 1.5, maxScore: 3.0, expected: "Warn"},
-		{name: "Fail - 40%", score: 1.2, maxScore: 3.0, expected: "Fail"},
-		{name: "Fail - 0%", score: 0.0, maxScore: 3.0, expected: "Fail"},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := scorer.getCategoryStatus(tt.score, tt.maxScore)
-			if result != tt.expected {
-				t.Errorf("getCategoryStatus(%v, %v) = %q, want %q", tt.score, tt.maxScore, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestCalculateScore(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -252,9 +102,9 @@ func TestCalculateScore(t *testing.T) {
 		rblResults     *RBLResults
 		contentResults *ContentResults
 		email          *EmailMessage
-		minScore       float32
-		maxScore       float32
-		expectedRating string
+		minScore       int
+		maxScore       int
+		expectedGrade  string
 	}{
 		{
 			name: "Perfect email",
@@ -294,9 +144,9 @@ func TestCalculateScore(t *testing.T) {
 				MessageID: "<abc123@example.com>",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore:       90.0,
-			maxScore:       100.0,
-			expectedRating: "Excellent",
+			minScore:      90.0,
+			maxScore:      100.0,
+			expectedGrade: "A+",
 		},
 		{
 			name: "Poor email - auth issues",
@@ -329,9 +179,9 @@ func TestCalculateScore(t *testing.T) {
 					"From": "sender@example.com",
 				}),
 			},
-			minScore:       0.0,
-			maxScore:       50.0,
-			expectedRating: "Poor",
+			minScore:      0.0,
+			maxScore:      50.0,
+			expectedGrade: "C",
 		},
 		{
 			name: "Average email",
@@ -366,9 +216,9 @@ func TestCalculateScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore:       60.0,
-			maxScore:       90.0,
-			expectedRating: "Good",
+			minScore:      60.0,
+			maxScore:      90.0,
+			expectedGrade: "A",
 		},
 	}
 
@@ -394,8 +244,8 @@ func TestCalculateScore(t *testing.T) {
 			}
 
 			// Check rating
-			if result.Rating != tt.expectedRating {
-				t.Errorf("Rating = %q, want %q", result.Rating, tt.expectedRating)
+			if result.Grade != api.ReportGrade(tt.expectedGrade) {
+				t.Errorf("Grade = %q, want %q", result.Grade, tt.expectedGrade)
 			}
 
 			// Verify score is within bounds
@@ -409,354 +259,16 @@ func TestCalculateScore(t *testing.T) {
 			}
 
 			// Verify recommendations exist
-			if len(result.Recommendations) == 0 && result.Rating != "Excellent" {
+			if len(result.Recommendations) == 0 && result.Grade != "A+" {
 				t.Error("Expected recommendations for non-excellent rating")
 			}
 
 			// Verify category scores add up to overall score
 			totalCategoryScore := result.AuthScore + result.SpamScore + result.BlacklistScore + result.ContentScore + result.HeaderScore
-			if totalCategoryScore < result.OverallScore-0.01 || totalCategoryScore > result.OverallScore+0.01 {
-				t.Errorf("Category scores sum (%.2f) doesn't match overall score (%.2f)",
+			if totalCategoryScore != result.OverallScore {
+				t.Errorf("Category scores sum (%d) doesn't match overall score (%d)",
 					totalCategoryScore, result.OverallScore)
 			}
 		})
 	}
-}
-
-func TestGenerateRecommendations(t *testing.T) {
-	tests := []struct {
-		name                 string
-		result               *ScoringResult
-		expectedMinCount     int
-		shouldContainKeyword string
-	}{
-		{
-			name: "Excellent - minimal recommendations",
-			result: &ScoringResult{
-				OverallScore:   9.5,
-				Rating:         "Excellent",
-				AuthScore:      3.0,
-				SpamScore:      2.0,
-				BlacklistScore: 2.0,
-				ContentScore:   2.0,
-				HeaderScore:    1.0,
-			},
-			expectedMinCount:     1,
-			shouldContainKeyword: "Excellent",
-		},
-		{
-			name: "Critical - many recommendations",
-			result: &ScoringResult{
-				OverallScore:   1.0,
-				Rating:         "Critical",
-				AuthScore:      0.5,
-				SpamScore:      0.0,
-				BlacklistScore: 0.0,
-				ContentScore:   0.3,
-				HeaderScore:    0.2,
-			},
-			expectedMinCount:     5,
-			shouldContainKeyword: "Critical",
-		},
-		{
-			name: "Poor authentication",
-			result: &ScoringResult{
-				OverallScore:   5.0,
-				Rating:         "Fair",
-				AuthScore:      1.5,
-				SpamScore:      2.0,
-				BlacklistScore: 2.0,
-				ContentScore:   1.5,
-				HeaderScore:    1.0,
-			},
-			expectedMinCount:     1,
-			shouldContainKeyword: "authentication",
-		},
-		{
-			name: "Blacklist issues",
-			result: &ScoringResult{
-				OverallScore:   4.0,
-				Rating:         "Poor",
-				AuthScore:      3.0,
-				SpamScore:      2.0,
-				BlacklistScore: 0.5,
-				ContentScore:   1.5,
-				HeaderScore:    1.0,
-			},
-			expectedMinCount:     1,
-			shouldContainKeyword: "blacklist",
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recommendations := scorer.generateRecommendations(tt.result)
-
-			if len(recommendations) < tt.expectedMinCount {
-				t.Errorf("Got %d recommendations, want at least %d", len(recommendations), tt.expectedMinCount)
-			}
-
-			// Check if expected keyword appears in any recommendation
-			found := false
-			for _, rec := range recommendations {
-				if strings.Contains(strings.ToLower(rec), strings.ToLower(tt.shouldContainKeyword)) {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				t.Errorf("No recommendation contains keyword %q. Recommendations: %v",
-					tt.shouldContainKeyword, recommendations)
-			}
-		})
-	}
-}
-
-func TestGenerateRequiredHeadersCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		email          *EmailMessage
-		expectedStatus api.CheckStatus
-		expectedScore  float32
-	}{
-		{
-			name: "All required headers present",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-				}),
-				From:      &mail.Address{Address: "sender@example.com"},
-				MessageID: "<abc123@example.com>",
-				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-			},
-			expectedStatus: api.CheckStatusPass,
-			expectedScore:  4.0,
-		},
-		{
-			name: "Missing all required headers",
-			email: &EmailMessage{
-				Header: make(mail.Header),
-			},
-			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
-		},
-		{
-			name: "Missing some required headers",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From": "sender@example.com",
-				}),
-			},
-			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0.0,
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			check := scorer.generateRequiredHeadersCheck(tt.email)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Score != tt.expectedScore {
-				t.Errorf("Score = %v, want %v", check.Score, tt.expectedScore)
-			}
-			if check.Category != api.Headers {
-				t.Errorf("Category = %v, want %v", check.Category, api.Headers)
-			}
-		})
-	}
-}
-
-func TestGenerateMessageIDCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		messageID      string
-		expectedStatus api.CheckStatus
-	}{
-		{
-			name:           "Valid Message-ID",
-			messageID:      "<abc123@example.com>",
-			expectedStatus: api.CheckStatusPass,
-		},
-		{
-			name:           "Invalid Message-ID format",
-			messageID:      "invalid-message-id",
-			expectedStatus: api.CheckStatusWarn,
-		},
-		{
-			name:           "Missing Message-ID",
-			messageID:      "",
-			expectedStatus: api.CheckStatusFail,
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"Message-ID": tt.messageID,
-				}),
-			}
-
-			check := scorer.generateMessageIDCheck(email)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Category != api.Headers {
-				t.Errorf("Category = %v, want %v", check.Category, api.Headers)
-			}
-		})
-	}
-}
-
-func TestGenerateMIMEStructureCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		parts          []MessagePart
-		expectedStatus api.CheckStatus
-	}{
-		{
-			name: "With MIME parts",
-			parts: []MessagePart{
-				{ContentType: "text/plain", Content: "test"},
-				{ContentType: "text/html", Content: "<p>test</p>"},
-			},
-			expectedStatus: api.CheckStatusPass,
-		},
-		{
-			name:           "No MIME parts",
-			parts:          []MessagePart{},
-			expectedStatus: api.CheckStatusWarn,
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
-				Header: make(mail.Header),
-				Parts:  tt.parts,
-			}
-
-			check := scorer.generateMIMEStructureCheck(email)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-		})
-	}
-}
-
-func TestGenerateHeaderChecks(t *testing.T) {
-	tests := []struct {
-		name      string
-		email     *EmailMessage
-		minChecks int
-	}{
-		{
-			name:      "Nil email",
-			email:     nil,
-			minChecks: 0,
-		},
-		{
-			name: "Complete email",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"To":         "recipient@example.com",
-					"Subject":    "Test",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-					"Reply-To":   "reply@example.com",
-				}),
-				Parts: []MessagePart{{ContentType: "text/plain", Content: "test"}},
-			},
-			minChecks: 4, // Required, Recommended, Message-ID, MIME
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			checks := scorer.GenerateHeaderChecks(tt.email)
-
-			if len(checks) < tt.minChecks {
-				t.Errorf("Got %d checks, want at least %d", len(checks), tt.minChecks)
-			}
-
-			// Verify all checks have the Headers category
-			for _, check := range checks {
-				if check.Category != api.Headers {
-					t.Errorf("Check %s has category %v, want %v", check.Name, check.Category, api.Headers)
-				}
-			}
-		})
-	}
-}
-
-func TestGetScoreSummary(t *testing.T) {
-	result := &ScoringResult{
-		OverallScore:   8.5,
-		Rating:         "Good",
-		AuthScore:      2.5,
-		SpamScore:      1.8,
-		BlacklistScore: 2.0,
-		ContentScore:   1.5,
-		HeaderScore:    0.7,
-		CategoryBreakdown: map[string]CategoryScore{
-			"Authentication":  {Score: 2.5, MaxScore: 3.0, Percentage: 83.3, Status: "Pass"},
-			"Spam Filters":    {Score: 1.8, MaxScore: 2.0, Percentage: 90.0, Status: "Pass"},
-			"Blacklists":      {Score: 2.0, MaxScore: 2.0, Percentage: 100.0, Status: "Pass"},
-			"Content Quality": {Score: 1.5, MaxScore: 2.0, Percentage: 75.0, Status: "Warn"},
-			"Email Structure": {Score: 0.7, MaxScore: 1.0, Percentage: 70.0, Status: "Warn"},
-		},
-		Recommendations: []string{
-			"Improve content quality",
-			"Add more headers",
-		},
-	}
-
-	scorer := NewDeliverabilityScorer()
-	summary := scorer.GetScoreSummary(result)
-
-	// Check that summary contains key information
-	if !strings.Contains(summary, "8.5") {
-		t.Error("Summary should contain overall score")
-	}
-	if !strings.Contains(summary, "Good") {
-		t.Error("Summary should contain rating")
-	}
-	if !strings.Contains(summary, "Authentication") {
-		t.Error("Summary should contain category names")
-	}
-	if !strings.Contains(summary, "Recommendations") {
-		t.Error("Summary should contain recommendations section")
-	}
-}
-
-// Helper function to create mail.Header with specific fields
-func createHeaderWithFields(fields map[string]string) mail.Header {
-	header := make(mail.Header)
-	for key, value := range fields {
-		if value != "" {
-			// Use canonical MIME header key format
-			canonicalKey := textproto.CanonicalMIMEHeaderKey(key)
-			header[canonicalKey] = []string{value}
-		}
-	}
-	return header
 }

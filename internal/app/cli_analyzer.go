@@ -92,10 +92,6 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 	fmt.Fprintln(writer, "EMAIL DELIVERABILITY ANALYSIS REPORT")
 	fmt.Fprintln(writer, strings.Repeat("=", 70))
 
-	// Score summary
-	summary := emailAnalyzer.GetScoreSummaryText(result)
-	fmt.Fprintln(writer, summary)
-
 	// Detailed checks
 	fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))
 	fmt.Fprintln(writer, "DETAILED CHECK RESULTS")

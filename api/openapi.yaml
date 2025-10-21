@@ -252,8 +252,7 @@ components:
           pattern: '^[a-z0-9-]+$'
           description: Associated test ID (base32-encoded with hyphens)
         score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: Overall deliverability score as percentage (0-100)
@@ -298,36 +297,31 @@ components:
         - header_score
       properties:
         authentication_score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: SPF/DKIM/DMARC score (in percentage)
           example: 28
         spam_score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: SpamAssassin score (in percentage)
           example: 15
         blacklist_score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: Blacklist check score (in percentage)
           example: 20
         content_score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: Content quality score (in percentage)
           example: 18
         header_score:
-          type: number
-          format: float
+          type: integer
           minimum: 0
           maximum: 100
           description: Header quality score (in percentage)
@@ -358,8 +352,7 @@ components:
           description: Check result status
           example: "pass"
         score:
-          type: number
-          format: float
+          type: integer
           description: Points contributed to total score
           example: 10
         grade:

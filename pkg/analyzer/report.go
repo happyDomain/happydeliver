@@ -36,6 +36,7 @@ type ReportGenerator struct {
 	dnsAnalyzer     *DNSAnalyzer
 	rblChecker      *RBLChecker
 	contentAnalyzer *ContentAnalyzer
+	headerAnalyzer  *HeaderAnalyzer
 	scorer          *DeliverabilityScorer
 }
 
@@ -51,6 +52,7 @@ func NewReportGenerator(
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),
+		headerAnalyzer:  NewHeaderAnalyzer(),
 		scorer:          NewDeliverabilityScorer(),
 	}
 }
@@ -63,7 +65,6 @@ type AnalysisResults struct {
 	DNS            *DNSResults
 	RBL            *RBLResults
 	Content        *ContentResults
-	Score          *ScoringResult
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -79,15 +80,6 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
 
-	// Calculate overall score
-	results.Score = r.scorer.CalculateScore(
-		results.Authentication,
-		results.SpamAssassin,
-		results.RBL,
-		results.Content,
-		email,
-	)
-
 	return results
 }
 
@@ -99,18 +91,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	report := &api.Report{
 		Id:        utils.UUIDToBase32(reportID),
 		TestId:    utils.UUIDToBase32(testID),
-		Score:     results.Score.OverallScore,
-		Grade:     ScoreToReportGrade(results.Score.OverallScore),
 		CreatedAt: now,
-	}
-
-	// Build score summary
-	report.Summary = &api.ScoreSummary{
-		AuthenticationScore: results.Score.AuthScore,
-		SpamScore:           results.Score.SpamScore,
-		BlacklistScore:      results.Score.BlacklistScore,
-		ContentScore:        results.Score.ContentScore,
-		HeaderScore:         results.Score.HeaderScore,
 	}
 
 	// Collect all checks from different analyzers
@@ -147,10 +128,39 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	// Header checks
-	headerChecks := r.scorer.GenerateHeaderChecks(results.Email)
+	headerChecks := r.headerAnalyzer.GenerateHeaderChecks(results.Email)
 	checks = append(checks, headerChecks...)
 
 	report.Checks = checks
+
+	// Summarize scores by category
+	categoryCounts := make(map[api.CheckCategory]int)
+	categoryTotals := make(map[api.CheckCategory]int)
+
+	for _, check := range checks {
+		if check.Status == "info" {
+			continue
+		}
+
+		categoryCounts[check.Category]++
+		categoryTotals[check.Category] += check.Score
+	}
+
+	// Calculate mean scores for each category
+	calcCategoryScore := func(category api.CheckCategory) int {
+		if count := categoryCounts[category]; count > 0 {
+			return categoryTotals[category] / count
+		}
+		return 0
+	}
+
+	report.Summary = &api.ScoreSummary{
+		AuthenticationScore: calcCategoryScore(api.Authentication),
+		BlacklistScore:      calcCategoryScore(api.Blacklist),
+		ContentScore:        calcCategoryScore(api.Content),
+		HeaderScore:         calcCategoryScore(api.Headers),
+		SpamScore:           calcCategoryScore(api.Spam),
+	}
 
 	// Add authentication results
 	report.Authentication = results.Authentication
@@ -201,6 +211,30 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	if results.Email != nil && results.Email.RawHeaders != "" {
 		report.RawHeaders = &results.Email.RawHeaders
 	}
+
+	// Calculate overall score as mean of all category scores
+	categoryScores := []int{
+		report.Summary.AuthenticationScore,
+		report.Summary.BlacklistScore,
+		report.Summary.ContentScore,
+		report.Summary.HeaderScore,
+		report.Summary.SpamScore,
+	}
+
+	var totalScore int
+	var categoryCount int
+	for _, score := range categoryScores {
+		totalScore += score
+		categoryCount++
+	}
+
+	if categoryCount > 0 {
+		report.Score = totalScore / categoryCount
+	} else {
+		report.Score = 0
+	}
+
+	report.Grade = ScoreToReportGrade(report.Score)
 
 	return report
 }
@@ -329,22 +363,4 @@ func (r *ReportGenerator) GenerateRawEmail(email *EmailMessage) string {
 	}
 
 	return raw
-}
-
-// GetRecommendations returns actionable recommendations based on the score
-func (r *ReportGenerator) GetRecommendations(results *AnalysisResults) []string {
-	if results == nil || results.Score == nil {
-		return []string{}
-	}
-
-	return results.Score.Recommendations
-}
-
-// GetScoreSummaryText returns a human-readable score summary
-func (r *ReportGenerator) GetScoreSummaryText(results *AnalysisResults) string {
-	if results == nil || results.Score == nil {
-		return ""
-	}
-
-	return r.scorer.GetScoreSummary(results.Score)
 }

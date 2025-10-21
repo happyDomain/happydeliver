@@ -79,14 +79,6 @@ func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (*A
 	}, nil
 }
 
-// GetScoreSummaryText returns a human-readable score summary
-func (a *EmailAnalyzer) GetScoreSummaryText(result *AnalysisResult) string {
-	if result == nil || result.Results == nil {
-		return ""
-	}
-	return a.generator.GetScoreSummaryText(result.Results)
-}
-
 // APIAdapter adapts the EmailAnalyzer to work with the API package
 // This adapter implements the interface expected by the API handler
 type APIAdapter struct {

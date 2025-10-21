@@ -41,7 +41,7 @@ func (a *AuthenticationAnalyzer) GenerateAuthenticationChecks(results *api.Authe
 			Category: api.Authentication,
 			Name:     "SPF Record",
 			Status:   api.CheckStatusWarn,
-			Score:    0.0,
+			Score:    0,
 			Message:  "No SPF authentication result found",
 			Severity: api.PtrTo(api.CheckSeverityMedium),
 			Advice:   api.PtrTo("Ensure your MTA is configured to check SPF records"),
@@ -59,7 +59,7 @@ func (a *AuthenticationAnalyzer) GenerateAuthenticationChecks(results *api.Authe
 			Category: api.Authentication,
 			Name:     "DKIM Signature",
 			Status:   api.CheckStatusWarn,
-			Score:    0.0,
+			Score:    0,
 			Message:  "No DKIM signature found",
 			Severity: api.PtrTo(api.CheckSeverityMedium),
 			Advice:   api.PtrTo("Configure DKIM signing for your domain to improve deliverability"),
@@ -75,7 +75,7 @@ func (a *AuthenticationAnalyzer) GenerateAuthenticationChecks(results *api.Authe
 			Category: api.Authentication,
 			Name:     "DMARC Policy",
 			Status:   api.CheckStatusWarn,
-			Score:    0.0,
+			Score:    0,
 			Message:  "No DMARC authentication result found",
 			Severity: api.PtrTo(api.CheckSeverityMedium),
 			Advice:   api.PtrTo("Implement DMARC policy for your domain"),
@@ -106,37 +106,38 @@ func (a *AuthenticationAnalyzer) generateSPFCheck(spf *api.AuthResult) api.Check
 	switch spf.Result {
 	case api.AuthResultResultPass:
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 100
 		check.Message = "SPF validation passed"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Advice = api.PtrTo("Your SPF record is properly configured")
 	case api.AuthResultResultFail:
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "SPF validation failed"
 		check.Severity = api.PtrTo(api.CheckSeverityCritical)
 		check.Advice = api.PtrTo("Fix your SPF record to authorize this sending server")
 	case api.AuthResultResultSoftfail:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.5
+		check.Score = 50
 		check.Message = "SPF validation softfail"
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("Review your SPF record configuration")
 	case api.AuthResultResultNeutral:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.5
+		check.Score = 50
 		check.Message = "SPF validation neutral"
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Advice = api.PtrTo("Consider tightening your SPF policy")
 	default:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = fmt.Sprintf("SPF validation result: %s", spf.Result)
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("Review your SPF record configuration")
 	}
 
-	if spf.Domain != nil {
+	if spf.Details != nil {
+		check.Details = spf.Details
+	} else if spf.Domain != nil {
 		details := fmt.Sprintf("Domain: %s", *spf.Domain)
 		check.Details = &details
 	}
@@ -153,34 +154,38 @@ func (a *AuthenticationAnalyzer) generateDKIMCheck(dkim *api.AuthResult, index i
 	switch dkim.Result {
 	case api.AuthResultResultPass:
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 10
 		check.Message = "DKIM signature is valid"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your DKIM signature is properly configured")
 	case api.AuthResultResultFail:
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "DKIM signature validation failed"
 		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Check your DKIM keys and signing configuration")
 	default:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = fmt.Sprintf("DKIM validation result: %s", dkim.Result)
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("Ensure DKIM signing is enabled and configured correctly")
 	}
 
-	var detailsParts []string
-	if dkim.Domain != nil {
-		detailsParts = append(detailsParts, fmt.Sprintf("Domain: %s", *dkim.Domain))
-	}
-	if dkim.Selector != nil {
-		detailsParts = append(detailsParts, fmt.Sprintf("Selector: %s", *dkim.Selector))
-	}
-	if len(detailsParts) > 0 {
-		details := strings.Join(detailsParts, ", ")
-		check.Details = &details
+	if dkim.Details != nil {
+		check.Details = dkim.Details
+	} else {
+		var detailsParts []string
+		if dkim.Domain != nil {
+			detailsParts = append(detailsParts, fmt.Sprintf("Domain: %s", *dkim.Domain))
+		}
+		if dkim.Selector != nil {
+			detailsParts = append(detailsParts, fmt.Sprintf("Selector: %s", *dkim.Selector))
+		}
+		if len(detailsParts) > 0 {
+			details := strings.Join(detailsParts, ", ")
+			check.Details = &details
+		}
 	}
 
 	return check
@@ -195,25 +200,27 @@ func (a *AuthenticationAnalyzer) generateDMARCCheck(dmarc *api.AuthResult) api.C
 	switch dmarc.Result {
 	case api.AuthResultResultPass:
 		check.Status = api.CheckStatusPass
-		check.Score = 1.0
+		check.Score = 10
 		check.Message = "DMARC validation passed"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your DMARC policy is properly aligned")
 	case api.AuthResultResultFail:
 		check.Status = api.CheckStatusFail
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "DMARC validation failed"
 		check.Severity = api.PtrTo(api.CheckSeverityHigh)
 		check.Advice = api.PtrTo("Ensure SPF or DKIM alignment with your From domain")
 	default:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = fmt.Sprintf("DMARC validation result: %s", dmarc.Result)
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("Configure DMARC policy for your domain")
 	}
 
-	if dmarc.Domain != nil {
+	if dmarc.Details != nil {
+		check.Details = dmarc.Details
+	} else if dmarc.Domain != nil {
 		details := fmt.Sprintf("Domain: %s", *dmarc.Domain)
 		check.Details = &details
 	}
@@ -230,25 +237,27 @@ func (a *AuthenticationAnalyzer) generateBIMICheck(bimi *api.AuthResult) api.Che
 	switch bimi.Result {
 	case api.AuthResultResultPass:
 		check.Status = api.CheckStatusPass
-		check.Score = 0.0 // BIMI doesn't contribute to score (branding feature)
+		check.Score = 0 // BIMI doesn't contribute to score (branding feature)
 		check.Message = "BIMI validation passed"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("Your brand logo is properly configured via BIMI")
 	case api.AuthResultResultFail:
 		check.Status = api.CheckStatusInfo
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "BIMI validation failed"
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Advice = api.PtrTo("BIMI is optional but can improve brand recognition. Ensure DMARC is enforced (p=quarantine or p=reject) and configure a valid BIMI record")
 	default:
 		check.Status = api.CheckStatusInfo
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = fmt.Sprintf("BIMI validation result: %s", bimi.Result)
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Advice = api.PtrTo("BIMI is optional. Consider implementing it to display your brand logo in supported email clients")
 	}
 
-	if bimi.Domain != nil {
+	if bimi.Details != nil {
+		check.Details = bimi.Details
+	} else if bimi.Domain != nil {
 		details := fmt.Sprintf("Domain: %s", *bimi.Domain)
 		check.Details = &details
 	}
@@ -265,39 +274,43 @@ func (a *AuthenticationAnalyzer) generateARCCheck(arc *api.ARCResult) api.Check 
 	switch arc.Result {
 	case api.ARCResultResultPass:
 		check.Status = api.CheckStatusPass
-		check.Score = 0.0 // ARC doesn't contribute to score (informational for forwarding)
+		check.Score = 0 // ARC doesn't contribute to score (informational for forwarding)
 		check.Message = "ARC chain validation passed"
 		check.Severity = api.PtrTo(api.CheckSeverityInfo)
 		check.Advice = api.PtrTo("ARC preserves authentication results through email forwarding. Your email passed through intermediaries while maintaining authentication")
 	case api.ARCResultResultFail:
 		check.Status = api.CheckStatusWarn
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "ARC chain validation failed"
 		check.Severity = api.PtrTo(api.CheckSeverityMedium)
 		check.Advice = api.PtrTo("The ARC chain is broken or invalid. This may indicate issues with email forwarding intermediaries")
 	default:
 		check.Status = api.CheckStatusInfo
-		check.Score = 0.0
+		check.Score = 0
 		check.Message = "No ARC chain present"
 		check.Severity = api.PtrTo(api.CheckSeverityLow)
 		check.Advice = api.PtrTo("ARC is not present. This is normal for emails sent directly without forwarding through mailing lists or other intermediaries")
 	}
 
-	// Build details
-	var detailsParts []string
-	if arc.ChainLength != nil {
-		detailsParts = append(detailsParts, fmt.Sprintf("Chain length: %d", *arc.ChainLength))
-	}
-	if arc.ChainValid != nil {
-		detailsParts = append(detailsParts, fmt.Sprintf("Chain valid: %v", *arc.ChainValid))
-	}
 	if arc.Details != nil {
-		detailsParts = append(detailsParts, *arc.Details)
-	}
+		check.Details = arc.Details
+	} else {
+		// Build details
+		var detailsParts []string
+		if arc.ChainLength != nil {
+			detailsParts = append(detailsParts, fmt.Sprintf("Chain length: %d", *arc.ChainLength))
+		}
+		if arc.ChainValid != nil {
+			detailsParts = append(detailsParts, fmt.Sprintf("Chain valid: %v", *arc.ChainValid))
+		}
+		if arc.Details != nil {
+			detailsParts = append(detailsParts, *arc.Details)
+		}
 
-	if len(detailsParts) > 0 {
-		details := strings.Join(detailsParts, ", ")
-		check.Details = &details
+		if len(detailsParts) > 0 {
+			details := strings.Join(detailsParts, ", ")
+			check.Details = &details
+		}
 	}
 
 	return check
