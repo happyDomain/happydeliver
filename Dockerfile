@@ -31,19 +31,88 @@ COPY --from=nodebuild /build/web/build/ ./web/build/
 RUN go generate ./... && \
     CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o happyDeliver ./cmd/happyDeliver
 
-# Stage 3: Runtime image with Postfix and all filters
+# Stage 3: Prepare perl
+FROM alpine:3 AS pl
+
+RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+    apk add --no-cache \
+    build-base \
+    musl-obstack-dev \
+    openssl \
+    openssl-dev \
+    perl-app-cpanminus \
+    perl-alien-libxml2 \
+    perl-class-load-xs \
+    perl-cpanel-json-xs \
+    perl-crypt-openssl-rsa \
+    perl-crypt-openssl-random \
+    perl-crypt-openssl-verify \
+    perl-crypt-openssl-x509 \
+    perl-dbd-sqlite \
+    perl-dbi \
+    perl-email-address-xs \
+    perl-json-xs \
+    perl-list-moreutils \
+    perl-moose \
+    perl-net-idn-encode@testing \
+    perl-net-ssleay \
+    perl-netaddr-ip \
+    perl-package-stash \
+    perl-params-util \
+    perl-params-validate \
+    perl-proc-processtable \
+    perl-sereal-decoder \
+    perl-sereal-encoder \
+    perl-socket6 \
+    perl-sub-identify \
+    perl-variable-magic \
+    perl-xml-libxml \
+    perl-dev \
+    zlib-dev \
+    && \
+    ln -s /usr/bin/ld /bin/ld
+
+RUN cpanm --notest Mail::SPF && \
+    cpanm --notest Mail::Milter::Authentication
+
+# Stage 4: Runtime image with Postfix and all filters
 FROM alpine:3
 
 # Install all required packages
-RUN apk add --no-cache \
+RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+    apk add --no-cache \
     bash \
     ca-certificates \
-    opendkim \
-    opendkim-utils \
-    opendmarc \
+    openssl \
+    perl \
+    perl-alien-libxml2 \
+    perl-class-load-xs \
+    perl-cpanel-json-xs \
+    perl-crypt-openssl-rsa \
+    perl-crypt-openssl-random \
+    perl-crypt-openssl-verify \
+    perl-crypt-openssl-x509 \
+    perl-dbd-sqlite \
+    perl-dbi \
+    perl-email-address-xs \
+    perl-json-xs \
+    perl-list-moreutils \
+    perl-moose \
+    perl-net-idn-encode@testing \
+    perl-net-ssleay \
+    perl-netaddr-ip \
+    perl-package-stash \
+    perl-params-util \
+    perl-params-validate \
+    perl-proc-processtable \
+    perl-sereal-decoder \
+    perl-sereal-encoder \
+    perl-socket6 \
+    perl-sub-identify \
+    perl-variable-magic \
+    perl-xml-libxml \
     postfix \
     postfix-pcre \
-    postfix-policyd-spf-perl \
     spamassassin \
     spamassassin-client \
     supervisor \
@@ -51,9 +120,8 @@ RUN apk add --no-cache \
     tzdata \
     && rm -rf /var/cache/apk/*
 
-# Get test-only version of postfix-policyd-spf-perl
-ADD https://git.nemunai.re/happyDomain/postfix-policyd-spf-perl/raw/branch/master/postfix-policyd-spf-perl  /usr/bin/postfix-policyd-spf-perl
-RUN chmod +x /usr/bin/postfix-policyd-spf-perl && chmod 755 /usr/bin/postfix-policyd-spf-perl
+# Copy Mail::Milter::Authentication and its dependancies
+COPY --from=pl /usr/local/ /usr/local/
 
 # Create happydeliver user and group
 RUN addgroup -g 1000 happydeliver && \
@@ -63,12 +131,11 @@ RUN addgroup -g 1000 happydeliver && \
 RUN mkdir -p /etc/happydeliver \
     /var/lib/happydeliver \
     /var/log/happydeliver \
-    /var/spool/postfix/opendkim \
-    /var/spool/postfix/opendmarc \
-    /etc/opendkim/keys \
+    /var/cache/authentication_milter \
+    /var/lib/authentication_milter \
+    /var/spool/postfix/authentication_milter \
     && chown -R happydeliver:happydeliver /var/lib/happydeliver /var/log/happydeliver \
-    && chown -R opendkim:postfix /var/spool/postfix/opendkim \
-    && chown -R opendmarc:postfix /var/spool/postfix/opendmarc
+    && chown -R mail:mail /var/spool/postfix/authentication_milter
 
 # Copy the built application
 COPY --from=builder /build/happyDeliver /usr/local/bin/happyDeliver
@@ -76,8 +143,7 @@ RUN chmod +x /usr/local/bin/happyDeliver
 
 # Copy configuration files
 COPY docker/postfix/ /etc/postfix/
-COPY docker/opendkim/ /etc/opendkim/
-COPY docker/opendmarc/ /etc/opendmarc/
+COPY docker/authentication_milter/authentication_milter.json /etc/authentication_milter.json
 COPY docker/spamassassin/ /etc/mail/spamassassin/
 COPY docker/supervisor/ /etc/supervisor/
 COPY docker/entrypoint.sh /entrypoint.sh

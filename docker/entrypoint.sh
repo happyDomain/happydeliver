@@ -10,28 +10,23 @@ HAPPYDELIVER_DOMAIN="${HAPPYDELIVER_DOMAIN:-happydeliver.local}"
 echo "Hostname: $HOSTNAME"
 echo "Domain: $HAPPYDELIVER_DOMAIN"
 
-# Create runtime directories
-mkdir -p /var/run/opendkim /var/run/opendmarc
-chown opendkim:postfix /var/run/opendkim
-chown opendmarc:postfix /var/run/opendmarc
-
 # Create socket directories
-mkdir -p /var/spool/postfix/opendkim /var/spool/postfix/opendmarc
-chown opendkim:postfix /var/spool/postfix/opendkim
-chown opendmarc:postfix /var/spool/postfix/opendmarc
-chmod 750 /var/spool/postfix/opendkim /var/spool/postfix/opendmarc
+mkdir -p /var/spool/postfix/authentication_milter
+chown mail:mail /var/spool/postfix/authentication_milter
+chmod 750 /var/spool/postfix/authentication_milter
 
 # Create log directory
-mkdir -p /var/log/happydeliver
+mkdir -p /var/log/happydeliver /var/cache/authentication_milter /var/spool/authentication_milter /var/lib/authentication_milter /run/authentication_milter
 chown happydeliver:happydeliver /var/log/happydeliver
+chown mail:mail /var/cache/authentication_milter /run/authentication_milter /var/spool/authentication_milter /var/lib/authentication_milter
 
 # Replace placeholders in Postfix configuration
 echo "Configuring Postfix..."
 sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/postfix/main.cf
 sed -i "s/__DOMAIN__/${HAPPYDELIVER_DOMAIN}/g" /etc/postfix/main.cf
 
-# Replace placeholders in OpenDMARC configuration
-sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/opendmarc/opendmarc.conf
+# Replace placeholders in configurations
+sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/authentication_milter.json
 
 # Initialize Postfix aliases
 if [ -f /etc/postfix/aliases ]; then

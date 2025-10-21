@@ -1,0 +1,69 @@
+{
+    "logtoerr"    : "1",
+    "error_log"   : "",
+    "connection"  : "unix:/var/spool/postfix/authentication_milter/authentication_milter.sock",
+    "umask"       : "0007",
+    "runas"       : "mail",
+    "rungroup"    : "mail",
+    "authserv_id" : "__HOSTNAME__",
+
+    "connect_timeout" : 30,
+    "command_timeout" : 30,
+    "content_timeout" : 300,
+    "dns_timeout"     : 10,
+    "dns_retry"       : 2,
+
+    "handlers" : {
+
+        "Sanitize" : {
+            "hosts_to_remove" : [
+                "__HOSTNAME__"
+            ]
+        },
+
+        "SPF" : {
+            "hide_none" : 0
+        },
+
+        "DKIM" : {
+            "hide_none" : 0,
+        },
+
+        "XGoogleDKIM" : {
+            "hide_none" : 1,
+        },
+
+        "ARC" : {
+            "hide_none" : 0,
+        },
+
+        "DMARC" : {
+            "hide_none" : 0,
+            "detect_list_id" : "1"
+        },
+
+        "BIMI" : {},
+
+        "PTR" : {},
+
+        "SenderID" : {
+            "hide_none" : 1
+        },
+
+        "IPRev" : {},
+
+        "Auth" : {},
+
+        "AlignedFrom" : {},
+
+        "LocalIP" : {},
+
+        "TrustedIP" : {
+            "trusted_ip_list" : []
+        },
+
+        "!AddID" : {},
+
+        "ReturnOK" : {}
+    }
+}

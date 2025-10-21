@@ -28,14 +28,13 @@ transport_maps = pcre:/etc/postfix/transport_maps
 # OpenDKIM for DKIM verification
 milter_default_action = accept
 milter_protocol = 6
-smtpd_milters = unix:/var/spool/postfix/opendkim/opendkim.sock, unix:/var/spool/postfix/opendmarc/opendmarc.sock
+smtpd_milters = unix:/var/spool/postfix/authentication_milter/authentication_milter.sock
 non_smtpd_milters = $smtpd_milters
 
 # SPF policy checking
 smtpd_recipient_restrictions =
     permit_mynetworks,
-    reject_unauth_destination,
-    check_policy_service unix:private/policy-spf
+    reject_unauth_destination
 
 # Logging
 debug_peer_level = 2

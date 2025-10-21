@@ -17,13 +17,12 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ### With Docker (Recommended)
 
-The easiest way to run happyDeliver is using the all-in-one Docker container that includes Postfix, OpenDKIM, OpenDMARC, SpamAssassin, and the happyDeliver application.
+The easiest way to run happyDeliver is using the all-in-one Docker container that includes Postfix, authentication_milter, SpamAssassin, and the happyDeliver application.
 
 #### What's included in the Docker container:
 
 - **Postfix MTA**: Receives emails on port 25
-- **OpenDKIM**: DKIM signature verification
-- **OpenDMARC**: DMARC policy validation
+- **authentication_milter**: Entreprise grade email authentication
 - **SpamAssassin**: Spam scoring and analysis
 - **happyDeliver API**: REST API server on port 8080
 - **SQLite Database**: Persistent storage for tests and reports
