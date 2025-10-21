@@ -145,10 +145,10 @@
             </div>
 
             <!-- DNS Records -->
-            {#if report.dns_records && report.dns_records.length > 0}
+            {#if report.dns_results}
                 <div class="row mb-4" id="dns">
                     <div class="col-12">
-                        <DnsRecordsCard dnsRecords={report.dns_records} />
+                        <DnsRecordsCard dnsResults={report.dns_results} />
                     </div>
                 </div>
             {/if}

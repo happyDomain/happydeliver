@@ -267,10 +267,8 @@ components:
           $ref: '#/components/schemas/AuthenticationResults'
         spamassassin:
           $ref: '#/components/schemas/SpamAssassinResult'
-        dns_records:
-          type: array
-          items:
-            $ref: '#/components/schemas/DNSRecord'
+        dns_results:
+          $ref: '#/components/schemas/DNSResults'
         blacklists:
           type: object
           additionalProperties:
@@ -694,31 +692,168 @@ components:
           type: string
           description: Full SpamAssassin report
 
-    DNSRecord:
+    DNSResults:
       type: object
       required:
         - domain
-        - record_type
-        - status
       properties:
         domain:
           type: string
           description: Domain name
           example: "example.com"
-        record_type:
+        mx_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/MXRecord'
+          description: MX records for the domain
+        spf_record:
+          $ref: '#/components/schemas/SPFRecord'
+        dkim_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DKIMRecord'
+          description: DKIM records found
+        dmarc_record:
+          $ref: '#/components/schemas/DMARCRecord'
+        bimi_record:
+          $ref: '#/components/schemas/BIMIRecord'
+        errors:
+          type: array
+          items:
+            type: string
+          description: DNS lookup errors
+
+    MXRecord:
+      type: object
+      required:
+        - host
+        - priority
+        - valid
+      properties:
+        host:
           type: string
-          enum: [MX, SPF, DKIM, DMARC, BIMI]
-          description: DNS record type
-          example: "SPF"
-        status:
+          description: MX hostname
+          example: "mail.example.com"
+        priority:
+          type: integer
+          format: uint16
+          description: MX priority (lower is higher priority)
+          example: 10
+        valid:
+          type: boolean
+          description: Whether the MX record is valid
+          example: true
+        error:
           type: string
-          enum: [found, missing, invalid]
-          description: Record status
-          example: "found"
-        value:
+          description: Error message if validation failed
+          example: "Failed to lookup MX records"
+
+    SPFRecord:
+      type: object
+      required:
+        - valid
+      properties:
+        record:
           type: string
-          description: Record value
+          description: SPF record content
           example: "v=spf1 include:_spf.example.com ~all"
+        valid:
+          type: boolean
+          description: Whether the SPF record is valid
+          example: true
+        error:
+          type: string
+          description: Error message if validation failed
+          example: "No SPF record found"
+
+    DKIMRecord:
+      type: object
+      required:
+        - selector
+        - domain
+        - valid
+      properties:
+        selector:
+          type: string
+          description: DKIM selector
+          example: "default"
+        domain:
+          type: string
+          description: Domain name
+          example: "example.com"
+        record:
+          type: string
+          description: DKIM record content
+          example: "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA..."
+        valid:
+          type: boolean
+          description: Whether the DKIM record is valid
+          example: true
+        error:
+          type: string
+          description: Error message if validation failed
+          example: "No DKIM record found"
+
+    DMARCRecord:
+      type: object
+      required:
+        - valid
+      properties:
+        record:
+          type: string
+          description: DMARC record content
+          example: "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+        policy:
+          type: string
+          enum: [none, quarantine, reject, unknown]
+          description: DMARC policy
+          example: "quarantine"
+        valid:
+          type: boolean
+          description: Whether the DMARC record is valid
+          example: true
+        error:
+          type: string
+          description: Error message if validation failed
+          example: "No DMARC record found"
+
+    BIMIRecord:
+      type: object
+      required:
+        - selector
+        - domain
+        - valid
+      properties:
+        selector:
+          type: string
+          description: BIMI selector
+          example: "default"
+        domain:
+          type: string
+          description: Domain name
+          example: "example.com"
+        record:
+          type: string
+          description: BIMI record content
+          example: "v=BIMI1; l=https://example.com/logo.svg"
+        logo_url:
+          type: string
+          format: uri
+          description: URL to the brand logo (SVG)
+          example: "https://example.com/logo.svg"
+        vmc_url:
+          type: string
+          format: uri
+          description: URL to Verified Mark Certificate (optional)
+          example: "https://example.com/vmc.pem"
+        valid:
+          type: boolean
+          description: Whether the BIMI record is valid
+          example: true
+        error:
+          type: string
+          description: Error message if validation failed
+          example: "No BIMI record found"
 
     BlacklistCheck:
       type: object

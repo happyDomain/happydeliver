@@ -62,7 +62,7 @@ type AnalysisResults struct {
 	Email          *EmailMessage
 	Authentication *api.AuthenticationResults
 	Content        *ContentResults
-	DNS            *DNSResults
+	DNS            *api.DNSResults
 	Headers        *api.HeaderAnalysis
 	RBL            *RBLResults
 	SpamAssassin   *SpamAssassinResult
@@ -141,10 +141,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Add DNS records
 	if results.DNS != nil {
-		dnsRecords := r.buildDNSRecords(results.DNS)
-		if len(dnsRecords) > 0 {
-			report.DnsRecords = &dnsRecords
-		}
+		report.DnsResults = results.DNS
 	}
 
 	// Add headers results
@@ -202,118 +199,6 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	report.Grade = ScoreToReportGrade(report.Score)
 
 	return report
-}
-
-// buildDNSRecords converts DNS analysis results to API DNS records
-func (r *ReportGenerator) buildDNSRecords(dns *DNSResults) []api.DNSRecord {
-	records := []api.DNSRecord{}
-
-	if dns == nil {
-		return records
-	}
-
-	// MX records
-	if len(dns.MXRecords) > 0 {
-		for _, mx := range dns.MXRecords {
-			status := api.Found
-			if !mx.Valid {
-				if mx.Error != "" {
-					status = api.Missing
-				} else {
-					status = api.Invalid
-				}
-			}
-
-			record := api.DNSRecord{
-				Domain:     dns.Domain,
-				RecordType: api.MX,
-				Status:     status,
-			}
-
-			if mx.Host != "" {
-				value := mx.Host
-				record.Value = &value
-			}
-
-			records = append(records, record)
-		}
-	}
-
-	// SPF record
-	if dns.SPFRecord != nil {
-		status := api.Found
-		if !dns.SPFRecord.Valid {
-			if dns.SPFRecord.Record == "" {
-				status = api.Missing
-			} else {
-				status = api.Invalid
-			}
-		}
-
-		record := api.DNSRecord{
-			Domain:     dns.Domain,
-			RecordType: api.SPF,
-			Status:     status,
-		}
-
-		if dns.SPFRecord.Record != "" {
-			record.Value = &dns.SPFRecord.Record
-		}
-
-		records = append(records, record)
-	}
-
-	// DKIM records
-	for _, dkim := range dns.DKIMRecords {
-		status := api.Found
-		if !dkim.Valid {
-			if dkim.Record == "" {
-				status = api.Missing
-			} else {
-				status = api.Invalid
-			}
-		}
-
-		record := api.DNSRecord{
-			Domain:     dkim.Domain,
-			RecordType: api.DKIM,
-			Status:     status,
-		}
-
-		if dkim.Record != "" {
-			// Include selector in value for clarity
-			value := dkim.Record
-			record.Value = &value
-		}
-
-		records = append(records, record)
-	}
-
-	// DMARC record
-	if dns.DMARCRecord != nil {
-		status := api.Found
-		if !dns.DMARCRecord.Valid {
-			if dns.DMARCRecord.Record == "" {
-				status = api.Missing
-			} else {
-				status = api.Invalid
-			}
-		}
-
-		record := api.DNSRecord{
-			Domain:     dns.Domain,
-			RecordType: api.DMARC,
-			Status:     status,
-		}
-
-		if dns.DMARCRecord.Record != "" {
-			record.Value = &dns.DMARCRecord.Record
-		}
-
-		records = append(records, record)
-	}
-
-	return records
 }
 
 // GenerateRawEmail returns the raw email message as a string

@@ -51,79 +51,25 @@ func NewDNSAnalyzer(timeout time.Duration) *DNSAnalyzer {
 	}
 }
 
-// DNSResults represents DNS validation results for an email
-type DNSResults struct {
-	Domain      string
-	MXRecords   []MXRecord
-	SPFRecord   *SPFRecord
-	DKIMRecords []DKIMRecord
-	DMARCRecord *DMARCRecord
-	BIMIRecord  *BIMIRecord
-	Errors      []string
-}
-
-// MXRecord represents an MX record
-type MXRecord struct {
-	Host     string
-	Priority uint16
-	Valid    bool
-	Error    string
-}
-
-// SPFRecord represents an SPF record
-type SPFRecord struct {
-	Record string
-	Valid  bool
-	Error  string
-}
-
-// DKIMRecord represents a DKIM record
-type DKIMRecord struct {
-	Selector string
-	Domain   string
-	Record   string
-	Valid    bool
-	Error    string
-}
-
-// DMARCRecord represents a DMARC record
-type DMARCRecord struct {
-	Record string
-	Policy string // none, quarantine, reject
-	Valid  bool
-	Error  string
-}
-
-// BIMIRecord represents a BIMI record
-type BIMIRecord struct {
-	Selector string
-	Domain   string
-	Record   string
-	LogoURL  string // URL to the brand logo (SVG)
-	VMCURL   string // URL to Verified Mark Certificate (optional)
-	Valid    bool
-	Error    string
-}
-
 // AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults) *DNSResults {
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults) *api.DNSResults {
 	// Extract domain from From address
 	domain := d.extractDomain(email)
 	if domain == "" {
-		return &DNSResults{
-			Errors: []string{"Unable to extract domain from email"},
+		return &api.DNSResults{
+			Errors: &[]string{"Unable to extract domain from email"},
 		}
 	}
 
-	results := &DNSResults{
+	results := &api.DNSResults{
 		Domain: domain,
 	}
 
 	// Check MX records
-	results.MXRecords = d.checkMXRecords(domain)
+	results.MxRecords = d.checkMXRecords(domain)
 
 	// Check SPF record
-	results.SPFRecord = d.checkSPFRecord(domain)
+	results.SpfRecord = d.checkSPFRecord(domain)
 
 	// Check DKIM records (from authentication results)
 	if authResults != nil && authResults.Dkim != nil {
@@ -131,17 +77,20 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 			if dkim.Domain != nil && dkim.Selector != nil {
 				dkimRecord := d.checkDKIMRecord(*dkim.Domain, *dkim.Selector)
 				if dkimRecord != nil {
-					results.DKIMRecords = append(results.DKIMRecords, *dkimRecord)
+					if results.DkimRecords == nil {
+						results.DkimRecords = new([]api.DKIMRecord)
+					}
+					*results.DkimRecords = append(*results.DkimRecords, *dkimRecord)
 				}
 			}
 		}
 	}
 
 	// Check DMARC record
-	results.DMARCRecord = d.checkDMARCRecord(domain)
+	results.DmarcRecord = d.checkDMARCRecord(domain)
 
 	// Check BIMI record (using default selector)
-	results.BIMIRecord = d.checkBIMIRecord(domain, "default")
+	results.BimiRecord = d.checkBIMIRecord(domain, "default")
 
 	return results
 }
@@ -158,51 +107,51 @@ func (d *DNSAnalyzer) extractDomain(email *EmailMessage) string {
 }
 
 // checkMXRecords looks up MX records for a domain
-func (d *DNSAnalyzer) checkMXRecords(domain string) []MXRecord {
+func (d *DNSAnalyzer) checkMXRecords(domain string) *[]api.MXRecord {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	mxRecords, err := d.resolver.LookupMX(ctx, domain)
 	if err != nil {
-		return []MXRecord{
+		return &[]api.MXRecord{
 			{
 				Valid: false,
-				Error: fmt.Sprintf("Failed to lookup MX records: %v", err),
+				Error: api.PtrTo(fmt.Sprintf("Failed to lookup MX records: %v", err)),
 			},
 		}
 	}
 
 	if len(mxRecords) == 0 {
-		return []MXRecord{
+		return &[]api.MXRecord{
 			{
 				Valid: false,
-				Error: "No MX records found",
+				Error: api.PtrTo("No MX records found"),
 			},
 		}
 	}
 
-	var results []MXRecord
+	var results []api.MXRecord
 	for _, mx := range mxRecords {
-		results = append(results, MXRecord{
+		results = append(results, api.MXRecord{
 			Host:     mx.Host,
 			Priority: mx.Pref,
 			Valid:    true,
 		})
 	}
 
-	return results
+	return &results
 }
 
 // checkSPFRecord looks up and validates SPF record for a domain
-func (d *DNSAnalyzer) checkSPFRecord(domain string) *SPFRecord {
+func (d *DNSAnalyzer) checkSPFRecord(domain string) *api.SPFRecord {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, domain)
 	if err != nil {
-		return &SPFRecord{
+		return &api.SPFRecord{
 			Valid: false,
-			Error: fmt.Sprintf("Failed to lookup TXT records: %v", err),
+			Error: api.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
 		}
 	}
 
@@ -217,31 +166,31 @@ func (d *DNSAnalyzer) checkSPFRecord(domain string) *SPFRecord {
 	}
 
 	if spfCount == 0 {
-		return &SPFRecord{
+		return &api.SPFRecord{
 			Valid: false,
-			Error: "No SPF record found",
+			Error: api.PtrTo("No SPF record found"),
 		}
 	}
 
 	if spfCount > 1 {
-		return &SPFRecord{
-			Record: spfRecord,
+		return &api.SPFRecord{
+			Record: &spfRecord,
 			Valid:  false,
-			Error:  "Multiple SPF records found (RFC violation)",
+			Error:  api.PtrTo("Multiple SPF records found (RFC violation)"),
 		}
 	}
 
 	// Basic validation
 	if !d.validateSPF(spfRecord) {
-		return &SPFRecord{
-			Record: spfRecord,
+		return &api.SPFRecord{
+			Record: &spfRecord,
 			Valid:  false,
-			Error:  "SPF record appears malformed",
+			Error:  api.PtrTo("SPF record appears malformed"),
 		}
 	}
 
-	return &SPFRecord{
-		Record: spfRecord,
+	return &api.SPFRecord{
+		Record: &spfRecord,
 		Valid:  true,
 	}
 }
@@ -267,8 +216,8 @@ func (d *DNSAnalyzer) validateSPF(record string) bool {
 	return hasValidEnding
 }
 
-// checkDKIMRecord looks up and validates DKIM record for a domain and selector
-func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *DKIMRecord {
+// checkapi.DKIMRecord looks up and validates DKIM record for a domain and selector
+func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *api.DKIMRecord {
 	// DKIM records are at: selector._domainkey.domain
 	dkimDomain := fmt.Sprintf("%s._domainkey.%s", selector, domain)
 
@@ -277,20 +226,20 @@ func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *DKIMRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, dkimDomain)
 	if err != nil {
-		return &DKIMRecord{
+		return &api.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    fmt.Sprintf("Failed to lookup DKIM record: %v", err),
+			Error:    api.PtrTo(fmt.Sprintf("Failed to lookup DKIM record: %v", err)),
 		}
 	}
 
 	if len(txtRecords) == 0 {
-		return &DKIMRecord{
+		return &api.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    "No DKIM record found",
+			Error:    api.PtrTo("No DKIM record found"),
 		}
 	}
 
@@ -299,19 +248,19 @@ func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *DKIMRecord {
 
 	// Basic validation - should contain "v=DKIM1" and "p=" (public key)
 	if !d.validateDKIM(dkimRecord) {
-		return &DKIMRecord{
+		return &api.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
-			Record:   dkimRecord,
+			Record:   api.PtrTo(dkimRecord),
 			Valid:    false,
-			Error:    "DKIM record appears malformed",
+			Error:    api.PtrTo("DKIM record appears malformed"),
 		}
 	}
 
-	return &DKIMRecord{
+	return &api.DKIMRecord{
 		Selector: selector,
 		Domain:   domain,
-		Record:   dkimRecord,
+		Record:   &dkimRecord,
 		Valid:    true,
 	}
 }
@@ -332,8 +281,8 @@ func (d *DNSAnalyzer) validateDKIM(record string) bool {
 	return true
 }
 
-// checkDMARCRecord looks up and validates DMARC record for a domain
-func (d *DNSAnalyzer) checkDMARCRecord(domain string) *DMARCRecord {
+// checkapi.DMARCRecord looks up and validates DMARC record for a domain
+func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
 	// DMARC records are at: _dmarc.domain
 	dmarcDomain := fmt.Sprintf("_dmarc.%s", domain)
 
@@ -342,9 +291,9 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *DMARCRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, dmarcDomain)
 	if err != nil {
-		return &DMARCRecord{
+		return &api.DMARCRecord{
 			Valid: false,
-			Error: fmt.Sprintf("Failed to lookup DMARC record: %v", err),
+			Error: api.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
 		}
 	}
 
@@ -358,9 +307,9 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *DMARCRecord {
 	}
 
 	if dmarcRecord == "" {
-		return &DMARCRecord{
+		return &api.DMARCRecord{
 			Valid: false,
-			Error: "No DMARC record found",
+			Error: api.PtrTo("No DMARC record found"),
 		}
 	}
 
@@ -369,17 +318,17 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *DMARCRecord {
 
 	// Basic validation
 	if !d.validateDMARC(dmarcRecord) {
-		return &DMARCRecord{
-			Record: dmarcRecord,
-			Policy: policy,
+		return &api.DMARCRecord{
+			Record: &dmarcRecord,
+			Policy: api.PtrTo(api.DMARCRecordPolicy(policy)),
 			Valid:  false,
-			Error:  "DMARC record appears malformed",
+			Error:  api.PtrTo("DMARC record appears malformed"),
 		}
 	}
 
-	return &DMARCRecord{
-		Record: dmarcRecord,
-		Policy: policy,
+	return &api.DMARCRecord{
+		Record: &dmarcRecord,
+		Policy: api.PtrTo(api.DMARCRecordPolicy(policy)),
 		Valid:  true,
 	}
 }
@@ -411,7 +360,7 @@ func (d *DNSAnalyzer) validateDMARC(record string) bool {
 }
 
 // checkBIMIRecord looks up and validates BIMI record for a domain and selector
-func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *BIMIRecord {
+func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *api.BIMIRecord {
 	// BIMI records are at: selector._bimi.domain
 	bimiDomain := fmt.Sprintf("%s._bimi.%s", selector, domain)
 
@@ -420,20 +369,20 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *BIMIRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, bimiDomain)
 	if err != nil {
-		return &BIMIRecord{
+		return &api.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    fmt.Sprintf("Failed to lookup BIMI record: %v", err),
+			Error:    api.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %v", err)),
 		}
 	}
 
 	if len(txtRecords) == 0 {
-		return &BIMIRecord{
+		return &api.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    "No BIMI record found",
+			Error:    api.PtrTo("No BIMI record found"),
 		}
 	}
 
@@ -446,23 +395,23 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *BIMIRecord {
 
 	// Basic validation - should contain "v=BIMI1" and "l=" (logo URL)
 	if !d.validateBIMI(bimiRecord) {
-		return &BIMIRecord{
+		return &api.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
-			Record:   bimiRecord,
-			LogoURL:  logoURL,
-			VMCURL:   vmcURL,
+			Record:   &bimiRecord,
+			LogoUrl:  &logoURL,
+			VmcUrl:   &vmcURL,
 			Valid:    false,
-			Error:    "BIMI record appears malformed",
+			Error:    api.PtrTo("BIMI record appears malformed"),
 		}
 	}
 
-	return &BIMIRecord{
+	return &api.BIMIRecord{
 		Selector: selector,
 		Domain:   domain,
-		Record:   bimiRecord,
-		LogoURL:  logoURL,
-		VMCURL:   vmcURL,
+		Record:   &bimiRecord,
+		LogoUrl:  &logoURL,
+		VmcUrl:   &vmcURL,
 		Valid:    true,
 	}
 }
