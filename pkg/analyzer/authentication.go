@@ -191,7 +191,7 @@ func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	result.Details = &part
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "dkim="))
 
 	return result
 }
@@ -215,7 +215,7 @@ func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *api.AuthResult {
 		result.Domain = &domain
 	}
 
-	result.Details = &part
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "dmarc="))
 
 	return result
 }
@@ -246,7 +246,7 @@ func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	result.Details = &part
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "bimi="))
 
 	return result
 }
@@ -263,7 +263,7 @@ func (a *AuthenticationAnalyzer) parseARCResult(part string) *api.ARCResult {
 		result.Result = api.ARCResultResult(resultStr)
 	}
 
-	result.Details = &part
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "arc="))
 
 	return result
 }
@@ -466,4 +466,76 @@ func textprotoCanonical(s string) string {
 		}
 	}
 	return strings.Join(words, "-")
+}
+
+// CalculateAuthenticationScore calculates the authentication score from auth results
+// Returns a score from 0-100 where higher is better
+func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.AuthenticationResults) int {
+	if results == nil {
+		return 0
+	}
+
+	score := 0
+
+	// SPF (30 points)
+	if results.Spf != nil {
+		switch results.Spf.Result {
+		case api.AuthResultResultPass:
+			score += 30
+		case api.AuthResultResultNeutral, api.AuthResultResultNone:
+			score += 15
+		case api.AuthResultResultSoftfail:
+			score += 5
+		default: // fail, temperror, permerror
+			score += 0
+		}
+	}
+
+	// DKIM (30 points) - at least one passing signature
+	if results.Dkim != nil && len(*results.Dkim) > 0 {
+		hasPass := false
+		for _, dkim := range *results.Dkim {
+			if dkim.Result == api.AuthResultResultPass {
+				hasPass = true
+				break
+			}
+		}
+		if hasPass {
+			score += 30
+		} else {
+			// Has DKIM signatures but none passed
+			score += 10
+		}
+	}
+
+	// DMARC (30 points)
+	if results.Dmarc != nil {
+		switch results.Dmarc.Result {
+		case api.AuthResultResultPass:
+			score += 30
+		case api.AuthResultResultNone:
+			score += 10
+		default: // fail
+			score += 0
+		}
+	}
+
+	// BIMI (10 points)
+	if results.Bimi != nil {
+		switch results.Bimi.Result {
+		case api.AuthResultResultPass:
+			score += 10
+		case api.AuthResultResultNone:
+			score += 5
+		default: // fail
+			score += 0
+		}
+	}
+
+	// Ensure score doesn't exceed 100
+	if score > 100 {
+		score = 100
+	}
+
+	return score
 }

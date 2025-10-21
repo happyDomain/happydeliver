@@ -240,7 +240,6 @@ components:
         - test_id
         - score
         - grade
-        - checks
         - created_at
       properties:
         id:
@@ -264,10 +263,6 @@ components:
           example: "A"
         summary:
           $ref: '#/components/schemas/ScoreSummary'
-        checks:
-          type: array
-          items:
-            $ref: '#/components/schemas/Check'
         authentication:
           $ref: '#/components/schemas/AuthenticationResults'
         spamassassin:
@@ -289,6 +284,10 @@ components:
                 listed: false
               - rbl: "bl.spamcop.net"
                 listed: false
+        content_analysis:
+          $ref: '#/components/schemas/ContentAnalysis'
+        header_analysis:
+          $ref: '#/components/schemas/HeaderAnalysis'
         raw_headers:
           type: string
           description: Raw email headers
@@ -336,55 +335,272 @@ components:
           description: Header quality score (in percentage)
           example: 9
 
-    Check:
+    ContentAnalysis:
+      type: object
+      properties:
+        has_html:
+          type: boolean
+          description: Whether email contains HTML part
+          example: true
+        has_plaintext:
+          type: boolean
+          description: Whether email contains plaintext part
+          example: true
+        html_issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentIssue'
+          description: Issues found in HTML content
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/LinkCheck'
+          description: Analysis of links found in the email
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageCheck'
+          description: Analysis of images in the email
+        text_to_image_ratio:
+          type: number
+          format: float
+          description: Ratio of text to images (higher is better)
+          example: 0.75
+        has_unsubscribe_link:
+          type: boolean
+          description: Whether email contains an unsubscribe link
+          example: true
+        unsubscribe_methods:
+          type: array
+          items:
+            type: string
+            enum: [link, mailto, list-unsubscribe-header, one-click]
+          description: Available unsubscribe methods
+          example: ["link", "list-unsubscribe-header"]
+
+    ContentIssue:
       type: object
       required:
-        - category
-        - name
-        - status
-        - score
-        - grade
+        - type
+        - severity
         - message
       properties:
-        category:
+        type:
           type: string
-          enum: [authentication, dns, content, blacklist, headers, spam]
-          description: Check category
-          example: "authentication"
-        name:
-          type: string
-          description: Check name
-          example: "DKIM Signature"
-        status:
-          type: string
-          enum: [pass, fail, warn, info, error]
-          description: Check result status
-          example: "pass"
-        score:
-          type: integer
-          description: Points contributed to total score
-          example: 10
-        grade:
-          type: string
-          enum: [A+, A, B, C, D, E, F]
-          description: Letter grade representation of the score (A+ is best, F is worst)
-          example: "A"
-        message:
-          type: string
-          description: Human-readable result message
-          example: "DKIM signature is valid"
-        details:
-          type: string
-          description: Additional details (may be JSON)
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link]
+          description: Type of content issue
+          example: "missing_alt"
         severity:
           type: string
           enum: [critical, high, medium, low, info]
           description: Issue severity
-          example: "info"
+          example: "medium"
+        message:
+          type: string
+          description: Human-readable description
+          example: "3 images are missing alt attributes"
+        location:
+          type: string
+          description: Where the issue was found
+          example: "HTML body line 42"
         advice:
           type: string
-          description: Remediation advice
-          example: "Your DKIM configuration is correct"
+          description: How to fix this issue
+          example: "Add descriptive alt text to all images for better accessibility and deliverability"
+
+    LinkCheck:
+      type: object
+      required:
+        - url
+        - status
+      properties:
+        url:
+          type: string
+          format: uri
+          description: The URL found in the email
+          example: "https://example.com/page"
+        status:
+          type: string
+          enum: [valid, broken, suspicious, redirected, timeout]
+          description: Link validation status
+          example: "valid"
+        http_code:
+          type: integer
+          description: HTTP status code received
+          example: 200
+        redirect_chain:
+          type: array
+          items:
+            type: string
+          description: URLs in the redirect chain, if any
+          example: ["https://example.com", "https://www.example.com"]
+        is_shortened:
+          type: boolean
+          description: Whether this is a URL shortener
+          example: false
+
+    ImageCheck:
+      type: object
+      required:
+        - has_alt
+      properties:
+        src:
+          type: string
+          description: Image source URL or path
+          example: "https://example.com/logo.png"
+        has_alt:
+          type: boolean
+          description: Whether image has alt attribute
+          example: true
+        alt_text:
+          type: string
+          description: Alt text content
+          example: "Company Logo"
+        is_tracking_pixel:
+          type: boolean
+          description: Whether this appears to be a tracking pixel (1x1 image)
+          example: false
+
+    HeaderAnalysis:
+      type: object
+      properties:
+        has_mime_structure:
+          type: boolean
+          description: Whether body has a MIME structure
+          example: true
+        headers:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/HeaderCheck'
+          description: Map of header names to their check results (e.g., "from", "to", "dkim-signature")
+          example:
+            from:
+              present: true
+              value: "sender@example.com"
+              valid: true
+              importance: "required"
+            date:
+              present: true
+              value: "Mon, 1 Jan 2024 12:00:00 +0000"
+              valid: true
+              importance: "required"
+        received_chain:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceivedHop'
+          description: Chain of Received headers showing email path
+        domain_alignment:
+          $ref: '#/components/schemas/DomainAlignment'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/HeaderIssue'
+          description: Issues found in headers
+
+    HeaderCheck:
+      type: object
+      required:
+        - present
+      properties:
+        present:
+          type: boolean
+          description: Whether the header is present
+          example: true
+        value:
+          type: string
+          description: Header value
+          example: "sender@example.com"
+        valid:
+          type: boolean
+          description: Whether the value is valid/well-formed
+          example: true
+        importance:
+          type: string
+          enum: [required, recommended, optional]
+          description: How important this header is for deliverability
+          example: "required"
+        issues:
+          type: array
+          items:
+            type: string
+          description: Any issues with this header
+          example: ["Invalid date format"]
+
+    ReceivedHop:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Sending server hostname
+          example: "mail.example.com"
+        by:
+          type: string
+          description: Receiving server hostname
+          example: "mx.receiver.com"
+        with:
+          type: string
+          description: Protocol used
+          example: "ESMTPS"
+        id:
+          type: string
+          description: Message ID at this hop
+        timestamp:
+          type: string
+          format: date-time
+          description: When this hop occurred
+
+    DomainAlignment:
+      type: object
+      properties:
+        from_domain:
+          type: string
+          description: Domain from From header
+          example: "example.com"
+        return_path_domain:
+          type: string
+          description: Domain from Return-Path header
+          example: "example.com"
+        dkim_domains:
+          type: array
+          items:
+            type: string
+          description: Domains from DKIM signatures
+          example: ["example.com"]
+        aligned:
+          type: boolean
+          description: Whether all domains align
+          example: true
+        issues:
+          type: array
+          items:
+            type: string
+          description: Alignment issues
+          example: ["Return-Path domain does not match From domain"]
+
+    HeaderIssue:
+      type: object
+      required:
+        - header
+        - severity
+        - message
+      properties:
+        header:
+          type: string
+          description: Header name
+          example: "Date"
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+          description: Issue severity
+          example: "medium"
+        message:
+          type: string
+          description: Human-readable description
+          example: "Date header is in the future"
+        advice:
+          type: string
+          description: How to fix this issue
+          example: "Ensure your mail server clock is synchronized with NTP"
 
     AuthenticationResults:
       type: object
@@ -522,6 +738,9 @@ components:
           type: string
           description: RBL response code or message
           example: "127.0.0.2"
+        error:
+          type: string
+          description: RBL error if any
 
     Status:
       type: object

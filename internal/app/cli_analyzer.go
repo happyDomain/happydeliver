@@ -31,7 +31,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
@@ -97,42 +96,7 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 	fmt.Fprintln(writer, "DETAILED CHECK RESULTS")
 	fmt.Fprintln(writer, strings.Repeat("-", 70))
 
-	// Group checks by category
-	categories := make(map[api.CheckCategory][]api.Check)
-	for _, check := range result.Report.Checks {
-		categories[check.Category] = append(categories[check.Category], check)
-	}
-
-	// Print checks by category
-	categoryOrder := []api.CheckCategory{
-		api.Authentication,
-		api.Dns,
-		api.Blacklist,
-		api.Content,
-		api.Headers,
-	}
-
-	for _, category := range categoryOrder {
-		checks, ok := categories[category]
-		if !ok || len(checks) == 0 {
-			continue
-		}
-
-		fmt.Fprintf(writer, "\n%s:\n", category)
-		for _, check := range checks {
-			statusSymbol := "✓"
-			if check.Status == api.CheckStatusFail {
-				statusSymbol = "✗"
-			} else if check.Status == api.CheckStatusWarn {
-				statusSymbol = "⚠"
-			}
-
-			fmt.Fprintf(writer, "  %s %s: %s\n", statusSymbol, check.Name, check.Message)
-			if check.Advice != nil && *check.Advice != "" {
-				fmt.Fprintf(writer, "    → %s\n", *check.Advice)
-			}
-		}
-	}
+	// TODO
 
 	fmt.Fprintln(writer, "\n"+strings.Repeat("=", 70))
 	return nil

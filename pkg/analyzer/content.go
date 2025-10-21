@@ -459,294 +459,151 @@ func (c *ContentAnalyzer) normalizeText(text string) string {
 	return text
 }
 
-// GenerateContentChecks generates check results for content analysis
-func (c *ContentAnalyzer) GenerateContentChecks(results *ContentResults) []api.Check {
-	var checks []api.Check
-
+// GenerateContentAnalysis creates structured content analysis from results
+func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.ContentAnalysis {
 	if results == nil {
-		return checks
+		return nil
 	}
 
-	// HTML validity check
-	checks = append(checks, c.generateHTMLValidityCheck(results))
-
-	// Link checks
-	checks = append(checks, c.generateLinkChecks(results)...)
-
-	// Image checks
-	checks = append(checks, c.generateImageChecks(results)...)
-
-	// Unsubscribe link check
-	checks = append(checks, c.generateUnsubscribeCheck(results))
-
-	// Text/HTML consistency check
-	if results.TextContent != "" && results.HTMLContent != "" {
-		checks = append(checks, c.generateTextConsistencyCheck(results))
+	analysis := &api.ContentAnalysis{
+		HasHtml:            api.PtrTo(results.HTMLContent != ""),
+		HasPlaintext:       api.PtrTo(results.TextContent != ""),
+		HasUnsubscribeLink: api.PtrTo(results.HasUnsubscribe),
 	}
 
-	// Image-to-text ratio check
+	// Calculate text-to-image ratio (inverse of image-to-text)
 	if len(results.Images) > 0 && results.HTMLContent != "" {
-		checks = append(checks, c.generateImageRatioCheck(results))
-	}
-
-	// Suspicious URLs check
-	if len(results.SuspiciousURLs) > 0 {
-		checks = append(checks, c.generateSuspiciousURLCheck(results))
-	}
-
-	return checks
-}
-
-// generateHTMLValidityCheck creates a check for HTML validity
-func (c *ContentAnalyzer) generateHTMLValidityCheck(results *ContentResults) api.Check {
-	check := api.Check{
-		Category: api.Content,
-		Name:     "HTML Structure",
-	}
-
-	if !results.HTMLValid {
-		check.Status = api.CheckStatusFail
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Message = "HTML structure is invalid"
-		if len(results.HTMLErrors) > 0 {
-			details := strings.Join(results.HTMLErrors, "; ")
-			check.Details = &details
-		}
-		check.Advice = api.PtrTo("Fix HTML structure errors to improve email rendering")
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 2
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "HTML structure is valid"
-		check.Advice = api.PtrTo("Your HTML is well-formed")
-	}
-
-	return check
-}
-
-// generateLinkChecks creates checks for links
-func (c *ContentAnalyzer) generateLinkChecks(results *ContentResults) []api.Check {
-	var checks []api.Check
-
-	if len(results.Links) == 0 {
-		return checks
-	}
-
-	// Count broken links
-	brokenLinks := 0
-	warningLinks := 0
-	for _, link := range results.Links {
-		if link.Status >= 400 {
-			brokenLinks++
-		} else if link.Warning != "" {
-			warningLinks++
+		textLen := float32(len(c.extractTextFromHTML(results.HTMLContent)))
+		if textLen > 0 {
+			ratio := textLen / float32(len(results.Images))
+			analysis.TextToImageRatio = &ratio
 		}
 	}
 
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Links",
-	}
+	// Build HTML issues
+	htmlIssues := []api.ContentIssue{}
 
-	if brokenLinks > 0 {
-		check.Status = api.CheckStatusFail
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		check.Message = fmt.Sprintf("Found %d broken link(s)", brokenLinks)
-		check.Advice = api.PtrTo("Fix or remove broken links to improve deliverability")
-		details := fmt.Sprintf("Total links: %d, Broken: %d", len(results.Links), brokenLinks)
-		check.Details = &details
-	} else if warningLinks > 0 {
-		check.Status = api.CheckStatusWarn
-		check.Score = 3
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = fmt.Sprintf("Found %d link(s) that could not be verified", warningLinks)
-		check.Advice = api.PtrTo("Review links that could not be verified")
-		details := fmt.Sprintf("Total links: %d, Unverified: %d", len(results.Links), warningLinks)
-		check.Details = &details
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 4
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = fmt.Sprintf("All %d link(s) are valid", len(results.Links))
-		check.Advice = api.PtrTo("Your links are working properly")
-	}
-
-	checks = append(checks, check)
-	return checks
-}
-
-// generateImageChecks creates checks for images
-func (c *ContentAnalyzer) generateImageChecks(results *ContentResults) []api.Check {
-	var checks []api.Check
-
-	if len(results.Images) == 0 {
-		return checks
-	}
-
-	// Count images without alt text
-	noAltCount := 0
-	for _, img := range results.Images {
-		if !img.HasAlt {
-			noAltCount++
+	// Add HTML parsing errors
+	if !results.HTMLValid && len(results.HTMLErrors) > 0 {
+		for _, errMsg := range results.HTMLErrors {
+			htmlIssues = append(htmlIssues, api.ContentIssue{
+				Type:     api.BrokenHtml,
+				Severity: api.ContentIssueSeverityHigh,
+				Message:  errMsg,
+				Advice:   api.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
+			})
 		}
 	}
 
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Image Alt Attributes",
+	// Add missing alt text issues
+	if len(results.Images) > 0 {
+		missingAltCount := 0
+		for _, img := range results.Images {
+			if !img.HasAlt {
+				missingAltCount++
+			}
+		}
+		if missingAltCount > 0 {
+			htmlIssues = append(htmlIssues, api.ContentIssue{
+				Type:     api.MissingAlt,
+				Severity: api.ContentIssueSeverityMedium,
+				Message:  fmt.Sprintf("%d image(s) missing alt attributes", missingAltCount),
+				Advice:   api.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
+			})
+		}
 	}
 
-	if noAltCount == len(results.Images) {
-		check.Status = api.CheckStatusFail
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Message = "No images have alt attributes"
-		check.Advice = api.PtrTo("Add alt text to all images for accessibility and deliverability")
-		details := fmt.Sprintf("Images without alt: %d/%d", noAltCount, len(results.Images))
-		check.Details = &details
-	} else if noAltCount > 0 {
-		check.Status = api.CheckStatusWarn
-		check.Score = 2
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = fmt.Sprintf("%d image(s) missing alt attributes", noAltCount)
-		check.Advice = api.PtrTo("Add alt text to all images for better accessibility")
-		details := fmt.Sprintf("Images without alt: %d/%d", noAltCount, len(results.Images))
-		check.Details = &details
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 3
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "All images have alt attributes"
-		check.Advice = api.PtrTo("Your images are properly tagged for accessibility")
+	// Add excessive images issue
+	if results.ImageTextRatio > 10.0 {
+		htmlIssues = append(htmlIssues, api.ContentIssue{
+			Type:     api.ExcessiveImages,
+			Severity: api.ContentIssueSeverityMedium,
+			Message:  "Email is excessively image-heavy",
+			Advice:   api.PtrTo("Reduce the number of images relative to text content"),
+		})
 	}
 
-	checks = append(checks, check)
-	return checks
+	// Add suspicious URL issues
+	for _, suspURL := range results.SuspiciousURLs {
+		htmlIssues = append(htmlIssues, api.ContentIssue{
+			Type:     api.SuspiciousLink,
+			Severity: api.ContentIssueSeverityHigh,
+			Message:  "Suspicious URL detected",
+			Location: &suspURL,
+			Advice:   api.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"),
+		})
+	}
+
+	if len(htmlIssues) > 0 {
+		analysis.HtmlIssues = &htmlIssues
+	}
+
+	// Convert links
+	if len(results.Links) > 0 {
+		links := make([]api.LinkCheck, 0, len(results.Links))
+		for _, link := range results.Links {
+			status := api.Valid
+			if link.Status >= 400 {
+				status = api.Broken
+			} else if !link.IsSafe {
+				status = api.Suspicious
+			} else if link.Warning != "" {
+				status = api.Timeout
+			}
+
+			apiLink := api.LinkCheck{
+				Url:    link.URL,
+				Status: status,
+			}
+
+			if link.Status > 0 {
+				apiLink.HttpCode = api.PtrTo(link.Status)
+			}
+
+			// Check if it's a URL shortener
+			parsedURL, err := url.Parse(link.URL)
+			if err == nil {
+				isShortened := c.isSuspiciousURL(link.URL, parsedURL)
+				apiLink.IsShortened = api.PtrTo(isShortened)
+			}
+
+			links = append(links, apiLink)
+		}
+		analysis.Links = &links
+	}
+
+	// Convert images
+	if len(results.Images) > 0 {
+		images := make([]api.ImageCheck, 0, len(results.Images))
+		for _, img := range results.Images {
+			apiImg := api.ImageCheck{
+				HasAlt: img.HasAlt,
+			}
+			if img.Src != "" {
+				apiImg.Src = &img.Src
+			}
+			if img.AltText != "" {
+				apiImg.AltText = &img.AltText
+			}
+			// Simple heuristic: tracking pixels are typically 1x1
+			apiImg.IsTrackingPixel = api.PtrTo(false)
+
+			images = append(images, apiImg)
+		}
+		analysis.Images = &images
+	}
+
+	// Unsubscribe methods
+	if results.HasUnsubscribe {
+		methods := []api.ContentAnalysisUnsubscribeMethods{api.Link}
+		analysis.UnsubscribeMethods = &methods
+	}
+
+	return analysis
 }
 
-// generateUnsubscribeCheck creates a check for unsubscribe links
-func (c *ContentAnalyzer) generateUnsubscribeCheck(results *ContentResults) api.Check {
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Unsubscribe Link",
-	}
-
-	if !results.HasUnsubscribe {
-		check.Status = api.CheckStatusWarn
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = "No unsubscribe link found"
-		check.Advice = api.PtrTo("Add an unsubscribe link for marketing emails (RFC 8058)")
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 3
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = fmt.Sprintf("Found %d unsubscribe link(s)", len(results.UnsubscribeLinks))
-		check.Advice = api.PtrTo("Your email includes an unsubscribe option")
-	}
-
-	return check
-}
-
-// generateTextConsistencyCheck creates a check for text/HTML consistency
-func (c *ContentAnalyzer) generateTextConsistencyCheck(results *ContentResults) api.Check {
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Plain Text Consistency",
-	}
-
-	consistency := results.TextPlainRatio
-
-	if consistency < 0.3 {
-		check.Status = api.CheckStatusWarn
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = "Plain text and HTML versions differ significantly"
-		check.Advice = api.PtrTo("Ensure plain text and HTML versions convey the same content")
-		details := fmt.Sprintf("Consistency: %.0f%%", consistency*100)
-		check.Details = &details
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 3
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "Plain text and HTML versions are consistent"
-		check.Advice = api.PtrTo("Your multipart email is well-structured")
-		details := fmt.Sprintf("Consistency: %.0f%%", consistency*100)
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateImageRatioCheck creates a check for image-to-text ratio
-func (c *ContentAnalyzer) generateImageRatioCheck(results *ContentResults) api.Check {
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Image-to-Text Ratio",
-	}
-
-	ratio := results.ImageTextRatio
-
-	// Flag if more than 1 image per 100 characters (very image-heavy)
-	if ratio > 10.0 {
-		check.Status = api.CheckStatusFail
-		check.Score = 0
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Message = "Email is excessively image-heavy"
-		check.Advice = api.PtrTo("Reduce the number of images relative to text content")
-		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
-		check.Details = &details
-	} else if ratio > 5.0 {
-		check.Status = api.CheckStatusWarn
-		check.Score = 2
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = "Email has high image-to-text ratio"
-		check.Advice = api.PtrTo("Consider adding more text content relative to images")
-		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
-		check.Details = &details
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 3
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "Image-to-text ratio is reasonable"
-		check.Advice = api.PtrTo("Your content has a good balance of images and text")
-		details := fmt.Sprintf("Images: %d, Ratio: %.2f images per 1000 chars", len(results.Images), ratio)
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateSuspiciousURLCheck creates a check for suspicious URLs
-func (c *ContentAnalyzer) generateSuspiciousURLCheck(results *ContentResults) api.Check {
-	check := api.Check{
-		Category: api.Content,
-		Name:     "Suspicious URLs",
-	}
-
-	count := len(results.SuspiciousURLs)
-
-	check.Status = api.CheckStatusWarn
-	check.Score = 0.0
-	check.Severity = api.PtrTo(api.CheckSeverityMedium)
-	check.Message = fmt.Sprintf("Found %d suspicious URL(s)", count)
-	check.Advice = api.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails")
-
-	if count <= 3 {
-		details := strings.Join(results.SuspiciousURLs, ", ")
-		check.Details = &details
-	} else {
-		details := fmt.Sprintf("%s, and %d more", strings.Join(results.SuspiciousURLs[:3], ", "), count-3)
-		check.Details = &details
-	}
-
-	return check
-}
-
-// GetContentScore calculates the content score (0-20 points)
-func (c *ContentAnalyzer) GetContentScore(results *ContentResults) int {
+// CalculateContentScore calculates the content score (0-20 points)
+func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 	if results == nil {
 		return 0
 	}

@@ -22,13 +22,10 @@
 package analyzer
 
 import (
-	"fmt"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"git.happydns.org/happyDeliver/internal/api"
 )
 
 // SpamAssassinAnalyzer analyzes SpamAssassin results from email headers
@@ -197,132 +194,4 @@ func (a *SpamAssassinAnalyzer) GetSpamAssassinScore(result *SpamAssassinResult) 
 
 	// Linear scaling based on how negative/low the score is
 	return 100 - int(math.Round(25*score/required))
-}
-
-// GenerateSpamAssassinChecks generates check results for SpamAssassin analysis
-func (a *SpamAssassinAnalyzer) GenerateSpamAssassinChecks(result *SpamAssassinResult) []api.Check {
-	var checks []api.Check
-
-	if result == nil {
-		checks = append(checks, api.Check{
-			Category: api.Spam,
-			Name:     "SpamAssassin Analysis",
-			Status:   api.CheckStatusWarn,
-			Score:    0.0,
-			Grade:    ScoreToCheckGrade(0.0),
-			Message:  "No SpamAssassin headers found",
-			Severity: api.PtrTo(api.CheckSeverityMedium),
-			Advice:   api.PtrTo("Ensure your MTA is configured to run SpamAssassin checks"),
-		})
-		return checks
-	}
-
-	// Main spam score check
-	mainCheck := a.generateMainSpamCheck(result)
-	checks = append(checks, mainCheck)
-
-	// Add checks for significant spam tests (score > 1.0 or < -1.0)
-	for _, test := range result.Tests {
-		if detail, ok := result.TestDetails[test]; ok {
-			if detail.Score > 1.0 || detail.Score < -1.0 {
-				check := a.generateTestCheck(detail)
-				checks = append(checks, check)
-			}
-		}
-	}
-
-	return checks
-}
-
-// generateMainSpamCheck creates the main spam score check
-func (a *SpamAssassinAnalyzer) generateMainSpamCheck(result *SpamAssassinResult) api.Check {
-	check := api.Check{
-		Category: api.Spam,
-		Name:     "SpamAssassin Score",
-	}
-
-	score := result.Score
-	required := result.RequiredScore
-	if required == 0 {
-		required = 5.0
-	}
-
-	check.Score = a.GetSpamAssassinScore(result)
-	check.Grade = ScoreToCheckGrade(check.Score)
-
-	// Determine status and message based on score
-	if score <= 0 {
-		check.Status = api.CheckStatusPass
-		check.Message = fmt.Sprintf("Excellent spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Advice = api.PtrTo("Your email has a negative spam score, indicating good email practices")
-	} else if score < required {
-		check.Status = api.CheckStatusPass
-		check.Message = fmt.Sprintf("Good spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Advice = api.PtrTo("Your email passes spam filters")
-	} else if score < required*1.5 {
-		check.Status = api.CheckStatusWarn
-		check.Message = fmt.Sprintf("Borderline spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Advice = api.PtrTo("Your email is close to being marked as spam. Review the triggered spam tests below")
-	} else if score < required*2 {
-		check.Status = api.CheckStatusWarn
-		check.Message = fmt.Sprintf("High spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		check.Advice = api.PtrTo("Your email is likely to be marked as spam. Address the issues identified in spam tests")
-	} else {
-		check.Status = api.CheckStatusFail
-		check.Message = fmt.Sprintf("Very high spam score: %.1f (threshold: %.1f)", score, required)
-		check.Severity = api.PtrTo(api.CheckSeverityCritical)
-		check.Advice = api.PtrTo("Your email will almost certainly be marked as spam. Urgently address the spam test failures")
-	}
-
-	// Add details
-	if len(result.Tests) > 0 {
-		details := fmt.Sprintf("Triggered %d tests: %s", len(result.Tests), strings.Join(result.Tests[:min(5, len(result.Tests))], ", "))
-		if len(result.Tests) > 5 {
-			details += fmt.Sprintf(" and %d more", len(result.Tests)-5)
-		}
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateTestCheck creates a check for a specific spam test
-func (a *SpamAssassinAnalyzer) generateTestCheck(detail SpamTestDetail) api.Check {
-	check := api.Check{
-		Category: api.Spam,
-		Name:     fmt.Sprintf("Spam Test: %s", detail.Name),
-	}
-
-	if detail.Score > 0 {
-		// Negative indicator (increases spam score)
-		if detail.Score > 2.0 {
-			check.Status = api.CheckStatusFail
-			check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		} else {
-			check.Status = api.CheckStatusWarn
-			check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		}
-		check.Score = 0.0
-		check.Grade = ScoreToCheckGrade(0)
-		check.Message = fmt.Sprintf("Test failed with score +%.1f", detail.Score)
-		advice := fmt.Sprintf("%s. This test adds %.1f to your spam score", detail.Description, detail.Score)
-		check.Advice = &advice
-	} else {
-		// Positive indicator (decreases spam score)
-		check.Status = api.CheckStatusPass
-		check.Score = 1.0
-		check.Grade = ScoreToCheckGrade((1.0 / 20.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = fmt.Sprintf("Test passed with score %.1f", detail.Score)
-		advice := fmt.Sprintf("%s. This test reduces your spam score by %.1f", detail.Description, -detail.Score)
-		check.Advice = &advice
-	}
-
-	check.Details = &detail.Description
-
-	return check
 }

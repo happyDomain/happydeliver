@@ -23,7 +23,6 @@ package analyzer
 
 import (
 	"net/mail"
-	"strings"
 	"testing"
 	"time"
 
@@ -327,7 +326,7 @@ func TestGetBlacklistScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := checker.GetBlacklistScore(tt.results)
+			score := checker.CalculateRBLScore(tt.results)
 			if score != tt.expectedScore {
 				t.Errorf("GetBlacklistScore() = %v, want %v", score, tt.expectedScore)
 			}
@@ -335,225 +334,19 @@ func TestGetBlacklistScore(t *testing.T) {
 	}
 }
 
-func TestGenerateSummaryCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		results        *RBLResults
-		expectedStatus api.CheckStatus
-		expectedScore  int
-	}{
-		{
-			name: "Not listed",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 0,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": make([]RBLCheck, 6), // 6 default RBLs
-				},
-			},
-			expectedStatus: api.CheckStatusPass,
-			expectedScore:  200,
-		},
-		{
-			name: "Listed on 1 RBL",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 1,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": make([]RBLCheck, 6),
-				},
-			},
-			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  100,
-		},
-		{
-			name: "Listed on 2 RBLs",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 2,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": make([]RBLCheck, 6),
-				},
-			},
-			expectedStatus: api.CheckStatusWarn,
-			expectedScore:  50,
-		},
-		{
-			name: "Listed on 4+ RBLs",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 4,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": make([]RBLCheck, 6),
-				},
-			},
-			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0,
-		},
-	}
-
-	checker := NewRBLChecker(5*time.Second, nil)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			check := checker.generateSummaryCheck(tt.results)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Score != tt.expectedScore {
-				t.Errorf("Score = %v, want %v", check.Score, tt.expectedScore)
-			}
-			if check.Category != api.Blacklist {
-				t.Errorf("Category = %v, want %v", check.Category, api.Blacklist)
-			}
-		})
-	}
-}
-
-func TestGenerateListingCheck(t *testing.T) {
-	tests := []struct {
-		name             string
-		rblCheck         *RBLCheck
-		expectedStatus   api.CheckStatus
-		expectedSeverity api.CheckSeverity
-	}{
-		{
-			name: "Spamhaus listing",
-			rblCheck: &RBLCheck{
-				RBL:      "zen.spamhaus.org",
-				Listed:   true,
-				Response: "127.0.0.2",
-			},
-			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.CheckSeverityCritical,
-		},
-		{
-			name: "SpamCop listing",
-			rblCheck: &RBLCheck{
-				RBL:      "bl.spamcop.net",
-				Listed:   true,
-				Response: "127.0.0.2",
-			},
-			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.CheckSeverityHigh,
-		},
-		{
-			name: "Other RBL listing",
-			rblCheck: &RBLCheck{
-				RBL:      "dnsbl.sorbs.net",
-				Listed:   true,
-				Response: "127.0.0.2",
-			},
-			expectedStatus:   api.CheckStatusFail,
-			expectedSeverity: api.CheckSeverityHigh,
-		},
-	}
-
-	checker := NewRBLChecker(5*time.Second, nil)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			check := checker.generateListingCheck("198.51.100.1", tt.rblCheck)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Severity == nil || *check.Severity != tt.expectedSeverity {
-				t.Errorf("Severity = %v, want %v", check.Severity, tt.expectedSeverity)
-			}
-			if check.Category != api.Blacklist {
-				t.Errorf("Category = %v, want %v", check.Category, api.Blacklist)
-			}
-			if !strings.Contains(check.Name, tt.rblCheck.RBL) {
-				t.Errorf("Check name should contain RBL name %s", tt.rblCheck.RBL)
-			}
-		})
-	}
-}
-
-func TestGenerateRBLChecks(t *testing.T) {
-	tests := []struct {
-		name      string
-		results   *RBLResults
-		minChecks int
-	}{
-		{
-			name:      "Nil results",
-			results:   nil,
-			minChecks: 0,
-		},
-		{
-			name: "No IPs checked",
-			results: &RBLResults{
-				IPsChecked: []string{},
-			},
-			minChecks: 1, // Warning check
-		},
-		{
-			name: "Not listed on any RBL",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 0,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": {
-						{RBL: "zen.spamhaus.org", Listed: false},
-						{RBL: "bl.spamcop.net", Listed: false},
-					},
-				},
-			},
-			minChecks: 1, // Summary check only
-		},
-		{
-			name: "Listed on 2 RBLs",
-			results: &RBLResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 2,
-				Checks: map[string][]RBLCheck{
-					"198.51.100.1": {
-						{RBL: "zen.spamhaus.org", Listed: true},
-						{RBL: "bl.spamcop.net", Listed: true},
-						{RBL: "dnsbl.sorbs.net", Listed: false},
-					},
-				},
-			},
-			minChecks: 3, // Summary + 2 listing checks
-		},
-	}
-
-	checker := NewRBLChecker(5*time.Second, nil)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			checks := checker.GenerateRBLChecks(tt.results)
-
-			if len(checks) < tt.minChecks {
-				t.Errorf("Got %d checks, want at least %d", len(checks), tt.minChecks)
-			}
-
-			// Verify all checks have the Blacklist category
-			for _, check := range checks {
-				if check.Category != api.Blacklist {
-					t.Errorf("Check %s has category %v, want %v", check.Name, check.Category, api.Blacklist)
-				}
-			}
-		})
-	}
-}
-
 func TestGetUniqueListedIPs(t *testing.T) {
 	results := &RBLResults{
-		Checks: map[string][]RBLCheck{
+		Checks: map[string][]api.BlacklistCheck{
 			"198.51.100.1": {
-				{RBL: "zen.spamhaus.org", Listed: true},
-				{RBL: "bl.spamcop.net", Listed: true},
+				{Rbl: "zen.spamhaus.org", Listed: true},
+				{Rbl: "bl.spamcop.net", Listed: true},
 			},
 			"198.51.100.2": {
-				{RBL: "zen.spamhaus.org", Listed: true},
-				{RBL: "bl.spamcop.net", Listed: false},
+				{Rbl: "zen.spamhaus.org", Listed: true},
+				{Rbl: "bl.spamcop.net", Listed: false},
 			},
 			"198.51.100.3": {
-				{RBL: "zen.spamhaus.org", Listed: false},
+				{Rbl: "zen.spamhaus.org", Listed: false},
 			},
 		},
 	}
@@ -571,14 +364,14 @@ func TestGetUniqueListedIPs(t *testing.T) {
 
 func TestGetRBLsForIP(t *testing.T) {
 	results := &RBLResults{
-		Checks: map[string][]RBLCheck{
+		Checks: map[string][]api.BlacklistCheck{
 			"198.51.100.1": {
-				{RBL: "zen.spamhaus.org", Listed: true},
-				{RBL: "bl.spamcop.net", Listed: true},
-				{RBL: "dnsbl.sorbs.net", Listed: false},
+				{Rbl: "zen.spamhaus.org", Listed: true},
+				{Rbl: "bl.spamcop.net", Listed: true},
+				{Rbl: "dnsbl.sorbs.net", Listed: false},
 			},
 			"198.51.100.2": {
-				{RBL: "zen.spamhaus.org", Listed: true},
+				{Rbl: "zen.spamhaus.org", Listed: true},
 			},
 		},
 	}

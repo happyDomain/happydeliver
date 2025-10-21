@@ -68,24 +68,15 @@ func NewRBLChecker(timeout time.Duration, rbls []string) *RBLChecker {
 
 // RBLResults represents the results of RBL checks
 type RBLResults struct {
-	Checks      map[string][]RBLCheck // Map of IP -> list of RBL checks for that IP
+	Checks      map[string][]api.BlacklistCheck // Map of IP -> list of RBL checks for that IP
 	IPsChecked  []string
 	ListedCount int
-}
-
-// RBLCheck represents a single RBL check result
-// Note: IP is not included here as it's used as the map key in the API
-type RBLCheck struct {
-	RBL      string
-	Listed   bool
-	Response string
-	Error    string
 }
 
 // CheckEmail checks all IPs found in the email headers against RBLs
 func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 	results := &RBLResults{
-		Checks: make(map[string][]RBLCheck),
+		Checks: make(map[string][]api.BlacklistCheck),
 	}
 
 	// Extract IPs from Received headers
@@ -179,15 +170,15 @@ func (r *RBLChecker) isPublicIP(ipStr string) bool {
 }
 
 // checkIP checks a single IP against a single RBL
-func (r *RBLChecker) checkIP(ip, rbl string) RBLCheck {
-	check := RBLCheck{
-		RBL: rbl,
+func (r *RBLChecker) checkIP(ip, rbl string) api.BlacklistCheck {
+	check := api.BlacklistCheck{
+		Rbl: rbl,
 	}
 
 	// Reverse the IP for DNSBL query
 	reversedIP := r.reverseIP(ip)
 	if reversedIP == "" {
-		check.Error = "Failed to reverse IP address"
+		check.Error = api.PtrTo("Failed to reverse IP address")
 		return check
 	}
 
@@ -208,19 +199,19 @@ func (r *RBLChecker) checkIP(ip, rbl string) RBLCheck {
 			}
 		}
 		// Other DNS errors
-		check.Error = fmt.Sprintf("DNS lookup failed: %v", err)
+		check.Error = api.PtrTo(fmt.Sprintf("DNS lookup failed: %v", err))
 		return check
 	}
 
 	// If we got a response, check the return code
 	if len(addrs) > 0 {
-		check.Response = addrs[0] // Return code (e.g., 127.0.0.2)
+		check.Response = api.PtrTo(addrs[0]) // Return code (e.g., 127.0.0.2)
 
 		// Check for RBL error codes: 127.255.255.253, 127.255.255.254, 127.255.255.255
 		// These indicate RBL operational issues, not actual listings
 		if addrs[0] == "127.255.255.253" || addrs[0] == "127.255.255.254" || addrs[0] == "127.255.255.255" {
 			check.Listed = false
-			check.Error = fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", rbl, addrs[0])
+			check.Error = api.PtrTo(fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", rbl, addrs[0]))
 		} else {
 			// Normal listing response
 			check.Listed = true
@@ -248,167 +239,14 @@ func (r *RBLChecker) reverseIP(ipStr string) string {
 	return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 }
 
-// GetBlacklistScore calculates the blacklist contribution to deliverability
-func (r *RBLChecker) GetBlacklistScore(results *RBLResults) int {
+// CalculateRBLScore calculates the blacklist contribution to deliverability
+func (r *RBLChecker) CalculateRBLScore(results *RBLResults) int {
 	if results == nil || len(results.IPsChecked) == 0 {
 		// No IPs to check, give benefit of doubt
 		return 100
 	}
 
 	return 100 - results.ListedCount*100/len(r.RBLs)
-}
-
-// GenerateRBLChecks generates check results for RBL analysis
-func (r *RBLChecker) GenerateRBLChecks(results *RBLResults) []api.Check {
-	var checks []api.Check
-
-	if results == nil {
-		return checks
-	}
-
-	// If no IPs were checked, add a warning
-	if len(results.IPsChecked) == 0 {
-		checks = append(checks, api.Check{
-			Category: api.Blacklist,
-			Name:     "RBL Check",
-			Status:   api.CheckStatusWarn,
-			Score:    50,
-			Grade:    ScoreToCheckGrade(50),
-			Message:  "No public IP addresses found to check",
-			Severity: api.PtrTo(api.CheckSeverityLow),
-			Advice:   api.PtrTo("Unable to extract sender IP from email headers"),
-		})
-		return checks
-	}
-
-	// Create a summary check
-	summaryCheck := r.generateSummaryCheck(results)
-	checks = append(checks, summaryCheck)
-
-	// Create individual checks for each listing and RBL errors
-	for ip, rblChecks := range results.Checks {
-		for _, check := range rblChecks {
-			if check.Listed {
-				detailCheck := r.generateListingCheck(ip, &check)
-				checks = append(checks, detailCheck)
-			} else if check.Error != "" && strings.Contains(check.Error, "RBL operational issue") {
-				// Generate info check for RBL errors
-				detailCheck := r.generateRBLErrorCheck(ip, &check)
-				checks = append(checks, detailCheck)
-			}
-		}
-	}
-
-	return checks
-}
-
-// generateSummaryCheck creates an overall RBL summary check
-func (r *RBLChecker) generateSummaryCheck(results *RBLResults) api.Check {
-	check := api.Check{
-		Category: api.Blacklist,
-		Name:     "RBL Summary",
-	}
-
-	score := r.GetBlacklistScore(results)
-	check.Score = score
-	check.Grade = ScoreToCheckGrade(score)
-
-	// Calculate total checks across all IPs
-	totalChecks := 0
-	for _, rblChecks := range results.Checks {
-		totalChecks += len(rblChecks)
-	}
-	listedCount := results.ListedCount
-
-	if listedCount == 0 {
-		check.Status = api.CheckStatusPass
-		check.Message = fmt.Sprintf("Not listed on any blacklists (%d RBLs checked)", len(r.RBLs))
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Advice = api.PtrTo("Your sending IP has a good reputation")
-	} else if listedCount == 1 {
-		check.Status = api.CheckStatusWarn
-		check.Message = fmt.Sprintf("Listed on 1 blacklist (out of %d checked)", totalChecks)
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Advice = api.PtrTo("You're listed on one blacklist. Review the specific listing and request delisting if appropriate")
-	} else if listedCount <= 3 {
-		check.Status = api.CheckStatusWarn
-		check.Message = fmt.Sprintf("Listed on %d blacklists (out of %d checked)", listedCount, totalChecks)
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		check.Advice = api.PtrTo("Multiple blacklist listings detected. This will significantly impact deliverability. Review each listing and take corrective action")
-	} else {
-		check.Status = api.CheckStatusFail
-		check.Message = fmt.Sprintf("Listed on %d blacklists (out of %d checked)", listedCount, totalChecks)
-		check.Severity = api.PtrTo(api.CheckSeverityCritical)
-		check.Advice = api.PtrTo("Your IP is listed on multiple blacklists. This will severely impact email deliverability. Investigate the cause and request delisting from each RBL")
-	}
-
-	// Add details about IPs checked
-	if len(results.IPsChecked) > 0 {
-		details := fmt.Sprintf("IPs checked: %s", strings.Join(results.IPsChecked, ", "))
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateListingCheck creates a check for a specific RBL listing
-func (r *RBLChecker) generateListingCheck(ip string, rblCheck *RBLCheck) api.Check {
-	check := api.Check{
-		Category: api.Blacklist,
-		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
-		Status:   api.CheckStatusFail,
-		Score:    0,
-		Grade:    ScoreToCheckGrade(0),
-	}
-
-	check.Message = fmt.Sprintf("IP %s is listed on %s", ip, rblCheck.RBL)
-
-	// Determine severity based on which RBL
-	if strings.Contains(rblCheck.RBL, "spamhaus") {
-		check.Severity = api.PtrTo(api.CheckSeverityCritical)
-		advice := fmt.Sprintf("Listed on Spamhaus, a widely-used blocklist. Visit https://check.spamhaus.org/ to check details and request delisting")
-		check.Advice = &advice
-	} else if strings.Contains(rblCheck.RBL, "spamcop") {
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		advice := fmt.Sprintf("Listed on SpamCop. Visit http://www.spamcop.net/bl.shtml to request delisting")
-		check.Advice = &advice
-	} else {
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		advice := fmt.Sprintf("Listed on %s. Contact the RBL operator for delisting procedures", rblCheck.RBL)
-		check.Advice = &advice
-	}
-
-	// Add response code details
-	if rblCheck.Response != "" {
-		details := fmt.Sprintf("Response: %s", rblCheck.Response)
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateRBLErrorCheck creates an info-level check for RBL operational errors
-func (r *RBLChecker) generateRBLErrorCheck(ip string, rblCheck *RBLCheck) api.Check {
-	check := api.Check{
-		Category: api.Blacklist,
-		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
-		Status:   api.CheckStatusInfo,
-		Score:    0, // No penalty for RBL operational issues
-		Grade:    ScoreToCheckGrade(-1),
-		Severity: api.PtrTo(api.CheckSeverityInfo),
-	}
-
-	check.Message = fmt.Sprintf("RBL %s returned an error code for IP %s", rblCheck.RBL, ip)
-
-	advice := fmt.Sprintf("The RBL %s is experiencing operational issues (error code: %s).", rblCheck.RBL, rblCheck.Response)
-	check.Advice = &advice
-
-	if rblCheck.Response != "" {
-		details := fmt.Sprintf("Error code: %s (RBL operational issue, not a listing)", rblCheck.Response)
-		check.Details = &details
-	}
-
-	return check
 }
 
 // GetUniqueListedIPs returns a list of unique IPs that are listed on at least one RBL
@@ -434,7 +272,7 @@ func (r *RBLChecker) GetRBLsForIP(results *RBLResults, ip string) []string {
 	if rblChecks, exists := results.Checks[ip]; exists {
 		for _, check := range rblChecks {
 			if check.Listed {
-				rbls = append(rbls, check.RBL)
+				rbls = append(rbls, check.Rbl)
 			}
 		}
 	}

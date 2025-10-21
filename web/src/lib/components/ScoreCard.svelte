@@ -54,19 +54,6 @@
                     <div class="p-2 bg-light rounded text-center">
                         <strong
                             class="fs-2"
-                            class:text-success={summary.spam_score >= 100}
-                            class:text-warning={summary.spam_score < 100 && summary.spam_score >= 50}
-                            class:text-danger={summary.spam_score < 50}
-                        >
-                            {summary.spam_score}%
-                        </strong>
-                        <small class="text-muted d-block">Spam Score</small>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg">
-                    <div class="p-2 bg-light rounded text-center">
-                        <strong
-                            class="fs-2"
                             class:text-success={summary.blacklist_score >= 100}
                             class:text-warning={summary.blacklist_score < 100 &&
                                 summary.blacklist_score >= 50}
@@ -81,20 +68,6 @@
                     <div class="p-2 bg-light rounded text-center">
                         <strong
                             class="fs-2"
-                            class:text-success={summary.content_score >= 100}
-                            class:text-warning={summary.content_score < 100 &&
-                                summary.content_score >= 50}
-                            class:text-danger={summary.content_score < 50}
-                        >
-                            {summary.content_score}%
-                        </strong>
-                        <small class="text-muted d-block">Content</small>
-                    </div>
-                </div>
-                <div class="col-md-6 col-lg">
-                    <div class="p-2 bg-light rounded text-center">
-                        <strong
-                            class="fs-2"
                             class:text-success={summary.header_score >= 100}
                             class:text-warning={summary.header_score < 100 &&
                                 summary.header_score >= 50}
@@ -103,6 +76,33 @@
                             {summary.header_score}%
                         </strong>
                         <small class="text-muted d-block">Headers</small>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.spam_score >= 100}
+                            class:text-warning={summary.spam_score < 100 && summary.spam_score >= 50}
+                            class:text-danger={summary.spam_score < 50}
+                        >
+                            {summary.spam_score}%
+                        </strong>
+                        <small class="text-muted d-block">Spam Score</small>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
+                            class:text-success={summary.content_score >= 100}
+                            class:text-warning={summary.content_score < 100 &&
+                                summary.content_score >= 50}
+                            class:text-danger={summary.content_score < 50}
+                        >
+                            {summary.content_score}%
+                        </strong>
+                        <small class="text-muted d-block">Content</small>
                     </div>
                 </div>
             </div>

@@ -3,7 +3,16 @@
     import { page } from "$app/state";
     import { getTest, getReport, reanalyzeReport } from "$lib/api";
     import type { Test, Report } from "$lib/api/types.gen";
-    import { ScoreCard, CheckCard, SpamAssassinCard, PendingState } from "$lib/components";
+    import {
+        ScoreCard,
+        SpamAssassinCard,
+        PendingState,
+        AuthenticationCard,
+        DnsRecordsCard,
+        BlacklistCard,
+        ContentAnalysisCard,
+        HeaderAnalysisCard
+    } from "$lib/components";
 
     let testId = $derived(page.params.test);
     let test = $state<Test | null>(null);
@@ -14,20 +23,6 @@
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     let nextfetch = $state(23);
     let nbfetch = $state(0);
-
-    // Group checks by category
-    let groupedChecks = $derived(() => {
-        if (!report) return { };
-
-        const groups: Record<string, typeof report.checks> = { };
-        for (const check of report.checks) {
-            if (!groups[check.category]) {
-                groups[check.category] = [];
-            }
-            groups[check.category].push(check);
-        }
-        return groups;
-    });
 
     async function fetchTest() {
         if (nbfetch > 0) {
@@ -86,29 +81,6 @@
         stopPolling();
     });
 
-    function getCategoryIcon(category: string): string {
-        switch (category) {
-            case "authentication":
-                return "bi-shield-check";
-            case "dns":
-                return "bi-diagram-3";
-            case "content":
-                return "bi-file-text";
-            case "blacklist":
-                return "bi-shield-exclamation";
-            case "headers":
-                return "bi-list-ul";
-            case "spam":
-                return "bi-filter";
-            default:
-                return "bi-question-circle";
-        }
-    }
-
-    function getCategoryScore(checks: typeof report.checks): number {
-        return Math.round(checks.reduce((sum, check) => sum + check.score, 0) / checks.filter((c) => c.status != "info").length);
-    }
-
     function getScoreColorClass(percentage: number): string {
         if (percentage >= 80) return "text-success";
         if (percentage >= 50) return "text-warning";
@@ -166,41 +138,74 @@
         <!-- Results State -->
         <div class="fade-in">
             <!-- Score Header -->
-            <div class="row mb-4">
+            <div class="row mb-4" id="score">
                 <div class="col-12">
                     <ScoreCard grade={report.grade} score={report.score} summary={report.summary} />
                 </div>
             </div>
 
-            <!-- Detailed Checks -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <h3 class="fw-bold mb-3">Detailed Checks</h3>
-                    {#each Object.entries(groupedChecks()) as [category, checks]}
-                        {@const categoryScore = getCategoryScore(checks)}
-                        <div class="category-section mb-4">
-                            <h4 class="category-title text-capitalize mb-3 d-flex justify-content-between align-items-center">
-                                <span>
-                                    <i class="bi {getCategoryIcon(category)} me-2"></i>
-                                    {category}
-                                </span>
-                                <span class="category-score {getScoreColorClass(categoryScore)}">
-                                    {categoryScore}%
-                                </span>
-                            </h4>
-                            {#each checks as check}
-                                <CheckCard {check} />
-                            {/each}
-                        </div>
-                    {/each}
+            <!-- DNS Records -->
+            {#if report.dns_records && report.dns_records.length > 0}
+                <div class="row mb-4" id="dns">
+                    <div class="col-12">
+                        <DnsRecordsCard dnsRecords={report.dns_records} />
+                    </div>
                 </div>
-            </div>
+            {/if}
+
+            <!-- Authentication Results -->
+            {#if report.authentication}
+                <div class="row mb-4" id="authentication">
+                    <div class="col-12">
+                        <AuthenticationCard
+                            authentication={report.authentication}
+                            authenticationScore={report.summary?.authentication_score}
+                        />
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Blacklist Checks -->
+            {#if report.blacklists && Object.keys(report.blacklists).length > 0}
+                <div class="row mb-4" id="blacklist">
+                    <div class="col-12">
+                        <BlacklistCard
+                            blacklists={report.blacklists}
+                            blacklistScore={report.summary?.blacklist_score}
+                        />
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Header Analysis -->
+            {#if report.header_analysis}
+                <div class="row mb-4" id="header">
+                    <div class="col-12">
+                        <HeaderAnalysisCard
+                            headerAnalysis={report.header_analysis}
+                            headerScore={report.summary?.header_score}
+                        />
+                    </div>
+                </div>
+            {/if}
 
             <!-- Additional Information -->
             {#if report.spamassassin}
-                <div class="row mb-4">
+                <div class="row mb-4" id="spam">
                     <div class="col-12">
                         <SpamAssassinCard spamassassin={report.spamassassin} />
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Content Analysis -->
+            {#if report.content_analysis}
+                <div class="row mb-4" id="content">
+                    <div class="col-12">
+                        <ContentAnalysisCard
+                            contentAnalysis={report.content_analysis}
+                            contentScore={report.summary?.content_score}
+                        />
                     </div>
                 </div>
             {/if}

@@ -36,56 +36,53 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 	return &HeaderAnalyzer{}
 }
 
-// calculateHeaderScore evaluates email structural quality
-func (h *HeaderAnalyzer) calculateHeaderScore(email *EmailMessage) int {
-	if email == nil {
+// CalculateHeaderScore evaluates email structural quality from header analysis
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int {
+	if analysis == nil || analysis.Headers == nil {
 		return 0
 	}
 
 	score := 0
-	requiredHeaders := 0
-	presentHeaders := 0
+	headers := *analysis.Headers
 
-	// Check required headers (RFC 5322)
-	headers := map[string]bool{
-		"From":       false,
-		"Date":       false,
-		"Message-ID": false,
-	}
+	// Check required headers (RFC 5322) - 40 points
+	requiredHeaders := []string{"from", "date", "message-id"}
+	requiredCount := len(requiredHeaders)
+	presentRequired := 0
 
-	for header := range headers {
-		requiredHeaders++
-		if email.HasHeader(header) && email.GetHeaderValue(header) != "" {
-			headers[header] = true
-			presentHeaders++
+	for _, headerName := range requiredHeaders {
+		if check, exists := headers[headerName]; exists && check.Present {
+			presentRequired++
 		}
 	}
 
-	// Score based on required headers (40 points)
-	if presentHeaders == requiredHeaders {
+	if presentRequired == requiredCount {
 		score += 40
 	} else {
-		score += int(40 * (float32(presentHeaders) / float32(requiredHeaders)))
+		score += int(40 * (float32(presentRequired) / float32(requiredCount)))
 	}
 
 	// Check recommended headers (30 points)
-	recommendedHeaders := []string{"Subject", "To", "Reply-To"}
-	recommendedPresent := 0
-	for _, header := range recommendedHeaders {
-		if email.HasHeader(header) && email.GetHeaderValue(header) != "" {
-			recommendedPresent++
+	recommendedHeaders := []string{"subject", "to", "reply-to"}
+	recommendedCount := len(recommendedHeaders)
+	presentRecommended := 0
+
+	for _, headerName := range recommendedHeaders {
+		if check, exists := headers[headerName]; exists && check.Present {
+			presentRecommended++
 		}
 	}
-	score += int(30 * (float32(recommendedPresent) / float32(len(recommendedHeaders))))
+	score += int(30 * (float32(presentRecommended) / float32(recommendedCount)))
 
 	// Check for proper MIME structure (20 points)
-	if len(email.Parts) > 0 {
+	if analysis.HasMimeStructure != nil && *analysis.HasMimeStructure {
 		score += 20
 	}
 
-	// Check Message-ID format (10 point)
-	if messageID := email.GetHeaderValue("Message-ID"); messageID != "" {
-		if h.isValidMessageID(messageID) {
+	// Check Message-ID format (10 points)
+	if check, exists := headers["message-id"]; exists && check.Present {
+		// If Valid is set and true, award points
+		if check.Valid != nil && *check.Valid {
 			score += 10
 		}
 	}
@@ -123,181 +120,187 @@ func (h *HeaderAnalyzer) isValidMessageID(messageID string) bool {
 	return len(parts[0]) > 0 && len(parts[1]) > 0
 }
 
-// GenerateHeaderChecks creates checks for email header quality
-func (h *HeaderAnalyzer) GenerateHeaderChecks(email *EmailMessage) []api.Check {
-	var checks []api.Check
-
+// GenerateHeaderAnalysis creates structured header analysis from email
+func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.HeaderAnalysis {
 	if email == nil {
-		return checks
+		return nil
 	}
 
-	// Required headers check
-	checks = append(checks, h.generateRequiredHeadersCheck(email))
+	analysis := &api.HeaderAnalysis{}
 
-	// Recommended headers check
-	checks = append(checks, h.generateRecommendedHeadersCheck(email))
+	// Check for proper MIME structure
+	analysis.HasMimeStructure = api.PtrTo(len(email.Parts) > 0)
 
-	// Message-ID check
-	checks = append(checks, h.generateMessageIDCheck(email))
+	// Initialize headers map
+	headers := make(map[string]api.HeaderCheck)
 
-	// MIME structure check
-	checks = append(checks, h.generateMIMEStructureCheck(email))
+	// Check required headers
+	requiredHeaders := []string{"From", "To", "Date", "Message-ID", "Subject"}
+	for _, headerName := range requiredHeaders {
+		check := h.checkHeader(email, headerName, "required")
+		headers[strings.ToLower(headerName)] = *check
+	}
 
-	return checks
+	// Check recommended headers
+	recommendedHeaders := []string{"Reply-To", "Return-Path"}
+	for _, headerName := range recommendedHeaders {
+		check := h.checkHeader(email, headerName, "recommended")
+		headers[strings.ToLower(headerName)] = *check
+	}
+
+	// Check optional headers
+	optionalHeaders := []string{"List-Unsubscribe", "List-Unsubscribe-Post", "Precedence"}
+	for _, headerName := range optionalHeaders {
+		check := h.checkHeader(email, headerName, "optional")
+		headers[strings.ToLower(headerName)] = *check
+	}
+
+	analysis.Headers = &headers
+
+	// Domain alignment
+	domainAlignment := h.analyzeDomainAlignment(email)
+	if domainAlignment != nil {
+		analysis.DomainAlignment = domainAlignment
+	}
+
+	// Header issues
+	issues := h.findHeaderIssues(email)
+	if len(issues) > 0 {
+		analysis.Issues = &issues
+	}
+
+	return analysis
 }
 
-// generateRequiredHeadersCheck checks for required RFC 5322 headers
-func (h *HeaderAnalyzer) generateRequiredHeadersCheck(email *EmailMessage) api.Check {
-	check := api.Check{
-		Category: api.Headers,
-		Name:     "Required Headers",
+// checkHeader checks if a header is present and valid
+func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, importance string) *api.HeaderCheck {
+	value := email.GetHeaderValue(headerName)
+	present := email.HasHeader(headerName) && value != ""
+
+	importanceEnum := api.HeaderCheckImportance(importance)
+	check := &api.HeaderCheck{
+		Present:    present,
+		Importance: &importanceEnum,
 	}
 
-	requiredHeaders := []string{"From", "Date", "Message-ID"}
-	missing := []string{}
+	if present {
+		check.Value = &value
 
+		// Validate specific headers
+		valid := true
+		var headerIssues []string
+
+		switch headerName {
+		case "Message-ID":
+			if !h.isValidMessageID(value) {
+				valid = false
+				headerIssues = append(headerIssues, "Invalid Message-ID format (should be <id@domain>)")
+			}
+		case "Date":
+			// Could add date validation here
+		}
+
+		check.Valid = &valid
+		if len(headerIssues) > 0 {
+			check.Issues = &headerIssues
+		}
+	} else {
+		valid := false
+		check.Valid = &valid
+		if importance == "required" {
+			issues := []string{"Required header is missing"}
+			check.Issues = &issues
+		}
+	}
+
+	return check
+}
+
+// analyzeDomainAlignment checks domain alignment between headers
+func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.DomainAlignment {
+	alignment := &api.DomainAlignment{
+		Aligned: api.PtrTo(true),
+	}
+
+	// Extract From domain
+	fromAddr := email.GetHeaderValue("From")
+	if fromAddr != "" {
+		domain := h.extractDomain(fromAddr)
+		if domain != "" {
+			alignment.FromDomain = &domain
+		}
+	}
+
+	// Extract Return-Path domain
+	returnPath := email.GetHeaderValue("Return-Path")
+	if returnPath != "" {
+		domain := h.extractDomain(returnPath)
+		if domain != "" {
+			alignment.ReturnPathDomain = &domain
+		}
+	}
+
+	// Check alignment
+	issues := []string{}
+	if alignment.FromDomain != nil && alignment.ReturnPathDomain != nil {
+		if *alignment.FromDomain != *alignment.ReturnPathDomain {
+			*alignment.Aligned = false
+			issues = append(issues, "Return-Path domain does not match From domain")
+		}
+	}
+
+	if len(issues) > 0 {
+		alignment.Issues = &issues
+	}
+
+	return alignment
+}
+
+// extractDomain extracts domain from email address
+func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
+	// Remove angle brackets if present
+	emailAddr = strings.Trim(emailAddr, "<> ")
+
+	// Find @ symbol
+	atIndex := strings.LastIndex(emailAddr, "@")
+	if atIndex == -1 {
+		return ""
+	}
+
+	domain := emailAddr[atIndex+1:]
+	// Remove any trailing >
+	domain = strings.TrimRight(domain, ">")
+
+	return domain
+}
+
+// findHeaderIssues identifies issues with headers
+func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []api.HeaderIssue {
+	var issues []api.HeaderIssue
+
+	// Check for missing required headers
+	requiredHeaders := []string{"From", "Date", "Message-ID"}
 	for _, header := range requiredHeaders {
 		if !email.HasHeader(header) || email.GetHeaderValue(header) == "" {
-			missing = append(missing, header)
+			issues = append(issues, api.HeaderIssue{
+				Header:   header,
+				Severity: api.HeaderIssueSeverityCritical,
+				Message:  fmt.Sprintf("Required header '%s' is missing", header),
+				Advice:   api.PtrTo(fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)),
+			})
 		}
 	}
 
-	if len(missing) == 0 {
-		check.Status = api.CheckStatusPass
-		check.Score = 4.0
-		check.Grade = ScoreToCheckGrade((4.0 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "All required headers are present"
-		check.Advice = api.PtrTo("Your email has proper RFC 5322 headers")
-	} else {
-		check.Status = api.CheckStatusFail
-		check.Score = 0.0
-		check.Grade = ScoreToCheckGrade(0.0)
-		check.Severity = api.PtrTo(api.CheckSeverityCritical)
-		check.Message = fmt.Sprintf("Missing required header(s): %s", strings.Join(missing, ", "))
-		check.Advice = api.PtrTo("Add all required headers to ensure email deliverability")
-		details := fmt.Sprintf("Missing: %s", strings.Join(missing, ", "))
-		check.Details = &details
-	}
-
-	return check
-}
-
-// generateRecommendedHeadersCheck checks for recommended headers
-func (h *HeaderAnalyzer) generateRecommendedHeadersCheck(email *EmailMessage) api.Check {
-	check := api.Check{
-		Category: api.Headers,
-		Name:     "Recommended Headers",
-	}
-
-	recommendedHeaders := []string{"Subject", "To", "Reply-To"}
-	missing := []string{}
-
-	for _, header := range recommendedHeaders {
-		if !email.HasHeader(header) || email.GetHeaderValue(header) == "" {
-			missing = append(missing, header)
-		}
-	}
-
-	if len(missing) == 0 {
-		check.Status = api.CheckStatusPass
-		check.Score = 30
-		check.Grade = ScoreToCheckGrade((3.0 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "All recommended headers are present"
-		check.Advice = api.PtrTo("Your email includes all recommended headers")
-	} else if len(missing) < len(recommendedHeaders) {
-		check.Status = api.CheckStatusWarn
-		check.Score = 15
-		check.Grade = ScoreToCheckGrade((1.5 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = fmt.Sprintf("Missing some recommended header(s): %s", strings.Join(missing, ", "))
-		check.Advice = api.PtrTo("Consider adding recommended headers for better deliverability")
-		details := fmt.Sprintf("Missing: %s", strings.Join(missing, ", "))
-		check.Details = &details
-	} else {
-		check.Status = api.CheckStatusWarn
-		check.Score = 0
-		check.Grade = ScoreToCheckGrade(0.0)
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Message = "Missing all recommended headers"
-		check.Advice = api.PtrTo("Add recommended headers (Subject, To, Reply-To) for better email presentation")
-	}
-
-	return check
-}
-
-// generateMessageIDCheck validates Message-ID header
-func (h *HeaderAnalyzer) generateMessageIDCheck(email *EmailMessage) api.Check {
-	check := api.Check{
-		Category: api.Headers,
-		Name:     "Message-ID Format",
-	}
-
+	// Check Message-ID format
 	messageID := email.GetHeaderValue("Message-ID")
-
-	if messageID == "" {
-		check.Status = api.CheckStatusFail
-		check.Score = 0
-		check.Grade = ScoreToCheckGrade(0.0)
-		check.Severity = api.PtrTo(api.CheckSeverityHigh)
-		check.Message = "Message-ID header is missing"
-		check.Advice = api.PtrTo("Add a unique Message-ID header to your email")
-	} else if !h.isValidMessageID(messageID) {
-		check.Status = api.CheckStatusWarn
-		check.Score = 5
-		check.Grade = ScoreToCheckGrade((0.5 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityMedium)
-		check.Message = "Message-ID format is invalid"
-		check.Advice = api.PtrTo("Use proper Message-ID format: <unique-id@domain.com>")
-		check.Details = &messageID
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 10
-		check.Grade = ScoreToCheckGrade((1.0 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = "Message-ID is properly formatted"
-		check.Advice = api.PtrTo("Your Message-ID follows RFC 5322 standards")
-		check.Details = &messageID
+	if messageID != "" && !h.isValidMessageID(messageID) {
+		issues = append(issues, api.HeaderIssue{
+			Header:   "Message-ID",
+			Severity: api.HeaderIssueSeverityMedium,
+			Message:  "Message-ID format is invalid",
+			Advice:   api.PtrTo("Use proper Message-ID format: <unique-id@domain.com>"),
+		})
 	}
 
-	return check
-}
-
-// generateMIMEStructureCheck validates MIME structure
-func (h *HeaderAnalyzer) generateMIMEStructureCheck(email *EmailMessage) api.Check {
-	check := api.Check{
-		Category: api.Headers,
-		Name:     "MIME Structure",
-	}
-
-	if len(email.Parts) == 0 {
-		check.Status = api.CheckStatusWarn
-		check.Score = 0.0
-		check.Grade = ScoreToCheckGrade(0.0)
-		check.Severity = api.PtrTo(api.CheckSeverityLow)
-		check.Message = "No MIME parts detected"
-		check.Advice = api.PtrTo("Consider using multipart MIME for better compatibility")
-	} else {
-		check.Status = api.CheckStatusPass
-		check.Score = 2.0
-		check.Grade = ScoreToCheckGrade((2.0 / 10.0) * 100)
-		check.Severity = api.PtrTo(api.CheckSeverityInfo)
-		check.Message = fmt.Sprintf("Proper MIME structure with %d part(s)", len(email.Parts))
-		check.Advice = api.PtrTo("Your email has proper MIME structure")
-
-		// Add details about parts
-		partTypes := []string{}
-		for _, part := range email.Parts {
-			if part.ContentType != "" {
-				partTypes = append(partTypes, part.ContentType)
-			}
-		}
-		if len(partTypes) > 0 {
-			details := fmt.Sprintf("Parts: %s", strings.Join(partTypes, ", "))
-			check.Details = &details
-		}
-	}
-
-	return check
+	return issues
 }

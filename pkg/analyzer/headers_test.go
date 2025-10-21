@@ -25,8 +25,6 @@ import (
 	"net/mail"
 	"net/textproto"
 	"testing"
-
-	"git.happydns.org/happyDeliver/internal/api"
 )
 
 func TestCalculateHeaderScore(t *testing.T) {
@@ -109,95 +107,70 @@ func TestCalculateHeaderScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := analyzer.calculateHeaderScore(tt.email)
+			// Generate header analysis first
+			analysis := analyzer.GenerateHeaderAnalysis(tt.email)
+			score := analyzer.CalculateHeaderScore(analysis)
 			if score < tt.minScore || score > tt.maxScore {
-				t.Errorf("calculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
+				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
 		})
 	}
 }
 
-func TestGenerateRequiredHeadersCheck(t *testing.T) {
+func TestCheckHeader(t *testing.T) {
 	tests := []struct {
-		name           string
-		email          *EmailMessage
-		expectedStatus api.CheckStatus
-		expectedScore  int
+		name              string
+		headerName        string
+		headerValue       string
+		importance        string
+		expectedPresent   bool
+		expectedValid     bool
+		expectedIssuesLen int
 	}{
 		{
-			name: "All required headers present",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-				}),
-				From:      &mail.Address{Address: "sender@example.com"},
-				MessageID: "<abc123@example.com>",
-				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-			},
-			expectedStatus: api.CheckStatusPass,
-			expectedScore:  40,
+			name:              "Valid Message-ID",
+			headerName:        "Message-ID",
+			headerValue:       "<abc123@example.com>",
+			importance:        "required",
+			expectedPresent:   true,
+			expectedValid:     true,
+			expectedIssuesLen: 0,
 		},
 		{
-			name: "Missing all required headers",
-			email: &EmailMessage{
-				Header: make(mail.Header),
-			},
-			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0,
+			name:              "Invalid Message-ID format",
+			headerName:        "Message-ID",
+			headerValue:       "invalid-message-id",
+			importance:        "required",
+			expectedPresent:   true,
+			expectedValid:     false,
+			expectedIssuesLen: 1,
 		},
 		{
-			name: "Missing some required headers",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From": "sender@example.com",
-				}),
-			},
-			expectedStatus: api.CheckStatusFail,
-			expectedScore:  0,
-		},
-	}
-
-	analyzer := NewHeaderAnalyzer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			check := analyzer.generateRequiredHeadersCheck(tt.email)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Score != tt.expectedScore {
-				t.Errorf("Score = %v, want %v", check.Score, tt.expectedScore)
-			}
-			if check.Category != api.Headers {
-				t.Errorf("Category = %v, want %v", check.Category, api.Headers)
-			}
-		})
-	}
-}
-
-func TestGenerateMessageIDCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		messageID      string
-		expectedStatus api.CheckStatus
-	}{
-		{
-			name:           "Valid Message-ID",
-			messageID:      "<abc123@example.com>",
-			expectedStatus: api.CheckStatusPass,
+			name:              "Missing required header",
+			headerName:        "From",
+			headerValue:       "",
+			importance:        "required",
+			expectedPresent:   false,
+			expectedValid:     false,
+			expectedIssuesLen: 1,
 		},
 		{
-			name:           "Invalid Message-ID format",
-			messageID:      "invalid-message-id",
-			expectedStatus: api.CheckStatusWarn,
+			name:              "Missing optional header",
+			headerName:        "Reply-To",
+			headerValue:       "",
+			importance:        "optional",
+			expectedPresent:   false,
+			expectedValid:     false,
+			expectedIssuesLen: 0,
 		},
 		{
-			name:           "Missing Message-ID",
-			messageID:      "",
-			expectedStatus: api.CheckStatusFail,
+			name:              "Valid Date header",
+			headerName:        "Date",
+			headerValue:       "Mon, 01 Jan 2024 12:00:00 +0000",
+			importance:        "required",
+			expectedPresent:   true,
+			expectedValid:     true,
+			expectedIssuesLen: 0,
 		},
 	}
 
@@ -207,86 +180,77 @@ func TestGenerateMessageIDCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			email := &EmailMessage{
 				Header: createHeaderWithFields(map[string]string{
-					"Message-ID": tt.messageID,
+					tt.headerName: tt.headerValue,
 				}),
 			}
 
-			check := analyzer.generateMessageIDCheck(email)
+			check := analyzer.checkHeader(email, tt.headerName, tt.importance)
 
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Category != api.Headers {
-				t.Errorf("Category = %v, want %v", check.Category, api.Headers)
-			}
-		})
-	}
-}
-
-func TestGenerateMIMEStructureCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		parts          []MessagePart
-		expectedStatus api.CheckStatus
-	}{
-		{
-			name: "With MIME parts",
-			parts: []MessagePart{
-				{ContentType: "text/plain", Content: "test"},
-				{ContentType: "text/html", Content: "<p>test</p>"},
-			},
-			expectedStatus: api.CheckStatusPass,
-		},
-		{
-			name:           "No MIME parts",
-			parts:          []MessagePart{},
-			expectedStatus: api.CheckStatusWarn,
-		},
-	}
-
-	analyzer := NewHeaderAnalyzer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
-				Header: make(mail.Header),
-				Parts:  tt.parts,
+			if check.Present != tt.expectedPresent {
+				t.Errorf("Present = %v, want %v", check.Present, tt.expectedPresent)
 			}
 
-			check := analyzer.generateMIMEStructureCheck(email)
+			if check.Valid != nil && *check.Valid != tt.expectedValid {
+				t.Errorf("Valid = %v, want %v", *check.Valid, tt.expectedValid)
+			}
 
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
+			if check.Importance == nil {
+				t.Error("Importance is nil")
+			} else if string(*check.Importance) != tt.importance {
+				t.Errorf("Importance = %v, want %v", *check.Importance, tt.importance)
+			}
+
+			issuesLen := 0
+			if check.Issues != nil {
+				issuesLen = len(*check.Issues)
+			}
+			if issuesLen != tt.expectedIssuesLen {
+				t.Errorf("Issues length = %d, want %d", issuesLen, tt.expectedIssuesLen)
 			}
 		})
 	}
 }
 
-func TestGenerateHeaderChecks(t *testing.T) {
+func TestHeaderAnalyzer_IsValidMessageID(t *testing.T) {
 	tests := []struct {
 		name      string
-		email     *EmailMessage
-		minChecks int
+		messageID string
+		expected  bool
 	}{
 		{
-			name:      "Nil email",
-			email:     nil,
-			minChecks: 0,
+			name:      "Valid Message-ID",
+			messageID: "<abc123@example.com>",
+			expected:  true,
 		},
 		{
-			name: "Complete email",
-			email: &EmailMessage{
-				Header: createHeaderWithFields(map[string]string{
-					"From":       "sender@example.com",
-					"To":         "recipient@example.com",
-					"Subject":    "Test",
-					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
-					"Message-ID": "<abc123@example.com>",
-					"Reply-To":   "reply@example.com",
-				}),
-				Parts: []MessagePart{{ContentType: "text/plain", Content: "test"}},
-			},
-			minChecks: 4, // Required, Recommended, Message-ID, MIME
+			name:      "Valid with complex local part",
+			messageID: "<complex.id-123_xyz@subdomain.example.com>",
+			expected:  true,
+		},
+		{
+			name:      "Missing angle brackets",
+			messageID: "abc123@example.com",
+			expected:  false,
+		},
+		{
+			name:      "Missing @ symbol",
+			messageID: "<abc123example.com>",
+			expected:  false,
+		},
+		{
+			name:      "Empty local part",
+			messageID: "<@example.com>",
+			expected:  false,
+		},
+		{
+			name:      "Empty domain",
+			messageID: "<abc123@>",
+			expected:  false,
+		},
+		{
+			name:      "Multiple @ symbols",
+			messageID: "<abc@123@example.com>",
+			expected:  false,
 		},
 	}
 
@@ -294,17 +258,126 @@ func TestGenerateHeaderChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checks := analyzer.GenerateHeaderChecks(tt.email)
+			result := analyzer.isValidMessageID(tt.messageID)
+			if result != tt.expected {
+				t.Errorf("isValidMessageID(%q) = %v, want %v", tt.messageID, result, tt.expected)
+			}
+		})
+	}
+}
 
-			if len(checks) < tt.minChecks {
-				t.Errorf("Got %d checks, want at least %d", len(checks), tt.minChecks)
+func TestHeaderAnalyzer_ExtractDomain(t *testing.T) {
+	tests := []struct {
+		name     string
+		email    string
+		expected string
+	}{
+		{
+			name:     "Simple email",
+			email:    "user@example.com",
+			expected: "example.com",
+		},
+		{
+			name:     "Email with angle brackets",
+			email:    "<user@example.com>",
+			expected: "example.com",
+		},
+		{
+			name:     "Email with display name",
+			email:    "User Name <user@example.com>",
+			expected: "example.com",
+		},
+		{
+			name:     "Email with spaces",
+			email:    " user@example.com ",
+			expected: "example.com",
+		},
+		{
+			name:     "Invalid email",
+			email:    "not-an-email",
+			expected: "",
+		},
+		{
+			name:     "Empty string",
+			email:    "",
+			expected: "",
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractDomain(tt.email)
+			if result != tt.expected {
+				t.Errorf("extractDomain(%q) = %q, want %q", tt.email, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAnalyzeDomainAlignment(t *testing.T) {
+	tests := []struct {
+		name            string
+		fromHeader      string
+		returnPath      string
+		expectAligned   bool
+		expectIssuesLen int
+	}{
+		{
+			name:            "Aligned domains",
+			fromHeader:      "sender@example.com",
+			returnPath:      "bounce@example.com",
+			expectAligned:   true,
+			expectIssuesLen: 0,
+		},
+		{
+			name:            "Misaligned domains",
+			fromHeader:      "sender@example.com",
+			returnPath:      "bounce@different.com",
+			expectAligned:   false,
+			expectIssuesLen: 1,
+		},
+		{
+			name:            "Only From header",
+			fromHeader:      "sender@example.com",
+			returnPath:      "",
+			expectAligned:   true,
+			expectIssuesLen: 0,
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := &EmailMessage{
+				Header: createHeaderWithFields(map[string]string{
+					"From":        tt.fromHeader,
+					"Return-Path": tt.returnPath,
+				}),
 			}
 
-			// Verify all checks have the Headers category
-			for _, check := range checks {
-				if check.Category != api.Headers {
-					t.Errorf("Check %s has category %v, want %v", check.Name, check.Category, api.Headers)
-				}
+			alignment := analyzer.analyzeDomainAlignment(email)
+
+			if alignment == nil {
+				t.Fatal("Expected non-nil alignment")
+			}
+
+			if alignment.Aligned == nil {
+				t.Fatal("Expected non-nil Aligned field")
+			}
+
+			if *alignment.Aligned != tt.expectAligned {
+				t.Errorf("Aligned = %v, want %v", *alignment.Aligned, tt.expectAligned)
+			}
+
+			issuesLen := 0
+			if alignment.Issues != nil {
+				issuesLen = len(*alignment.Issues)
+			}
+			if issuesLen != tt.expectIssuesLen {
+				t.Errorf("Issues length = %d, want %d", issuesLen, tt.expectIssuesLen)
 			}
 		})
 	}

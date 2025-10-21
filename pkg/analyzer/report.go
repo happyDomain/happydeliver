@@ -61,10 +61,11 @@ func NewReportGenerator(
 type AnalysisResults struct {
 	Email          *EmailMessage
 	Authentication *api.AuthenticationResults
-	SpamAssassin   *SpamAssassinResult
-	DNS            *DNSResults
-	RBL            *RBLResults
 	Content        *ContentResults
+	DNS            *DNSResults
+	Headers        *api.HeaderAnalysis
+	RBL            *RBLResults
+	SpamAssassin   *SpamAssassinResult
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -75,10 +76,11 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email)
-	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
-	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Authentication)
-	results.RBL = r.rblChecker.CheckEmail(email)
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
+	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Authentication)
+	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email)
+	results.RBL = r.rblChecker.CheckEmail(email)
+	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
 
 	return results
 }
@@ -94,76 +96,64 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		CreatedAt: now,
 	}
 
-	// Collect all checks from different analyzers
-	checks := []api.Check{}
-
-	// Authentication checks
+	// Calculate scores directly from analyzers (no more checks array)
+	authScore := 0
 	if results.Authentication != nil {
-		authChecks := r.authAnalyzer.GenerateAuthenticationChecks(results.Authentication)
-		checks = append(checks, authChecks...)
+		authScore = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication)
 	}
 
-	// DNS checks
-	if results.DNS != nil {
-		dnsChecks := r.dnsAnalyzer.GenerateDNSChecks(results.DNS)
-		checks = append(checks, dnsChecks...)
-	}
-
-	// RBL checks
-	if results.RBL != nil {
-		rblChecks := r.rblChecker.GenerateRBLChecks(results.RBL)
-		checks = append(checks, rblChecks...)
-	}
-
-	// SpamAssassin checks
-	if results.SpamAssassin != nil {
-		spamChecks := r.spamAnalyzer.GenerateSpamAssassinChecks(results.SpamAssassin)
-		checks = append(checks, spamChecks...)
-	}
-
-	// Content checks
+	contentScore := 0
 	if results.Content != nil {
-		contentChecks := r.contentAnalyzer.GenerateContentChecks(results.Content)
-		checks = append(checks, contentChecks...)
+		contentScore = r.contentAnalyzer.CalculateContentScore(results.Content)
 	}
 
-	// Header checks
-	headerChecks := r.headerAnalyzer.GenerateHeaderChecks(results.Email)
-	checks = append(checks, headerChecks...)
-
-	report.Checks = checks
-
-	// Summarize scores by category
-	categoryCounts := make(map[api.CheckCategory]int)
-	categoryTotals := make(map[api.CheckCategory]int)
-
-	for _, check := range checks {
-		if check.Status == "info" {
-			continue
-		}
-
-		categoryCounts[check.Category]++
-		categoryTotals[check.Category] += check.Score
+	headerScore := 0
+	if results.Headers != nil {
+		headerScore = r.headerAnalyzer.CalculateHeaderScore(results.Headers)
 	}
 
-	// Calculate mean scores for each category
-	calcCategoryScore := func(category api.CheckCategory) int {
-		if count := categoryCounts[category]; count > 0 {
-			return categoryTotals[category] / count
-		}
-		return 0
+	blacklistScore := 0
+	if results.RBL != nil {
+		blacklistScore = r.rblChecker.CalculateRBLScore(results.RBL)
+	}
+
+	spamScore := 0
+	if results.SpamAssassin != nil {
+		spamScore = r.scorer.CalculateSpamScore(results.SpamAssassin)
 	}
 
 	report.Summary = &api.ScoreSummary{
-		AuthenticationScore: calcCategoryScore(api.Authentication),
-		BlacklistScore:      calcCategoryScore(api.Blacklist),
-		ContentScore:        calcCategoryScore(api.Content),
-		HeaderScore:         calcCategoryScore(api.Headers),
-		SpamScore:           calcCategoryScore(api.Spam),
+		AuthenticationScore: authScore,
+		BlacklistScore:      blacklistScore,
+		ContentScore:        contentScore,
+		HeaderScore:         headerScore,
+		SpamScore:           spamScore,
 	}
 
 	// Add authentication results
 	report.Authentication = results.Authentication
+
+	// Add content analysis
+	if results.Content != nil {
+		contentAnalysis := r.contentAnalyzer.GenerateContentAnalysis(results.Content)
+		report.ContentAnalysis = contentAnalysis
+	}
+
+	// Add DNS records
+	if results.DNS != nil {
+		dnsRecords := r.buildDNSRecords(results.DNS)
+		if len(dnsRecords) > 0 {
+			report.DnsRecords = &dnsRecords
+		}
+	}
+
+	// Add headers results
+	report.HeaderAnalysis = results.Headers
+
+	// Add blacklist checks as a map of IP -> array of BlacklistCheck
+	if results.RBL != nil && len(results.RBL.Checks) > 0 {
+		report.Blacklists = &results.RBL.Checks
+	}
 
 	// Add SpamAssassin result
 	if results.SpamAssassin != nil {
@@ -179,39 +169,6 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 		if results.SpamAssassin.RawReport != "" {
 			report.Spamassassin.Report = &results.SpamAssassin.RawReport
-		}
-	}
-
-	// Add DNS records
-	if results.DNS != nil {
-		dnsRecords := r.buildDNSRecords(results.DNS)
-		if len(dnsRecords) > 0 {
-			report.DnsRecords = &dnsRecords
-		}
-	}
-
-	// Add blacklist checks as a map of IP -> array of BlacklistCheck
-	if results.RBL != nil && len(results.RBL.Checks) > 0 {
-		blacklistMap := make(map[string][]api.BlacklistCheck)
-
-		// Convert internal RBL checks to API format
-		for ip, rblChecks := range results.RBL.Checks {
-			apiChecks := make([]api.BlacklistCheck, 0, len(rblChecks))
-			for _, check := range rblChecks {
-				blCheck := api.BlacklistCheck{
-					Rbl:    check.RBL,
-					Listed: check.Listed,
-				}
-				if check.Response != "" {
-					blCheck.Response = &check.Response
-				}
-				apiChecks = append(apiChecks, blCheck)
-			}
-			blacklistMap[ip] = apiChecks
-		}
-
-		if len(blacklistMap) > 0 {
-			report.Blacklists = &blacklistMap
 		}
 	}
 

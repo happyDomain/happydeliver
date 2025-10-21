@@ -26,8 +26,6 @@ import (
 	"net/mail"
 	"strings"
 	"testing"
-
-	"git.happydns.org/happyDeliver/internal/api"
 )
 
 func TestParseSpamStatus(t *testing.T) {
@@ -298,86 +296,6 @@ func TestAnalyzeSpamAssassin(t *testing.T) {
 	}
 }
 
-func TestGenerateSpamAssassinChecks(t *testing.T) {
-	tests := []struct {
-		name           string
-		result         *SpamAssassinResult
-		expectedStatus api.CheckStatus
-		minChecks      int
-	}{
-		{
-			name:           "Nil result",
-			result:         nil,
-			expectedStatus: api.CheckStatusWarn,
-			minChecks:      1,
-		},
-		{
-			name: "Clean email",
-			result: &SpamAssassinResult{
-				IsSpam:        false,
-				Score:         -0.5,
-				RequiredScore: 5.0,
-				Tests:         []string{"ALL_TRUSTED"},
-				TestDetails: map[string]SpamTestDetail{
-					"ALL_TRUSTED": {
-						Name:        "ALL_TRUSTED",
-						Score:       -1.5,
-						Description: "All mail servers are trusted",
-					},
-				},
-			},
-			expectedStatus: api.CheckStatusPass,
-			minChecks:      2, // Main check + one test detail
-		},
-		{
-			name: "Spam email",
-			result: &SpamAssassinResult{
-				IsSpam:        true,
-				Score:         15.0,
-				RequiredScore: 5.0,
-				Tests:         []string{"BAYES_99", "SPOOFED_SENDER"},
-				TestDetails: map[string]SpamTestDetail{
-					"BAYES_99": {
-						Name:        "BAYES_99",
-						Score:       5.0,
-						Description: "Bayes spam probability is 99 to 100%",
-					},
-					"SPOOFED_SENDER": {
-						Name:        "SPOOFED_SENDER",
-						Score:       3.5,
-						Description: "From address doesn't match envelope sender",
-					},
-				},
-			},
-			expectedStatus: api.CheckStatusFail,
-			minChecks:      3, // Main check + two significant tests
-		},
-	}
-
-	analyzer := NewSpamAssassinAnalyzer()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			checks := analyzer.GenerateSpamAssassinChecks(tt.result)
-
-			if len(checks) < tt.minChecks {
-				t.Errorf("Got %d checks, want at least %d", len(checks), tt.minChecks)
-			}
-
-			// Check main check (first one)
-			if len(checks) > 0 {
-				mainCheck := checks[0]
-				if mainCheck.Status != tt.expectedStatus {
-					t.Errorf("Main check status = %v, want %v", mainCheck.Status, tt.expectedStatus)
-				}
-				if mainCheck.Category != api.Spam {
-					t.Errorf("Main check category = %v, want %v", mainCheck.Category, api.Spam)
-				}
-			}
-		})
-	}
-}
-
 func TestAnalyzeSpamAssassinNoHeaders(t *testing.T) {
 	analyzer := NewSpamAssassinAnalyzer()
 	email := &EmailMessage{
@@ -388,98 +306,6 @@ func TestAnalyzeSpamAssassinNoHeaders(t *testing.T) {
 
 	if result != nil {
 		t.Errorf("Expected nil result for email without SpamAssassin headers, got %+v", result)
-	}
-}
-
-func TestGenerateMainSpamCheck(t *testing.T) {
-	analyzer := NewSpamAssassinAnalyzer()
-
-	tests := []struct {
-		name           string
-		score          float64
-		required       float64
-		expectedStatus api.CheckStatus
-	}{
-		{"Excellent", -1.0, 5.0, api.CheckStatusPass},
-		{"Good", 2.0, 5.0, api.CheckStatusPass},
-		{"Borderline", 6.0, 5.0, api.CheckStatusWarn},
-		{"High", 8.0, 5.0, api.CheckStatusWarn},
-		{"Very High", 15.0, 5.0, api.CheckStatusFail},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := &SpamAssassinResult{
-				Score:         tt.score,
-				RequiredScore: tt.required,
-			}
-
-			check := analyzer.generateMainSpamCheck(result)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Category != api.Spam {
-				t.Errorf("Category = %v, want %v", check.Category, api.Spam)
-			}
-			if !strings.Contains(check.Message, "spam score") {
-				t.Error("Message should contain 'spam score'")
-			}
-		})
-	}
-}
-
-func TestGenerateTestCheck(t *testing.T) {
-	analyzer := NewSpamAssassinAnalyzer()
-
-	tests := []struct {
-		name           string
-		detail         SpamTestDetail
-		expectedStatus api.CheckStatus
-	}{
-		{
-			name: "High penalty test",
-			detail: SpamTestDetail{
-				Name:        "BAYES_99",
-				Score:       5.0,
-				Description: "Bayes spam probability is 99 to 100%",
-			},
-			expectedStatus: api.CheckStatusFail,
-		},
-		{
-			name: "Medium penalty test",
-			detail: SpamTestDetail{
-				Name:        "HTML_MESSAGE",
-				Score:       1.5,
-				Description: "Contains HTML",
-			},
-			expectedStatus: api.CheckStatusWarn,
-		},
-		{
-			name: "Positive test",
-			detail: SpamTestDetail{
-				Name:        "ALL_TRUSTED",
-				Score:       -2.0,
-				Description: "All mail servers are trusted",
-			},
-			expectedStatus: api.CheckStatusPass,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			check := analyzer.generateTestCheck(tt.detail)
-
-			if check.Status != tt.expectedStatus {
-				t.Errorf("Status = %v, want %v", check.Status, tt.expectedStatus)
-			}
-			if check.Category != api.Spam {
-				t.Errorf("Category = %v, want %v", check.Category, api.Spam)
-			}
-			if !strings.Contains(check.Name, tt.detail.Name) {
-				t.Errorf("Check name should contain test name %s", tt.detail.Name)
-			}
-		})
 	}
 }
 
@@ -622,34 +448,6 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 	score := analyzer.GetSpamAssassinScore(result)
 	if score != 100 {
 		t.Errorf("GetSpamAssassinScore() = %v, want 100 (excellent score for negative spam score)", score)
-	}
-
-	// Test GenerateSpamAssassinChecks
-	checks := analyzer.GenerateSpamAssassinChecks(result)
-	if len(checks) < 1 {
-		t.Fatal("Expected at least 1 check, got none")
-	}
-
-	// Main check should be PASS with excellent score
-	mainCheck := checks[0]
-	if mainCheck.Status != api.CheckStatusPass {
-		t.Errorf("Main check status = %v, want %v", mainCheck.Status, api.CheckStatusPass)
-	}
-	if mainCheck.Category != api.Spam {
-		t.Errorf("Main check category = %v, want %v", mainCheck.Category, api.Spam)
-	}
-	if !strings.Contains(mainCheck.Message, "spam score") {
-		t.Errorf("Main check message should contain 'spam score', got: %s", mainCheck.Message)
-	}
-	if mainCheck.Score != 100 {
-		t.Errorf("Main check score = %v, want 100", mainCheck.Score)
-	}
-
-	// Log all checks for debugging
-	t.Logf("Generated %d checks:", len(checks))
-	for i, check := range checks {
-		t.Logf("  Check %d: %s - %s (score: %d, status: %s)",
-			i+1, check.Name, check.Message, check.Score, check.Status)
 	}
 }
 
