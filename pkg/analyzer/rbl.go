@@ -211,10 +211,19 @@ func (r *RBLChecker) checkIP(ip, rbl string) RBLCheck {
 		return check
 	}
 
-	// If we got a response, the IP is listed
+	// If we got a response, check the return code
 	if len(addrs) > 0 {
-		check.Listed = true
 		check.Response = addrs[0] // Return code (e.g., 127.0.0.2)
+
+		// Check for RBL error codes: 127.255.255.253, 127.255.255.254, 127.255.255.255
+		// These indicate RBL operational issues, not actual listings
+		if addrs[0] == "127.255.255.253" || addrs[0] == "127.255.255.254" || addrs[0] == "127.255.255.255" {
+			check.Listed = false
+			check.Error = fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", rbl, addrs[0])
+		} else {
+			// Normal listing response
+			check.Listed = true
+		}
 	}
 
 	return check
@@ -275,10 +284,14 @@ func (r *RBLChecker) GenerateRBLChecks(results *RBLResults) []api.Check {
 	summaryCheck := r.generateSummaryCheck(results)
 	checks = append(checks, summaryCheck)
 
-	// Create individual checks for each listing
+	// Create individual checks for each listing and RBL errors
 	for _, check := range results.Checks {
 		if check.Listed {
 			detailCheck := r.generateListingCheck(&check)
+			checks = append(checks, detailCheck)
+		} else if check.Error != "" && strings.Contains(check.Error, "RBL operational issue") {
+			// Generate info check for RBL errors
+			detailCheck := r.generateRBLErrorCheck(&check)
 			checks = append(checks, detailCheck)
 		}
 	}
@@ -361,6 +374,30 @@ func (r *RBLChecker) generateListingCheck(rblCheck *RBLCheck) api.Check {
 	// Add response code details
 	if rblCheck.Response != "" {
 		details := fmt.Sprintf("Response: %s", rblCheck.Response)
+		check.Details = &details
+	}
+
+	return check
+}
+
+// generateRBLErrorCheck creates an info-level check for RBL operational errors
+func (r *RBLChecker) generateRBLErrorCheck(rblCheck *RBLCheck) api.Check {
+	check := api.Check{
+		Category: api.Blacklist,
+		Name:     fmt.Sprintf("RBL: %s", rblCheck.RBL),
+		Status:   api.CheckStatusInfo,
+		Score:    0, // No penalty for RBL operational issues
+		Grade:    ScoreToCheckGrade(-1),
+		Severity: api.PtrTo(api.CheckSeverityInfo),
+	}
+
+	check.Message = fmt.Sprintf("RBL %s returned an error code for IP %s", rblCheck.RBL, rblCheck.IP)
+
+	advice := fmt.Sprintf("The RBL %s is experiencing operational issues (error code: %s).", rblCheck.RBL, rblCheck.Response)
+	check.Advice = &advice
+
+	if rblCheck.Response != "" {
+		details := fmt.Sprintf("Error code: %s (RBL operational issue, not a listing)", rblCheck.Response)
 		check.Details = &details
 	}
 
