@@ -1,12 +1,13 @@
 <script lang="ts">
-    import type { Authentication, ReportSummary } from "$lib/api/types.gen";
+    import type { Authentication, DNSResults, ReportSummary } from "$lib/api/types.gen";
 
     interface Props {
         authentication: Authentication;
         authenticationScore?: number;
+        dnsResults?: DNSResults;
     }
 
-    let { authentication, authenticationScore }: Props = $props();
+    let { authentication, authenticationScore, dnsResults }: Props = $props();
 
     function getAuthResultClass(result: string): string {
         switch (result) {
@@ -109,13 +110,19 @@
                                 {authentication.dkim[0].result}
                             </span>
                             {#if authentication.dkim[0].domain}
-                                <div class="text-muted small">{authentication.dkim[0].domain}</div>
+                                <div class="small">
+                                    <strong>Domain:</strong>
+                                    <span class="text-muted">{authentication.dkim[0].domain}</span>
+                                </div>
                             {/if}
                             {#if authentication.dkim[0].selector}
-                                <div class="text-muted small">Selector: {authentication.dkim[0].selector}</div>
+                                <div class="small">
+                                    <strong>Selector:</strong>
+                                    <span class="text-muted">{authentication.dkim[0].selector}</span>
+                                </div>
                             {/if}
-                            {#if authentication.dkim.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dkim.details}</pre>
+                            {#if authentication.dkim[0].details}
+                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dkim[0].details}</pre>
                             {/if}
                         </div>
                     {:else}
@@ -141,6 +148,32 @@
                             <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dmarc.result)}">
                                 {authentication.dmarc.result}
                             </span>
+                            {#if authentication.dmarc.domain}
+                                <div class="small">
+                                    <strong>Domain:</strong>
+                                    <span class="text-muted">{authentication.dmarc.domain}</span>
+                                </div>
+                            {/if}
+                            {#snippet DMARCPolicy(policy)}
+                                <div class="small">
+                                    <strong>Policy:</strong>
+                                    <span
+                                        class="fw-bold"
+                                        class:text-success={policy == "reject"}
+                                        class:text-warning={policy == "quarantine"}
+                                        class:text-danger={policy == "none"}
+                                        class:bg-warning={policy != "none" && policy != "quarantine" && policy != "reject"}
+                                    >
+                                        {policy}
+                                    </span>
+                                </div>
+                            {/snippet}
+                            {#if authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
+                                {@const policy = authentication.dmarc.details.replace(/^.*policy.published-domain-policy=([^\s]+).*$/, "$1")}
+                                {@render DMARCPolicy(policy)}
+                            {:else if authentication.dmarc.domain}
+                                {@render DMARCPolicy(dnsResults.dmarc_record.policy)}
+                            {/if}
                             {#if authentication.dmarc.details}
                                 <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dmarc.details}</pre>
                             {/if}
@@ -161,13 +194,25 @@
             <!-- BIMI (Optional) -->
             <div class="col mb-3">
                 <div class="d-flex align-items-start">
-                    {#if authentication.bimi}
+                    {#if authentication.bimi && authentication.bimi.result != "none"}
                         <i class="bi {getAuthResultIcon(authentication.bimi.result)} {getAuthResultClass(authentication.bimi.result)} me-2 fs-5"></i>
                         <div>
                             <strong>BIMI</strong>
                             <span class="text-uppercase ms-2 {getAuthResultClass(authentication.bimi.result)}">
                                 {authentication.bimi.result}
                             </span>
+                            {#if authentication.bimi.details}
+                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
+                            {/if}
+                        </div>
+                    {:else if authentication.bimi && authentication.bimi.result == "none"}
+                        <i class="bi bi-exclamation-circle-fill text-warning me-2 fs-5"></i>
+                        <div>
+                            <strong>BIMI</strong>
+                            <span class="text-uppercase ms-2 text-warning">
+                                NONE
+                            </span>
+                            <div class="text-muted small">Brand Indicators for Message Identification</div>
                             {#if authentication.bimi.details}
                                 <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
                             {/if}

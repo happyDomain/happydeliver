@@ -153,14 +153,7 @@ func (a *AuthenticationAnalyzer) parseSPFResult(part string) *api.AuthResult {
 		}
 	}
 
-	// Extract details
-	if idx := strings.Index(part, "("); idx != -1 {
-		endIdx := strings.Index(part[idx:], ")")
-		if endIdx != -1 {
-			details := strings.TrimSpace(part[idx+1 : idx+endIdx])
-			result.Details = &details
-		}
-	}
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "spf="))
 
 	return result
 }

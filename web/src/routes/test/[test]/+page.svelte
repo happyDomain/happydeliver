@@ -160,6 +160,7 @@
                         <AuthenticationCard
                             authentication={report.authentication}
                             authenticationScore={report.summary?.authentication_score}
+                            dnsResults={report.dns_results}
                         />
                     </div>
                 </div>

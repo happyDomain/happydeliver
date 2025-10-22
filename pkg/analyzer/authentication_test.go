@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -264,7 +265,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 30,
+			expectedScore: 90, // SPF=30 + DKIM=30 + DMARC=30
 		},
 		{
 			name: "SPF and DKIM only",
@@ -276,7 +277,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 20,
+			expectedScore: 60, // SPF=30 + DKIM=30
 		},
 		{
 			name: "SPF fail, DKIM pass",
@@ -288,7 +289,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 10,
+			expectedScore: 30, // SPF=0 + DKIM=30
 		},
 		{
 			name: "SPF softfail",
@@ -305,7 +306,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 			expectedScore: 0,
 		},
 		{
-			name: "BIMI doesn't affect score",
+			name: "BIMI adds to score",
 			results: &api.AuthenticationResults{
 				Spf: &api.AuthResult{
 					Result: api.AuthResultResultPass,
@@ -314,7 +315,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 10, // Only SPF counted, not BIMI
+			expectedScore: 40, // SPF (30) + BIMI (10)
 		},
 	}
 
@@ -362,6 +363,461 @@ func TestParseARCResult(t *testing.T) {
 
 			if result.Result != tt.expectedResult {
 				t.Errorf("Result = %v, want %v", result.Result, tt.expectedResult)
+			}
+		})
+	}
+}
+
+func TestParseAuthenticationResultsHeader(t *testing.T) {
+	tests := []struct {
+		name                 string
+		header               string
+		expectedSPFResult    *api.AuthResultResult
+		expectedSPFDomain    *string
+		expectedDKIMCount    int
+		expectedDKIMResult   *api.AuthResultResult
+		expectedDMARCResult  *api.AuthResultResult
+		expectedDMARCDomain  *string
+		expectedBIMIResult   *api.AuthResultResult
+		expectedARCResult    *api.ARCResultResult
+	}{
+		{
+			name:                "Complete authentication results",
+			header:              "mx.google.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=pass action=none header.from=example.com",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedDKIMCount:   1,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCResult: api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCDomain: api.PtrTo("example.com"),
+		},
+		{
+			name:                "SPF only",
+			header:              "mail.example.com; spf=pass smtp.mailfrom=user@domain.com",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:   api.PtrTo("domain.com"),
+			expectedDKIMCount:   0,
+			expectedDMARCResult: nil,
+		},
+		{
+			name:               "DKIM only",
+			header:             "mail.example.com; dkim=pass header.d=example.com header.s=selector1",
+			expectedSPFResult:  nil,
+			expectedDKIMCount:  1,
+			expectedDKIMResult: api.PtrTo(api.AuthResultResultPass),
+		},
+		{
+			name:                "Multiple DKIM signatures",
+			header:              "mail.example.com; dkim=pass header.d=example.com header.s=s1; dkim=pass header.d=example.com header.s=s2",
+			expectedSPFResult:   nil,
+			expectedDKIMCount:   2,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCResult: nil,
+		},
+		{
+			name:                "SPF fail with DKIM pass",
+			header:              "mail.example.com; spf=fail smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultFail),
+			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedDKIMCount:   1,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCResult: nil,
+		},
+		{
+			name:                "SPF softfail",
+			header:              "mail.example.com; spf=softfail smtp.mailfrom=sender@example.com",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultSoftfail),
+			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedDKIMCount:   0,
+			expectedDMARCResult: nil,
+		},
+		{
+			name:                "DMARC fail",
+			header:              "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=fail action=quarantine header.from=example.com",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMCount:   1,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCResult: api.PtrTo(api.AuthResultResultFail),
+			expectedDMARCDomain: api.PtrTo("example.com"),
+		},
+		{
+			name:                "BIMI pass",
+			header:              "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; bimi=pass header.d=example.com header.selector=default",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedDKIMCount:   0,
+			expectedBIMIResult:  api.PtrTo(api.AuthResultResultPass),
+		},
+		{
+			name:              "ARC pass",
+			header:            "mail.example.com; arc=pass",
+			expectedSPFResult: nil,
+			expectedDKIMCount: 0,
+			expectedARCResult: api.PtrTo(api.ARCResultResultPass),
+		},
+		{
+			name:                "All authentication methods",
+			header:              "mx.google.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=pass action=none header.from=example.com; bimi=pass header.d=example.com header.selector=v1; arc=pass",
+			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedDKIMCount:   1,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCResult: api.PtrTo(api.AuthResultResultPass),
+			expectedDMARCDomain: api.PtrTo("example.com"),
+			expectedBIMIResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedARCResult:   api.PtrTo(api.ARCResultResultPass),
+		},
+		{
+			name:               "Empty header (authserv-id only)",
+			header:             "mx.google.com",
+			expectedSPFResult:  nil,
+			expectedDKIMCount:  0,
+		},
+		{
+			name:               "Empty parts with semicolons",
+			header:             "mx.google.com; ; ; spf=pass smtp.mailfrom=sender@example.com; ;",
+			expectedSPFResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:  api.PtrTo("example.com"),
+			expectedDKIMCount:  0,
+		},
+		{
+			name:                "DKIM with short form parameters",
+			header:              "mail.example.com; dkim=pass d=example.com s=selector1",
+			expectedSPFResult:   nil,
+			expectedDKIMCount:   1,
+			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+		},
+		{
+			name:              "SPF neutral",
+			header:            "mail.example.com; spf=neutral smtp.mailfrom=sender@example.com",
+			expectedSPFResult: api.PtrTo(api.AuthResultResultNeutral),
+			expectedSPFDomain: api.PtrTo("example.com"),
+			expectedDKIMCount: 0,
+		},
+		{
+			name:              "SPF none",
+			header:            "mail.example.com; spf=none",
+			expectedSPFResult: api.PtrTo(api.AuthResultResultNone),
+			expectedDKIMCount: 0,
+		},
+	}
+
+	analyzer := NewAuthenticationAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := &api.AuthenticationResults{}
+			analyzer.parseAuthenticationResultsHeader(tt.header, results)
+
+			// Check SPF
+			if tt.expectedSPFResult != nil {
+				if results.Spf == nil {
+					t.Errorf("Expected SPF result, got nil")
+				} else {
+					if results.Spf.Result != *tt.expectedSPFResult {
+						t.Errorf("SPF Result = %v, want %v", results.Spf.Result, *tt.expectedSPFResult)
+					}
+					if tt.expectedSPFDomain != nil {
+						if results.Spf.Domain == nil || *results.Spf.Domain != *tt.expectedSPFDomain {
+							var gotDomain string
+							if results.Spf.Domain != nil {
+								gotDomain = *results.Spf.Domain
+							}
+							t.Errorf("SPF Domain = %v, want %v", gotDomain, *tt.expectedSPFDomain)
+						}
+					}
+				}
+			} else {
+				if results.Spf != nil {
+					t.Errorf("Expected no SPF result, got %+v", results.Spf)
+				}
+			}
+
+			// Check DKIM count and result
+			if results.Dkim == nil {
+				if tt.expectedDKIMCount != 0 {
+					t.Errorf("Expected %d DKIM results, got nil", tt.expectedDKIMCount)
+				}
+			} else {
+				if len(*results.Dkim) != tt.expectedDKIMCount {
+					t.Errorf("DKIM count = %d, want %d", len(*results.Dkim), tt.expectedDKIMCount)
+				}
+				if tt.expectedDKIMResult != nil && len(*results.Dkim) > 0 {
+					if (*results.Dkim)[0].Result != *tt.expectedDKIMResult {
+						t.Errorf("DKIM Result = %v, want %v", (*results.Dkim)[0].Result, *tt.expectedDKIMResult)
+					}
+				}
+			}
+
+			// Check DMARC
+			if tt.expectedDMARCResult != nil {
+				if results.Dmarc == nil {
+					t.Errorf("Expected DMARC result, got nil")
+				} else {
+					if results.Dmarc.Result != *tt.expectedDMARCResult {
+						t.Errorf("DMARC Result = %v, want %v", results.Dmarc.Result, *tt.expectedDMARCResult)
+					}
+					if tt.expectedDMARCDomain != nil {
+						if results.Dmarc.Domain == nil || *results.Dmarc.Domain != *tt.expectedDMARCDomain {
+							var gotDomain string
+							if results.Dmarc.Domain != nil {
+								gotDomain = *results.Dmarc.Domain
+							}
+							t.Errorf("DMARC Domain = %v, want %v", gotDomain, *tt.expectedDMARCDomain)
+						}
+					}
+				}
+			} else {
+				if results.Dmarc != nil {
+					t.Errorf("Expected no DMARC result, got %+v", results.Dmarc)
+				}
+			}
+
+			// Check BIMI
+			if tt.expectedBIMIResult != nil {
+				if results.Bimi == nil {
+					t.Errorf("Expected BIMI result, got nil")
+				} else {
+					if results.Bimi.Result != *tt.expectedBIMIResult {
+						t.Errorf("BIMI Result = %v, want %v", results.Bimi.Result, *tt.expectedBIMIResult)
+					}
+				}
+			} else {
+				if results.Bimi != nil {
+					t.Errorf("Expected no BIMI result, got %+v", results.Bimi)
+				}
+			}
+
+			// Check ARC
+			if tt.expectedARCResult != nil {
+				if results.Arc == nil {
+					t.Errorf("Expected ARC result, got nil")
+				} else {
+					if results.Arc.Result != *tt.expectedARCResult {
+						t.Errorf("ARC Result = %v, want %v", results.Arc.Result, *tt.expectedARCResult)
+					}
+				}
+			} else {
+				if results.Arc != nil {
+					t.Errorf("Expected no ARC result, got %+v", results.Arc)
+				}
+			}
+		})
+	}
+}
+
+func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
+	// This test verifies that only the first occurrence of each auth method is parsed
+	analyzer := NewAuthenticationAnalyzer()
+
+	t.Run("Multiple SPF results - only first is parsed", func(t *testing.T) {
+		header := "mail.example.com; spf=pass smtp.mailfrom=first@example.com; spf=fail smtp.mailfrom=second@example.com"
+		results := &api.AuthenticationResults{}
+		analyzer.parseAuthenticationResultsHeader(header, results)
+
+		if results.Spf == nil {
+			t.Fatal("Expected SPF result, got nil")
+		}
+		if results.Spf.Result != api.AuthResultResultPass {
+			t.Errorf("Expected first SPF result (pass), got %v", results.Spf.Result)
+		}
+		if results.Spf.Domain == nil || *results.Spf.Domain != "example.com" {
+			t.Errorf("Expected domain from first SPF result")
+		}
+	})
+
+	t.Run("Multiple DMARC results - only first is parsed", func(t *testing.T) {
+		header := "mail.example.com; dmarc=pass header.from=first.com; dmarc=fail header.from=second.com"
+		results := &api.AuthenticationResults{}
+		analyzer.parseAuthenticationResultsHeader(header, results)
+
+		if results.Dmarc == nil {
+			t.Fatal("Expected DMARC result, got nil")
+		}
+		if results.Dmarc.Result != api.AuthResultResultPass {
+			t.Errorf("Expected first DMARC result (pass), got %v", results.Dmarc.Result)
+		}
+		if results.Dmarc.Domain == nil || *results.Dmarc.Domain != "first.com" {
+			t.Errorf("Expected domain from first DMARC result")
+		}
+	})
+
+	t.Run("Multiple ARC results - only first is parsed", func(t *testing.T) {
+		header := "mail.example.com; arc=pass; arc=fail"
+		results := &api.AuthenticationResults{}
+		analyzer.parseAuthenticationResultsHeader(header, results)
+
+		if results.Arc == nil {
+			t.Fatal("Expected ARC result, got nil")
+		}
+		if results.Arc.Result != api.ARCResultResultPass {
+			t.Errorf("Expected first ARC result (pass), got %v", results.Arc.Result)
+		}
+	})
+
+	t.Run("Multiple BIMI results - only first is parsed", func(t *testing.T) {
+		header := "mail.example.com; bimi=pass header.d=first.com; bimi=fail header.d=second.com"
+		results := &api.AuthenticationResults{}
+		analyzer.parseAuthenticationResultsHeader(header, results)
+
+		if results.Bimi == nil {
+			t.Fatal("Expected BIMI result, got nil")
+		}
+		if results.Bimi.Result != api.AuthResultResultPass {
+			t.Errorf("Expected first BIMI result (pass), got %v", results.Bimi.Result)
+		}
+		if results.Bimi.Domain == nil || *results.Bimi.Domain != "first.com" {
+			t.Errorf("Expected domain from first BIMI result")
+		}
+	})
+
+	t.Run("Multiple DKIM results - all are parsed", func(t *testing.T) {
+		// DKIM is special - multiple signatures should all be collected
+		header := "mail.example.com; dkim=pass header.d=first.com header.s=s1; dkim=fail header.d=second.com header.s=s2"
+		results := &api.AuthenticationResults{}
+		analyzer.parseAuthenticationResultsHeader(header, results)
+
+		if results.Dkim == nil {
+			t.Fatal("Expected DKIM results, got nil")
+		}
+		if len(*results.Dkim) != 2 {
+			t.Errorf("Expected 2 DKIM results, got %d", len(*results.Dkim))
+		}
+		if (*results.Dkim)[0].Result != api.AuthResultResultPass {
+			t.Errorf("Expected first DKIM result to be pass, got %v", (*results.Dkim)[0].Result)
+		}
+		if (*results.Dkim)[1].Result != api.AuthResultResultFail {
+			t.Errorf("Expected second DKIM result to be fail, got %v", (*results.Dkim)[1].Result)
+		}
+	})
+}
+
+func TestParseLegacySPF(t *testing.T) {
+	tests := []struct {
+		name           string
+		receivedSPF    string
+		expectedResult api.AuthResultResult
+		expectedDomain *string
+		expectNil      bool
+	}{
+		{
+			name: "SPF pass with envelope-from",
+			receivedSPF: `pass
+    (mail.example.com: 192.0.2.10 is authorized to use 'user@example.com' in 'mfrom' identity (mechanism 'ip4:192.0.2.10' matched))
+    receiver=mx.receiver.com;
+    identity=mailfrom;
+    envelope-from="user@example.com";
+    helo=smtp.example.com;
+    client-ip=192.0.2.10`,
+			expectedResult: api.AuthResultResultPass,
+			expectedDomain: api.PtrTo("example.com"),
+		},
+		{
+			name: "SPF fail with sender",
+			receivedSPF: `fail
+    (mail.example.com: domain of sender@test.com does not designate 192.0.2.20 as permitted sender)
+    receiver=mx.receiver.com;
+    identity=mailfrom;
+    sender="sender@test.com";
+    helo=smtp.test.com;
+    client-ip=192.0.2.20`,
+			expectedResult: api.AuthResultResultFail,
+			expectedDomain: api.PtrTo("test.com"),
+		},
+		{
+			name:           "SPF softfail",
+			receivedSPF:    "softfail (example.com: transitioning domain of admin@example.org does not designate 192.0.2.30 as permitted sender) envelope-from=\"admin@example.org\"",
+			expectedResult: api.AuthResultResultSoftfail,
+			expectedDomain: api.PtrTo("example.org"),
+		},
+		{
+			name:           "SPF neutral",
+			receivedSPF:    "neutral (example.com: 192.0.2.40 is neither permitted nor denied by domain of info@domain.net) envelope-from=\"info@domain.net\"",
+			expectedResult: api.AuthResultResultNeutral,
+			expectedDomain: api.PtrTo("domain.net"),
+		},
+		{
+			name:           "SPF none",
+			receivedSPF:    "none (example.com: domain of noreply@company.io has no SPF record) envelope-from=\"noreply@company.io\"",
+			expectedResult: api.AuthResultResultNone,
+			expectedDomain: api.PtrTo("company.io"),
+		},
+		{
+			name:           "SPF temperror",
+			receivedSPF:    "temperror (example.com: error in processing SPF record) envelope-from=\"support@shop.example\"",
+			expectedResult: api.AuthResultResultTemperror,
+			expectedDomain: api.PtrTo("shop.example"),
+		},
+		{
+			name:           "SPF permerror",
+			receivedSPF:    "permerror (example.com: domain of contact@invalid.test has invalid SPF record) envelope-from=\"contact@invalid.test\"",
+			expectedResult: api.AuthResultResultPermerror,
+			expectedDomain: api.PtrTo("invalid.test"),
+		},
+		{
+			name:           "SPF pass without domain extraction",
+			receivedSPF:    "pass (example.com: 192.0.2.50 is authorized)",
+			expectedResult: api.AuthResultResultPass,
+			expectedDomain: nil,
+		},
+		{
+			name:        "Empty Received-SPF header",
+			receivedSPF: "",
+			expectNil:   true,
+		},
+		{
+			name:           "SPF with unquoted envelope-from",
+			receivedSPF:    "pass (example.com: sender SPF authorized) envelope-from=postmaster@mail.example.net",
+			expectedResult: api.AuthResultResultPass,
+			expectedDomain: api.PtrTo("mail.example.net"),
+		},
+	}
+
+	analyzer := NewAuthenticationAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock email message with Received-SPF header
+			email := &EmailMessage{
+				Header: make(map[string][]string),
+			}
+			if tt.receivedSPF != "" {
+				email.Header["Received-Spf"] = []string{tt.receivedSPF}
+			}
+
+			result := analyzer.parseLegacySPF(email)
+
+			if tt.expectNil {
+				if result != nil {
+					t.Errorf("Expected nil result, got %+v", result)
+				}
+				return
+			}
+
+			if result == nil {
+				t.Fatal("Expected non-nil result, got nil")
+			}
+
+			if result.Result != tt.expectedResult {
+				t.Errorf("Result = %v, want %v", result.Result, tt.expectedResult)
+			}
+
+			if tt.expectedDomain != nil {
+				if result.Domain == nil {
+					t.Errorf("Domain = nil, want %v", *tt.expectedDomain)
+				} else if *result.Domain != *tt.expectedDomain {
+					t.Errorf("Domain = %v, want %v", *result.Domain, *tt.expectedDomain)
+				}
+			} else {
+				if result.Domain != nil {
+					t.Errorf("Domain = %v, want nil", *result.Domain)
+				}
+			}
+
+			if result.Details == nil {
+				t.Error("Expected Details to be set, got nil")
+			} else if *result.Details != tt.receivedSPF {
+				t.Errorf("Details = %v, want %v", *result.Details, tt.receivedSPF)
 			}
 		})
 	}
@@ -451,4 +907,245 @@ func TestValidateARCChain(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseLegacyDKIM(t *testing.T) {
+	tests := []struct {
+		name             string
+		dkimSignatures   []string
+		expectedCount    int
+		expectedDomains  []string
+		expectedSelector []string
+	}{
+		{
+			name: "Single DKIM signature with domain and selector",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=selector1; h=from:to:subject:date; bh=xyz; b=abc",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"example.com"},
+			expectedSelector: []string{"selector1"},
+		},
+		{
+			name: "Multiple DKIM signatures",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=example.com; s=selector1; b=abc123",
+				"v=1; a=rsa-sha256; d=example.com; s=selector2; b=def456",
+			},
+			expectedCount:    2,
+			expectedDomains:  []string{"example.com", "example.com"},
+			expectedSelector: []string{"selector1", "selector2"},
+		},
+		{
+			name: "DKIM signature with different domain",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=mail.example.org; s=default; b=xyz789",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"mail.example.org"},
+			expectedSelector: []string{"default"},
+		},
+		{
+			name: "DKIM signature with subdomain",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=newsletters.example.com; s=marketing; b=aaa",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"newsletters.example.com"},
+			expectedSelector: []string{"marketing"},
+		},
+		{
+			name: "Multiple signatures from different domains",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=example.com; s=s1; b=abc",
+				"v=1; a=rsa-sha256; d=relay.com; s=s2; b=def",
+			},
+			expectedCount:    2,
+			expectedDomains:  []string{"example.com", "relay.com"},
+			expectedSelector: []string{"s1", "s2"},
+		},
+		{
+			name:             "No DKIM signatures",
+			dkimSignatures:   []string{},
+			expectedCount:    0,
+			expectedDomains:  []string{},
+			expectedSelector: []string{},
+		},
+		{
+			name: "DKIM signature without selector",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=example.com; b=abc123",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"example.com"},
+			expectedSelector: []string{""},
+		},
+		{
+			name: "DKIM signature without domain",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; s=selector1; b=abc123",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{""},
+			expectedSelector: []string{"selector1"},
+		},
+		{
+			name: "DKIM signature with whitespace in parameters",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; d=example.com ; s=selector1 ; b=abc123",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"example.com"},
+			expectedSelector: []string{"selector1"},
+		},
+		{
+			name: "DKIM signature with multiline format",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; c=relaxed/relaxed;\r\n\td=example.com; s=selector1;\r\n\th=from:to:subject:date;\r\n\tb=abc123def456ghi789",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"example.com"},
+			expectedSelector: []string{"selector1"},
+		},
+		{
+			name: "DKIM signature with ed25519 algorithm",
+			dkimSignatures: []string{
+				"v=1; a=ed25519-sha256; d=example.com; s=ed25519; b=xyz",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"example.com"},
+			expectedSelector: []string{"ed25519"},
+		},
+		{
+			name: "Complex real-world DKIM signature",
+			dkimSignatures: []string{
+				"v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20230601; t=1234567890; x=1234567950; darn=example.com; h=to:subject:message-id:date:from:mime-version:from:to:cc:subject:date:message-id:reply-to; bh=abc123def456==; b=longsignaturehere==",
+			},
+			expectedCount:    1,
+			expectedDomains:  []string{"google.com"},
+			expectedSelector: []string{"20230601"},
+		},
+	}
+
+	analyzer := NewAuthenticationAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock email message with DKIM-Signature headers
+			email := &EmailMessage{
+				Header: make(map[string][]string),
+			}
+			if len(tt.dkimSignatures) > 0 {
+				email.Header["Dkim-Signature"] = tt.dkimSignatures
+			}
+
+			results := analyzer.parseLegacyDKIM(email)
+
+			// Check count
+			if len(results) != tt.expectedCount {
+				t.Errorf("Expected %d results, got %d", tt.expectedCount, len(results))
+				return
+			}
+
+			// Check each result
+			for i, result := range results {
+				// All legacy DKIM results should have Result = none
+				if result.Result != api.AuthResultResultNone {
+					t.Errorf("Result[%d].Result = %v, want %v", i, result.Result, api.AuthResultResultNone)
+				}
+
+				// Check domain
+				if i < len(tt.expectedDomains) {
+					expectedDomain := tt.expectedDomains[i]
+					if expectedDomain != "" {
+						if result.Domain == nil {
+							t.Errorf("Result[%d].Domain = nil, want %v", i, expectedDomain)
+						} else if strings.TrimSpace(*result.Domain) != expectedDomain {
+							t.Errorf("Result[%d].Domain = %v, want %v", i, *result.Domain, expectedDomain)
+						}
+					}
+				}
+
+				// Check selector
+				if i < len(tt.expectedSelector) {
+					expectedSelector := tt.expectedSelector[i]
+					if expectedSelector != "" {
+						if result.Selector == nil {
+							t.Errorf("Result[%d].Selector = nil, want %v", i, expectedSelector)
+						} else if strings.TrimSpace(*result.Selector) != expectedSelector {
+							t.Errorf("Result[%d].Selector = %v, want %v", i, *result.Selector, expectedSelector)
+						}
+					}
+				}
+
+				// Check that Details is set
+				if result.Details == nil {
+					t.Errorf("Result[%d].Details = nil, expected non-nil", i)
+				} else {
+					expectedDetails := "DKIM signature present (verification status unknown)"
+					if *result.Details != expectedDetails {
+						t.Errorf("Result[%d].Details = %v, want %v", i, *result.Details, expectedDetails)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestParseLegacyDKIM_Integration(t *testing.T) {
+	// Test that parseLegacyDKIM is properly integrated into AnalyzeAuthentication
+	t.Run("Legacy DKIM is used when no Authentication-Results", func(t *testing.T) {
+		analyzer := NewAuthenticationAnalyzer()
+		email := &EmailMessage{
+			Header: make(map[string][]string),
+		}
+		email.Header["Dkim-Signature"] = []string{
+			"v=1; a=rsa-sha256; d=example.com; s=selector1; b=abc",
+		}
+
+		results := analyzer.AnalyzeAuthentication(email)
+
+		if results.Dkim == nil {
+			t.Fatal("Expected DKIM results, got nil")
+		}
+		if len(*results.Dkim) != 1 {
+			t.Errorf("Expected 1 DKIM result, got %d", len(*results.Dkim))
+		}
+		if (*results.Dkim)[0].Result != api.AuthResultResultNone {
+			t.Errorf("Expected DKIM result to be 'none', got %v", (*results.Dkim)[0].Result)
+		}
+		if (*results.Dkim)[0].Domain == nil || *(*results.Dkim)[0].Domain != "example.com" {
+			t.Error("Expected domain to be 'example.com'")
+		}
+	})
+
+	t.Run("Legacy DKIM is NOT used when Authentication-Results present", func(t *testing.T) {
+		analyzer := NewAuthenticationAnalyzer()
+		email := &EmailMessage{
+			Header: make(map[string][]string),
+		}
+		// Both Authentication-Results and DKIM-Signature headers
+		email.Header["Authentication-Results"] = []string{
+			"mx.example.com; dkim=pass header.d=verified.com header.s=s1",
+		}
+		email.Header["Dkim-Signature"] = []string{
+			"v=1; a=rsa-sha256; d=example.com; s=selector1; b=abc",
+		}
+
+		results := analyzer.AnalyzeAuthentication(email)
+
+		// Should use the Authentication-Results DKIM (pass from verified.com), not the legacy signature
+		if results.Dkim == nil {
+			t.Fatal("Expected DKIM results, got nil")
+		}
+		if len(*results.Dkim) != 1 {
+			t.Errorf("Expected 1 DKIM result, got %d", len(*results.Dkim))
+		}
+		if (*results.Dkim)[0].Result != api.AuthResultResultPass {
+			t.Errorf("Expected DKIM result to be 'pass', got %v", (*results.Dkim)[0].Result)
+		}
+		if (*results.Dkim)[0].Domain == nil || *(*results.Dkim)[0].Domain != "verified.com" {
+			t.Error("Expected domain to be 'verified.com' from Authentication-Results, not 'example.com' from legacy")
+		}
+	})
 }
