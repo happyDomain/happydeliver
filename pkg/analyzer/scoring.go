@@ -49,37 +49,3 @@ func ScoreToGrade(score int) string {
 func ScoreToReportGrade(score int) api.ReportGrade {
 	return api.ReportGrade(ScoreToGrade(score))
 }
-
-// DeliverabilityScorer aggregates all analysis results and computes overall score
-type DeliverabilityScorer struct{}
-
-// NewDeliverabilityScorer creates a new deliverability scorer
-func NewDeliverabilityScorer() *DeliverabilityScorer {
-	return &DeliverabilityScorer{}
-}
-
-// CalculateSpamScore calculates spam score from SpamAssassin results
-// Returns a score from 0-100 where higher is better
-func (s *DeliverabilityScorer) CalculateSpamScore(result *SpamAssassinResult) int {
-	if result == nil {
-		return 100 // No spam scan results, assume good
-	}
-
-	// SpamAssassin score typically ranges from -10 to +20
-	// Score < 0 is very likely ham (good)
-	// Score 0-5 is threshold range (configurable, usually 5.0)
-	// Score > 5 is likely spam
-
-	score := result.Score
-
-	// Convert SpamAssassin score to 0-100 scale (inverted - lower SA score is better)
-	if score <= 0 {
-		return 100 // Perfect score for ham
-	} else if score >= result.RequiredScore {
-		return 0 // Failed spam test
-	} else {
-		// Linear scale between 0 and required threshold
-		percentage := (score / result.RequiredScore) * 100
-		return int(100 - percentage)
-	}
-}

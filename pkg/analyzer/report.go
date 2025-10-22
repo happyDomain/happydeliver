@@ -37,7 +37,6 @@ type ReportGenerator struct {
 	rblChecker      *RBLChecker
 	contentAnalyzer *ContentAnalyzer
 	headerAnalyzer  *HeaderAnalyzer
-	scorer          *DeliverabilityScorer
 }
 
 // NewReportGenerator creates a new report generator
@@ -53,7 +52,6 @@ func NewReportGenerator(
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),
 		headerAnalyzer:  NewHeaderAnalyzer(),
-		scorer:          NewDeliverabilityScorer(),
 	}
 }
 
@@ -119,7 +117,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	spamScore := 0
 	if results.SpamAssassin != nil {
-		spamScore = r.scorer.CalculateSpamScore(results.SpamAssassin)
+		spamScore = r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
 	}
 
 	report.Summary = &api.ScoreSummary{
