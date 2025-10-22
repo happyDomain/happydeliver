@@ -441,3 +441,103 @@ func (d *DNSAnalyzer) validateBIMI(record string) bool {
 
 	return true
 }
+
+// CalculateDNSScore calculates the DNS score from records results
+// Returns a score from 0-100 where higher is better
+func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) int {
+	if results == nil {
+		return 0
+	}
+
+	score := 0
+
+	// TODO: 20 points for correct PTR and A/AAAA
+
+	// MX Records: 20 points
+	// Having valid MX records is critical for email deliverability
+	if results.MxRecords != nil && len(*results.MxRecords) > 0 {
+		hasValidMX := false
+		for _, mx := range *results.MxRecords {
+			if mx.Valid {
+				hasValidMX = true
+				break
+			}
+		}
+		if hasValidMX {
+			score += 20
+		}
+	}
+
+	// SPF Record: 20 points
+	// SPF is essential for email authentication
+	if results.SpfRecord != nil {
+		if results.SpfRecord.Valid {
+			score += 20
+		} else if results.SpfRecord.Record != nil {
+			// Partial credit if SPF record exists but has issues
+			score += 5
+		}
+	}
+
+	// DKIM Records: 20 points
+	// DKIM provides strong email authentication
+	if results.DkimRecords != nil && len(*results.DkimRecords) > 0 {
+		hasValidDKIM := false
+		for _, dkim := range *results.DkimRecords {
+			if dkim.Valid {
+				hasValidDKIM = true
+				break
+			}
+		}
+		if hasValidDKIM {
+			score += 20
+		} else {
+			// Partial credit if DKIM record exists but has issues
+			score += 5
+		}
+	}
+
+	// DMARC Record: 20 points
+	// DMARC ties SPF and DKIM together and provides policy
+	if results.DmarcRecord != nil {
+		if results.DmarcRecord.Valid {
+			score += 15
+			// Bonus points for stricter policies
+			if results.DmarcRecord.Policy != nil {
+				switch *results.DmarcRecord.Policy {
+				case "reject":
+					// Strictest policy - full points already awarded
+					score += 5
+				case "quarantine":
+					// Good policy - no deduction
+				case "none":
+					// Weakest policy - deduct 5 points
+					score -= 5
+				}
+			}
+		} else if results.DmarcRecord.Record != nil {
+			// Partial credit if DMARC record exists but has issues
+			score += 5
+		}
+	}
+
+	// BIMI Record: 5 bonus points
+	// BIMI is optional but indicates advanced email branding
+	if results.BimiRecord != nil && results.BimiRecord.Valid {
+		if score >= 100 {
+			return 100
+		}
+	}
+
+	// Ensure score doesn't exceed maximum
+	if score > 100 {
+		score = 100
+	}
+
+	// Ensure score is non-negative
+	if score < 0 {
+		score = 0
+	}
+
+	return score
+}

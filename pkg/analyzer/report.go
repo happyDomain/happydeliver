@@ -95,6 +95,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	// Calculate scores directly from analyzers (no more checks array)
+	dnsScore := 0
+	if results.DNS != nil {
+		dnsScore = r.dnsAnalyzer.CalculateDNSScore(results.DNS)
+	}
+
 	authScore := 0
 	if results.Authentication != nil {
 		authScore = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication)
@@ -121,6 +126,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	report.Summary = &api.ScoreSummary{
+		DnsScore:            dnsScore,
 		AuthenticationScore: authScore,
 		BlacklistScore:      blacklistScore,
 		ContentScore:        contentScore,

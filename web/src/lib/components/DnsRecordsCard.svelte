@@ -3,16 +3,24 @@
 
     interface Props {
         dnsResults?: DNSResults;
+        dnsScore?: number;
     }
 
-    let { dnsResults }: Props = $props();
+    let { dnsResults, dnsScore }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
     <div class="card-header bg-white">
-        <h4 class="mb-0">
-            <i class="bi bi-diagram-3 me-2"></i>
-            DNS Records
+        <h4 class="mb-0 d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-diagram-3 me-2"></i>
+                DNS Records
+            </span>
+            {#if dnsScore !== undefined}
+                <span class="badge bg-secondary">
+                    {dnsScore}%
+                </span>
+            {/if}
         </h4>
     </div>
     <div class="card-body">

@@ -148,7 +148,10 @@
             {#if report.dns_results}
                 <div class="row mb-4" id="dns">
                     <div class="col-12">
-                        <DnsRecordsCard dnsResults={report.dns_results} />
+                        <DnsRecordsCard
+                            dnsResults={report.dns_results}
+                            dnsScore={report.summary?.dns_score}
+                        />
                     </div>
                 </div>
             {/if}

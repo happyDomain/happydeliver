@@ -296,12 +296,19 @@ components:
     ScoreSummary:
       type: object
       required:
+        - dns_score
         - authentication_score
         - spam_score
         - blacklist_score
         - content_score
         - header_score
       properties:
+        dns_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: DNS records score (in percentage)
+          example: 42
         authentication_score:
           type: integer
           minimum: 0

@@ -40,6 +40,20 @@
                     <div class="p-2 bg-light rounded text-center">
                         <strong
                             class="fs-2"
+                            class:text-success={summary.dns_score >= 100}
+                            class:text-warning={summary.dns_score < 100 &&
+                                summary.dns_score >= 50}
+                            class:text-danger={summary.dns_score < 50}
+                        >
+                            {summary.dns_score}%
+                        </strong>
+                        <small class="text-muted d-block">DNS</small>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg">
+                    <div class="p-2 bg-light rounded text-center">
+                        <strong
+                            class="fs-2"
                             class:text-success={summary.authentication_score >= 100}
                             class:text-warning={summary.authentication_score < 100 &&
                                 summary.authentication_score >= 50}
