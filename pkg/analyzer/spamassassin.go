@@ -84,7 +84,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAss
 
 	// Parse X-Spam-Report header for detailed test results
 	if reportHeader, ok := headers["X-Spam-Report"]; ok {
-		result.RawReport = strings.Replace(reportHeader, " *  ", "\n *  ", -1)
+		result.RawReport = strings.Replace(reportHeader, " * ", "\n* ", -1)
 		a.parseSpamReport(reportHeader, result)
 	}
 
