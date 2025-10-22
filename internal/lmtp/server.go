@@ -92,6 +92,10 @@ func (s *Session) Data(r io.Reader) error {
 
 	log.Printf("LMTP: Received %d bytes", len(emailData))
 
+	// Prepend Return-Path header from envelope sender
+	returnPath := fmt.Sprintf("Return-Path: <%s>\r\n", s.from)
+	emailData = append([]byte(returnPath), emailData...)
+
 	// Process email for each recipient
 	// LMTP requires per-recipient status, but go-smtp handles this internally
 	for _, recipient := range s.recipients {
