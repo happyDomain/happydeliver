@@ -88,35 +88,46 @@
                 </div>
             {/if}
 
-            <!-- SPF Record -->
-            {#if dnsResults.spf_record}
+            <!-- SPF Records -->
+            {#if dnsResults.spf_records && dnsResults.spf_records.length > 0}
                 <div class="mb-4">
                     <h5 class="text-muted mb-2">
                         <span class="badge bg-secondary">SPF</span> Sender Policy Framework
                     </h5>
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="mb-2">
-                                <strong>Status:</strong>
-                                {#if dnsResults.spf_record.valid}
-                                    <span class="badge bg-success">Valid</span>
-                                {:else}
-                                    <span class="badge bg-danger">Invalid</span>
+                    {#each dnsResults.spf_records as spf, index}
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                {#if spf.domain}
+                                    <div class="mb-2">
+                                        <strong>Domain:</strong> <code>{spf.domain}</code>
+                                        {#if index > 0}
+                                            <span class="badge bg-info ms-2">Included</span>
+                                        {/if}
+                                    </div>
+                                {/if}
+                                <div class="mb-2">
+                                    <strong>Status:</strong>
+                                    {#if spf.valid}
+                                        <span class="badge bg-success">Valid</span>
+                                    {:else}
+                                        <span class="badge bg-danger">Invalid</span>
+                                    {/if}
+                                </div>
+                                {#if spf.record}
+                                    <div class="mb-2">
+                                        <strong>Record:</strong><br>
+                                        <code class="d-block mt-1 text-break">{spf.record}</code>
+                                    </div>
+                                {/if}
+                                {#if spf.error}
+                                    <div class="alert alert-{spf.valid ? 'warning' : 'danger'} mb-0 mt-2">
+                                        <i class="bi bi-{spf.valid ? 'exclamation-triangle' : 'x-circle'} me-1"></i>
+                                        <strong>{spf.valid ? 'Warning:' : 'Error:'}</strong> {spf.error}
+                                    </div>
                                 {/if}
                             </div>
-                            {#if dnsResults.spf_record.record}
-                                <div class="mb-2">
-                                    <strong>Record:</strong><br>
-                                    <code class="d-block mt-1 text-break">{dnsResults.spf_record.record}</code>
-                                </div>
-                            {/if}
-                            {#if dnsResults.spf_record.error}
-                                <div class="text-danger">
-                                    <strong>Error:</strong> {dnsResults.spf_record.error}
-                                </div>
-                            {/if}
                         </div>
-                    </div>
+                    {/each}
                 </div>
             {/if}
 

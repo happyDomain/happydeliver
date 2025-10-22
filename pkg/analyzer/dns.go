@@ -68,8 +68,8 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	// Check MX records
 	results.MxRecords = d.checkMXRecords(domain)
 
-	// Check SPF record
-	results.SpfRecord = d.checkSPFRecord(domain)
+	// Check SPF records (including includes)
+	results.SpfRecords = d.checkSPFRecords(domain)
 
 	// Check DKIM records (from authentication results)
 	if authResults != nil && authResults.Dkim != nil {
@@ -142,16 +142,43 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) *[]api.MXRecord {
 	return &results
 }
 
-// checkSPFRecord looks up and validates SPF record for a domain
-func (d *DNSAnalyzer) checkSPFRecord(domain string) *api.SPFRecord {
+// checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
+func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]api.SPFRecord {
+	visited := make(map[string]bool)
+	return d.resolveSPFRecords(domain, visited, 0)
+}
+
+// resolveSPFRecords recursively resolves SPF records including include: directives
+func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int) *[]api.SPFRecord {
+	const maxDepth = 10 // Prevent infinite recursion
+
+	if depth > maxDepth {
+		return &[]api.SPFRecord{
+			{
+				Domain: &domain,
+				Valid:  false,
+				Error:  api.PtrTo("Maximum SPF include depth exceeded"),
+			},
+		}
+	}
+
+	// Prevent circular references
+	if visited[domain] {
+		return &[]api.SPFRecord{}
+	}
+	visited[domain] = true
+
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, domain)
 	if err != nil {
-		return &api.SPFRecord{
-			Valid: false,
-			Error: api.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
+		return &[]api.SPFRecord{
+			{
+				Domain: &domain,
+				Valid:  false,
+				Error:  api.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
+			},
 		}
 	}
 
@@ -166,33 +193,77 @@ func (d *DNSAnalyzer) checkSPFRecord(domain string) *api.SPFRecord {
 	}
 
 	if spfCount == 0 {
-		return &api.SPFRecord{
-			Valid: false,
-			Error: api.PtrTo("No SPF record found"),
+		return &[]api.SPFRecord{
+			{
+				Domain: &domain,
+				Valid:  false,
+				Error:  api.PtrTo("No SPF record found"),
+			},
 		}
 	}
 
+	var results []api.SPFRecord
+
 	if spfCount > 1 {
-		return &api.SPFRecord{
+		results = append(results, api.SPFRecord{
+			Domain: &domain,
 			Record: &spfRecord,
 			Valid:  false,
 			Error:  api.PtrTo("Multiple SPF records found (RFC violation)"),
-		}
+		})
+		return &results
 	}
 
 	// Basic validation
-	if !d.validateSPF(spfRecord) {
-		return &api.SPFRecord{
-			Record: &spfRecord,
-			Valid:  false,
-			Error:  api.PtrTo("SPF record appears malformed"),
+	valid := d.validateSPF(spfRecord)
+
+	// Check for strict -all mechanism
+	var errMsg *string
+	if !valid {
+		errMsg = api.PtrTo("SPF record appears malformed")
+	} else if !d.hasSPFStrictFail(spfRecord) {
+		// Check what mechanism is used
+		if strings.HasSuffix(spfRecord, " ~all") {
+			errMsg = api.PtrTo("SPF uses ~all (softfail) instead of -all (hardfail). This weakens email authentication and may reduce deliverability.")
+		} else if strings.HasSuffix(spfRecord, " +all") || strings.HasSuffix(spfRecord, " ?all") {
+			errMsg = api.PtrTo("SPF uses permissive 'all' mechanism. This severely weakens email authentication. Use -all for strict policy.")
+		} else if strings.HasSuffix(spfRecord, " all") {
+			errMsg = api.PtrTo("SPF uses neutral 'all' mechanism. Use -all for strict policy to improve deliverability.")
+		} else {
+			errMsg = api.PtrTo("SPF record should end with -all for strict policy to improve deliverability and prevent spoofing.")
 		}
 	}
 
-	return &api.SPFRecord{
+	results = append(results, api.SPFRecord{
+		Domain: &domain,
 		Record: &spfRecord,
-		Valid:  true,
+		Valid:  valid,
+		Error:  errMsg,
+	})
+
+	// Extract and resolve include: directives
+	includes := d.extractSPFIncludes(spfRecord)
+	for _, includeDomain := range includes {
+		includedRecords := d.resolveSPFRecords(includeDomain, visited, depth+1)
+		if includedRecords != nil {
+			results = append(results, *includedRecords...)
+		}
 	}
+
+	return &results
+}
+
+// extractSPFIncludes extracts all include: domains from an SPF record
+func (d *DNSAnalyzer) extractSPFIncludes(record string) []string {
+	var includes []string
+	re := regexp.MustCompile(`include:([^\s]+)`)
+	matches := re.FindAllStringSubmatch(record, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			includes = append(includes, match[1])
+		}
+	}
+	return includes
 }
 
 // validateSPF performs basic SPF record validation
@@ -214,6 +285,11 @@ func (d *DNSAnalyzer) validateSPF(record string) bool {
 	}
 
 	return hasValidEnding
+}
+
+// hasSPFStrictFail checks if SPF record has strict -all mechanism
+func (d *DNSAnalyzer) hasSPFStrictFail(record string) bool {
+	return strings.HasSuffix(record, " -all")
 }
 
 // checkapi.DKIMRecord looks up and validates DKIM record for a domain and selector
@@ -468,12 +544,32 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 		}
 	}
 
-	// SPF Record: 20 points
+	// SPF Records: 20 points
 	// SPF is essential for email authentication
-	if results.SpfRecord != nil {
-		if results.SpfRecord.Valid {
+	if results.SpfRecords != nil && len(*results.SpfRecords) > 0 {
+		// Check the main domain's SPF record (first in the list)
+		mainSPF := (*results.SpfRecords)[0]
+		if mainSPF.Valid {
+			// Full points for valid SPF
 			score += 20
-		} else if results.SpfRecord.Record != nil {
+
+			// Check for strict -all mechanism
+			if mainSPF.Record != nil && !d.hasSPFStrictFail(*mainSPF.Record) {
+				// Deduct points for weak SPF policy
+				if strings.HasSuffix(*mainSPF.Record, " ~all") {
+					// Softfail - moderate penalty
+					score -= 5
+				} else if strings.HasSuffix(*mainSPF.Record, " +all") ||
+				          strings.HasSuffix(*mainSPF.Record, " ?all") ||
+				          strings.HasSuffix(*mainSPF.Record, " all") {
+					// Pass/neutral - severe penalty
+					score -= 10
+				} else {
+					// No 'all' mechanism at all - severe penalty
+					score -= 10
+				}
+			}
+		} else if mainSPF.Record != nil {
 			// Partial credit if SPF record exists but has issues
 			score += 5
 		}

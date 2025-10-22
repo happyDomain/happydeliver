@@ -788,8 +788,11 @@ components:
           items:
             $ref: '#/components/schemas/MXRecord'
           description: MX records for the domain
-        spf_record:
-          $ref: '#/components/schemas/SPFRecord'
+        spf_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SPFRecord'
+          description: SPF records found (includes resolved include directives)
         dkim_records:
           type: array
           items:
@@ -835,6 +838,10 @@ components:
       required:
         - valid
       properties:
+        domain:
+          type: string
+          description: Domain this SPF record belongs to
+          example: "example.com"
         record:
           type: string
           description: SPF record content
