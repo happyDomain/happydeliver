@@ -56,11 +56,18 @@
         {/if}
 
         {#if headerAnalysis.domain_alignment}
-            <div class="mb-3">
+            <div class="mb-3" id="domain-alignment">
                 <h6>Domain Alignment</h6>
                 <div class="card">
                     <div class="card-body">
                         <div class="row">
+                            <div class="col-md-4">
+                                <small class="text-muted">Aligned</small>
+                                <div>
+                                    <i class="bi {headerAnalysis.domain_alignment.aligned ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} me-1"></i>
+                                    <strong>{headerAnalysis.domain_alignment.aligned ? 'Yes' : 'No'}</strong>
+                                </div>
+                            </div>
                             <div class="col-md-4">
                                 <small class="text-muted">From Domain</small>
                                 <div><code>{headerAnalysis.domain_alignment.from_domain || '-'}</code></div>
@@ -68,13 +75,6 @@
                             <div class="col-md-4">
                                 <small class="text-muted">Return-Path Domain</small>
                                 <div><code>{headerAnalysis.domain_alignment.return_path_domain || '-'}</code></div>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Aligned</small>
-                                <div>
-                                    <i class="bi {headerAnalysis.domain_alignment.aligned ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} me-1"></i>
-                                    {headerAnalysis.domain_alignment.aligned ? 'Yes' : 'No'}
-                                </div>
                             </div>
                         </div>
                         {#if headerAnalysis.domain_alignment.issues && headerAnalysis.domain_alignment.issues.length > 0}

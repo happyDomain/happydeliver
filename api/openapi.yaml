@@ -777,17 +777,26 @@ components:
     DNSResults:
       type: object
       required:
-        - domain
+        - from_domain
       properties:
-        domain:
+        from_domain:
           type: string
-          description: Domain name
+          description: From Domain name
           example: "example.com"
-        mx_records:
+        rp_domain:
+          type: string
+          description: Return Path Domain name
+          example: "example.com"
+        from_mx_records:
           type: array
           items:
             $ref: '#/components/schemas/MXRecord'
-          description: MX records for the domain
+          description: MX records for the From domain
+        rp_mx_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/MXRecord'
+          description: MX records for the Return-Path domain
         spf_records:
           type: array
           items:

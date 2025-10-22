@@ -54,24 +54,40 @@ func NewDNSAnalyzer(timeout time.Duration) *DNSAnalyzer {
 // AnalyzeDNS performs DNS validation for the email's domain
 func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults) *api.DNSResults {
 	// Extract domain from From address
-	domain := d.extractDomain(email)
-	if domain == "" {
+	fromDomain := d.extractFromDomain(email)
+	if fromDomain == "" {
 		return &api.DNSResults{
 			Errors: &[]string{"Unable to extract domain from email"},
 		}
 	}
 
 	results := &api.DNSResults{
-		Domain: domain,
+		FromDomain: fromDomain,
+		RpDomain:   d.extractRPDomain(email),
 	}
 
-	// Check MX records
-	results.MxRecords = d.checkMXRecords(domain)
+	// Determine which domain to check SPF for (Return-Path domain)
+	// SPF validates the envelope sender (Return-Path), not the From header
+	spfDomain := fromDomain
+	if results.RpDomain != nil {
+		spfDomain = *results.RpDomain
+	}
 
-	// Check SPF records (including includes)
-	results.SpfRecords = d.checkSPFRecords(domain)
+	// Check MX records for From domain (where replies would go)
+	results.FromMxRecords = d.checkMXRecords(fromDomain)
+
+	// Check MX records for Return-Path domain (where bounces would go)
+	// Only check if Return-Path domain is different from From domain
+	if results.RpDomain != nil && *results.RpDomain != fromDomain {
+		results.RpMxRecords = d.checkMXRecords(*results.RpDomain)
+	}
+
+	// Check SPF records (for Return-Path domain - this is the envelope sender)
+	// SPF validates the MAIL FROM command, which corresponds to Return-Path
+	results.SpfRecords = d.checkSPFRecords(spfDomain)
 
 	// Check DKIM records (from authentication results)
+	// DKIM can be for any domain, but typically the From domain
 	if authResults != nil && authResults.Dkim != nil {
 		for _, dkim := range *authResults.Dkim {
 			if dkim.Domain != nil && dkim.Selector != nil {
@@ -86,17 +102,18 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 		}
 	}
 
-	// Check DMARC record
-	results.DmarcRecord = d.checkDMARCRecord(domain)
+	// Check DMARC record (for From domain - DMARC protects the visible sender)
+	// DMARC validates alignment between SPF/DKIM and the From domain
+	results.DmarcRecord = d.checkDMARCRecord(fromDomain)
 
-	// Check BIMI record (using default selector)
-	results.BimiRecord = d.checkBIMIRecord(domain, "default")
+	// Check BIMI record (for From domain - branding is based on visible sender)
+	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default")
 
 	return results
 }
 
-// extractDomain extracts the domain from the email's From address
-func (d *DNSAnalyzer) extractDomain(email *EmailMessage) string {
+// extractFromDomain extracts the domain from the email's From address
+func (d *DNSAnalyzer) extractFromDomain(email *EmailMessage) string {
 	if email.From != nil && email.From.Address != "" {
 		parts := strings.Split(email.From.Address, "@")
 		if len(parts) == 2 {
@@ -104,6 +121,17 @@ func (d *DNSAnalyzer) extractDomain(email *EmailMessage) string {
 		}
 	}
 	return ""
+}
+
+// extractRPDomain extracts the domain from the email's Return-Path address
+func (d *DNSAnalyzer) extractRPDomain(email *EmailMessage) *string {
+	if email.ReturnPath != "" {
+		parts := strings.Split(email.ReturnPath, "@")
+		if len(parts) == 2 {
+			return api.PtrTo(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parts[1])), ">"))
+		}
+	}
+	return nil
 }
 
 // checkMXRecords looks up MX records for a domain
@@ -529,18 +557,50 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 
 	// TODO: 20 points for correct PTR and A/AAAA
 
-	// MX Records: 20 points
+	// MX Records: 20 points (10 for From domain, 10 for Return-Path domain)
 	// Having valid MX records is critical for email deliverability
-	if results.MxRecords != nil && len(*results.MxRecords) > 0 {
-		hasValidMX := false
-		for _, mx := range *results.MxRecords {
+	// From domain MX records (10 points) - needed for replies
+	if results.FromMxRecords != nil && len(*results.FromMxRecords) > 0 {
+		hasValidFromMX := false
+		for _, mx := range *results.FromMxRecords {
 			if mx.Valid {
-				hasValidMX = true
+				hasValidFromMX = true
 				break
 			}
 		}
-		if hasValidMX {
-			score += 20
+		if hasValidFromMX {
+			score += 10
+		}
+	}
+
+	// Return-Path domain MX records (10 points) - needed for bounces
+	if results.RpMxRecords != nil && len(*results.RpMxRecords) > 0 {
+		hasValidRpMX := false
+		for _, mx := range *results.RpMxRecords {
+			if mx.Valid {
+				hasValidRpMX = true
+				break
+			}
+		}
+		if hasValidRpMX {
+			score += 10
+		}
+	} else if results.RpDomain != nil && *results.RpDomain != results.FromDomain {
+		// If Return-Path domain is different but has no MX records, it's a problem
+		// Don't deduct points if RP domain is same as From domain (already checked)
+	} else {
+		// If Return-Path is same as From domain, give full 10 points for RP MX
+		if results.FromMxRecords != nil && len(*results.FromMxRecords) > 0 {
+			hasValidFromMX := false
+			for _, mx := range *results.FromMxRecords {
+				if mx.Valid {
+					hasValidFromMX = true
+					break
+				}
+			}
+			if hasValidFromMX {
+				score += 10
+			}
 		}
 	}
 
@@ -560,8 +620,8 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 					// Softfail - moderate penalty
 					score -= 5
 				} else if strings.HasSuffix(*mainSPF.Record, " +all") ||
-				          strings.HasSuffix(*mainSPF.Record, " ?all") ||
-				          strings.HasSuffix(*mainSPF.Record, " all") {
+					strings.HasSuffix(*mainSPF.Record, " ?all") ||
+					strings.HasSuffix(*mainSPF.Record, " all") {
 					// Pass/neutral - severe penalty
 					score -= 10
 				} else {

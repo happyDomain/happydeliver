@@ -46,7 +46,14 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 	maxGrade := 6
 	headers := *analysis.Headers
 
-	// Check required headers (RFC 5322) - 40 points
+	// RP and From alignment (20 points)
+	if analysis.DomainAlignment.Aligned != nil && *analysis.DomainAlignment.Aligned {
+		score += 20
+	} else {
+		maxGrade -= 2
+	}
+
+	// Check required headers (RFC 5322) - 30 points
 	requiredHeaders := []string{"from", "date", "message-id"}
 	requiredCount := len(requiredHeaders)
 	presentRequired := 0
@@ -58,13 +65,13 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 	}
 
 	if presentRequired == requiredCount {
-		score += 40
+		score += 30
 	} else {
-		score += int(40 * (float32(presentRequired) / float32(requiredCount)))
+		score += int(30 * (float32(presentRequired) / float32(requiredCount)))
 		maxGrade = 1
 	}
 
-	// Check recommended headers (30 points)
+	// Check recommended headers (20 points)
 	recommendedHeaders := []string{"subject", "to"}
 
 	// Add reply-to when from is a no-reply address
@@ -80,7 +87,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 			presentRecommended++
 		}
 	}
-	score += presentRecommended * 30 / recommendedCount
+	score += presentRecommended * 20 / recommendedCount
 
 	if presentRecommended < recommendedCount {
 		maxGrade -= 1

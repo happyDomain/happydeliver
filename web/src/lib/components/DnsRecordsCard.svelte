@@ -2,6 +2,7 @@
     import type { DNSResults } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
 
     interface Props {
         dnsResults?: DNSResults;
@@ -35,10 +36,6 @@
         {#if !dnsResults}
             <p class="text-muted mb-0">No DNS results available</p>
         {:else}
-            <div class="mb-3">
-                <strong>Domain:</strong> <code>{dnsResults.domain}</code>
-            </div>
-
             {#if dnsResults.errors && dnsResults.errors.length > 0}
                 <div class="alert alert-warning mb-3">
                     <strong>Errors:</strong>
@@ -50,50 +47,36 @@
                 </div>
             {/if}
 
-            <!-- MX Records -->
-            {#if dnsResults.mx_records && dnsResults.mx_records.length > 0}
-                <div class="mb-4">
-                    <h5 class="text-muted mb-2">
-                        <span class="badge bg-secondary">MX</span> Mail Exchange Records
-                    </h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Priority</th>
-                                    <th>Host</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {#each dnsResults.mx_records as mx}
-                                    <tr>
-                                        <td>{mx.priority}</td>
-                                        <td><code>{mx.host}</code></td>
-                                        <td>
-                                            {#if mx.valid}
-                                                <span class="badge bg-success">Valid</span>
-                                            {:else}
-                                                <span class="badge bg-danger">Invalid</span>
-                                                {#if mx.error}
-                                                    <br><small class="text-danger">{mx.error}</small>
-                                                {/if}
-                                            {/if}
-                                        </td>
-                                    </tr>
-                                {/each}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <!-- Return-Path Domain Section -->
+            <div class="mb-3">
+                <strong>Return-Path Domain:</strong> <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
+                {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
+                    <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from From domain</span>
+                    <small>
+                        <i class="bi bi-chevron-right"></i>
+                        <a href="#domain-alignment">See domain alignment</a>
+                    </small>
+                {:else}
+                    <span class="badge bg-success ms-2">Same as From domain</span>
+                {/if}
+            </div>
+
+            <!-- MX Records for Return-Path Domain -->
+            {#if dnsResults.rp_mx_records && dnsResults.rp_mx_records.length > 0}
+                <MxRecordsDisplay
+                    mxRecords={dnsResults.rp_mx_records}
+                    title="Mail Exchange Records for Return-Path Domain"
+                    description="These MX records handle bounce messages and non-delivery reports."
+                />
             {/if}
 
-            <!-- SPF Records -->
+            <!-- SPF Records (for Return-Path Domain) -->
             {#if dnsResults.spf_records && dnsResults.spf_records.length > 0}
                 <div class="mb-4">
                     <h5 class="text-muted mb-2">
                         <span class="badge bg-secondary">SPF</span> Sender Policy Framework
                     </h5>
+                    <p class="small text-muted mb-2">SPF validates the Return-Path (envelope sender) domain.</p>
                     {#each dnsResults.spf_records as spf, index}
                         <div class="card mb-2">
                             <div class="card-body">
@@ -129,6 +112,25 @@
                         </div>
                     {/each}
                 </div>
+            {/if}
+
+            <hr>
+
+            <!-- From Domain Section -->
+            <div class="mb-3">
+                <strong>From Domain:</strong> <code>{dnsResults.from_domain}</code>
+                {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
+                    <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from Return-Path domain</span>
+                {/if}
+            </div>
+
+            <!-- MX Records for From Domain -->
+            {#if dnsResults.from_mx_records && dnsResults.from_mx_records.length > 0}
+                <MxRecordsDisplay
+                    mxRecords={dnsResults.from_mx_records}
+                    title="Mail Exchange Records for From Domain"
+                    description="These MX records handle replies to emails sent from this domain."
+                />
             {/if}
 
             <!-- DKIM Records -->

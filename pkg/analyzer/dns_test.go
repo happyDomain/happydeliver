@@ -104,9 +104,9 @@ func TestExtractDomain(t *testing.T) {
 				}
 			}
 
-			domain := analyzer.extractDomain(email)
+			domain := analyzer.extractFromDomain(email)
 			if domain != tt.expectedDomain {
-				t.Errorf("extractDomain() = %q, want %q", domain, tt.expectedDomain)
+				t.Errorf("extractFromDomain() = %q, want %q", domain, tt.expectedDomain)
 			}
 		})
 	}
