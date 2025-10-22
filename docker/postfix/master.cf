@@ -2,7 +2,6 @@
 
 # SMTP service
 smtp      inet  n       -       n       -       -       smtpd
-  -o content_filter=spamassassin
 
 # Pickup service
 pickup    unix  n       -       n       60      1       pickup
@@ -73,10 +72,6 @@ scache    unix  -       -       n       -       1       scache
 # Maildrop service
 maildrop  unix  -       n       n       -       -       pipe
   flags=DRXhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
-
-# SPF policy service
-policy-spf unix -       n       n       -       0       spawn
-  user=nobody argv=/usr/bin/postfix-policyd-spf-perl
 
 # SpamAssassin content filter
 spamassassin unix -     n       n       -       -       pipe

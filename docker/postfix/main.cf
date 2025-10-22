@@ -10,7 +10,7 @@ inet_interfaces = all
 inet_protocols = ipv4
 
 # Recipient settings
-mydestination = $myhostname, localhost.$mydomain, localhost
+mydestination = localhost.$mydomain, localhost
 mynetworks = 127.0.0.0/8 [::1]/128
 
 # Relay settings - accept mail for our test domain
@@ -28,7 +28,7 @@ transport_maps = pcre:/etc/postfix/transport_maps
 # OpenDKIM for DKIM verification
 milter_default_action = accept
 milter_protocol = 6
-smtpd_milters = unix:/var/spool/postfix/authentication_milter/authentication_milter.sock
+smtpd_milters = unix:/var/spool/postfix/authentication_milter/authentication_milter.sock unix:/var/spool/postfix/spamassassin/spamass-milter.sock
 non_smtpd_milters = $smtpd_milters
 
 # SPF policy checking

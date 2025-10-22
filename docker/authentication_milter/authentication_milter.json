@@ -18,6 +18,12 @@
         "Sanitize" : {
             "hosts_to_remove" : [
                 "__HOSTNAME__"
+            ],
+            "extra_auth_results_types" : [
+                "X-Spam-Status",
+                "X-Spam-Report",
+                "X-Spam-Level",
+                "X-Spam-Checker-Version"
             ]
         },
 

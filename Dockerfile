@@ -31,12 +31,13 @@ COPY --from=nodebuild /build/web/build/ ./web/build/
 RUN go generate ./... && \
     CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o happyDeliver ./cmd/happyDeliver
 
-# Stage 3: Prepare perl
+# Stage 3: Prepare perl and spamass-milt
 FROM alpine:3 AS pl
 
 RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
     apk add --no-cache \
     build-base \
+    libmilter-dev \
     musl-obstack-dev \
     openssl \
     openssl-dev \
@@ -68,12 +69,18 @@ RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/a
     perl-variable-magic \
     perl-xml-libxml \
     perl-dev \
+    spamassassin-client \
     zlib-dev \
     && \
     ln -s /usr/bin/ld /bin/ld
 
 RUN cpanm --notest Mail::SPF && \
     cpanm --notest Mail::Milter::Authentication
+
+RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milter-0.4.0.tar.gz && \
+    tar xzf spamass-milter-0.4.0.tar.gz && \
+    cd spamass-milter-0.4.0 && \
+    ./configure && make install
 
 # Stage 4: Runtime image with Postfix and all filters
 FROM alpine:3
@@ -83,6 +90,7 @@ RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/a
     apk add --no-cache \
     bash \
     ca-certificates \
+    libmilter \
     openssl \
     perl \
     perl-alien-libxml2 \
@@ -134,8 +142,9 @@ RUN mkdir -p /etc/happydeliver \
     /var/cache/authentication_milter \
     /var/lib/authentication_milter \
     /var/spool/postfix/authentication_milter \
+    /var/spool/postfix/spamassassin \
     && chown -R happydeliver:happydeliver /var/lib/happydeliver /var/log/happydeliver \
-    && chown -R mail:mail /var/spool/postfix/authentication_milter
+    && chown -R mail:mail /var/spool/postfix/authentication_milter /var/spool/postfix/spamassassin
 
 # Copy the built application
 COPY --from=builder /build/happyDeliver /usr/local/bin/happyDeliver
