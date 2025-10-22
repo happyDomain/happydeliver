@@ -674,7 +674,12 @@ components:
         - score
         - required_score
         - is_spam
+        - test_details
       properties:
+        version:
+          type: string
+          description: SpamAssassin version
+          example: "SpamAssassin 4.0.1"
         score:
           type: number
           format: float
@@ -695,9 +700,43 @@ components:
             type: string
           description: List of triggered SpamAssassin tests
           example: ["BAYES_00", "DKIM_SIGNED"]
+        test_details:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SpamTestDetail'
+          description: Map of test names to their detailed results
+          example:
+            BAYES_00:
+              name: "BAYES_00"
+              score: -1.9
+              description: "Bayes spam probability is 0 to 1%"
+            DKIM_SIGNED:
+              name: "DKIM_SIGNED"
+              score: 0.1
+              description: "Message has a DKIM or DK signature, not necessarily valid"
         report:
           type: string
           description: Full SpamAssassin report
+
+    SpamTestDetail:
+      type: object
+      required:
+        - name
+        - score
+      properties:
+        name:
+          type: string
+          description: Test name
+          example: "BAYES_00"
+        score:
+          type: number
+          format: float
+          description: Score contribution of this test
+          example: -1.9
+        description:
+          type: string
+          description: Human-readable description of what this test checks
+          example: "Bayes spam probability is 0 to 1%"
 
     DNSResults:
       type: object

@@ -26,6 +26,8 @@ import (
 	"net/mail"
 	"strings"
 	"testing"
+
+	"git.happydns.org/happyDeliver/internal/api"
 )
 
 func TestParseSpamStatus(t *testing.T) {
@@ -33,8 +35,8 @@ func TestParseSpamStatus(t *testing.T) {
 		name           string
 		header         string
 		expectedIsSpam bool
-		expectedScore  float64
-		expectedReq    float64
+		expectedScore  float32
+		expectedReq    float32
 		expectedTests  []string
 	}{
 		{
@@ -75,8 +77,8 @@ func TestParseSpamStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &SpamAssassinResult{
-				TestDetails: make(map[string]SpamTestDetail),
+			result := &api.SpamAssassinResult{
+				TestDetails: make(map[string]api.SpamTestDetail),
 			}
 			analyzer.parseSpamStatus(tt.header, result)
 
@@ -89,8 +91,12 @@ func TestParseSpamStatus(t *testing.T) {
 			if result.RequiredScore != tt.expectedReq {
 				t.Errorf("RequiredScore = %v, want %v", result.RequiredScore, tt.expectedReq)
 			}
-			if len(tt.expectedTests) > 0 && !stringSliceEqual(result.Tests, tt.expectedTests) {
-				t.Errorf("Tests = %v, want %v", result.Tests, tt.expectedTests)
+			if len(tt.expectedTests) > 0 {
+				if result.Tests == nil {
+					t.Errorf("Tests = nil, want %v", tt.expectedTests)
+				} else if !stringSliceEqual(*result.Tests, tt.expectedTests) {
+					t.Errorf("Tests = %v, want %v", *result.Tests, tt.expectedTests)
+				}
 			}
 		})
 	}
@@ -109,27 +115,27 @@ func TestParseSpamReport(t *testing.T) {
 `
 
 	analyzer := NewSpamAssassinAnalyzer()
-	result := &SpamAssassinResult{
-		TestDetails: make(map[string]SpamTestDetail),
+	result := &api.SpamAssassinResult{
+		TestDetails: make(map[string]api.SpamTestDetail),
 	}
 
 	analyzer.parseSpamReport(report, result)
 
-	expectedTests := map[string]SpamTestDetail{
+	expectedTests := map[string]api.SpamTestDetail{
 		"BAYES_99": {
 			Name:        "BAYES_99",
 			Score:       5.0,
-			Description: "Bayes spam probability is 99 to 100%",
+			Description: api.PtrTo("Bayes spam probability is 99 to 100%"),
 		},
 		"SPOOFED_SENDER": {
 			Name:        "SPOOFED_SENDER",
 			Score:       3.5,
-			Description: "From address doesn't match envelope sender",
+			Description: api.PtrTo("From address doesn't match envelope sender"),
 		},
 		"ALL_TRUSTED": {
 			Name:        "ALL_TRUSTED",
 			Score:       -1.0,
-			Description: "All mail servers are trusted",
+			Description: api.PtrTo("All mail servers are trusted"),
 		},
 	}
 
@@ -142,8 +148,8 @@ func TestParseSpamReport(t *testing.T) {
 		if detail.Score != expected.Score {
 			t.Errorf("Test %s score = %v, want %v", testName, detail.Score, expected.Score)
 		}
-		if detail.Description != expected.Description {
-			t.Errorf("Test %s description = %q, want %q", testName, detail.Description, expected.Description)
+		if *detail.Description != *expected.Description {
+			t.Errorf("Test %s description = %q, want %q", testName, *detail.Description, *expected.Description)
 		}
 	}
 }
@@ -151,7 +157,7 @@ func TestParseSpamReport(t *testing.T) {
 func TestGetSpamAssassinScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        *SpamAssassinResult
+		result        *api.SpamAssassinResult
 		expectedScore int
 		minScore      int
 		maxScore      int
@@ -159,11 +165,11 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		{
 			name:          "Nil result",
 			result:        nil,
-			expectedScore: 0,
+			expectedScore: 100,
 		},
 		{
 			name: "Excellent score (negative)",
-			result: &SpamAssassinResult{
+			result: &api.SpamAssassinResult{
 				Score:         -2.5,
 				RequiredScore: 5.0,
 			},
@@ -171,38 +177,43 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Good score (below threshold)",
-			result: &SpamAssassinResult{
+			result: &api.SpamAssassinResult{
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
-			minScore: 80,
-			maxScore: 100,
+			expectedScore: 60, // 100 - round(2*100/5) = 100 - 40 = 60
 		},
 		{
-			name: "Borderline (just above threshold)",
-			result: &SpamAssassinResult{
+			name: "Score at threshold",
+			result: &api.SpamAssassinResult{
+				Score:         5.0,
+				RequiredScore: 5.0,
+			},
+			expectedScore: 0, // >= threshold = 0
+		},
+		{
+			name: "Above threshold (spam)",
+			result: &api.SpamAssassinResult{
 				Score:         6.0,
 				RequiredScore: 5.0,
 			},
-			minScore: 60,
-			maxScore: 80,
+			expectedScore: 0, // >= threshold = 0
 		},
 		{
 			name: "High spam score",
-			result: &SpamAssassinResult{
+			result: &api.SpamAssassinResult{
 				Score:         12.0,
 				RequiredScore: 5.0,
 			},
-			minScore: 20,
-			maxScore: 50,
+			expectedScore: 0, // >= threshold = 0
 		},
 		{
 			name: "Very high spam score",
-			result: &SpamAssassinResult{
+			result: &api.SpamAssassinResult{
 				Score:         20.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0,
+			expectedScore: 0, // >= threshold = 0
 		},
 	}
 
@@ -210,7 +221,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := analyzer.GetSpamAssassinScore(tt.result)
+			score, _ := analyzer.CalculateSpamAssassinScore(tt.result)
 
 			if tt.minScore > 0 || tt.maxScore > 0 {
 				if score < tt.minScore || score > tt.maxScore {
@@ -230,7 +241,7 @@ func TestAnalyzeSpamAssassin(t *testing.T) {
 		name               string
 		headers            map[string]string
 		expectedIsSpam     bool
-		expectedScore      float64
+		expectedScore      float32
 		expectedHasDetails bool
 	}{
 		{
@@ -370,24 +381,26 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 	}
 
 	// Validate score (should be -0.1)
-	expectedScore := -0.1
+	var expectedScore float32 = -0.1
 	if result.Score != expectedScore {
 		t.Errorf("Score = %v, want %v", result.Score, expectedScore)
 	}
 
 	// Validate required score (should be 5.0)
-	expectedRequired := 5.0
+	var expectedRequired float32 = 5.0
 	if result.RequiredScore != expectedRequired {
 		t.Errorf("RequiredScore = %v, want %v", result.RequiredScore, expectedRequired)
 	}
 
 	// Validate version
-	if !strings.Contains(result.Version, "SpamAssassin") {
-		t.Errorf("Version should contain 'SpamAssassin', got: %s", result.Version)
+	if result.Version == nil {
+		t.Errorf("Version should contain 'SpamAssassin', got: nil")
+	} else if !strings.Contains(*result.Version, "SpamAssassin") {
+		t.Errorf("Version should contain 'SpamAssassin', got: %s", *result.Version)
 	}
 
 	// Validate that tests were extracted
-	if len(result.Tests) == 0 {
+	if len(*result.Tests) == 0 {
 		t.Error("Expected tests to be extracted, got none")
 	}
 
@@ -400,7 +413,7 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 		"SPF_HELO_NONE": true,
 	}
 
-	for _, testName := range result.Tests {
+	for _, testName := range *result.Tests {
 		if expectedTests[testName] {
 			t.Logf("Found expected test: %s", testName)
 		}
@@ -414,11 +427,11 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 	// Log what we actually got for debugging
 	t.Logf("Parsed %d test details from X-Spam-Report", len(result.TestDetails))
 	for name, detail := range result.TestDetails {
-		t.Logf("  %s: score=%v, description=%s", name, detail.Score, detail.Description)
+		t.Logf("  %s: score=%v, description=%s", name, detail.Score, *detail.Description)
 	}
 
 	// Define expected test details with their scores
-	expectedTestDetails := map[string]float64{
+	expectedTestDetails := map[string]float32{
 		"SPF_PASS":                           -0.0,
 		"SPF_HELO_NONE":                      0.0,
 		"DKIM_VALID":                         -0.1,
@@ -439,13 +452,13 @@ func TestAnalyzeRealEmailExample(t *testing.T) {
 		if detail.Score != expectedScore {
 			t.Errorf("Test %s score = %v, want %v", testName, detail.Score, expectedScore)
 		}
-		if detail.Description == "" {
+		if detail.Description == nil || *detail.Description == "" {
 			t.Errorf("Test %s should have a description", testName)
 		}
 	}
 
 	// Test GetSpamAssassinScore
-	score := analyzer.GetSpamAssassinScore(result)
+	score, _ := analyzer.CalculateSpamAssassinScore(result)
 	if score != 100 {
 		t.Errorf("GetSpamAssassinScore() = %v, want 100 (excellent score for negative spam score)", score)
 	}

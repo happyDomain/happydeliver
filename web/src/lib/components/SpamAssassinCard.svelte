@@ -3,16 +3,25 @@
 
     interface Props {
         spamassassin: SpamAssassinResult;
+        spamScore: number;
     }
 
-    let { spamassassin }: Props = $props();
+    let { spamassassin, spamScore }: Props = $props();
 </script>
 
 <div class="card">
-    <div class="card-header bg-warning bg-opacity-10">
-        <h5 class="mb-0 fw-bold">
-            <i class="bi bi-bug me-2"></i>SpamAssassin Analysis
-        </h5>
+    <div class="card-header bg-white">
+        <h4 class="mb-0 d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-bug me-2"></i>
+                SpamAssassin Analysis
+            </span>
+            {#if spamScore !== undefined}
+                <span class="badge bg-secondary">
+                    {spamScore}%
+                </span>
+            {/if}
+        </h4>
     </div>
     <div class="card-body">
         <div class="row mb-3">
@@ -30,7 +39,34 @@
             </div>
         </div>
 
-        {#if spamassassin.tests && spamassassin.tests.length > 0}
+        {#if spamassassin.test_details && Object.keys(spamassassin.test_details).length > 0}
+            <div class="mb-3">
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Test Name</th>
+                                <th class="text-end">Score</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each Object.entries(spamassassin.test_details) as [testName, detail]}
+                                <tr class={detail.score > 0 ? 'table-warning' : detail.score < 0 ? 'table-success' : ''}>
+                                    <td class="font-monospace">{testName}</td>
+                                    <td class="text-end">
+                                        <span class={detail.score > 0 ? 'text-danger fw-bold' : detail.score < 0 ? 'text-success fw-bold' : 'text-muted'}>
+                                            {detail.score > 0 ? '+' : ''}{detail.score.toFixed(1)}
+                                        </span>
+                                    </td>
+                                    <td class="small">{detail.description || ''}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {:else if spamassassin.tests && spamassassin.tests.length > 0}
             <div class="mb-2">
                 <strong>Tests Triggered:</strong>
                 <div class="mt-2">
@@ -43,7 +79,7 @@
 
         {#if spamassassin.report}
             <details class="mt-3">
-                <summary class="cursor-pointer fw-bold">Full Report</summary>
+                <summary class="cursor-pointer fw-bold">Raw Report</summary>
                 <pre class="mt-2 small bg-light p-3 rounded">{spamassassin.report}</pre>
             </details>
         {/if}

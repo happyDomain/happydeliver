@@ -26,6 +26,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"git.happydns.org/happyDeliver/internal/api"
 )
 
 // SpamAssassinAnalyzer analyzes SpamAssassin results from email headers
@@ -36,33 +38,15 @@ func NewSpamAssassinAnalyzer() *SpamAssassinAnalyzer {
 	return &SpamAssassinAnalyzer{}
 }
 
-// SpamAssassinResult represents parsed SpamAssassin results
-type SpamAssassinResult struct {
-	IsSpam        bool
-	Score         float64
-	RequiredScore float64
-	Tests         []string
-	TestDetails   map[string]SpamTestDetail
-	Version       string
-	RawReport     string
-}
-
-// SpamTestDetail contains details about a specific spam test
-type SpamTestDetail struct {
-	Name        string
-	Score       float64
-	Description string
-}
-
 // AnalyzeSpamAssassin extracts and analyzes SpamAssassin results from email headers
-func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAssassinResult {
+func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.SpamAssassinResult {
 	headers := email.GetSpamAssassinHeaders()
 	if len(headers) == 0 {
 		return nil
 	}
 
-	result := &SpamAssassinResult{
-		TestDetails: make(map[string]SpamTestDetail),
+	result := &api.SpamAssassinResult{
+		TestDetails: make(map[string]api.SpamTestDetail),
 	}
 
 	// Parse X-Spam-Status header
@@ -73,7 +57,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAss
 	// Parse X-Spam-Score header (as fallback if not in X-Spam-Status)
 	if scoreHeader, ok := headers["X-Spam-Score"]; ok && result.Score == 0 {
 		if score, err := strconv.ParseFloat(strings.TrimSpace(scoreHeader), 64); err == nil {
-			result.Score = score
+			result.Score = float32(score)
 		}
 	}
 
@@ -84,13 +68,13 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAss
 
 	// Parse X-Spam-Report header for detailed test results
 	if reportHeader, ok := headers["X-Spam-Report"]; ok {
-		result.RawReport = strings.Replace(reportHeader, " * ", "\n* ", -1)
+		result.Report = api.PtrTo(strings.Replace(reportHeader, " * ", "\n* ", -1))
 		a.parseSpamReport(reportHeader, result)
 	}
 
 	// Parse X-Spam-Checker-Version
 	if versionHeader, ok := headers["X-Spam-Checker-Version"]; ok {
-		result.Version = strings.TrimSpace(versionHeader)
+		result.Version = api.PtrTo(strings.TrimSpace(versionHeader))
 	}
 
 	return result
@@ -98,7 +82,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *SpamAss
 
 // parseSpamStatus parses the X-Spam-Status header
 // Format: Yes/No, score=5.5 required=5.0 tests=TEST1,TEST2,TEST3 autolearn=no
-func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *SpamAssassinResult) {
+func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *api.SpamAssassinResult) {
 	// Check if spam (first word)
 	parts := strings.SplitN(header, ",", 2)
 	if len(parts) > 0 {
@@ -110,7 +94,7 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *SpamAssass
 	scoreRe := regexp.MustCompile(`score=(-?\d+\.?\d*)`)
 	if matches := scoreRe.FindStringSubmatch(header); len(matches) > 1 {
 		if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			result.Score = score
+			result.Score = float32(score)
 		}
 	}
 
@@ -118,19 +102,19 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *SpamAssass
 	requiredRe := regexp.MustCompile(`required=(-?\d+\.?\d*)`)
 	if matches := requiredRe.FindStringSubmatch(header); len(matches) > 1 {
 		if required, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			result.RequiredScore = required
+			result.RequiredScore = float32(required)
 		}
 	}
 
 	// Extract tests
-	testsRe := regexp.MustCompile(`tests=([^\s]+)`)
+	testsRe := regexp.MustCompile(`tests=([^=]+)(?:\s|$)`)
 	if matches := testsRe.FindStringSubmatch(header); len(matches) > 1 {
 		testsStr := matches[1]
 		// Tests can be comma or space separated
 		tests := strings.FieldsFunc(testsStr, func(r rune) bool {
 			return r == ',' || r == ' '
 		})
-		result.Tests = tests
+		result.Tests = &tests
 	}
 }
 
@@ -138,16 +122,19 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *SpamAssass
 // Format varies, but typically:
 // * 1.5 TEST_NAME Description of test
 // * 0.0 TEST_NAME2 Description
-// Note: mail.Header.Get() joins continuation lines, so newlines are removed.
-// We split on '*' to separate individual tests.
-func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *SpamAssassinResult) {
-	// The report header has been joined by mail.Header.Get(), so we split on '*'
-	// Each segment starting with '*' is either a test line or continuation
+// Multiline descriptions continue on lines starting with * but without score:
+// *  0.0 TEST_NAME Description line 1
+// *      continuation line 2
+// *      continuation line 3
+func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAssassinResult) {
 	segments := strings.Split(report, "*")
 
 	// Regex to match test lines: score TEST_NAME Description
 	// Format: "  0.0 TEST_NAME Description" or " -0.1 TEST_NAME Description"
 	testRe := regexp.MustCompile(`^\s*(-?\d+\.?\d*)\s+(\S+)\s+(.*)$`)
+
+	var currentTestName string
+	var currentDescription strings.Builder
 
 	for _, segment := range segments {
 		segment = strings.TrimSpace(segment)
@@ -158,22 +145,55 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *SpamAssass
 		// Try to match as a test line
 		matches := testRe.FindStringSubmatch(segment)
 		if len(matches) > 3 {
+			// Save previous test if exists
+			if currentTestName != "" {
+				description := strings.TrimSpace(currentDescription.String())
+				detail := api.SpamTestDetail{
+					Name:        currentTestName,
+					Score:       result.TestDetails[currentTestName].Score,
+					Description: &description,
+				}
+				result.TestDetails[currentTestName] = detail
+			}
+
+			// Start new test
 			testName := matches[2]
 			score, _ := strconv.ParseFloat(matches[1], 64)
 			description := strings.TrimSpace(matches[3])
 
-			detail := SpamTestDetail{
-				Name:        testName,
-				Score:       score,
-				Description: description,
+			currentTestName = testName
+			currentDescription.Reset()
+			currentDescription.WriteString(description)
+
+			// Initialize with score
+			result.TestDetails[testName] = api.SpamTestDetail{
+				Name:  testName,
+				Score: float32(score),
 			}
-			result.TestDetails[testName] = detail
+		} else if currentTestName != "" {
+			// This is a continuation line for the current test
+			// Add a space before appending to ensure proper word separation
+			if currentDescription.Len() > 0 {
+				currentDescription.WriteString(" ")
+			}
+			currentDescription.WriteString(segment)
 		}
+	}
+
+	// Save the last test if exists
+	if currentTestName != "" {
+		description := strings.TrimSpace(currentDescription.String())
+		detail := api.SpamTestDetail{
+			Name:        currentTestName,
+			Score:       result.TestDetails[currentTestName].Score,
+			Description: &description,
+		}
+		result.TestDetails[currentTestName] = detail
 	}
 }
 
 // CalculateSpamAssassinScore calculates the SpamAssassin contribution to deliverability
-func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *SpamAssassinResult) int {
+func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssassinResult) int {
 	if result == nil {
 		return 100 // No spam scan results, assume good
 	}
@@ -192,6 +212,6 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *SpamAssassinRe
 		return 0 // Failed spam test
 	} else {
 		// Linear scale between 0 and required threshold
-		return 100 - int(math.Round(score*100/result.RequiredScore))
+		return 100 - int(math.Round(float64(score*100/result.RequiredScore)))
 	}
 }

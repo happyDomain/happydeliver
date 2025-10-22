@@ -63,7 +63,7 @@ type AnalysisResults struct {
 	DNS            *api.DNSResults
 	Headers        *api.HeaderAnalysis
 	RBL            *RBLResults
-	SpamAssassin   *SpamAssassinResult
+	SpamAssassin   *api.SpamAssassinResult
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -157,21 +157,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	// Add SpamAssassin result
-	if results.SpamAssassin != nil {
-		report.Spamassassin = &api.SpamAssassinResult{
-			Score:         float32(results.SpamAssassin.Score),
-			RequiredScore: float32(results.SpamAssassin.RequiredScore),
-			IsSpam:        results.SpamAssassin.IsSpam,
-		}
-
-		if len(results.SpamAssassin.Tests) > 0 {
-			report.Spamassassin.Tests = &results.SpamAssassin.Tests
-		}
-
-		if results.SpamAssassin.RawReport != "" {
-			report.Spamassassin.Report = &results.SpamAssassin.RawReport
-		}
-	}
+	report.Spamassassin = results.SpamAssassin
 
 	// Add raw headers
 	if results.Email != nil && results.Email.RawHeaders != "" {

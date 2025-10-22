@@ -197,7 +197,10 @@
             {#if report.spamassassin}
                 <div class="row mb-4" id="spam">
                     <div class="col-12">
-                        <SpamAssassinCard spamassassin={report.spamassassin} />
+                        <SpamAssassinCard
+                            spamassassin={report.spamassassin}
+                            spamScore={report.summary?.spam_score}
+                        />
                     </div>
                 </div>
             {/if}
