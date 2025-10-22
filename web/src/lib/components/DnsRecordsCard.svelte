@@ -157,7 +157,7 @@
                                 {#if dkim.record}
                                     <div class="mb-2">
                                         <strong>Record:</strong><br>
-                                        <code class="d-block mt-1 text-break small">{dkim.record}</code>
+                                        <code class="d-block mt-1 text-break small text-truncate">{dkim.record}</code>
                                     </div>
                                 {/if}
                                 {#if dkim.error}
