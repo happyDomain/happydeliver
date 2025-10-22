@@ -63,6 +63,7 @@ func NewContentAnalyzer(timeout time.Duration) *ContentAnalyzer {
 
 // ContentResults represents content analysis results
 type ContentResults struct {
+	IsMultipart      bool
 	HTMLValid        bool
 	HTMLErrors       []string
 	Links            []LinkCheck
@@ -75,6 +76,12 @@ type ContentResults struct {
 	ImageTextRatio   float32 // Ratio of images to text
 	SuspiciousURLs   []string
 	ContentIssues    []string
+	HarmfullIssues   []string
+}
+
+// HasPlaintext returns true if the email has plain text content
+func (r *ContentResults) HasPlaintext() bool {
+	return r.TextContent != ""
 }
 
 // LinkCheck represents a link validation result
@@ -101,6 +108,8 @@ type ImageCheck struct {
 func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
 	results := &ContentResults{}
 
+	results.IsMultipart = len(email.Parts) > 1
+
 	// Get HTML and text parts
 	htmlParts := email.GetHTMLParts()
 	textParts := email.GetTextParts()
@@ -117,14 +126,55 @@ func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
 		for _, part := range textParts {
 			results.TextContent += part.Content
 		}
+		// Extract and validate links from plain text
+		c.analyzeTextLinks(results.TextContent, results)
 	}
 
 	// Check plain text/HTML consistency
 	if len(htmlParts) > 0 && len(textParts) > 0 {
 		results.TextPlainRatio = c.calculateTextPlainConsistency(results.TextContent, results.HTMLContent)
+	} else if !results.IsMultipart {
+		results.TextPlainRatio = 1.0
 	}
 
 	return results
+}
+
+// analyzeTextLinks extracts and validates URLs from plain text
+func (c *ContentAnalyzer) analyzeTextLinks(textContent string, results *ContentResults) {
+	// Regular expression to match URLs in plain text
+	// Matches http://, https://, and www. URLs
+	urlRegex := regexp.MustCompile(`(?i)\b(?:https?://|www\.)[^\s<>"{}|\\^\[\]` + "`" + `]+`)
+
+	matches := urlRegex.FindAllString(textContent, -1)
+
+	for _, match := range matches {
+		// Normalize URL (add http:// if missing)
+		urlStr := match
+		if strings.HasPrefix(strings.ToLower(urlStr), "www.") {
+			urlStr = "http://" + urlStr
+		}
+
+		// Check if this URL already exists in results.Links (from HTML analysis)
+		exists := false
+		for _, link := range results.Links {
+			if link.URL == urlStr {
+				exists = true
+				break
+			}
+		}
+
+		// Only validate if not already checked
+		if !exists {
+			linkCheck := c.validateLink(urlStr)
+			results.Links = append(results.Links, linkCheck)
+
+			// Check for suspicious URLs
+			if !linkCheck.IsSafe {
+				results.SuspiciousURLs = append(results.SuspiciousURLs, urlStr)
+			}
+		}
+	}
 }
 
 // analyzeHTML parses and analyzes HTML content
@@ -195,6 +245,59 @@ func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
 			}
 
 			results.Images = append(results.Images, imageCheck)
+
+		case "script":
+			// JavaScript in emails is a security risk and typically blocked
+			results.HarmfullIssues = append(results.HarmfullIssues, "Dangerous <script> tag detected - JavaScript is blocked by most email clients")
+
+		case "iframe":
+			// Iframes are security risks and blocked by most email clients
+			src := c.getAttr(n, "src")
+			issue := "Dangerous <iframe> tag detected"
+			if src != "" {
+				issue += fmt.Sprintf(" with src='%s'", src)
+			}
+			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - iframes are blocked by most email clients")
+
+		case "object", "embed", "applet":
+			// Legacy embedding tags, security risks
+			results.HarmfullIssues = append(results.HarmfullIssues, fmt.Sprintf("Dangerous <%s> tag detected - legacy embedding tags are security risks and blocked by email clients", n.Data))
+
+		case "form":
+			// Forms in emails can be phishing vectors
+			action := c.getAttr(n, "action")
+			issue := "Suspicious <form> tag detected"
+			if action != "" {
+				issue += fmt.Sprintf(" with action='%s'", action)
+			}
+			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - forms can be phishing vectors and are often blocked")
+
+		case "base":
+			// Base tag can be used for phishing by redirecting relative URLs
+			href := c.getAttr(n, "href")
+			issue := "Potentially dangerous <base> tag detected"
+			if href != "" {
+				issue += fmt.Sprintf(" with href='%s'", href)
+			}
+			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - can redirect all relative URLs")
+
+		case "meta":
+			// Check for suspicious meta redirects
+			httpEquiv := c.getAttr(n, "http-equiv")
+			if strings.ToLower(httpEquiv) == "refresh" {
+				content := c.getAttr(n, "content")
+				results.HarmfullIssues = append(results.HarmfullIssues, fmt.Sprintf("Suspicious <meta http-equiv='refresh'> tag detected with content='%s' - can be used for phishing redirects", content))
+			}
+
+		case "link":
+			// Check for external stylesheet links (potential privacy/tracking concerns)
+			rel := c.getAttr(n, "rel")
+			href := c.getAttr(n, "href")
+			if strings.Contains(strings.ToLower(rel), "stylesheet") && href != "" {
+				if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
+					results.ContentIssues = append(results.ContentIssues, fmt.Sprintf("External stylesheet link detected: %s - may cause rendering issues or privacy concerns", href))
+				}
+			}
 		}
 	}
 
@@ -288,7 +391,7 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 	}
 
 	// Set a reasonable user agent
-	req.Header.Set("User-Agent", "HappyDeliver/1.0 (Email Deliverability Tester)")
+	req.Header.Set("User-Agent", "happyDeliver/1.0 (Email Deliverability Tester)")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -325,7 +428,7 @@ func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) boo
 		"buff.ly", "is.gd", "bl.ink", "short.io",
 	}
 	for _, shortener := range shorteners {
-		if strings.Contains(strings.ToLower(parsedURL.Host), shortener) {
+		if strings.ToLower(parsedURL.Host) == shortener {
 			return true
 		}
 	}
@@ -534,6 +637,26 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 		})
 	}
 
+	// Add harmful HTML tag issues
+	for _, harmfulIssue := range results.HarmfullIssues {
+		htmlIssues = append(htmlIssues, api.ContentIssue{
+			Type:     api.DangerousHtml,
+			Severity: api.ContentIssueSeverityCritical,
+			Message:  harmfulIssue,
+			Advice:   api.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
+		})
+	}
+
+	// Add general content issues (like external stylesheets)
+	for _, contentIssue := range results.ContentIssues {
+		htmlIssues = append(htmlIssues, api.ContentIssue{
+			Type:     api.BrokenHtml,
+			Severity: api.ContentIssueSeverityLow,
+			Message:  contentIssue,
+			Advice:   api.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
+		})
+	}
+
 	if len(htmlIssues) > 0 {
 		analysis.HtmlIssues = &htmlIssues
 	}
@@ -608,14 +731,19 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 		return 0
 	}
 
-	var score int = 0
+	var score int = 10
 
-	// HTML validity (10 points)
-	if results.HTMLValid {
+	// HTML validity or text alone (10 points)
+	if results.HTMLValid || (!results.IsMultipart && results.HasPlaintext()) {
 		score += 10
 	}
 
-	// Links (20 points)
+	// Requires plain text alternative (10 points)
+	if results.HasPlaintext() {
+		score += 10
+	}
+
+	// Links (25 points)
 	if len(results.Links) > 0 {
 		brokenLinks := 0
 		for _, link := range results.Links {
@@ -626,9 +754,13 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 		if brokenLinks == 0 {
 			score += 20
 		}
+		// Too much links, 10 points penalty
+		if len(results.Links) > 30 {
+			score -= 10
+		}
 	} else {
-		// No links is neutral, give partial score
-		score += 10
+		// No links is better, less suspiscous
+		score += 25
 	}
 
 	// Images (15 points)
@@ -645,12 +777,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 			score += 7
 		}
 	} else {
-		// No images is neutral
-		score += 7
-	}
-
-	// Unsubscribe link (15 points)
-	if results.HasUnsubscribe {
+		// No images is Ok
 		score += 15
 	}
 
@@ -671,6 +798,15 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 		penalty := len(results.SuspiciousURLs)
 		if penalty > 5.0 {
 			penalty = 5
+		}
+		score -= penalty
+	}
+
+	// Penalize harmful HTML tags (deduct 20 points per harmful tag, max 40 points)
+	if len(results.HarmfullIssues) > 0 {
+		penalty := len(results.HarmfullIssues) * 20
+		if penalty > 40 {
+			penalty = 40
 		}
 		score -= penalty
 	}

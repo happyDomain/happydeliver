@@ -392,7 +392,7 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link]
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html]
           description: Type of content issue
           example: "missing_alt"
         severity:
