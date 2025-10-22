@@ -81,12 +81,6 @@
         stopPolling();
     });
 
-    function getScoreColorClass(percentage: number): string {
-        if (percentage >= 80) return "text-success";
-        if (percentage >= 50) return "text-warning";
-        return "text-danger";
-    }
-
     async function handleReanalyze() {
         if (!testId || reanalyzing) return;
 
@@ -150,6 +144,7 @@
                     <div class="col-12">
                         <DnsRecordsCard
                             dnsResults={report.dns_results}
+                            dnsGrade={report.summary?.dns_grade}
                             dnsScore={report.summary?.dns_score}
                         />
                     </div>
@@ -162,6 +157,7 @@
                     <div class="col-12">
                         <AuthenticationCard
                             authentication={report.authentication}
+                            authenticationGrade={report.summary?.authentication_grade}
                             authenticationScore={report.summary?.authentication_score}
                             dnsResults={report.dns_results}
                         />
@@ -175,6 +171,7 @@
                     <div class="col-12">
                         <BlacklistCard
                             blacklists={report.blacklists}
+                            blacklistGrade={report.summary?.blacklist_grade}
                             blacklistScore={report.summary?.blacklist_score}
                         />
                     </div>
@@ -187,6 +184,7 @@
                     <div class="col-12">
                         <HeaderAnalysisCard
                             headerAnalysis={report.header_analysis}
+                            headerGrade={report.summary?.header_grade}
                             headerScore={report.summary?.header_score}
                         />
                     </div>
@@ -199,6 +197,7 @@
                     <div class="col-12">
                         <SpamAssassinCard
                             spamassassin={report.spamassassin}
+                            spamGrade={report.summary?.spam_grade}
                             spamScore={report.summary?.spam_score}
                         />
                     </div>
@@ -211,6 +210,7 @@
                     <div class="col-12">
                         <ContentAnalysisCard
                             contentAnalysis={report.content_analysis}
+                            contentGrade={report.summary?.content_grade}
                             contentScore={report.summary?.content_score}
                         />
                     </div>

@@ -297,11 +297,17 @@ components:
       type: object
       required:
         - dns_score
+        - dns_grade
         - authentication_score
+        - authentication_grade
         - spam_score
+        - spam_grade
         - blacklist_score
-        - content_score
+        - blacklist_grade
         - header_score
+        - header_grade
+        - content_score
+        - content_grade
       properties:
         dns_score:
           type: integer
@@ -309,36 +315,66 @@ components:
           maximum: 100
           description: DNS records score (in percentage)
           example: 42
+        dns_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         authentication_score:
           type: integer
           minimum: 0
           maximum: 100
           description: SPF/DKIM/DMARC score (in percentage)
           example: 28
+        authentication_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         spam_score:
           type: integer
           minimum: 0
           maximum: 100
           description: SpamAssassin score (in percentage)
           example: 15
+        spam_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         blacklist_score:
           type: integer
           minimum: 0
           maximum: 100
           description: Blacklist check score (in percentage)
           example: 20
-        content_score:
-          type: integer
-          minimum: 0
-          maximum: 100
-          description: Content quality score (in percentage)
-          example: 18
+        blacklist_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
         header_score:
           type: integer
           minimum: 0
           maximum: 100
           description: Header quality score (in percentage)
           example: 9
+        header_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
+        content_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Content quality score (in percentage)
+          example: 18
+        content_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
 
     ContentAnalysis:
       type: object

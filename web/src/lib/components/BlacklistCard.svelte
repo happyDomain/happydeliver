@@ -1,12 +1,15 @@
 <script lang="ts">
     import type { RBLCheck } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         blacklists: Record<string, RBLCheck[]>;
+        blacklistGrade?: string;
         blacklistScore?: number;
     }
 
-    let { blacklists, blacklistScore }: Props = $props();
+    let { blacklists, blacklistGrade, blacklistScore }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
@@ -16,11 +19,16 @@
                 <i class="bi bi-shield-exclamation me-2"></i>
                 Blacklist Checks
             </span>
-            {#if blacklistScore !== undefined}
-                <span class="badge bg-secondary">
-                    {blacklistScore}%
-                </span>
-            {/if}
+            <span>
+                {#if blacklistScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(blacklistScore)}">
+                        {blacklistScore}%
+                    </span>
+                {/if}
+                {#if blacklistGrade !== undefined}
+                    <GradeDisplay grade={blacklistGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">

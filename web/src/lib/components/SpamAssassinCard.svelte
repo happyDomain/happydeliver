@@ -1,12 +1,15 @@
 <script lang="ts">
     import type { SpamAssassinResult } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         spamassassin: SpamAssassinResult;
+        spamGrade: string;
         spamScore: number;
     }
 
-    let { spamassassin, spamScore }: Props = $props();
+    let { spamassassin, spamGrade, spamScore }: Props = $props();
 </script>
 
 <div class="card">
@@ -16,11 +19,16 @@
                 <i class="bi bi-bug me-2"></i>
                 SpamAssassin Analysis
             </span>
-            {#if spamScore !== undefined}
-                <span class="badge bg-secondary">
-                    {spamScore}%
-                </span>
-            {/if}
+            <span>
+                {#if spamScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(spamScore)}">
+                        {spamScore}%
+                    </span>
+                {/if}
+                {#if spamGrade !== undefined}
+                    <GradeDisplay grade={spamGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">

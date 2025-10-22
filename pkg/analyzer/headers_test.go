@@ -109,7 +109,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate header analysis first
 			analysis := analyzer.GenerateHeaderAnalysis(tt.email)
-			score := analyzer.CalculateHeaderScore(analysis)
+			score, _ := analyzer.CalculateHeaderScore(analysis)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}

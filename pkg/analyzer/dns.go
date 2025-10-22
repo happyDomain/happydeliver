@@ -444,9 +444,9 @@ func (d *DNSAnalyzer) validateBIMI(record string) bool {
 
 // CalculateDNSScore calculates the DNS score from records results
 // Returns a score from 0-100 where higher is better
-func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) int {
+func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 	if results == nil {
-		return 0
+		return 0, ""
 	}
 
 	score := 0
@@ -525,7 +525,7 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) int {
 	// BIMI is optional but indicates advanced email branding
 	if results.BimiRecord != nil && results.BimiRecord.Valid {
 		if score >= 100 {
-			return 100
+			return 100, "A+"
 		}
 	}
 
@@ -539,5 +539,5 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) int {
 		score = 0
 	}
 
-	return score
+	return score, ScoreToGrade(score)
 }

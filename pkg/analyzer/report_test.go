@@ -106,22 +106,25 @@ func TestGenerateReport(t *testing.T) {
 		t.Error("Summary should not be nil")
 	}
 
-	// Verify score summary
+	// Verify score summary (all scores are 0-100 percentages)
 	if report.Summary != nil {
-		if report.Summary.AuthenticationScore < 0 || report.Summary.AuthenticationScore > 3 {
+		if report.Summary.AuthenticationScore < 0 || report.Summary.AuthenticationScore > 100 {
 			t.Errorf("AuthenticationScore %v is out of bounds", report.Summary.AuthenticationScore)
 		}
-		if report.Summary.SpamScore < 0 || report.Summary.SpamScore > 2 {
+		if report.Summary.SpamScore < 0 || report.Summary.SpamScore > 100 {
 			t.Errorf("SpamScore %v is out of bounds", report.Summary.SpamScore)
 		}
-		if report.Summary.BlacklistScore < 0 || report.Summary.BlacklistScore > 20 {
+		if report.Summary.BlacklistScore < 0 || report.Summary.BlacklistScore > 100 {
 			t.Errorf("BlacklistScore %v is out of bounds", report.Summary.BlacklistScore)
 		}
-		if report.Summary.ContentScore < 0 || report.Summary.ContentScore > 20 {
+		if report.Summary.ContentScore < 0 || report.Summary.ContentScore > 100 {
 			t.Errorf("ContentScore %v is out of bounds", report.Summary.ContentScore)
 		}
-		if report.Summary.HeaderScore < 0 || report.Summary.HeaderScore > 10 {
+		if report.Summary.HeaderScore < 0 || report.Summary.HeaderScore > 100 {
 			t.Errorf("HeaderScore %v is out of bounds", report.Summary.HeaderScore)
+		}
+		if report.Summary.DnsScore < 0 || report.Summary.DnsScore > 100 {
+			t.Errorf("DnsScore %v is out of bounds", report.Summary.DnsScore)
 		}
 	}
 }

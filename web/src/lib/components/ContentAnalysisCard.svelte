@@ -1,12 +1,15 @@
 <script lang="ts">
     import type { ContentAnalysis } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         contentAnalysis: ContentAnalysis;
+        contentGrade?: string;
         contentScore?: number;
     }
 
-    let { contentAnalysis, contentScore }: Props = $props();
+    let { contentAnalysis, contentGrade, contentScore }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
@@ -16,11 +19,16 @@
                 <i class="bi bi-file-text me-2"></i>
                 Content Analysis
             </span>
-            {#if contentScore !== undefined}
-                <span class="badge bg-secondary">
-                    {contentScore}%
-                </span>
-            {/if}
+            <span>
+                {#if contentScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(contentScore)}">
+                        {contentScore}%
+                    </span>
+                {/if}
+                {#if contentGrade !== undefined}
+                    <GradeDisplay grade={contentGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">

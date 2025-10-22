@@ -463,9 +463,9 @@ func textprotoCanonical(s string) string {
 
 // CalculateAuthenticationScore calculates the authentication score from auth results
 // Returns a score from 0-100 where higher is better
-func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.AuthenticationResults) int {
+func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.AuthenticationResults) (int, string) {
 	if results == nil {
-		return 0
+		return 0, ""
 	}
 
 	score := 0
@@ -530,5 +530,5 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 		score = 100
 	}
 
-	return score
+	return score, ScoreToGrade(score)
 }

@@ -1,12 +1,15 @@
 <script lang="ts">
     import type { DNSResults } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         dnsResults?: DNSResults;
+        dnsGrade?: string;
         dnsScore?: number;
     }
 
-    let { dnsResults, dnsScore }: Props = $props();
+    let { dnsResults, dnsGrade, dnsScore }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
@@ -16,11 +19,16 @@
                 <i class="bi bi-diagram-3 me-2"></i>
                 DNS Records
             </span>
-            {#if dnsScore !== undefined}
-                <span class="badge bg-secondary">
-                    {dnsScore}%
-                </span>
-            {/if}
+            <span>
+                {#if dnsScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(dnsScore)}">
+                        {dnsScore}%
+                    </span>
+                {/if}
+                {#if dnsGrade !== undefined}
+                    <GradeDisplay grade={dnsGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">

@@ -6,10 +6,10 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ## Features
 
-- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, BIMI, SpamAssassin scores, DNS records, blacklist status, content quality, and more
+- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, BIMI, ARC, SpamAssassin scores, DNS records, blacklist status, content quality, and more
 - **REST API**: Full-featured API for creating tests and retrieving reports
 - **LMTP Server**: Built-in LMTP server for seamless MTA integration
-- **Scoring System**: 0-10 scoring with weighted factors across authentication, spam, blacklists, content, and headers
+- **Scoring System**: Gives A to F grades and scoring with weighted factors across dns, authentication, spam, blacklists, content, and headers
 - **Database Storage**: SQLite or PostgreSQL support
 - **Configurable**: via environment or config file for all settings
 
@@ -187,22 +187,14 @@ cat email.eml | ./happyDeliver analyze -recipient test-uuid@yourdomain.com
 
 ## Scoring System
 
-The deliverability score is calculated from 0 to 10 based on:
+The deliverability score is calculated from A to F based on:
 
-- **Authentication (3 pts)**: SPF, DKIM, DMARC validation
-- **Spam (2 pts)**: SpamAssassin score
-- **Blacklist (2 pts)**: RBL/DNSBL checks
-- **Content (2 pts)**: HTML quality, links, images, unsubscribe
-- **Headers (1 pt)**: Required headers, MIME structure
-
-**Note:** BIMI (Brand Indicators for Message Identification) is also checked and reported but does not contribute to the score, as it's a branding feature rather than a deliverability factor.
-
-**Ratings:**
-- 9-10: Excellent
-- 7-8.9: Good
-- 5-6.9: Fair
-- 3-4.9: Poor
-- 0-2.9: Critical
+- **DNS**: Step-by-step analysis of PTR, Forward-Confirmed Reverse DNS, MX, SPF, DKIM, DMARC and BIMI records
+- **Authentication**: IPRev, SPF, DKIM, DMARC, BIMI and ARC validation
+- **Blacklist**: RBL/DNSBL checks
+- **Headers**: Required headers, MIME structure, Domain alignment
+- **Spam**: SpamAssassin score
+- **Content**: HTML quality, links, images, unsubscribe
 
 ## Funding
 

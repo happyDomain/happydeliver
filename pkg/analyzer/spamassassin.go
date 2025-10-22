@@ -193,9 +193,9 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAs
 }
 
 // CalculateSpamAssassinScore calculates the SpamAssassin contribution to deliverability
-func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssassinResult) int {
+func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssassinResult) (int, string) {
 	if result == nil {
-		return 100 // No spam scan results, assume good
+		return 100, "" // No spam scan results, assume good
 	}
 
 	// SpamAssassin score typically ranges from -10 to +20
@@ -206,12 +206,15 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssass
 	score := result.Score
 
 	// Convert SpamAssassin score to 0-100 scale (inverted - lower SA score is better)
-	if score <= 0 {
-		return 100 // Perfect score for ham
+	if score < 0 {
+		return 100, "A+" // Perfect score for ham
+	} else if score == 0 {
+		return 100, "A" // Perfect score for ham
 	} else if score >= result.RequiredScore {
-		return 0 // Failed spam test
+		return 0, "F" // Failed spam test
 	} else {
 		// Linear scale between 0 and required threshold
-		return 100 - int(math.Round(float64(score*100/result.RequiredScore)))
+		percentage := 100 - int(math.Round(float64(score*100/result.RequiredScore)))
+		return percentage, ScoreToGrade(percentage - 15)
 	}
 }

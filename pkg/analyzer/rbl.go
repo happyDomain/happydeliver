@@ -240,13 +240,14 @@ func (r *RBLChecker) reverseIP(ipStr string) string {
 }
 
 // CalculateRBLScore calculates the blacklist contribution to deliverability
-func (r *RBLChecker) CalculateRBLScore(results *RBLResults) int {
+func (r *RBLChecker) CalculateRBLScore(results *RBLResults) (int, string) {
 	if results == nil || len(results.IPsChecked) == 0 {
 		// No IPs to check, give benefit of doubt
-		return 100
+		return 100, ""
 	}
 
-	return 100 - results.ListedCount*100/len(r.RBLs)
+	percentage := 100 - results.ListedCount*100/len(r.RBLs)
+	return percentage, ScoreToGrade(percentage)
 }
 
 // GetUniqueListedIPs returns a list of unique IPs that are listed on at least one RBL

@@ -1,13 +1,16 @@
 <script lang="ts">
     import type { Authentication, DNSResults, ReportSummary } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         authentication: Authentication;
+        authenticationGrade?: string;
         authenticationScore?: number;
         dnsResults?: DNSResults;
     }
 
-    let { authentication, authenticationScore, dnsResults }: Props = $props();
+    let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
 
     function getAuthResultClass(result: string): string {
         switch (result) {
@@ -57,11 +60,16 @@
                 <i class="bi bi-shield-check me-2"></i>
                 Authentication
             </span>
-            {#if authenticationScore !== undefined}
-                <span class="badge bg-secondary">
-                    {authenticationScore}%
-                </span>
-            {/if}
+            <span>
+                {#if authenticationScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(authenticationScore)}">
+                        {authenticationScore}%
+                    </span>
+                {/if}
+                {#if authenticationGrade !== undefined}
+                    <GradeDisplay grade={authenticationGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">

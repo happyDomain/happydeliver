@@ -323,7 +323,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.CalculateAuthenticationScore(tt.results)
+			score, _ := scorer.CalculateAuthenticationScore(tt.results)
 
 			if score != tt.expectedScore {
 				t.Errorf("Score = %v, want %v", score, tt.expectedScore)
@@ -370,16 +370,16 @@ func TestParseARCResult(t *testing.T) {
 
 func TestParseAuthenticationResultsHeader(t *testing.T) {
 	tests := []struct {
-		name                 string
-		header               string
-		expectedSPFResult    *api.AuthResultResult
-		expectedSPFDomain    *string
-		expectedDKIMCount    int
-		expectedDKIMResult   *api.AuthResultResult
-		expectedDMARCResult  *api.AuthResultResult
-		expectedDMARCDomain  *string
-		expectedBIMIResult   *api.AuthResultResult
-		expectedARCResult    *api.ARCResultResult
+		name                string
+		header              string
+		expectedSPFResult   *api.AuthResultResult
+		expectedSPFDomain   *string
+		expectedDKIMCount   int
+		expectedDKIMResult  *api.AuthResultResult
+		expectedDMARCResult *api.AuthResultResult
+		expectedDMARCDomain *string
+		expectedBIMIResult  *api.AuthResultResult
+		expectedARCResult   *api.ARCResultResult
 	}{
 		{
 			name:                "Complete authentication results",
@@ -441,12 +441,12 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 			expectedDMARCDomain: api.PtrTo("example.com"),
 		},
 		{
-			name:                "BIMI pass",
-			header:              "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; bimi=pass header.d=example.com header.selector=default",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:   api.PtrTo("example.com"),
-			expectedDKIMCount:   0,
-			expectedBIMIResult:  api.PtrTo(api.AuthResultResultPass),
+			name:               "BIMI pass",
+			header:             "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; bimi=pass header.d=example.com header.selector=default",
+			expectedSPFResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain:  api.PtrTo("example.com"),
+			expectedDKIMCount:  0,
+			expectedBIMIResult: api.PtrTo(api.AuthResultResultPass),
 		},
 		{
 			name:              "ARC pass",
@@ -468,24 +468,24 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 			expectedARCResult:   api.PtrTo(api.ARCResultResultPass),
 		},
 		{
-			name:               "Empty header (authserv-id only)",
-			header:             "mx.google.com",
+			name:              "Empty header (authserv-id only)",
+			header:            "mx.google.com",
+			expectedSPFResult: nil,
+			expectedDKIMCount: 0,
+		},
+		{
+			name:              "Empty parts with semicolons",
+			header:            "mx.google.com; ; ; spf=pass smtp.mailfrom=sender@example.com; ;",
+			expectedSPFResult: api.PtrTo(api.AuthResultResultPass),
+			expectedSPFDomain: api.PtrTo("example.com"),
+			expectedDKIMCount: 0,
+		},
+		{
+			name:               "DKIM with short form parameters",
+			header:             "mail.example.com; dkim=pass d=example.com s=selector1",
 			expectedSPFResult:  nil,
-			expectedDKIMCount:  0,
-		},
-		{
-			name:               "Empty parts with semicolons",
-			header:             "mx.google.com; ; ; spf=pass smtp.mailfrom=sender@example.com; ;",
-			expectedSPFResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:  api.PtrTo("example.com"),
-			expectedDKIMCount:  0,
-		},
-		{
-			name:                "DKIM with short form parameters",
-			header:              "mail.example.com; dkim=pass d=example.com s=selector1",
-			expectedSPFResult:   nil,
-			expectedDKIMCount:   1,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMCount:  1,
+			expectedDKIMResult: api.PtrTo(api.AuthResultResultPass),
 		},
 		{
 			name:              "SPF neutral",

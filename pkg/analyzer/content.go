@@ -726,9 +726,9 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 }
 
 // CalculateContentScore calculates the content score (0-20 points)
-func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
+func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, string) {
 	if results == nil {
-		return 0
+		return 0, ""
 	}
 
 	var score int = 10
@@ -819,5 +819,5 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) int {
 		score = 100
 	}
 
-	return score
+	return score, ScoreToGrade(score)
 }

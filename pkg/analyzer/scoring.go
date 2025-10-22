@@ -28,9 +28,9 @@ import (
 // ScoreToGrade converts a percentage score (0-100) to a letter grade
 func ScoreToGrade(score int) string {
 	switch {
-	case score >= 97:
+	case score > 100:
 		return "A+"
-	case score >= 93:
+	case score > 95:
 		return "A"
 	case score >= 85:
 		return "B"

@@ -96,42 +96,54 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Calculate scores directly from analyzers (no more checks array)
 	dnsScore := 0
+	var dnsGrade string
 	if results.DNS != nil {
-		dnsScore = r.dnsAnalyzer.CalculateDNSScore(results.DNS)
+		dnsScore, dnsGrade = r.dnsAnalyzer.CalculateDNSScore(results.DNS)
 	}
 
 	authScore := 0
+	var authGrade string
 	if results.Authentication != nil {
-		authScore = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication)
+		authScore, authGrade = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication)
 	}
 
 	contentScore := 0
+	var contentGrade string
 	if results.Content != nil {
-		contentScore = r.contentAnalyzer.CalculateContentScore(results.Content)
+		contentScore, contentGrade = r.contentAnalyzer.CalculateContentScore(results.Content)
 	}
 
 	headerScore := 0
+	var headerGrade rune
 	if results.Headers != nil {
-		headerScore = r.headerAnalyzer.CalculateHeaderScore(results.Headers)
+		headerScore, headerGrade = r.headerAnalyzer.CalculateHeaderScore(results.Headers)
 	}
 
 	blacklistScore := 0
+	var blacklistGrade string
 	if results.RBL != nil {
-		blacklistScore = r.rblChecker.CalculateRBLScore(results.RBL)
+		blacklistScore, blacklistGrade = r.rblChecker.CalculateRBLScore(results.RBL)
 	}
 
 	spamScore := 0
+	var spamGrade string
 	if results.SpamAssassin != nil {
-		spamScore = r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
+		spamScore, spamGrade = r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
 	}
 
 	report.Summary = &api.ScoreSummary{
 		DnsScore:            dnsScore,
+		DnsGrade:            api.ScoreSummaryDnsGrade(dnsGrade),
 		AuthenticationScore: authScore,
+		AuthenticationGrade: api.ScoreSummaryAuthenticationGrade(authGrade),
 		BlacklistScore:      blacklistScore,
+		BlacklistGrade:      api.ScoreSummaryBlacklistGrade(blacklistGrade),
 		ContentScore:        contentScore,
+		ContentGrade:        api.ScoreSummaryContentGrade(contentGrade),
 		HeaderScore:         headerScore,
+		HeaderGrade:         api.ScoreSummaryHeaderGrade(headerGrade),
 		SpamScore:           spamScore,
+		SpamGrade:           api.ScoreSummarySpamGrade(spamGrade),
 	}
 
 	// Add authentication results
@@ -187,6 +199,41 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	report.Grade = ScoreToReportGrade(report.Score)
+	categoryGrades := []string{
+		string(report.Summary.DnsGrade),
+		string(report.Summary.AuthenticationGrade),
+		string(report.Summary.BlacklistGrade),
+		string(report.Summary.ContentGrade),
+		string(report.Summary.HeaderGrade),
+		string(report.Summary.SpamGrade),
+	}
+	if report.Score >= 100 {
+		hasLessThanA := false
+
+		for _, grade := range categoryGrades {
+			if len(grade) < 1 || grade[0] != 'A' {
+				hasLessThanA = true
+			}
+		}
+
+		if !hasLessThanA {
+			report.Grade = "A+"
+		}
+	} else {
+		var minusGrade byte = 0
+		for _, grade := range categoryGrades {
+			if len(grade) == 0 {
+				minusGrade = 255
+				break
+			} else if grade[0]-'A' > minusGrade {
+				minusGrade = grade[0] - 'A'
+			}
+		}
+
+		if minusGrade < 255 {
+			report.Grade = api.ReportGrade(string([]byte{'A' + minusGrade}))
+		}
+	}
 
 	return report
 }

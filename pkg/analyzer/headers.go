@@ -37,12 +37,13 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 }
 
 // CalculateHeaderScore evaluates email structural quality from header analysis
-func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int {
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int, rune) {
 	if analysis == nil || analysis.Headers == nil {
-		return 0
+		return 0, ' '
 	}
 
 	score := 0
+	maxGrade := 6
 	headers := *analysis.Headers
 
 	// Check required headers (RFC 5322) - 40 points
@@ -60,6 +61,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int 
 		score += 40
 	} else {
 		score += int(40 * (float32(presentRequired) / float32(requiredCount)))
+		maxGrade = 1
 	}
 
 	// Check recommended headers (30 points)
@@ -80,9 +82,15 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int 
 	}
 	score += presentRecommended * 30 / recommendedCount
 
+	if presentRecommended < recommendedCount {
+		maxGrade -= 1
+	}
+
 	// Check for proper MIME structure (20 points)
 	if analysis.HasMimeStructure != nil && *analysis.HasMimeStructure {
 		score += 20
+	} else {
+		maxGrade -= 1
 	}
 
 	// Check Message-ID format (10 points)
@@ -90,15 +98,20 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int 
 		// If Valid is set and true, award points
 		if check.Valid != nil && *check.Valid {
 			score += 10
+		} else {
+			maxGrade -= 1
 		}
+	} else {
+		maxGrade -= 1
 	}
 
 	// Ensure score doesn't exceed 100
 	if score > 100 {
 		score = 100
 	}
+	grade := 'A' + max(6-maxGrade, 0)
 
-	return score
+	return score, rune(grade)
 }
 
 // isValidMessageID checks if a Message-ID has proper format

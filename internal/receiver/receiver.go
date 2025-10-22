@@ -96,7 +96,7 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 		return fmt.Errorf("failed to analyze email: %w", err)
 	}
 
-	log.Printf("Analysis complete. Score: %.2f/10", result.Report.Score)
+	log.Printf("Analysis complete. Grade: %s. Score: %d/100", result.Report.Grade, result.Report.Score)
 
 	// Marshal report to JSON
 	reportJSON, err := json.Marshal(result.Report)

@@ -1,12 +1,15 @@
 <script lang="ts">
     import type { HeaderAnalysis } from "$lib/api/types.gen";
+    import { getScoreColorClass } from "$lib/score";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         headerAnalysis: HeaderAnalysis;
+        headerGrade?: string;
         headerScore?: number;
     }
 
-    let { headerAnalysis, headerScore }: Props = $props();
+    let { headerAnalysis, headerGrade, headerScore }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
@@ -16,11 +19,16 @@
                 <i class="bi bi-list-ul me-2"></i>
                 Header Analysis
             </span>
-            {#if headerScore !== undefined}
-                <span class="badge bg-secondary">
-                    {headerScore}%
-                </span>
-            {/if}
+            <span>
+                {#if headerScore !== undefined}
+                    <span class="badge bg-{getScoreColorClass(headerScore)}">
+                        {headerScore}%
+                    </span>
+                {/if}
+                {#if headerGrade !== undefined}
+                    <GradeDisplay grade={headerGrade} size="small" />
+                {/if}
+            </span>
         </h4>
     </div>
     <div class="card-body">
