@@ -63,7 +63,13 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int 
 	}
 
 	// Check recommended headers (30 points)
-	recommendedHeaders := []string{"subject", "to", "reply-to"}
+	recommendedHeaders := []string{"subject", "to"}
+
+	// Add reply-to when from is a no-reply address
+	if h.isNoReplyAddress(headers["from"]) {
+		recommendedHeaders = append(recommendedHeaders, "reply-to")
+	}
+
 	recommendedCount := len(recommendedHeaders)
 	presentRecommended := 0
 
@@ -72,7 +78,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) int 
 			presentRecommended++
 		}
 	}
-	score += int(30 * (float32(presentRecommended) / float32(recommendedCount)))
+	score += presentRecommended * 30 / recommendedCount
 
 	// Check for proper MIME structure (20 points)
 	if analysis.HasMimeStructure != nil && *analysis.HasMimeStructure {
@@ -120,6 +126,29 @@ func (h *HeaderAnalyzer) isValidMessageID(messageID string) bool {
 	return len(parts[0]) > 0 && len(parts[1]) > 0
 }
 
+// isNoReplyAddress checks if a header check represents a no-reply email address
+func (h *HeaderAnalyzer) isNoReplyAddress(headerCheck api.HeaderCheck) bool {
+	if !headerCheck.Present || headerCheck.Value == nil {
+		return false
+	}
+
+	value := strings.ToLower(*headerCheck.Value)
+	noReplyPatterns := []string{
+		"no-reply",
+		"noreply",
+		"ne-pas-repondre",
+		"nepasrepondre",
+	}
+
+	for _, pattern := range noReplyPatterns {
+		if strings.Contains(value, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GenerateHeaderAnalysis creates structured header analysis from email
 func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.HeaderAnalysis {
 	if email == nil {
@@ -142,16 +171,19 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.Header
 	}
 
 	// Check recommended headers
-	recommendedHeaders := []string{"Reply-To", "Return-Path"}
+	recommendedHeaders := []string{}
+	if h.isNoReplyAddress(headers["from"]) {
+		recommendedHeaders = append(recommendedHeaders, "reply-to")
+	}
 	for _, headerName := range recommendedHeaders {
 		check := h.checkHeader(email, headerName, "recommended")
 		headers[strings.ToLower(headerName)] = *check
 	}
 
 	// Check optional headers
-	optionalHeaders := []string{"List-Unsubscribe", "List-Unsubscribe-Post", "Precedence"}
+	optionalHeaders := []string{"List-Unsubscribe", "List-Unsubscribe-Post"}
 	for _, headerName := range optionalHeaders {
-		check := h.checkHeader(email, headerName, "optional")
+		check := h.checkHeader(email, headerName, "newsletter")
 		headers[strings.ToLower(headerName)] = *check
 	}
 

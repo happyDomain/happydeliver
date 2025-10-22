@@ -98,7 +98,12 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each Object.entries(headerAnalysis.headers) as [name, check]}
+                            {#each Object.entries(headerAnalysis.headers).sort((a, b) => {
+                                const importanceOrder = { 'required': 0, 'recommended': 1, 'optional': 2, 'newsletter': 3 };
+                                const aImportance = importanceOrder[a[1].importance || 'optional'];
+                                const bImportance = importanceOrder[b[1].importance || 'optional'];
+                                return aImportance - bImportance;
+                            }) as [name, check]}
                                 <tr>
                                     <td>
                                         <code>{name}</code>
@@ -112,7 +117,7 @@
                                         <i class="bi {check.present ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}"></i>
                                     </td>
                                     <td>
-                                        {#if check.valid !== undefined}
+                                        {#if check.present && check.valid !== undefined}
                                             <i class="bi {check.valid ? 'bi-check-circle text-success' : 'bi-x-circle text-warning'}"></i>
                                         {:else}
                                             -
