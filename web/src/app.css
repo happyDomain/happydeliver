@@ -74,14 +74,21 @@ body {
 
 /* Custom card styling */
 .card {
-    border: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition:
         transform 0.2s ease,
         box-shadow 0.2s ease;
 }
 
-.card:hover {
+.card:not(.fade-in .card) {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.fade-in .card:not(.card .card) {
+    border: none;
+}
+
+.card:hover:not(.fade-in .card) {
     transform: translateY(-2px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }

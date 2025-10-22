@@ -48,8 +48,10 @@
             {/if}
 
             <!-- Return-Path Domain Section -->
-            <div class="mb-3">
-                <strong>Return-Path Domain:</strong> <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
+            <div class="mb-3 d-flex align-items-center gap-2">
+                <h4 class="mb-0">
+                    Return-Path Domain: <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
+                </h4>
                 {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                     <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from From domain</span>
                     <small>
@@ -64,6 +66,7 @@
             <!-- MX Records for Return-Path Domain -->
             {#if dnsResults.rp_mx_records && dnsResults.rp_mx_records.length > 0}
                 <MxRecordsDisplay
+                    class="mb-4"
                     mxRecords={dnsResults.rp_mx_records}
                     title="Mail Exchange Records for Return-Path Domain"
                     description="These MX records handle bounce messages and non-delivery reports."
@@ -72,14 +75,27 @@
 
             <!-- SPF Records (for Return-Path Domain) -->
             {#if dnsResults.spf_records && dnsResults.spf_records.length > 0}
-                <div class="mb-4">
-                    <h5 class="text-muted mb-2">
-                        <span class="badge bg-secondary">SPF</span> Sender Policy Framework
-                    </h5>
-                    <p class="small text-muted mb-2">SPF validates the Return-Path (envelope sender) domain.</p>
-                    {#each dnsResults.spf_records as spf, index}
-                        <div class="card mb-2">
-                            <div class="card-body">
+                {@const spfIsValid = dnsResults.spf_records.reduce((acc, r) => acc && r.valid, true)}
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="text-muted mb-2">
+                            <i
+                                class="bi"
+                                class:bi-check-circle-fill={spfIsValid}
+                                class:text-success={spfIsValid}
+                                class:bi-x-circle-fill={!spfIsValid}
+                                class:text-danger={!spfIsValid}
+                            ></i>
+                            Sender Policy Framework
+                        </h5>
+                        <span class="badge bg-secondary">SPF</span>
+                    </div>
+                    <div class="card-body pb-0">
+                        <p class="card-text small text-muted mb-0">SPF specifies which mail servers are authorized to send emails on behalf of your domain. Receiving servers check the sender's IP address against your SPF record to prevent email spoofing.</p>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {#each dnsResults.spf_records as spf, index}
+                            <div class="list-group-item">
                                 {#if spf.domain}
                                     <div class="mb-2">
                                         <strong>Domain:</strong> <code>{spf.domain}</code>
@@ -109,16 +125,18 @@
                                     </div>
                                 {/if}
                             </div>
-                        </div>
-                    {/each}
+                        {/each}
+                    </div>
                 </div>
             {/if}
 
-            <hr>
+            <hr class="my-4">
 
             <!-- From Domain Section -->
-            <div class="mb-3">
-                <strong>From Domain:</strong> <code>{dnsResults.from_domain}</code>
+            <div class="mb-3 d-flex align-items-center gap-2">
+                <h4 class="mb-0">
+                    From Domain: <code>{dnsResults.from_domain}</code>
+                </h4>
                 {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                     <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from Return-Path domain</span>
                 {/if}
@@ -127,6 +145,7 @@
             <!-- MX Records for From Domain -->
             {#if dnsResults.from_mx_records && dnsResults.from_mx_records.length > 0}
                 <MxRecordsDisplay
+                    class="mb-4"
                     mxRecords={dnsResults.from_mx_records}
                     title="Mail Exchange Records for From Domain"
                     description="These MX records handle replies to emails sent from this domain."
@@ -135,13 +154,27 @@
 
             <!-- DKIM Records -->
             {#if dnsResults.dkim_records && dnsResults.dkim_records.length > 0}
-                <div class="mb-4">
-                    <h5 class="text-muted mb-2">
-                        <span class="badge bg-secondary">DKIM</span> DomainKeys Identified Mail
-                    </h5>
-                    {#each dnsResults.dkim_records as dkim}
-                        <div class="card mb-2">
-                            <div class="card-body">
+                {@const dkimIsValid = dnsResults.dkim_records.reduce((acc, r) => acc && r.valid, true)}
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="text-muted mb-0">
+                            <i
+                                class="bi"
+                                class:bi-check-circle-fill={dkimIsValid}
+                                class:text-success={dkimIsValid}
+                                class:bi-x-circle-fill={!dkimIsValid}
+                                class:text-danger={!dkimIsValid}
+                            ></i>
+                            DomainKeys Identified Mail
+                        </h5>
+                        <span class="badge bg-secondary">DKIM</span>
+                    </div>
+                    <div class="card-body pb-0">
+                        <p class="card-text small text-muted mb-0">DKIM cryptographically signs your emails, proving they haven't been tampered with in transit. Receiving servers verify this signature against your DNS records.</p>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {#each dnsResults.dkim_records as dkim}
+                            <div class="list-group-item">
                                 <div class="mb-2">
                                     <strong>Selector:</strong> <code>{dkim.selector}</code>
                                     <strong class="ms-3">Domain:</strong> <code>{dkim.domain}</code>
@@ -166,59 +199,79 @@
                                     </div>
                                 {/if}
                             </div>
-                        </div>
-                    {/each}
+                        {/each}
+                    </div>
                 </div>
             {/if}
 
             <!-- DMARC Record -->
             {#if dnsResults.dmarc_record}
-                <div class="mb-4">
-                    <h5 class="text-muted mb-2">
-                        <span class="badge bg-secondary">DMARC</span> Domain-based Message Authentication
-                    </h5>
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="mb-2">
-                                <strong>Status:</strong>
-                                {#if dnsResults.dmarc_record.valid}
-                                    <span class="badge bg-success">Valid</span>
-                                {:else}
-                                    <span class="badge bg-danger">Invalid</span>
-                                {/if}
-                            </div>
-                            {#if dnsResults.dmarc_record.policy}
-                                <div class="mb-2">
-                                    <strong>Policy:</strong>
-                                    <span class="badge {dnsResults.dmarc_record.policy === 'reject' ? 'bg-success' : dnsResults.dmarc_record.policy === 'quarantine' ? 'bg-warning' : 'bg-secondary'}">
-                                        {dnsResults.dmarc_record.policy}
-                                    </span>
-                                </div>
-                            {/if}
-                            {#if dnsResults.dmarc_record.record}
-                                <div class="mb-2">
-                                    <strong>Record:</strong><br>
-                                    <code class="d-block mt-1 text-break">{dnsResults.dmarc_record.record}</code>
-                                </div>
-                            {/if}
-                            {#if dnsResults.dmarc_record.error}
-                                <div class="text-danger">
-                                    <strong>Error:</strong> {dnsResults.dmarc_record.error}
-                                </div>
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="text-muted mb-0">
+                            <i
+                                class="bi"
+                                class:bi-check-circle-fill={dnsResults.dmarc_record.valid}
+                                class:text-success={dnsResults.dmarc_record.valid}
+                                class:bi-x-circle-fill={!dnsResults.dmarc_record.valid}
+                                class:text-danger={!dnsResults.dmarc_record.valid}
+                            ></i>
+                            Domain-based Message Authentication
+                        </h5>
+                        <span class="badge bg-secondary">DMARC</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text small text-muted mb-2">DMARC builds on SPF and DKIM by telling receiving servers what to do with emails that fail authentication checks. It also enables reporting so you can monitor your email security.</p>
+                        <div class="mb-2">
+                            <strong>Status:</strong>
+                            {#if dnsResults.dmarc_record.valid}
+                                <span class="badge bg-success">Valid</span>
+                            {:else}
+                                <span class="badge bg-danger">Invalid</span>
                             {/if}
                         </div>
+                        {#if dnsResults.dmarc_record.policy}
+                            <div class="mb-2">
+                                <strong>Policy:</strong>
+                                <span class="badge {dnsResults.dmarc_record.policy === 'reject' ? 'bg-success' : dnsResults.dmarc_record.policy === 'quarantine' ? 'bg-warning' : 'bg-secondary'}">
+                                    {dnsResults.dmarc_record.policy}
+                                </span>
+                            </div>
+                        {/if}
+                        {#if dnsResults.dmarc_record.record}
+                            <div class="mb-2">
+                                <strong>Record:</strong><br>
+                                <code class="d-block mt-1 text-break">{dnsResults.dmarc_record.record}</code>
+                            </div>
+                        {/if}
+                        {#if dnsResults.dmarc_record.error}
+                            <div class="text-danger">
+                                <strong>Error:</strong> {dnsResults.dmarc_record.error}
+                            </div>
+                        {/if}
                     </div>
                 </div>
             {/if}
 
             <!-- BIMI Record -->
             {#if dnsResults.bimi_record}
-                <div class="mb-4">
-                    <h5 class="text-muted mb-2">
-                        <span class="badge bg-secondary">BIMI</span> Brand Indicators for Message Identification
-                    </h5>
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="text-muted mb-0">
+                            <i
+                                class="bi"
+                                class:bi-check-circle-fill={dnsResults.bimi_record.valid}
+                                class:text-success={dnsResults.bimi_record.valid}
+                                class:bi-x-circle-fill={!dnsResults.bimi_record.valid}
+                                class:text-danger={!dnsResults.bimi_record.valid}
+                            ></i>
+                            Brand Indicators for Message Identification
+                        </h5>
+                        <span class="badge bg-secondary">BIMI</span>
+                    </div>
                     <div class="card">
                         <div class="card-body">
+                            <p class="card-text small text-muted mb-2">BIMI allows your brand logo to be displayed next to your emails in supported mail clients. Requires strong DMARC enforcement (quarantine or reject policy) and optionally a Verified Mark Certificate (VMC).</p>
                             <div class="mb-2">
                                 <strong>Selector:</strong> <code>{dnsResults.bimi_record.selector}</code>
                                 <strong class="ms-3">Domain:</strong> <code>{dnsResults.bimi_record.domain}</code>

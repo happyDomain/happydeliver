@@ -35,32 +35,24 @@
         <div class="row row-cols-1 row-cols-lg-2">
             {#each Object.entries(blacklists) as [ip, checks]}
                 <div class="col mb-3">
-                    <h6 class="text-muted">
+                    <h5 class="text-muted">
                         <i class="bi bi-hdd-network me-1"></i>
                         {ip}
-                    </h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
+                    </h5>
+                    <table class="table table-sm table-striped table-hover mb-0">
+                        <tbody>
+                            {#each checks as check}
                                 <tr>
-                                    <th>RBL</th>
-                                    <th>Status</th>
+                                    <td title={check.response || '-'}>
+                                        <span class="badge {check.listed ? 'bg-danger' : check.error ? 'bg-dark' : 'bg-success'}">
+                                            {check.error ? 'Error' : (check.listed ? 'Listed' : 'Clean')}
+                                        </span>
+                                    </td>
+                                    <td><code>{check.rbl}</code></td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {#each checks as check}
-                                    <tr>
-                                        <td><code>{check.rbl}</code></td>
-                                        <td title={check.response || '-'}>
-                                            <span class="badge {check.listed ? 'bg-danger' : check.error ? 'bg-dark' : 'bg-success'}">
-                                                {check.error ? 'Error' : (check.listed ? 'Listed' : 'Clean')}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                {/each}
-                            </tbody>
-                        </table>
-                    </div>
+                            {/each}
+                        </tbody>
+                    </table>
                 </div>
             {/each}
         </div>

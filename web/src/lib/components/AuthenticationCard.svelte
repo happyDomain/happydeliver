@@ -72,10 +72,9 @@
             </span>
         </h4>
     </div>
-    <div class="card-body">
-        <div class="row row-cols-1">
+    <div class="list-group list-group-flush">
             <!-- SPF (Required) -->
-            <div class="col mb-3">
+            <div class="list-group-item">
                 <div class="d-flex align-items-start">
                     {#if authentication.spf}
                         <i class="bi {getAuthResultIcon(authentication.spf.result)} {getAuthResultClass(authentication.spf.result)} me-2 fs-5"></i>
@@ -108,7 +107,7 @@
             </div>
 
             <!-- DKIM (Required) -->
-            <div class="col mb-3">
+            <div class="list-group-item">
                 <div class="d-flex align-items-start">
                     {#if authentication.dkim && authentication.dkim.length > 0}
                         <i class="bi {getAuthResultIcon(authentication.dkim[0].result)} {getAuthResultClass(authentication.dkim[0].result)} me-2 fs-5"></i>
@@ -147,7 +146,7 @@
             </div>
 
             <!-- DMARC (Required) -->
-            <div class="col mb-3">
+            <div class="list-group-item">
                 <div class="d-flex align-items-start">
                     {#if authentication.dmarc}
                         <i class="bi {getAuthResultIcon(authentication.dmarc.result)} {getAuthResultClass(authentication.dmarc.result)} me-2 fs-5"></i>
@@ -200,7 +199,7 @@
             </div>
 
             <!-- BIMI (Optional) -->
-            <div class="col mb-3">
+            <div class="list-group-item">
                 <div class="d-flex align-items-start">
                     {#if authentication.bimi && authentication.bimi.result != "none"}
                         <i class="bi {getAuthResultIcon(authentication.bimi.result)} {getAuthResultClass(authentication.bimi.result)} me-2 fs-5"></i>
@@ -240,7 +239,7 @@
 
             <!-- ARC (Optional) -->
             {#if authentication.arc}
-                <div class="col mb-3">
+                <div class="list-group-item">
                     <div class="d-flex align-items-start">
                         <i class="bi {getAuthResultIcon(authentication.arc.result)} {getAuthResultClass(authentication.arc.result)} me-2 fs-5"></i>
                         <div>
@@ -258,6 +257,5 @@
                     </div>
                 </div>
             {/if}
-        </div>
     </div>
 </div>
