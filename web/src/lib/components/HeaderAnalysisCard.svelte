@@ -13,7 +13,7 @@
     let { dmarcRecord, headerAnalysis, headerGrade, headerScore }: Props = $props();
 </script>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" id="header-details">
     <div class="card-header bg-white">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>

@@ -12,7 +12,7 @@
     let { spamassassin, spamGrade, spamScore }: Props = $props();
 </script>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" id="spam-details">
     <div class="card-header bg-white">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
