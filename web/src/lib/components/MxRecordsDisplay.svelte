@@ -28,7 +28,7 @@
         </h5>
         <span class="badge bg-secondary">MX</span>
     </div>
-    <div class="card-body pb-0">
+    <div class="card-body">
         {#if description}
             <p class="card-text small text-muted mb-0">{description}</p>
         {/if}
