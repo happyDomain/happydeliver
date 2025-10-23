@@ -10,3 +10,5 @@ export { default as DnsRecordsCard } from "./DnsRecordsCard.svelte";
 export { default as BlacklistCard } from "./BlacklistCard.svelte";
 export { default as ContentAnalysisCard } from "./ContentAnalysisCard.svelte";
 export { default as HeaderAnalysisCard } from "./HeaderAnalysisCard.svelte";
+export { default as PtrRecordsDisplay } from "./PtrRecordsDisplay.svelte";
+export { default as PtrForwardRecordsDisplay } from "./PtrForwardRecordsDisplay.svelte";

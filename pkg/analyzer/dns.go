@@ -73,6 +73,22 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 		spfDomain = *results.RpDomain
 	}
 
+	// Store sender IP for later use in scoring
+	var senderIP string
+	if headersResults.ReceivedChain != nil && len(*headersResults.ReceivedChain) > 0 {
+		firstHop := (*headersResults.ReceivedChain)[0]
+		if firstHop.Ip != nil && *firstHop.Ip != "" {
+			senderIP = *firstHop.Ip
+			ptrRecords, forwardRecords := d.checkPTRAndForward(senderIP)
+			if len(ptrRecords) > 0 {
+				results.PtrRecords = &ptrRecords
+			}
+			if len(forwardRecords) > 0 {
+				results.PtrForwardRecords = &forwardRecords
+			}
+		}
+	}
+
 	// Check MX records for From domain (where replies would go)
 	results.FromMxRecords = d.checkMXRecords(fromDomain)
 
@@ -613,16 +629,78 @@ func (d *DNSAnalyzer) validateBIMI(record string) bool {
 	return true
 }
 
+// checkPTRAndForward performs reverse DNS lookup (PTR) and forward confirmation (A/AAAA)
+// Returns PTR hostnames and their corresponding forward-resolved IPs
+func (d *DNSAnalyzer) checkPTRAndForward(ip string) ([]string, []string) {
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	// Perform reverse DNS lookup (PTR)
+	ptrNames, err := d.resolver.LookupAddr(ctx, ip)
+	if err != nil || len(ptrNames) == 0 {
+		return nil, nil
+	}
+
+	var forwardIPs []string
+	seenIPs := make(map[string]bool)
+
+	// For each PTR record, perform forward DNS lookup (A/AAAA)
+	for _, ptrName := range ptrNames {
+		// Look up A records
+		ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+		aRecords, err := d.resolver.LookupHost(ctx, ptrName)
+		cancel()
+
+		if err == nil {
+			for _, forwardIP := range aRecords {
+				if !seenIPs[forwardIP] {
+					forwardIPs = append(forwardIPs, forwardIP)
+					seenIPs[forwardIP] = true
+				}
+			}
+		}
+	}
+
+	return ptrNames, forwardIPs
+}
+
 // CalculateDNSScore calculates the DNS score from records results
 // Returns a score from 0-100 where higher is better
-func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
+// senderIP is the original sender IP address used for FCrDNS verification
+func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults, senderIP string) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
 
 	score := 0
 
-	// TODO: 20 points for correct PTR and A/AAAA
+	// PTR and Forward DNS: 20 points
+	// Proper reverse DNS (PTR) and forward-confirmed reverse DNS (FCrDNS) is important for deliverability
+	if results.PtrRecords != nil && len(*results.PtrRecords) > 0 {
+		// 10 points for having PTR records
+		score += 10
+
+		if len(*results.PtrRecords) > 1 {
+			// Penalty has it's bad to have multiple PTR records
+			score -= 3
+		}
+
+		// Additional 10 points for forward-confirmed reverse DNS (FCrDNS)
+		// This means the PTR hostname resolves back to IPs that include the original sender IP
+		if results.PtrForwardRecords != nil && len(*results.PtrForwardRecords) > 0 && senderIP != "" {
+			// Verify that the sender IP is in the list of forward-resolved IPs
+			fcrDnsValid := false
+			for _, forwardIP := range *results.PtrForwardRecords {
+				if forwardIP == senderIP {
+					fcrDnsValid = true
+					break
+				}
+			}
+			if fcrDnsValid {
+				score += 10
+			}
+		}
+	}
 
 	// MX Records: 20 points (10 for From domain, 10 for Return-Path domain)
 	// Having valid MX records is critical for email deliverability

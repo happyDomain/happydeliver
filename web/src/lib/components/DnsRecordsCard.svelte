@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DNSResults } from "$lib/api/types.gen";
+    import type { DNSResults, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
@@ -7,14 +7,22 @@
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
+    import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
+    import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
 
     interface Props {
         dnsResults?: DNSResults;
         dnsGrade?: string;
         dnsScore?: number;
+        receivedChain?: ReceivedHop[];
     }
 
-    let { dnsResults, dnsGrade, dnsScore }: Props = $props();
+    let { dnsResults, dnsGrade, dnsScore, receivedChain }: Props = $props();
+
+    // Extract sender IP from first hop
+    const senderIp = $derived(
+        receivedChain && receivedChain.length > 0 ? receivedChain[0].ip : undefined,
+    );
 </script>
 
 <div class="card shadow-sm">
@@ -50,6 +58,27 @@
                     </ul>
                 </div>
             {/if}
+
+            <!-- Reverse IP Section -->
+            {#if receivedChain && receivedChain.length > 0}
+                <div class="mb-3 d-flex align-items-center gap-2">
+                    <h4 class="mb-0">
+                        Received by: <code>{receivedChain[0].from} ({receivedChain[0].reverse || "Unknown"} [{receivedChain[0].ip}])</code>
+                    </h4>
+                </div>
+            {/if}
+
+            <!-- PTR Records Section -->
+            <PtrRecordsDisplay ptrRecords={dnsResults.ptr_records} {senderIp} />
+
+            <!-- Forward-Confirmed Reverse DNS -->
+            <PtrForwardRecordsDisplay
+                ptrRecords={dnsResults.ptr_records}
+                ptrForwardRecords={dnsResults.ptr_forward_records}
+                {senderIp}
+            />
+
+            <hr class="my-4" />
 
             <!-- Return-Path Domain Section -->
             <div class="mb-3 d-flex align-items-center gap-2">

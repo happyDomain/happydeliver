@@ -819,6 +819,18 @@ components:
           $ref: '#/components/schemas/DMARCRecord'
         bimi_record:
           $ref: '#/components/schemas/BIMIRecord'
+        ptr_records:
+          type: array
+          items:
+            type: string
+          description: PTR (reverse DNS) records for the sender IP address
+          example: ["mail.example.com", "smtp.example.com"]
+        ptr_forward_records:
+          type: array
+          items:
+            type: string
+          description: A or AAAA records resolved from the PTR hostnames (forward confirmation)
+          example: ["192.0.2.1", "2001:db8::1"]
         errors:
           type: array
           items:

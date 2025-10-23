@@ -98,7 +98,15 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	dnsScore := 0
 	var dnsGrade string
 	if results.DNS != nil {
-		dnsScore, dnsGrade = r.dnsAnalyzer.CalculateDNSScore(results.DNS)
+		// Extract sender IP from received chain for FCrDNS verification
+		var senderIP string
+		if results.Headers != nil && results.Headers.ReceivedChain != nil && len(*results.Headers.ReceivedChain) > 0 {
+			firstHop := (*results.Headers.ReceivedChain)[0]
+			if firstHop.Ip != nil {
+				senderIP = *firstHop.Ip
+			}
+		}
+		dnsScore, dnsGrade = r.dnsAnalyzer.CalculateDNSScore(results.DNS, senderIP)
 	}
 
 	authScore := 0
@@ -178,6 +186,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Calculate overall score as mean of all category scores
 	categoryScores := []int{
+		report.Summary.DnsScore,
 		report.Summary.AuthenticationScore,
 		report.Summary.BlacklistScore,
 		report.Summary.ContentScore,
