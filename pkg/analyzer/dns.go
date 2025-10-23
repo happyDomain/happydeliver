@@ -102,6 +102,10 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	// SPF validates the MAIL FROM command, which corresponds to Return-Path
 	results.SpfRecords = d.checkSPFRecords(spfDomain)
 
+	// Check legacy SPF type records (deprecated RFC 4408)
+	// These are SPF records using the SPF DNS record type instead of TXT
+	results.LegacySpfRecords = d.checkLegacySPFRecords(spfDomain)
+
 	// Check DKIM records (from authentication results)
 	// DKIM can be for any domain, but typically the From domain
 	if authResults != nil && authResults.Dkim != nil {

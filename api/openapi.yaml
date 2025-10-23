@@ -847,6 +847,11 @@ components:
           items:
             $ref: '#/components/schemas/SPFRecord'
           description: SPF records found (includes resolved include directives)
+        legacy_spf_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SPFRecord'
+          description: Legacy SPF type records found (deprecated RFC 4408 SPF DNS record type)
         dkim_records:
           type: array
           items:
