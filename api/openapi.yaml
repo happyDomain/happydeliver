@@ -605,9 +605,17 @@ components:
           type: string
           description: Domain from From header
           example: "example.com"
+        from_org_domain:
+          type: string
+          description: Organizational domain extracted from From header (using Public Suffix List)
+          example: "example.com"
         return_path_domain:
           type: string
           description: Domain from Return-Path header
+          example: "example.com"
+        return_path_org_domain:
+          type: string
+          description: Organizational domain extracted from Return-Path header (using Public Suffix List)
           example: "example.com"
         dkim_domains:
           type: array
@@ -617,7 +625,11 @@ components:
           example: ["example.com"]
         aligned:
           type: boolean
-          description: Whether all domains align
+          description: Whether all domains align (strict alignment - exact match)
+          example: true
+        relaxed_aligned:
+          type: boolean
+          description: Whether domains satisfy relaxed alignment (organizational domain match)
           example: true
         issues:
           type: array

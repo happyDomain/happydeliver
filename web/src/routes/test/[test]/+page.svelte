@@ -143,6 +143,7 @@
                 <div class="row mb-4" id="dns">
                     <div class="col-12">
                         <DnsRecordsCard
+                            domainAlignment={report.header_analysis?.domain_alignment}
                             dnsResults={report.dns_results}
                             dnsGrade={report.summary?.dns_grade}
                             dnsScore={report.summary?.dns_score}
@@ -185,6 +186,7 @@
                 <div class="row mb-4" id="header">
                     <div class="col-12">
                         <HeaderAnalysisCard
+                            dmarcRecord={report.dns_results.dmarc_record}
                             headerAnalysis={report.header_analysis}
                             headerGrade={report.summary?.header_grade}
                             headerScore={report.summary?.header_score}

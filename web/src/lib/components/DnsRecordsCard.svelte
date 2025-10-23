@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DNSResults, ReceivedHop } from "$lib/api/types.gen";
+    import type { DomainAlignment, DNSResults, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
@@ -11,13 +11,14 @@
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
 
     interface Props {
+        domainAlignment?: DomainAlignment;
         dnsResults?: DNSResults;
         dnsGrade?: string;
         dnsScore?: number;
         receivedChain?: ReceivedHop[];
     }
 
-    let { dnsResults, dnsGrade, dnsScore, receivedChain }: Props = $props();
+    let { domainAlignment, dnsResults, dnsGrade, dnsScore, receivedChain }: Props = $props();
 
     // Extract sender IP from first hop
     const senderIp = $derived(
@@ -81,19 +82,21 @@
             <hr class="my-4" />
 
             <!-- Return-Path Domain Section -->
-            <div class="mb-3 d-flex align-items-center gap-2">
-                <h4 class="mb-0">
-                    Return-Path Domain: <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
-                </h4>
-                {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
-                    <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from From domain</span>
-                    <small>
-                        <i class="bi bi-chevron-right"></i>
-                        <a href="#domain-alignment">See domain alignment</a>
-                    </small>
-                {:else}
-                    <span class="badge bg-success ms-2">Same as From domain</span>
-                {/if}
+            <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h4 class="mb-0">
+                        Return-Path Domain: <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
+                    </h4>
+                    {#if (domainAlignment && !domainAlignment.aligned && !domainAlignment.relaxed_aligned) || (domainAlignment && !domainAlignment.aligned && domainAlignment.relaxed_aligned && dnsResults.dmarc_record && dnsResults.dmarc_record.spf_alignment === "strict") || (!domainAlignment && dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain)}
+                        <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Differs from From domain</span>
+                        <small>
+                            <i class="bi bi-chevron-right"></i>
+                            <a href="#domain-alignment">See domain alignment</a>
+                        </small>
+                    {:else}
+                        <span class="badge bg-success ms-2">Same as From domain</span>
+                    {/if}
+                </div>
             </div>
 
             <!-- MX Records for Return-Path Domain -->
@@ -117,7 +120,7 @@
                     From Domain: <code>{dnsResults.from_domain}</code>
                 </h4>
                 {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
-                    <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Different from Return-Path domain</span>
+                    <span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain</span>
                 {/if}
             </div>
 

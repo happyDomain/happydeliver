@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/publicsuffix"
+
 	"git.happydns.org/happyDeliver/internal/api"
 )
 
@@ -52,6 +54,8 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 	// RP and From alignment (20 points)
 	if analysis.DomainAlignment.Aligned != nil && *analysis.DomainAlignment.Aligned {
 		score += 20
+	} else if analysis.DomainAlignment.RelaxedAligned != nil && *analysis.DomainAlignment.RelaxedAligned {
+		score += 15
 	} else {
 		maxGrade -= 2
 	}
@@ -280,7 +284,8 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 // analyzeDomainAlignment checks domain alignment between headers
 func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.DomainAlignment {
 	alignment := &api.DomainAlignment{
-		Aligned: api.PtrTo(true),
+		Aligned:        api.PtrTo(true),
+		RelaxedAligned: api.PtrTo(true),
 	}
 
 	// Extract From domain
@@ -289,6 +294,9 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.Domain
 		domain := h.extractDomain(fromAddr)
 		if domain != "" {
 			alignment.FromDomain = &domain
+			// Extract organizational domain
+			orgDomain := h.getOrganizationalDomain(domain)
+			alignment.FromOrgDomain = &orgDomain
 		}
 	}
 
@@ -298,15 +306,40 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.Domain
 		domain := h.extractDomain(returnPath)
 		if domain != "" {
 			alignment.ReturnPathDomain = &domain
+			// Extract organizational domain
+			orgDomain := h.getOrganizationalDomain(domain)
+			alignment.ReturnPathOrgDomain = &orgDomain
 		}
 	}
 
-	// Check alignment
+	// Check alignment (strict and relaxed)
 	issues := []string{}
 	if alignment.FromDomain != nil && alignment.ReturnPathDomain != nil {
-		if *alignment.FromDomain != *alignment.ReturnPathDomain {
-			*alignment.Aligned = false
-			issues = append(issues, "Return-Path domain does not match From domain")
+		fromDomain := *alignment.FromDomain
+		rpDomain := *alignment.ReturnPathDomain
+
+		// Strict alignment: exact match (case-insensitive)
+		strictAligned := strings.EqualFold(fromDomain, rpDomain)
+
+		// Relaxed alignment: organizational domain match
+		var fromOrgDomain, rpOrgDomain string
+		if alignment.FromOrgDomain != nil {
+			fromOrgDomain = *alignment.FromOrgDomain
+		}
+		if alignment.ReturnPathOrgDomain != nil {
+			rpOrgDomain = *alignment.ReturnPathOrgDomain
+		}
+		relaxedAligned := strings.EqualFold(fromOrgDomain, rpOrgDomain)
+
+		*alignment.Aligned = strictAligned
+		*alignment.RelaxedAligned = relaxedAligned
+
+		if !strictAligned {
+			if relaxedAligned {
+				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not exactly match From domain (%s), but satisfies relaxed alignment (organizational domain: %s)", rpDomain, fromDomain, fromOrgDomain))
+			} else {
+				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not match From domain (%s) - neither strict nor relaxed alignment", rpDomain, fromDomain))
+			}
 		}
 	}
 
@@ -333,6 +366,27 @@ func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
 	domain = strings.TrimRight(domain, ">")
 
 	return domain
+}
+
+// getOrganizationalDomain extracts the organizational domain from a fully qualified domain name
+// using the Public Suffix List (PSL) to correctly handle multi-level TLDs.
+// For example: mail.example.com -> example.com, mail.example.co.uk -> example.co.uk
+func (h *HeaderAnalyzer) getOrganizationalDomain(domain string) string {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+
+	// Use golang.org/x/net/publicsuffix to get the eTLD+1 (organizational domain)
+	// This correctly handles cases like .co.uk, .com.au, etc.
+	etldPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	if err != nil {
+		// Fallback to simple two-label extraction if PSL lookup fails
+		labels := strings.Split(domain, ".")
+		if len(labels) <= 2 {
+			return domain
+		}
+		return strings.Join(labels[len(labels)-2:], ".")
+	}
+
+	return etldPlusOne
 }
 
 // findHeaderIssues identifies issues with headers
@@ -458,8 +512,8 @@ func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.Received
 
 		// Try parsing with common email date formats
 		formats := []string{
-			time.RFC1123Z,           // "Mon, 02 Jan 2006 15:04:05 -0700"
-			time.RFC1123,            // "Mon, 02 Jan 2006 15:04:05 MST"
+			time.RFC1123Z, // "Mon, 02 Jan 2006 15:04:05 -0700"
+			time.RFC1123,  // "Mon, 02 Jan 2006 15:04:05 MST"
 			"Mon, 2 Jan 2006 15:04:05 -0700",
 			"Mon, 2 Jan 2006 15:04:05 MST",
 			"2 Jan 2006 15:04:05 -0700",
