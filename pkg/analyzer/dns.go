@@ -245,28 +245,34 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	// Basic validation
 	valid := d.validateSPF(spfRecord)
 
-	// Check for strict -all mechanism
+	// Extract the "all" mechanism qualifier
+	var allQualifier *api.SPFRecordAllQualifier
 	var errMsg *string
+
 	if !valid {
 		errMsg = api.PtrTo("SPF record appears malformed")
-	} else if !d.hasSPFStrictFail(spfRecord) {
-		// Check what mechanism is used
-		if strings.HasSuffix(spfRecord, " ~all") {
-			errMsg = api.PtrTo("SPF uses ~all (softfail) instead of -all (hardfail). This weakens email authentication and may reduce deliverability.")
-		} else if strings.HasSuffix(spfRecord, " +all") || strings.HasSuffix(spfRecord, " ?all") {
-			errMsg = api.PtrTo("SPF uses permissive 'all' mechanism. This severely weakens email authentication. Use -all for strict policy.")
+	} else {
+		// Extract qualifier from the "all" mechanism
+		if strings.HasSuffix(spfRecord, " -all") {
+			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("-"))
+		} else if strings.HasSuffix(spfRecord, " ~all") {
+			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("~"))
+		} else if strings.HasSuffix(spfRecord, " +all") {
+			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("+"))
+		} else if strings.HasSuffix(spfRecord, " ?all") {
+			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("?"))
 		} else if strings.HasSuffix(spfRecord, " all") {
-			errMsg = api.PtrTo("SPF uses neutral 'all' mechanism. Use -all for strict policy to improve deliverability.")
-		} else {
-			errMsg = api.PtrTo("SPF record should end with -all for strict policy to improve deliverability and prevent spoofing.")
+			// Implicit + qualifier (default)
+			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("+"))
 		}
 	}
 
 	results = append(results, api.SPFRecord{
-		Domain: &domain,
-		Record: &spfRecord,
-		Valid:  valid,
-		Error:  errMsg,
+		Domain:       &domain,
+		Record:       &spfRecord,
+		Valid:        valid,
+		AllQualifier: allQualifier,
+		Error:        errMsg,
 	})
 
 	// Extract and resolve include: directives
@@ -694,23 +700,23 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 		mainSPF := (*results.SpfRecords)[0]
 		if mainSPF.Valid {
 			// Full points for valid SPF
-			score += 20
+			score += 15
 
-			// Check for strict -all mechanism
-			if mainSPF.Record != nil && !d.hasSPFStrictFail(*mainSPF.Record) {
-				// Deduct points for weak SPF policy
-				if strings.HasSuffix(*mainSPF.Record, " ~all") {
+			// Deduct points based on the all mechanism qualifier
+			if mainSPF.AllQualifier != nil {
+				switch *mainSPF.AllQualifier {
+				case "-":
+					// Strict fail - no deduction, this is the recommended policy
+					score += 5
+				case "~":
 					// Softfail - moderate penalty
-					score -= 5
-				} else if strings.HasSuffix(*mainSPF.Record, " +all") ||
-					strings.HasSuffix(*mainSPF.Record, " ?all") ||
-					strings.HasSuffix(*mainSPF.Record, " all") {
+				case "+", "?":
 					// Pass/neutral - severe penalty
-					score -= 10
-				} else {
-					// No 'all' mechanism at all - severe penalty
-					score -= 10
+					score -= 5
 				}
+			} else {
+				// No 'all' mechanism qualifier extracted - severe penalty
+				score -= 5
 			}
 		} else if mainSPF.Record != nil {
 			// Partial credit if SPF record exists but has issues

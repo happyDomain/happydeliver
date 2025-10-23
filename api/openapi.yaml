@@ -867,6 +867,11 @@ components:
           type: boolean
           description: Whether the SPF record is valid
           example: true
+        all_qualifier:
+          type: string
+          enum: ["+", "-", "~", "?"]
+          description: "Qualifier for the 'all' mechanism: + (pass), - (fail), ~ (softfail), ? (neutral)"
+          example: "~"
         error:
           type: string
           description: Error message if validation failed

@@ -50,6 +50,33 @@
                             <span class="badge bg-danger">Invalid</span>
                         {/if}
                     </div>
+                    {#if spf.all_qualifier}
+                        <div class="mb-2">
+                            <strong>All Mechanism Policy:</strong>
+                            {#if spf.all_qualifier === '-'}
+                                <span class="badge bg-success">Strict (-all)</span>
+                            {:else if spf.all_qualifier === '~'}
+                                <span class="badge bg-warning">Softfail (~all)</span>
+                            {:else if spf.all_qualifier === '+'}
+                                <span class="badge bg-danger">Pass (+all)</span>
+                            {:else if spf.all_qualifier === '?'}
+                                <span class="badge bg-warning">Neutral (?all)</span>
+                            {/if}
+                            {#if index === 0}
+                                <div class="alert small mt-2" class:alert-warning={spf.all_qualifier !== '-'} class:alert-success={spf.all_qualifier === '-'}>
+                                    {#if spf.all_qualifier === '-'}
+                                        All unauthorized servers will be rejected. This is the recommended strict policy.
+                                    {:else if spf.all_qualifier === '~'}
+                                        Unauthorized servers will softfail. Consider using <code>-all</code> for stricter policy, though this rarely affects legitimate email deliverability.
+                                    {:else if spf.all_qualifier === '+'}
+                                        All servers are allowed to send email. This severely weakens email authentication. Use <code>-all</code> for strict policy.
+                                    {:else if spf.all_qualifier === '?'}
+                                        No statement about unauthorized servers. Use <code>-all</code> for strict policy to prevent spoofing.
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
                     {#if spf.record}
                         <div class="mb-2">
                             <strong>Record:</strong><br>
