@@ -589,6 +589,14 @@ components:
           type: string
           format: date-time
           description: When this hop occurred
+        ip:
+          type: string
+          description: IP address of the sending server (IPv4 or IPv6)
+          example: "192.0.2.1"
+        reverse:
+          type: string
+          description: Reverse DNS (PTR record) for the IP address
+          example: "mail.example.com"
 
     DomainAlignment:
       type: object

@@ -1,15 +1,17 @@
 <script lang="ts">
-    import type { RBLCheck } from "$lib/api/types.gen";
+    import type { RBLCheck, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import EmailPathCard from "./EmailPathCard.svelte";
 
     interface Props {
         blacklists: Record<string, RBLCheck[]>;
         blacklistGrade?: string;
         blacklistScore?: number;
+        receivedChain?: ReceivedHop[];
     }
 
-    let { blacklists, blacklistGrade, blacklistScore }: Props = $props();
+    let { blacklists, blacklistGrade, blacklistScore, receivedChain }: Props = $props();
 </script>
 
 <div class="card shadow-sm">
@@ -32,6 +34,10 @@
         </h4>
     </div>
     <div class="card-body">
+        {#if receivedChain}
+            <EmailPathCard {receivedChain} />
+        {/if}
+
         <div class="row row-cols-1 row-cols-lg-2">
             {#each Object.entries(blacklists) as [ip, checks]}
                 <div class="col mb-3">

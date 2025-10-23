@@ -23,7 +23,10 @@ package analyzer
 
 import (
 	"fmt"
+	"net"
+	"regexp"
 	"strings"
+	"time"
 
 	"git.happydns.org/happyDeliver/internal/api"
 )
@@ -209,6 +212,12 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.Header
 
 	analysis.Headers = &headers
 
+	// Received chain
+	receivedChain := h.parseReceivedChain(email)
+	if len(receivedChain) > 0 {
+		analysis.ReceivedChain = &receivedChain
+	}
+
 	// Domain alignment
 	domainAlignment := h.analyzeDomainAlignment(email)
 	if domainAlignment != nil {
@@ -355,4 +364,114 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []api.HeaderIssue
 	}
 
 	return issues
+}
+
+// parseReceivedChain extracts the chain of Received headers from an email
+func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []api.ReceivedHop {
+	if email == nil || email.Header == nil {
+		return nil
+	}
+
+	receivedHeaders := email.Header["Received"]
+	if len(receivedHeaders) == 0 {
+		return nil
+	}
+
+	var chain []api.ReceivedHop
+
+	for _, receivedValue := range receivedHeaders {
+		hop := h.parseReceivedHeader(receivedValue)
+		if hop != nil {
+			chain = append(chain, *hop)
+		}
+	}
+
+	return chain
+}
+
+// parseReceivedHeader parses a single Received header value
+func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.ReceivedHop {
+	hop := &api.ReceivedHop{}
+
+	// Normalize whitespace - Received headers can span multiple lines
+	normalized := strings.Join(strings.Fields(receivedValue), " ")
+
+	// Extract "from" field
+	fromRegex := regexp.MustCompile(`(?i)from\s+([^\s(]+)`)
+	if matches := fromRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		from := matches[1]
+		hop.From = &from
+	}
+
+	// Extract "by" field
+	byRegex := regexp.MustCompile(`(?i)by\s+([^\s(]+)`)
+	if matches := byRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		by := matches[1]
+		hop.By = &by
+	}
+
+	// Extract "with" field (protocol) - must come after "by" and before "id" or "for"
+	// This ensures we get the mail transfer protocol, not other "with" occurrences
+	withRegex := regexp.MustCompile(`(?i)by\s+[^\s(]+[^;]*?\s+with\s+([A-Z0-9]+)`)
+	if matches := withRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		with := matches[1]
+		hop.With = &with
+	}
+
+	// Extract "id" field
+	idRegex := regexp.MustCompile(`(?i)id\s+([^\s;]+)`)
+	if matches := idRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		id := matches[1]
+		hop.Id = &id
+	}
+
+	// Extract IP address from parentheses after "from"
+	// Pattern: from hostname (anything [IPv4/IPv6])
+	ipRegex := regexp.MustCompile(`\[([^\]]+)\]`)
+	if matches := ipRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		ipStr := matches[1]
+
+		// Handle IPv6: prefix (some MTAs include this)
+		ipStr = strings.TrimPrefix(ipStr, "IPv6:")
+
+		// Check if it's a valid IP (IPv4 or IPv6)
+		if net.ParseIP(ipStr) != nil {
+			hop.Ip = &ipStr
+
+			// Perform reverse DNS lookup
+			if reverseNames, err := net.LookupAddr(ipStr); err == nil && len(reverseNames) > 0 {
+				// Remove trailing dot from PTR record
+				reverse := strings.TrimSuffix(reverseNames[0], ".")
+				hop.Reverse = &reverse
+			}
+		}
+	}
+
+	// Extract timestamp - usually at the end after semicolon
+	// Common formats: "for <...>; Tue, 15 Oct 2024 12:34:56 +0000 (UTC)"
+	timestampRegex := regexp.MustCompile(`;\s*(.+)$`)
+	if matches := timestampRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+		timestampStr := strings.TrimSpace(matches[1])
+
+		// Remove timezone name in parentheses if present
+		timestampStr = regexp.MustCompile(`\s*\([^)]+\)\s*$`).ReplaceAllString(timestampStr, "")
+
+		// Try parsing with common email date formats
+		formats := []string{
+			time.RFC1123Z,           // "Mon, 02 Jan 2006 15:04:05 -0700"
+			time.RFC1123,            // "Mon, 02 Jan 2006 15:04:05 MST"
+			"Mon, 2 Jan 2006 15:04:05 -0700",
+			"Mon, 2 Jan 2006 15:04:05 MST",
+			"2 Jan 2006 15:04:05 -0700",
+		}
+
+		for _, format := range formats {
+			if parsedTime, err := time.Parse(format, timestampStr); err == nil {
+				hop.Timestamp = &parsedTime
+				break
+			}
+		}
+	}
+
+	return hop
 }

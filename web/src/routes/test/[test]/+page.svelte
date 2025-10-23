@@ -173,6 +173,7 @@
                             blacklists={report.blacklists}
                             blacklistGrade={report.summary?.blacklist_grade}
                             blacklistScore={report.summary?.blacklist_score}
+                            receivedChain={report.header_analysis?.received_chain}
                         />
                     </div>
                 </div>
