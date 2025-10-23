@@ -127,6 +127,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.Arc = a.parseARCResult(part)
 			}
 		}
+
+		// Parse IPRev
+		if strings.HasPrefix(part, "iprev=") {
+			if results.Iprev == nil {
+				results.Iprev = a.parseIPRevResult(part)
+			}
+		}
 	}
 }
 
@@ -257,6 +264,37 @@ func (a *AuthenticationAnalyzer) parseARCResult(part string) *api.ARCResult {
 	}
 
 	result.Details = api.PtrTo(strings.TrimPrefix(part, "arc="))
+
+	return result
+}
+
+// parseIPRevResult parses IP reverse lookup result from Authentication-Results
+// Example: iprev=pass smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)
+func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *api.IPRevResult {
+	result := &api.IPRevResult{}
+
+	// Extract result (pass, fail, temperror, permerror, none)
+	re := regexp.MustCompile(`iprev=(\w+)`)
+	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
+		resultStr := strings.ToLower(matches[1])
+		result.Result = api.IPRevResultResult(resultStr)
+	}
+
+	// Extract IP address (smtp.remote-ip or remote-ip)
+	ipRe := regexp.MustCompile(`(?:smtp\.)?remote-ip=([^\s;()]+)`)
+	if matches := ipRe.FindStringSubmatch(part); len(matches) > 1 {
+		ip := matches[1]
+		result.Ip = &ip
+	}
+
+	// Extract hostname from parentheses
+	hostnameRe := regexp.MustCompile(`\(([^)]+)\)`)
+	if matches := hostnameRe.FindStringSubmatch(part); len(matches) > 1 {
+		hostname := matches[1]
+		result.Hostname = &hostname
+	}
+
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "iprev="))
 
 	return result
 }
@@ -470,21 +508,31 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 
 	score := 0
 
-	// SPF (30 points)
-	if results.Spf != nil {
-		switch results.Spf.Result {
-		case api.AuthResultResultPass:
-			score += 30
-		case api.AuthResultResultNeutral, api.AuthResultResultNone:
+	// IPRev (15 points)
+	if results.Iprev != nil {
+		switch results.Iprev.Result {
+		case api.Pass:
 			score += 15
-		case api.AuthResultResultSoftfail:
-			score += 5
 		default: // fail, temperror, permerror
 			score += 0
 		}
 	}
 
-	// DKIM (30 points) - at least one passing signature
+	// SPF (25 points)
+	if results.Spf != nil {
+		switch results.Spf.Result {
+		case api.AuthResultResultPass:
+			score += 25
+		case api.AuthResultResultNeutral, api.AuthResultResultNone:
+			score += 12
+		case api.AuthResultResultSoftfail:
+			score += 4
+		default: // fail, temperror, permerror
+			score += 0
+		}
+	}
+
+	// DKIM (20 points) - at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		hasPass := false
 		for _, dkim := range *results.Dkim {
@@ -494,10 +542,10 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 			}
 		}
 		if hasPass {
-			score += 30
+			score += 20
 		} else {
 			// Has DKIM signatures but none passed
-			score += 10
+			score += 7
 		}
 	}
 

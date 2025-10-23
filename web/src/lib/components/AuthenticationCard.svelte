@@ -73,6 +73,36 @@
         </h4>
     </div>
     <div class="list-group list-group-flush">
+            <!-- IPREV -->
+            {#if authentication.iprev}
+                <div class="list-group-item">
+                    <div class="d-flex align-items-start">
+                        <i class="bi {getAuthResultIcon(authentication.iprev.result)} {getAuthResultClass(authentication.iprev.result)} me-2 fs-5"></i>
+                        <div>
+                            <strong>IP Reverse DNS</strong>
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.iprev.result)}">
+                                {authentication.iprev.result}
+                            </span>
+                            {#if authentication.iprev.ip}
+                                <div class="small">
+                                    <strong>IP Address:</strong>
+                                    <span class="text-muted">{authentication.iprev.ip}</span>
+                                </div>
+                            {/if}
+                            {#if authentication.iprev.hostname}
+                                <div class="small">
+                                    <strong>Hostname:</strong>
+                                    <span class="text-muted">{authentication.iprev.hostname}</span>
+                                </div>
+                            {/if}
+                            {#if authentication.iprev.details}
+                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.iprev.details}</pre>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
             <!-- SPF (Required) -->
             <div class="list-group-item">
                 <div class="d-flex align-items-start">

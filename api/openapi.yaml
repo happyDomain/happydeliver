@@ -678,6 +678,8 @@ components:
           $ref: '#/components/schemas/AuthResult'
         arc:
           $ref: '#/components/schemas/ARCResult'
+        iprev:
+          $ref: '#/components/schemas/IPRevResult'
 
     AuthResult:
       type: object
@@ -723,6 +725,29 @@ components:
           type: string
           description: Additional details about ARC validation
           example: "ARC chain valid with 2 intermediaries"
+
+    IPRevResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [pass, fail, temperror, permerror]
+          description: IP reverse DNS lookup result
+          example: "pass"
+        ip:
+          type: string
+          description: IP address that was checked
+          example: "195.110.101.58"
+        hostname:
+          type: string
+          description: Hostname from reverse DNS lookup (PTR record)
+          example: "authsmtp74.register.it"
+        details:
+          type: string
+          description: Additional details about the IP reverse lookup
+          example: "smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)"
 
     SpamAssassinResult:
       type: object
