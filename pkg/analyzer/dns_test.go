@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"net/mail"
 	"testing"
 	"time"
 )
@@ -57,61 +56,6 @@ func TestNewDNSAnalyzer(t *testing.T) {
 		})
 	}
 }
-
-func TestExtractDomain(t *testing.T) {
-	tests := []struct {
-		name           string
-		fromAddress    string
-		expectedDomain string
-	}{
-		{
-			name:           "Valid email",
-			fromAddress:    "user@example.com",
-			expectedDomain: "example.com",
-		},
-		{
-			name:           "Email with subdomain",
-			fromAddress:    "user@mail.example.com",
-			expectedDomain: "mail.example.com",
-		},
-		{
-			name:           "Email with uppercase",
-			fromAddress:    "User@Example.COM",
-			expectedDomain: "example.com",
-		},
-		{
-			name:           "Invalid email (no @)",
-			fromAddress:    "invalid-email",
-			expectedDomain: "",
-		},
-		{
-			name:           "Empty email",
-			fromAddress:    "",
-			expectedDomain: "",
-		},
-	}
-
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
-				Header: make(mail.Header),
-			}
-			if tt.fromAddress != "" {
-				email.From = &mail.Address{
-					Address: tt.fromAddress,
-				}
-			}
-
-			domain := analyzer.extractFromDomain(email)
-			if domain != tt.expectedDomain {
-				t.Errorf("extractFromDomain() = %q, want %q", domain, tt.expectedDomain)
-			}
-		})
-	}
-}
-
 func TestValidateSPF(t *testing.T) {
 	tests := []struct {
 		name     string

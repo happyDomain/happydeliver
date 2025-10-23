@@ -52,18 +52,18 @@ func NewDNSAnalyzer(timeout time.Duration) *DNSAnalyzer {
 }
 
 // AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults) *api.DNSResults {
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults, headersResults *api.HeaderAnalysis) *api.DNSResults {
 	// Extract domain from From address
-	fromDomain := d.extractFromDomain(email)
-	if fromDomain == "" {
+	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
 		return &api.DNSResults{
 			Errors: &[]string{"Unable to extract domain from email"},
 		}
 	}
+	fromDomain := *headersResults.DomainAlignment.FromDomain
 
 	results := &api.DNSResults{
 		FromDomain: fromDomain,
-		RpDomain:   d.extractRPDomain(email),
+		RpDomain:   headersResults.DomainAlignment.ReturnPathDomain,
 	}
 
 	// Determine which domain to check SPF for (Return-Path domain)
@@ -110,28 +110,6 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default")
 
 	return results
-}
-
-// extractFromDomain extracts the domain from the email's From address
-func (d *DNSAnalyzer) extractFromDomain(email *EmailMessage) string {
-	if email.From != nil && email.From.Address != "" {
-		parts := strings.Split(email.From.Address, "@")
-		if len(parts) == 2 {
-			return strings.ToLower(strings.TrimSpace(parts[1]))
-		}
-	}
-	return ""
-}
-
-// extractRPDomain extracts the domain from the email's Return-Path address
-func (d *DNSAnalyzer) extractRPDomain(email *EmailMessage) *string {
-	if email.ReturnPath != "" {
-		parts := strings.Split(email.ReturnPath, "@")
-		if len(parts) == 2 {
-			return api.PtrTo(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parts[1])), ">"))
-		}
-	}
-	return nil
 }
 
 // checkMXRecords looks up MX records for a domain
