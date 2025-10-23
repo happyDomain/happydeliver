@@ -5,6 +5,7 @@
     import type { Test, Report } from "$lib/api/types.gen";
     import {
         ScoreCard,
+        SummaryCard,
         SpamAssassinCard,
         PendingState,
         AuthenticationCard,
@@ -135,6 +136,13 @@
             <div class="row mb-4" id="score">
                 <div class="col-12">
                     <ScoreCard grade={report.grade} score={report.score} summary={report.summary} />
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <SummaryCard {report} />
                 </div>
             </div>
 

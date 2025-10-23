@@ -2,7 +2,7 @@
     interface Props {
         grade?: string;
         score: number;
-        size?: "small" | "medium" | "large";
+        size?: "inline" | "small" | "medium" | "large";
     }
 
     let { grade, score, size = "medium" }: Props = $props();
@@ -36,7 +36,8 @@
         }
     }
 
-    function getSizeClass(size: "small" | "medium" | "large"): string {
+    function getSizeClass(size: "inline" | "small" | "medium" | "large"): string {
+        if (size === "inline") return "fw-bold";
         if (size === "small") return "fs-4";
         if (size === "large") return "display-1";
         return "fs-2";

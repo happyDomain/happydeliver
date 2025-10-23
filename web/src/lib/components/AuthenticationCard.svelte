@@ -75,7 +75,7 @@
     <div class="list-group list-group-flush">
             <!-- IPREV -->
             {#if authentication.iprev}
-                <div class="list-group-item">
+                <div class="list-group-item" id="authentication-iprev">
                     <div class="d-flex align-items-start">
                         <i class="bi {getAuthResultIcon(authentication.iprev.result)} {getAuthResultClass(authentication.iprev.result)} me-2 fs-5"></i>
                         <div>
@@ -105,7 +105,7 @@
 
             <!-- SPF (Required) -->
             <div class="list-group-item">
-                <div class="d-flex align-items-start">
+                <div class="d-flex align-items-start" id="authentication-spf">
                     {#if authentication.spf}
                         <i class="bi {getAuthResultIcon(authentication.spf.result)} {getAuthResultClass(authentication.spf.result)} me-2 fs-5"></i>
                         <div>
@@ -137,7 +137,7 @@
             </div>
 
             <!-- DKIM (Required) -->
-            <div class="list-group-item">
+            <div class="list-group-item" id="authentication-dkim">
                 <div class="d-flex align-items-start">
                     {#if authentication.dkim && authentication.dkim.length > 0}
                         <i class="bi {getAuthResultIcon(authentication.dkim[0].result)} {getAuthResultClass(authentication.dkim[0].result)} me-2 fs-5"></i>
@@ -176,7 +176,7 @@
             </div>
 
             <!-- DMARC (Required) -->
-            <div class="list-group-item">
+            <div class="list-group-item" id="authentication-dmarc">
                 <div class="d-flex align-items-start">
                     {#if authentication.dmarc}
                         <i class="bi {getAuthResultIcon(authentication.dmarc.result)} {getAuthResultClass(authentication.dmarc.result)} me-2 fs-5"></i>
@@ -229,7 +229,7 @@
             </div>
 
             <!-- BIMI (Optional) -->
-            <div class="list-group-item">
+            <div class="list-group-item" id="authentication-bimi">
                 <div class="d-flex align-items-start">
                     {#if authentication.bimi && authentication.bimi.result != "none"}
                         <i class="bi {getAuthResultIcon(authentication.bimi.result)} {getAuthResultClass(authentication.bimi.result)} me-2 fs-5"></i>
@@ -269,7 +269,7 @@
 
             <!-- ARC (Optional) -->
             {#if authentication.arc}
-                <div class="list-group-item">
+                <div class="list-group-item" id="authentication-arc">
                     <div class="d-flex align-items-start">
                         <i class="bi {getAuthResultIcon(authentication.arc.result)} {getAuthResultClass(authentication.arc.result)} me-2 fs-5"></i>
                         <div>

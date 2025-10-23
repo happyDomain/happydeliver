@@ -9,7 +9,7 @@
 </script>
 
 {#if receivedChain && receivedChain.length > 0}
-    <div class="mb-3">
+    <div class="mb-3" id="email-path">
         <h5>Email Path (Received Chain)</h5>
         <div class="list-group">
             {#each receivedChain as hop, i}

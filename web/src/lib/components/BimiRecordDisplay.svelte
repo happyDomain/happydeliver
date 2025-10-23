@@ -9,7 +9,7 @@
 </script>
 
 {#if bimiRecord}
-    <div class="card mb-4">
+    <div class="card mb-4" id="dns-bimi">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="text-muted mb-0">
                 <i

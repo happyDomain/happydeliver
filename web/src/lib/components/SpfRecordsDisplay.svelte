@@ -14,7 +14,7 @@
 </script>
 
 {#if spfRecords && spfRecords.length > 0}
-    <div class="card mb-4">
+    <div class="card mb-4" id="dns-spf">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="text-muted mb-2">
                 <i

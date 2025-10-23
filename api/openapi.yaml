@@ -557,7 +557,7 @@ components:
           example: true
         importance:
           type: string
-          enum: [required, recommended, optional]
+          enum: [required, recommended, optional, newsletter]
           description: How important this header is for deliverability
           example: "required"
         issues:
