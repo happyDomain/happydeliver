@@ -420,20 +420,38 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
 	// Extract policy
 	policy := d.extractDMARCPolicy(dmarcRecord)
 
+	// Extract subdomain policy
+	subdomainPolicy := d.extractDMARCSubdomainPolicy(dmarcRecord)
+
+	// Extract percentage
+	percentage := d.extractDMARCPercentage(dmarcRecord)
+
+	// Extract alignment modes
+	spfAlignment := d.extractDMARCSPFAlignment(dmarcRecord)
+	dkimAlignment := d.extractDMARCDKIMAlignment(dmarcRecord)
+
 	// Basic validation
 	if !d.validateDMARC(dmarcRecord) {
 		return &api.DMARCRecord{
-			Record: &dmarcRecord,
-			Policy: api.PtrTo(api.DMARCRecordPolicy(policy)),
-			Valid:  false,
-			Error:  api.PtrTo("DMARC record appears malformed"),
+			Record:          &dmarcRecord,
+			Policy:          api.PtrTo(api.DMARCRecordPolicy(policy)),
+			SubdomainPolicy: subdomainPolicy,
+			Percentage:      percentage,
+			SpfAlignment:    spfAlignment,
+			DkimAlignment:   dkimAlignment,
+			Valid:           false,
+			Error:           api.PtrTo("DMARC record appears malformed"),
 		}
 	}
 
 	return &api.DMARCRecord{
-		Record: &dmarcRecord,
-		Policy: api.PtrTo(api.DMARCRecordPolicy(policy)),
-		Valid:  true,
+		Record:          &dmarcRecord,
+		Policy:          api.PtrTo(api.DMARCRecordPolicy(policy)),
+		SubdomainPolicy: subdomainPolicy,
+		Percentage:      percentage,
+		SpfAlignment:    spfAlignment,
+		DkimAlignment:   dkimAlignment,
+		Valid:           true,
 	}
 }
 
@@ -446,6 +464,71 @@ func (d *DNSAnalyzer) extractDMARCPolicy(record string) string {
 		return matches[1]
 	}
 	return "unknown"
+}
+
+// extractDMARCSPFAlignment extracts SPF alignment mode from a DMARC record
+// Returns "relaxed" (default) or "strict"
+func (d *DNSAnalyzer) extractDMARCSPFAlignment(record string) *api.DMARCRecordSpfAlignment {
+	// Look for aspf=s (strict) or aspf=r (relaxed)
+	re := regexp.MustCompile(`aspf=(r|s)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		if matches[1] == "s" {
+			return api.PtrTo(api.DMARCRecordSpfAlignmentStrict)
+		}
+		return api.PtrTo(api.DMARCRecordSpfAlignmentRelaxed)
+	}
+	// Default is relaxed if not specified
+	return api.PtrTo(api.DMARCRecordSpfAlignmentRelaxed)
+}
+
+// extractDMARCDKIMAlignment extracts DKIM alignment mode from a DMARC record
+// Returns "relaxed" (default) or "strict"
+func (d *DNSAnalyzer) extractDMARCDKIMAlignment(record string) *api.DMARCRecordDkimAlignment {
+	// Look for adkim=s (strict) or adkim=r (relaxed)
+	re := regexp.MustCompile(`adkim=(r|s)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		if matches[1] == "s" {
+			return api.PtrTo(api.DMARCRecordDkimAlignmentStrict)
+		}
+		return api.PtrTo(api.DMARCRecordDkimAlignmentRelaxed)
+	}
+	// Default is relaxed if not specified
+	return api.PtrTo(api.DMARCRecordDkimAlignmentRelaxed)
+}
+
+// extractDMARCSubdomainPolicy extracts subdomain policy from a DMARC record
+// Returns the sp tag value or nil if not specified (defaults to main policy)
+func (d *DNSAnalyzer) extractDMARCSubdomainPolicy(record string) *api.DMARCRecordSubdomainPolicy {
+	// Look for sp=none, sp=quarantine, or sp=reject
+	re := regexp.MustCompile(`sp=(none|quarantine|reject)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		return api.PtrTo(api.DMARCRecordSubdomainPolicy(matches[1]))
+	}
+	// If sp is not specified, it defaults to the main policy (p tag)
+	// Return nil to indicate it's using the default
+	return nil
+}
+
+// extractDMARCPercentage extracts the percentage from a DMARC record
+// Returns the pct tag value or nil if not specified (defaults to 100)
+func (d *DNSAnalyzer) extractDMARCPercentage(record string) *int {
+	// Look for pct=<number>
+	re := regexp.MustCompile(`pct=(\d+)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		// Convert string to int
+		var pct int
+		fmt.Sscanf(matches[1], "%d", &pct)
+		// Validate range (0-100)
+		if pct >= 0 && pct <= 100 {
+			return &pct
+		}
+	}
+	// Default is 100 if not specified
+	return nil
 }
 
 // validateDMARC performs basic DMARC record validation
@@ -657,7 +740,7 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 	// DMARC ties SPF and DKIM together and provides policy
 	if results.DmarcRecord != nil {
 		if results.DmarcRecord.Valid {
-			score += 15
+			score += 10
 			// Bonus points for stricter policies
 			if results.DmarcRecord.Policy != nil {
 				switch *results.DmarcRecord.Policy {
@@ -670,6 +753,43 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults) (int, string) {
 					// Weakest policy - deduct 5 points
 					score -= 5
 				}
+			}
+			// Bonus points for strict alignment modes (2 points each)
+			if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == api.DMARCRecordSpfAlignmentStrict {
+				score += 1
+			}
+			if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == api.DMARCRecordDkimAlignmentStrict {
+				score += 1
+			}
+			// Subdomain policy scoring (sp tag)
+			// +3 for stricter or equal subdomain policy, -3 for weaker
+			if results.DmarcRecord.SubdomainPolicy != nil {
+				mainPolicy := string(*results.DmarcRecord.Policy)
+				subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
+
+				// Policy strength: none < quarantine < reject
+				policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
+
+				mainStrength := policyStrength[mainPolicy]
+				subStrength := policyStrength[subPolicy]
+
+				if subStrength >= mainStrength {
+					// Subdomain policy is equal or stricter
+					score += 3
+				} else {
+					// Subdomain policy is weaker
+					score -= 3
+				}
+			} else {
+				// No sp tag means subdomains inherit main policy (good default)
+				score += 3
+			}
+			// Percentage scoring (pct tag)
+			// Apply the percentage on the current score
+			if results.DmarcRecord.Percentage != nil {
+				pct := *results.DmarcRecord.Percentage
+
+				score = score * pct / 100
 			}
 		} else if results.DmarcRecord.Record != nil {
 			// Partial credit if DMARC record exists but has issues

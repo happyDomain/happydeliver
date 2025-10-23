@@ -914,6 +914,27 @@ components:
           enum: [none, quarantine, reject, unknown]
           description: DMARC policy
           example: "quarantine"
+        subdomain_policy:
+          type: string
+          enum: [none, quarantine, reject, unknown]
+          description: DMARC subdomain policy (sp tag) - policy for subdomains if different from main policy
+          example: "quarantine"
+        percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Percentage of messages subjected to filtering (pct tag, default 100)
+          example: 100
+        spf_alignment:
+          type: string
+          enum: [relaxed, strict]
+          description: SPF alignment mode (aspf tag)
+          example: "relaxed"
+        dkim_alignment:
+          type: string
+          enum: [relaxed, strict]
+          description: DKIM alignment mode (adkim tag)
+          example: "relaxed"
         valid:
           type: boolean
           description: Whether the DMARC record is valid

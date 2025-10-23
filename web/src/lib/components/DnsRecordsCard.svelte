@@ -3,6 +3,7 @@
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
+    import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
 
     interface Props {
         dnsResults?: DNSResults;
@@ -205,53 +206,7 @@
             {/if}
 
             <!-- DMARC Record -->
-            {#if dnsResults.dmarc_record}
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="text-muted mb-0">
-                            <i
-                                class="bi"
-                                class:bi-check-circle-fill={dnsResults.dmarc_record.valid}
-                                class:text-success={dnsResults.dmarc_record.valid}
-                                class:bi-x-circle-fill={!dnsResults.dmarc_record.valid}
-                                class:text-danger={!dnsResults.dmarc_record.valid}
-                            ></i>
-                            Domain-based Message Authentication
-                        </h5>
-                        <span class="badge bg-secondary">DMARC</span>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text small text-muted mb-2">DMARC builds on SPF and DKIM by telling receiving servers what to do with emails that fail authentication checks. It also enables reporting so you can monitor your email security.</p>
-                        <div class="mb-2">
-                            <strong>Status:</strong>
-                            {#if dnsResults.dmarc_record.valid}
-                                <span class="badge bg-success">Valid</span>
-                            {:else}
-                                <span class="badge bg-danger">Invalid</span>
-                            {/if}
-                        </div>
-                        {#if dnsResults.dmarc_record.policy}
-                            <div class="mb-2">
-                                <strong>Policy:</strong>
-                                <span class="badge {dnsResults.dmarc_record.policy === 'reject' ? 'bg-success' : dnsResults.dmarc_record.policy === 'quarantine' ? 'bg-warning' : 'bg-secondary'}">
-                                    {dnsResults.dmarc_record.policy}
-                                </span>
-                            </div>
-                        {/if}
-                        {#if dnsResults.dmarc_record.record}
-                            <div class="mb-2">
-                                <strong>Record:</strong><br>
-                                <code class="d-block mt-1 text-break">{dnsResults.dmarc_record.record}</code>
-                            </div>
-                        {/if}
-                        {#if dnsResults.dmarc_record.error}
-                            <div class="text-danger">
-                                <strong>Error:</strong> {dnsResults.dmarc_record.error}
-                            </div>
-                        {/if}
-                    </div>
-                </div>
-            {/if}
+            <DmarcRecordDisplay dmarcRecord={dnsResults.dmarc_record} />
 
             <!-- BIMI Record -->
             {#if dnsResults.bimi_record}
