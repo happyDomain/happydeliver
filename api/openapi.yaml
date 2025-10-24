@@ -683,6 +683,9 @@ components:
         x_google_dkim:
           $ref: '#/components/schemas/AuthResult'
           description: Google-specific DKIM authentication result (x-google-dkim)
+        x_aligned_from:
+          $ref: '#/components/schemas/AuthResult'
+          description: X-Aligned-From authentication result (checks address alignment)
 
     AuthResult:
       type: object

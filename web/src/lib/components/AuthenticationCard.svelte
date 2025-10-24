@@ -213,6 +213,30 @@
                 </div>
             {/if}
 
+            <!-- X-Aligned-From (Disabled) -->
+            {#if false && authentication.x_aligned_from}
+                <div class="list-group-item" id="authentication-x-aligned-from">
+                    <div class="d-flex align-items-start">
+                        <i class="bi {getAuthResultIcon(authentication.x_aligned_from.result, false)} {getAuthResultClass(authentication.x_aligned_from.result, false)} me-2 fs-5"></i>
+                        <div>
+                            <strong>X-Aligned-From</strong>
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.x_aligned_from.result, false)}">
+                                {authentication.x_aligned_from.result}
+                            </span>
+                            {#if authentication.x_aligned_from.domain}
+                                <div class="small">
+                                    <strong>Domain:</strong>
+                                    <span class="text-muted">{authentication.x_aligned_from.domain}</span>
+                                </div>
+                            {/if}
+                            {#if authentication.x_aligned_from.details}
+                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.x_aligned_from.details}</pre>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
             <!-- DMARC (Required) -->
             <div class="list-group-item" id="authentication-dmarc">
                 <div class="d-flex align-items-start">

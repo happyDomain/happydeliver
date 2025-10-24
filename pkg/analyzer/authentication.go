@@ -138,6 +138,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.XGoogleDkim = a.parseXGoogleDKIMResult(part)
 			}
 		}
+
+		// Parse x-aligned-from
+		if strings.HasPrefix(part, "x-aligned-from=") {
+			if results.XAlignedFrom == nil {
+				results.XAlignedFrom = a.parseXAlignedFromResult(part)
+			}
+		}
 	}
 }
 
@@ -156,11 +163,14 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 	// SPF (25 points)
 	score += 25 * a.calculateSPFScore(results) / 100
 
-	// DKIM (25 points)
-	score += 25 * a.calculateDKIMScore(results) / 100
+	// DKIM (23 points)
+	score += 23 * a.calculateDKIMScore(results) / 100
 
 	// X-Google-DKIM (optional) - penalty if failed
 	score += 12 * a.calculateXGoogleDKIMScore(results) / 100
+
+	// X-Aligned-From
+	score += 2 * a.calculateXAlignedFromScore(results) / 100
 
 	// DMARC (25 points)
 	score += 25 * a.calculateDMARCScore(results) / 100

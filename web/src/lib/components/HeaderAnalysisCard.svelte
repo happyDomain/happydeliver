@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DMARCRecord, HeaderAnalysis } from "$lib/api/types.gen";
+    import type { AuthResult, DMARCRecord, HeaderAnalysis } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
 
@@ -8,9 +8,10 @@
         headerAnalysis: HeaderAnalysis;
         headerGrade?: string;
         headerScore?: number;
+        xAlignedFrom?: AuthResult;
     }
 
-    let { dmarcRecord, headerAnalysis, headerGrade, headerScore }: Props = $props();
+    let { dmarcRecord, headerAnalysis, headerGrade, headerScore, xAlignedFrom }: Props = $props();
 </script>
 
 <div class="card shadow-sm" id="header-details">
@@ -60,7 +61,11 @@
             <div class="card mb-3" id="domain-alignment">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="bi {headerAnalysis.domain_alignment.aligned ? 'bi-check-circle-fill text-success' : headerAnalysis.domain_alignment.relaxed_aligned ? 'bi-check-circle text-info' : 'bi-x-circle-fill text-danger'}"></i>
+                        {#if xAlignedFrom}
+                            <i class="bi {xAlignedFrom == "pass" ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                        {:else}
+                            <i class="bi {headerAnalysis.domain_alignment.aligned ? 'bi-check-circle-fill text-success' : headerAnalysis.domain_alignment.relaxed_aligned ? 'bi-check-circle text-info' : 'bi-x-circle-fill text-danger'}"></i>
+                        {/if}
                         Domain Alignment
                     </h5>
                 </div>
