@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Authentication, DNSResults, ReportSummary } from "$lib/api/types.gen";
+    import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
-        authentication: Authentication;
+        authentication: AuthenticationResults;
         authenticationGrade?: string;
         authenticationScore?: number;
-        dnsResults?: DNSResults;
+        dnsResults?: DnsResults;
     }
 
     let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
@@ -132,10 +132,10 @@
                             {/if}
                         </div>
                     {:else}
-                        <i class="bi {getAuthResultIcon('missing')} {getAuthResultClass('missing')} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass('missing', true)} me-2 fs-5"></i>
                         <div>
                             <strong>SPF</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass('missing')}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
                                 {getAuthResultText('missing')}
                             </span>
                             <div class="text-muted small">SPF record is required for proper email authentication</div>
@@ -171,10 +171,10 @@
                             {/if}
                         </div>
                     {:else}
-                        <i class="bi {getAuthResultIcon('missing')} {getAuthResultClass('missing')} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass('missing', true)} me-2 fs-5"></i>
                         <div>
                             <strong>DKIM</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass('missing')}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
                                 {getAuthResultText('missing')}
                             </span>
                             <div class="text-muted small">DKIM signature is required for proper email authentication</div>
@@ -214,7 +214,7 @@
             {/if}
 
             <!-- X-Aligned-From (Disabled) -->
-            {#if false && authentication.x_aligned_from}
+            {#if authentication.x_aligned_from}
                 <div class="list-group-item" id="authentication-x-aligned-from">
                     <div class="d-flex align-items-start">
                         <i class="bi {getAuthResultIcon(authentication.x_aligned_from.result, false)} {getAuthResultClass(authentication.x_aligned_from.result, false)} me-2 fs-5"></i>
@@ -253,7 +253,7 @@
                                     <span class="text-muted">{authentication.dmarc.domain}</span>
                                 </div>
                             {/if}
-                            {#snippet DMARCPolicy(policy)}
+                            {#snippet DMARCPolicy(policy: string)}
                                 <div class="small">
                                     <strong>Policy:</strong>
                                     <span
@@ -268,10 +268,10 @@
                                 </div>
                             {/snippet}
                             {#if authentication.dmarc.result != "none"}
-                                {#if authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
+                                {#if authentication.dmarc.details && authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
                                     {@const policy = authentication.dmarc.details.replace(/^.*policy.published-domain-policy=([^\s]+).*$/, "$1")}
                                     {@render DMARCPolicy(policy)}
-                                {:else if authentication.dmarc.domain}
+                                {:else if authentication.dmarc.domain && dnsResults?.dmarc_record?.policy}
                                     {@render DMARCPolicy(dnsResults.dmarc_record.policy)}
                                 {/if}
                             {/if}
@@ -280,10 +280,10 @@
                             {/if}
                         </div>
                     {:else}
-                        <i class="bi {getAuthResultIcon('missing')} {getAuthResultClass('missing')} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass('missing', true)} me-2 fs-5"></i>
                         <div>
                             <strong>DMARC</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass('missing')}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
                                 {getAuthResultText('missing')}
                             </span>
                             <div class="text-muted small">DMARC policy is required for proper email authentication</div>
@@ -296,10 +296,10 @@
             <div class="list-group-item" id="authentication-bimi">
                 <div class="d-flex align-items-start">
                     {#if authentication.bimi && authentication.bimi.result != "none"}
-                        <i class="bi {getAuthResultIcon(authentication.bimi.result)} {getAuthResultClass(authentication.bimi.result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.bimi.result, false)} {getAuthResultClass(authentication.bimi.result, false)} me-2 fs-5"></i>
                         <div>
                             <strong>BIMI</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.bimi.result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.bimi.result, false)}">
                                 {authentication.bimi.result}
                             </span>
                             {#if authentication.bimi.details}
@@ -335,10 +335,10 @@
             {#if authentication.arc}
                 <div class="list-group-item" id="authentication-arc">
                     <div class="d-flex align-items-start">
-                        <i class="bi {getAuthResultIcon(authentication.arc.result)} {getAuthResultClass(authentication.arc.result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.arc.result, false)} {getAuthResultClass(authentication.arc.result, false)} me-2 fs-5"></i>
                         <div>
                             <strong>ARC</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.arc.result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.arc.result, false)}">
                                 {authentication.arc.result}
                             </span>
                             {#if authentication.arc.chain_length}

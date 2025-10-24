@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DomainAlignment, DNSResults, ReceivedHop } from "$lib/api/types.gen";
+    import type { DomainAlignment, DnsResults, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
@@ -12,7 +12,7 @@
 
     interface Props {
         domainAlignment?: DomainAlignment;
-        dnsResults?: DNSResults;
+        dnsResults?: DnsResults;
         dnsGrade?: string;
         dnsScore?: number;
         receivedChain?: ReceivedHop[];

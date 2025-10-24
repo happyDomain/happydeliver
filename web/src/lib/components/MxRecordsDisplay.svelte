@@ -1,10 +1,10 @@
 <script lang="ts">
-    import type { ClassValue } from 'svelte/elements';
-    import type { MXRecord } from "$lib/api/types.gen";
+    import type { ClassValue } from "svelte/elements";
+    import type { MxRecord } from "$lib/api/types.gen";
 
     interface Props {
         class: ClassValue;
-        mxRecords: MXRecord[];
+        mxRecords: MxRecord[];
         title: string;
         description?: string;
     }

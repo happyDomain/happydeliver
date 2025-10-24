@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { BIMIRecord } from "$lib/api/types.gen";
+    import type { BimiRecord } from "$lib/api/types.gen";
 
     interface Props {
-        bimiRecord?: BIMIRecord;
+        bimiRecord?: BimiRecord;
     }
 
     let { bimiRecord }: Props = $props();

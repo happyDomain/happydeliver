@@ -7,8 +7,8 @@ export class NotAuthorizedError extends Error {
     }
 }
 
-async function customFetch(url: string, init: RequestInit): Promise<Response> {
-    const response = await fetch(url, init);
+async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const response = await fetch(input, init);
 
     if (response.status === 400) {
         const json = await response.json();

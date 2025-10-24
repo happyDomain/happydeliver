@@ -1,18 +1,18 @@
 <script lang="ts">
-    import type { SPFRecord } from "$lib/api/types.gen";
+    import type { SpfRecord } from "$lib/api/types.gen";
 
     interface Props {
-        spfRecords?: SPFRecord[];
+        spfRecords?: SpfRecord[];
     }
 
     let { spfRecords }: Props = $props();
 
     // Compute overall validity
-    const spfIsValid = $derived(
-        spfRecords?.reduce((acc, r) => acc && r.valid, true) ?? false
-    );
+    const spfIsValid = $derived(spfRecords?.reduce((acc, r) => acc && r.valid, true) ?? false);
     const spfCanBeImprove = $derived(
-        spfRecords.length > 0 && spfRecords.filter((r) => !r.record.includes(" redirect="))[0]?.all_qualifier != "-"
+        spfRecords &&
+            spfRecords.length > 0 &&
+            spfRecords.filter((r) => !r.record?.includes(" redirect="))[0]?.all_qualifier != "-",
     );
 </script>
 
@@ -58,13 +58,13 @@
                     {#if spf.all_qualifier}
                         <div class="mb-2">
                             <strong>All Mechanism Policy:</strong>
-                            {#if spf.all_qualifier === '-'}
+                            {#if spf.all_qualifier === "-"}
                                 <span class="badge bg-success">Strict (-all)</span>
-                            {:else if spf.all_qualifier === '~'}
+                            {:else if spf.all_qualifier === "~"}
                                 <span class="badge bg-warning">Softfail (~all)</span>
-                            {:else if spf.all_qualifier === '+'}
+                            {:else if spf.all_qualifier === "+"}
                                 <span class="badge bg-danger">Pass (+all)</span>
-                            {:else if spf.all_qualifier === '?'}
+                            {:else if spf.all_qualifier === "?"}
                                 <span class="badge bg-warning">Neutral (?all)</span>
                             {/if}
                             {#if index === 0 || (index === 1 && spfRecords[0].record?.includes('redirect='))}

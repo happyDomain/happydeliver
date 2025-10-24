@@ -1,10 +1,10 @@
 <script lang="ts">
-    import type { AuthResult, DMARCRecord, HeaderAnalysis } from "$lib/api/types.gen";
+    import type { AuthResult, DmarcRecord, HeaderAnalysis } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
-        dmarcRecord: DMARCRecord;
+        dmarcRecord?: DmarcRecord;
         headerAnalysis: HeaderAnalysis;
         headerGrade?: string;
         headerScore?: number;
@@ -62,7 +62,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         {#if xAlignedFrom}
-                            <i class="bi {xAlignedFrom == "pass" ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
+                            <i class="bi {xAlignedFrom.result == "pass" ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'}"></i>
                         {:else}
                             <i class="bi {headerAnalysis.domain_alignment.aligned ? 'bi-check-circle-fill text-success' : headerAnalysis.domain_alignment.relaxed_aligned ? 'bi-check-circle text-info' : 'bi-x-circle-fill text-danger'}"></i>
                         {/if}

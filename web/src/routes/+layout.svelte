@@ -38,7 +38,12 @@
                     </h3>
                     <ul class="footer-links">
                         <li><a href="/#features">Features</a></li>
-                        <li><a href="#">Download</a></li>
+                        <li>
+                            <a
+                                href="https://github.com/happyDomain/happydeliver/releases"
+                                target="_blank">Download</a
+                            >
+                        </li>
                         <li>
                             <a href="https://github.com/happyDomain/happydeliver/" target="_blank">
                                 GitHub
@@ -73,16 +78,32 @@
                         class="d-flex flex-wrap justify-content-between footer-links"
                         style="gap: .5em; font-size: 2em"
                     >
-                        <a href="https://framagit.org/happyDomain/happydeliver" target="_blank">
+                        <a
+                            href="https://framagit.org/happyDomain/happydeliver"
+                            target="_blank"
+                            aria-label="Visit our GitLab repository"
+                        >
                             <i class="bi bi-gitlab"></i>
                         </a>
-                        <a href="https://github.com/happyDomain/happydeliver" target="_blank">
+                        <a
+                            href="https://github.com/happyDomain/happydeliver"
+                            target="_blank"
+                            aria-label="Visit our GitHub repository"
+                        >
                             <i class="bi bi-github"></i>
                         </a>
-                        <a href="https://feedback.happydomain.org/" target="_blank">
+                        <a
+                            href="https://feedback.happydeliver.org/"
+                            target="_blank"
+                            aria-label="Share your feedback"
+                        >
                             <i class="bi bi-lightbulb-fill"></i>
                         </a>
-                        <a href="https://floss.social/@happyDomain" target="_blank">
+                        <a
+                            href="https://floss.social/@happyDomain"
+                            target="_blank"
+                            aria-label="Follow us on Mastodon"
+                        >
                             <i class="bi bi-mastodon"></i>
                         </a>
                     </div>
