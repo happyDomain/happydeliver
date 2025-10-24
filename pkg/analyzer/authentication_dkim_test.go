@@ -270,6 +270,8 @@ func TestParseLegacyDKIM(t *testing.T) {
 }
 
 func TestParseLegacyDKIM_Integration(t *testing.T) {
+	hostname = ""
+
 	// Test that parseLegacyDKIM is properly integrated into AnalyzeAuthentication
 	t.Run("Legacy DKIM is used when no Authentication-Results", func(t *testing.T) {
 		analyzer := NewAuthenticationAnalyzer()
