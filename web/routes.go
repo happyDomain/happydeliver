@@ -24,6 +24,7 @@ package web
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -131,13 +132,14 @@ func serveOrReverse(forced_url string, cfg *config.Config) gin.HandlerFunc {
 
 						v, _ := ioutil.ReadAll(resp.Body)
 
-						v2 := strings.Replace(strings.Replace(string(v), "</head>", "{{ .Head }}</head>", 1), "</body>", "{{ .Body }}</body>", 1)
+						v2 := strings.Replace(strings.Replace(string(v), "</head>", `{{ .Head }}<meta property="og:url" content="{{ .RootURL }}"></head>`, 1), "</body>", "{{ .Body }}</body>", 1)
 
 						indexTpl = template.Must(template.New("index.html").Parse(v2))
 
 						if err := indexTpl.ExecuteTemplate(c.Writer, "index.html", map[string]string{
-							"Body": CustomBodyHTML,
-							"Head": CustomHeadHTML,
+							"Body":    CustomBodyHTML,
+							"Head":    CustomHeadHTML,
+							"RootURL": fmt.Sprintf("https://%s/", c.Request.Host),
 						}); err != nil {
 							log.Println("Unable to return index.html:", err.Error())
 						}
@@ -157,14 +159,16 @@ func serveOrReverse(forced_url string, cfg *config.Config) gin.HandlerFunc {
 				f, _ := Assets.Open("index.html")
 				v, _ := ioutil.ReadAll(f)
 
-				v2 := strings.Replace(string(v), "</head>", "{{ .Head }}</head>", 1)
+				v2 := strings.Replace(strings.Replace(string(v), "</head>", `{{ .Head }}<meta property="og:url" content="{{ .RootURL }}"></head>`, 1), "</body>", "{{ .Body }}</body>", 1)
 
 				indexTpl = template.Must(template.New("index.html").Parse(v2))
 			}
 
 			// Serve template
 			if err := indexTpl.ExecuteTemplate(c.Writer, "index.html", map[string]string{
-				"Head": CustomHeadHTML,
+				"Body":    CustomBodyHTML,
+				"Head":    CustomHeadHTML,
+				"RootURL": fmt.Sprintf("https://%s/", c.Request.Host),
 			}); err != nil {
 				log.Println("Unable to return index.html:", err.Error())
 			}
