@@ -38,6 +38,7 @@ func declareFlags(o *Config) {
 	flag.DurationVar(&o.Analysis.HTTPTimeout, "http-timeout", o.Analysis.HTTPTimeout, "Timeout when performing HTTP query")
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
+	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
 
 	// Others flags are declared in some other files likes sources, storages, ... when they need specials configurations
 }

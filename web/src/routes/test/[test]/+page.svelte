@@ -12,7 +12,8 @@
         DnsRecordsCard,
         BlacklistCard,
         ContentAnalysisCard,
-        HeaderAnalysisCard
+        HeaderAnalysisCard,
+        TinySurvey,
     } from "$lib/components";
 
     let testId = $derived(page.params.test);
@@ -236,7 +237,11 @@
             <!-- Summary -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <SummaryCard {report} />
+                    <SummaryCard {report}>
+                        <div class="d-flex justify-content-end me-lg-5">
+                            <TinySurvey class="bg-primary-subtle rounded-4 p-3 text-center" />
+                        </div>
+                    </SummaryCard>
                 </div>
             </div>
 

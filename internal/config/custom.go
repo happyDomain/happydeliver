@@ -23,6 +23,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -41,5 +42,27 @@ func (i *StringArray) String() string {
 func (i *StringArray) Set(value string) error {
 	*i.Array = append(*i.Array, strings.Split(value, ",")...)
 
+	return nil
+}
+
+type URL struct {
+	URL *url.URL
+}
+
+func (i *URL) String() string {
+	if i.URL != nil {
+		return i.URL.String()
+	} else {
+		return ""
+	}
+}
+
+func (i *URL) Set(value string) error {
+	u, err := url.Parse(value)
+	if err != nil {
+		return err
+	}
+
+	*i.URL = *u
 	return nil
 }

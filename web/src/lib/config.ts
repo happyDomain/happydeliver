@@ -23,10 +23,12 @@ import { writable } from "svelte/store";
 
 interface AppConfig {
     report_retention?: number;
+    surveyUrl?: string;
 }
 
 const defaultConfig: AppConfig = {
     report_retention: 0,
+    surveyUrl: "",
 };
 
 function getConfigFromScriptTag(): AppConfig | null {

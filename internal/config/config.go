@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -41,6 +42,7 @@ type Config struct {
 	Email           EmailConfig
 	Analysis        AnalysisConfig
 	ReportRetention time.Duration // How long to keep reports. 0 = keep forever
+	SurveyURL       url.URL       // URL for user feedback survey
 }
 
 // DatabaseConfig contains database connection settings
