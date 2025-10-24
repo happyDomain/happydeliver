@@ -13,6 +13,8 @@ An open-source email deliverability testing platform that analyzes test emails a
 - **Database Storage**: SQLite or PostgreSQL support
 - **Configurable**: via environment or config file for all settings
 
+![A sample deliverability report](web/static/img/report.webp)
+
 ## Quick Start
 
 ### With Docker (Recommended)
