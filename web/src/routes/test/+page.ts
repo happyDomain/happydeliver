@@ -10,10 +10,11 @@ export const load: Load = async ({}) => {
     try {
         response = await apiCreateTest();
     } catch (err) {
-        error(err.response.status, err.message);
+        const errorObj = err as { response?: { status?: number }; message?: string };
+        error(errorObj.response?.status || 500, errorObj.message || "Unknown error");
     }
 
-    if (response.response.ok) {
+    if (response.response.ok && response.data) {
         redirect(302, `/test/${response.data.id}`);
     } else {
         error(response.response.status, response.error);

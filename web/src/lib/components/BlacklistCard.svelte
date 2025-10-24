@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { RBLCheck, ReceivedHop } from "$lib/api/types.gen";
+    import type { BlacklistCheck, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import GradeDisplay from "./GradeDisplay.svelte";
     import EmailPathCard from "./EmailPathCard.svelte";
 
     interface Props {
-        blacklists: Record<string, RBLCheck[]>;
+        blacklists: Record<string, BlacklistCheck[]>;
         blacklistGrade?: string;
         blacklistScore?: number;
         receivedChain?: ReceivedHop[];

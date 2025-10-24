@@ -8,6 +8,8 @@
 
     interface Props {
         test: Test;
+        nbfetch: number;
+        nextfetch: number;
         fetching?: boolean;
     }
 

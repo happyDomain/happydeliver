@@ -28,6 +28,8 @@
     let fetching = $state(false);
 
     async function fetchTest() {
+        if (!testId) return;
+
         if (nbfetch > 0) {
             nextfetch = Math.max(nextfetch, Math.floor(3 + nbfetch * 0.5));
         }
@@ -89,8 +91,8 @@
         }
     }
 
-    let lastTestId = null;
-    function testChange(newTestId) {
+    let lastTestId: string | null = null;
+    function testChange(newTestId: string) {
         if (lastTestId != newTestId) {
             lastTestId = newTestId;
             test = null;
@@ -100,7 +102,10 @@
     }
 
     $effect(() => {
-        testChange(page.params.test);
+        const newTestId = page.params.test;
+        if (newTestId) {
+            testChange(newTestId);
+        }
     })
 
     onDestroy(() => {
@@ -128,9 +133,9 @@
 
     function handleExportJSON() {
         const dataStr = JSON.stringify(report, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const dataBlob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = `report-${testId}.json`;
         link.click();
@@ -140,7 +145,7 @@
 </script>
 
 <svelte:head>
-    <title>{report ? `Test of ${report.dns_results.from_domain} ${report.test_id.slice(0, 7)}` : (test ? `Test ${test.id.slice(0, 7)}` : "Loading...")} - happyDeliver</title>
+    <title>{report ? `Test${report.dns_results ? ` of ${report.dns_results.from_domain}` : ''} ${report.test_id?.slice(0, 7) || ''}` : (test ? `Test ${test.id.slice(0, 7)}` : "Loading...")} - happyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">
@@ -283,11 +288,11 @@
                 <div class="row mb-4" id="header">
                     <div class="col-12">
                         <HeaderAnalysisCard
-                            dmarcRecord={report.dns_results.dmarc_record}
+                            dmarcRecord={report.dns_results?.dmarc_record}
                             headerAnalysis={report.header_analysis}
                             headerGrade={report.summary?.header_grade}
                             headerScore={report.summary?.header_score}
-                            xAlignedFrom={report.authentication.x_aligned_from}
+                            xAlignedFrom={report.authentication?.x_aligned_from}
                         />
                     </div>
                 </div>
@@ -346,23 +351,6 @@
             opacity: 1;
             transform: translateY(0);
         }
-    }
-
-    .category-section {
-        margin-bottom: 2rem;
-    }
-
-    .category-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #495057;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #e9ecef;
-    }
-
-    .category-score {
-        font-size: 1rem;
-        font-weight: 700;
     }
 
     .menu-container {

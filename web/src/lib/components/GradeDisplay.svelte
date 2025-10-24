@@ -1,7 +1,7 @@
 <script lang="ts">
     interface Props {
         grade?: string;
-        score: number;
+        score?: number;
         size?: "inline" | "small" | "medium" | "large";
     }
 

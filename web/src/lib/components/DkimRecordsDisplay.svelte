@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { DKIMRecord } from "$lib/api/types.gen";
+    import type { DkimRecord } from "$lib/api/types.gen";
 
     interface Props {
-        dkimRecords?: DKIMRecord[];
+        dkimRecords?: DkimRecord[];
     }
 
     let { dkimRecords }: Props = $props();

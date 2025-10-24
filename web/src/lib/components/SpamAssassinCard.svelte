@@ -5,8 +5,8 @@
 
     interface Props {
         spamassassin: SpamAssassinResult;
-        spamGrade: string;
-        spamScore: number;
+        spamGrade?: string;
+        spamScore?: number;
     }
 
     let { spamassassin, spamGrade, spamScore }: Props = $props();

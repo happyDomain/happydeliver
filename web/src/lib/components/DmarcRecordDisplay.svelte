@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { DMARCRecord } from "$lib/api/types.gen";
+    import type { DmarcRecord } from "$lib/api/types.gen";
 
     interface Props {
-        dmarcRecord?: DMARCRecord;
+        dmarcRecord?: DmarcRecord;
     }
 
     let { dmarcRecord }: Props = $props();
