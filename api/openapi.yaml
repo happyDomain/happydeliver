@@ -680,6 +680,9 @@ components:
           $ref: '#/components/schemas/ARCResult'
         iprev:
           $ref: '#/components/schemas/IPRevResult'
+        x_google_dkim:
+          $ref: '#/components/schemas/AuthResult'
+          description: Google-specific DKIM authentication result (x-google-dkim)
 
     AuthResult:
       type: object

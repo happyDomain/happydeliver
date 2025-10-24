@@ -134,6 +134,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.Iprev = a.parseIPRevResult(part)
 			}
 		}
+
+		// Parse x-google-dkim
+		if strings.HasPrefix(part, "x-google-dkim=") {
+			if results.XGoogleDkim == nil {
+				results.XGoogleDkim = a.parseXGoogleDKIMResult(part)
+			}
+		}
 	}
 }
 
@@ -295,6 +302,37 @@ func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *api.IPRevResult 
 	}
 
 	result.Details = api.PtrTo(strings.TrimPrefix(part, "iprev="))
+
+	return result
+}
+
+// parseXGoogleDKIMResult parses Google DKIM result from Authentication-Results
+// Example: x-google-dkim=pass (2048-bit rsa key) header.d=1e100.net header.i=@1e100.net header.b=fauiPVZ6
+func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(part string) *api.AuthResult {
+	result := &api.AuthResult{}
+
+	// Extract result (pass, fail, etc.)
+	re := regexp.MustCompile(`x-google-dkim=(\w+)`)
+	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
+		resultStr := strings.ToLower(matches[1])
+		result.Result = api.AuthResultResult(resultStr)
+	}
+
+	// Extract domain (header.d or d)
+	domainRe := regexp.MustCompile(`(?:header\.)?d=([^\s;]+)`)
+	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
+		domain := matches[1]
+		result.Domain = &domain
+	}
+
+	// Extract selector (header.s or s) - though not always present in x-google-dkim
+	selectorRe := regexp.MustCompile(`(?:header\.)?s=([^\s;]+)`)
+	if matches := selectorRe.FindStringSubmatch(part); len(matches) > 1 {
+		selector := matches[1]
+		result.Selector = &selector
+	}
+
+	result.Details = api.PtrTo(strings.TrimPrefix(part, "x-google-dkim="))
 
 	return result
 }
@@ -546,6 +584,16 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 		} else {
 			// Has DKIM signatures but none passed
 			score += 10
+		}
+	}
+
+	// X-Google-DKIM (optional) - penalty if failed
+	if results.XGoogleDkim != nil {
+		switch results.XGoogleDkim.Result {
+		case api.AuthResultResultPass:
+			// pass: don't alter the score
+		default: // fail
+			score -= 12
 		}
 	}
 

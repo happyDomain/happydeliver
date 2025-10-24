@@ -1261,6 +1261,61 @@ func TestParseIPRevResult(t *testing.T) {
 	}
 }
 
+func TestParseXGoogleDKIMResult(t *testing.T) {
+	tests := []struct {
+		name             string
+		part             string
+		expectedResult   api.AuthResultResult
+		expectedDomain   string
+		expectedSelector string
+	}{
+		{
+			name:           "x-google-dkim pass with domain",
+			part:           "x-google-dkim=pass (2048-bit rsa key) header.d=1e100.net header.i=@1e100.net header.b=fauiPVZ6",
+			expectedResult: api.AuthResultResultPass,
+			expectedDomain: "1e100.net",
+		},
+		{
+			name:           "x-google-dkim pass with short form",
+			part:           "x-google-dkim=pass d=gmail.com",
+			expectedResult: api.AuthResultResultPass,
+			expectedDomain: "gmail.com",
+		},
+		{
+			name:           "x-google-dkim fail",
+			part:           "x-google-dkim=fail header.d=example.com",
+			expectedResult: api.AuthResultResultFail,
+			expectedDomain: "example.com",
+		},
+		{
+			name:           "x-google-dkim with minimal info",
+			part:           "x-google-dkim=pass",
+			expectedResult: api.AuthResultResultPass,
+		},
+	}
+
+	analyzer := NewAuthenticationAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.parseXGoogleDKIMResult(tt.part)
+
+			if result.Result != tt.expectedResult {
+				t.Errorf("Result = %v, want %v", result.Result, tt.expectedResult)
+			}
+			if tt.expectedDomain != "" {
+				if result.Domain == nil || *result.Domain != tt.expectedDomain {
+					var gotDomain string
+					if result.Domain != nil {
+						gotDomain = *result.Domain
+					}
+					t.Errorf("Domain = %v, want %v", gotDomain, tt.expectedDomain)
+				}
+			}
+		})
+	}
+}
+
 func TestParseAuthenticationResultsHeader_IPRev(t *testing.T) {
 	tests := []struct {
 		name              string

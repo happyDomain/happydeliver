@@ -183,6 +183,36 @@
                 </div>
             </div>
 
+            <!-- X-Google-DKIM (Optional) -->
+            {#if authentication.x_google_dkim}
+                <div class="list-group-item" id="authentication-x-google-dkim">
+                    <div class="d-flex align-items-start">
+                        <i class="bi {getAuthResultIcon(authentication.x_google_dkim.result, false)} {getAuthResultClass(authentication.x_google_dkim.result, false)} me-2 fs-5"></i>
+                        <div>
+                            <strong>X-Google-DKIM</strong>
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.x_google_dkim.result, false)}">
+                                {authentication.x_google_dkim.result}
+                            </span>
+                            {#if authentication.x_google_dkim.domain}
+                                <div class="small">
+                                    <strong>Domain:</strong>
+                                    <span class="text-muted">{authentication.x_google_dkim.domain}</span>
+                                </div>
+                            {/if}
+                            {#if authentication.x_google_dkim.selector}
+                                <div class="small">
+                                    <strong>Selector:</strong>
+                                    <span class="text-muted">{authentication.x_google_dkim.selector}</span>
+                                </div>
+                            {/if}
+                            {#if authentication.x_google_dkim.details}
+                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.x_google_dkim.details}</pre>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
             <!-- DMARC (Required) -->
             <div class="list-group-item" id="authentication-dmarc">
                 <div class="d-flex align-items-start">
