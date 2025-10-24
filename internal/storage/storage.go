@@ -108,7 +108,7 @@ func (s *DBStorage) ReportExists(testID uuid.UUID) (bool, error) {
 // GetReport retrieves a report by test ID, returning the raw JSON and email bytes
 func (s *DBStorage) GetReport(testID uuid.UUID) ([]byte, []byte, error) {
 	var dbReport Report
-	if err := s.db.First(&dbReport, "test_id = ?", testID).Error; err != nil {
+	if err := s.db.Where("test_id = ?", testID).Order("created_at DESC").First(&dbReport).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, ErrNotFound
 		}
