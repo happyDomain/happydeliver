@@ -11,6 +11,9 @@
     const spfIsValid = $derived(
         spfRecords?.reduce((acc, r) => acc && r.valid, true) ?? false
     );
+    const spfCanBeImprove = $derived(
+        spfRecords.length > 0 && spfRecords.filter((r) => !r.record.includes(" redirect="))[0]?.all_qualifier != "-"
+    );
 </script>
 
 {#if spfRecords && spfRecords.length > 0}
@@ -19,8 +22,10 @@
             <h5 class="text-muted mb-2">
                 <i
                     class="bi"
-                    class:bi-check-circle-fill={spfIsValid}
-                    class:text-success={spfIsValid}
+                    class:bi-check-circle-fill={spfIsValid && !spfCanBeImprove}
+                    class:text-success={spfIsValid && !spfCanBeImprove}
+                    class:bi-arrow-up-circle-fill={spfIsValid && spfCanBeImprove}
+                    class:text-warning={spfIsValid && spfCanBeImprove}
                     class:bi-x-circle-fill={!spfIsValid}
                     class:text-danger={!spfIsValid}
                 ></i>
@@ -62,7 +67,7 @@
                             {:else if spf.all_qualifier === '?'}
                                 <span class="badge bg-warning">Neutral (?all)</span>
                             {/if}
-                            {#if index === 0}
+                            {#if index === 0 || (index === 1 && spfRecords[0].record?.includes('redirect='))}
                                 <div class="alert small mt-2" class:alert-warning={spf.all_qualifier !== '-'} class:alert-success={spf.all_qualifier === '-'}>
                                     {#if spf.all_qualifier === '-'}
                                         All unauthorized servers will be rejected. This is the recommended strict policy.

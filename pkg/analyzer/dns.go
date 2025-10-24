@@ -269,6 +269,18 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 		Error:        errMsg,
 	})
 
+	// Check for redirect= modifier first (it replaces the entire SPF policy)
+	redirectDomain := d.extractSPFRedirect(spfRecord)
+	if redirectDomain != "" {
+		// redirect= replaces the current domain's policy entirely
+		// Only follow if no other mechanisms matched (per RFC 7208)
+		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1)
+		if redirectRecords != nil {
+			results = append(results, *redirectRecords...)
+		}
+		return &results
+	}
+
 	// Extract and resolve include: directives
 	includes := d.extractSPFIncludes(spfRecord)
 	for _, includeDomain := range includes {
@@ -294,11 +306,27 @@ func (d *DNSAnalyzer) extractSPFIncludes(record string) []string {
 	return includes
 }
 
+// extractSPFRedirect extracts the redirect= domain from an SPF record
+// The redirect= modifier replaces the current domain's SPF policy with that of the target domain
+func (d *DNSAnalyzer) extractSPFRedirect(record string) string {
+	re := regexp.MustCompile(`redirect=([^\s]+)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
 // validateSPF performs basic SPF record validation
 func (d *DNSAnalyzer) validateSPF(record string) bool {
 	// Must start with v=spf1
 	if !strings.HasPrefix(record, "v=spf1") {
 		return false
+	}
+
+	// Check for redirect= modifier (which replaces the need for an 'all' mechanism)
+	if strings.Contains(record, "redirect=") {
+		return true
 	}
 
 	// Check for common syntax issues
@@ -752,8 +780,27 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults, senderIP string
 	// SPF Records: 20 points
 	// SPF is essential for email authentication
 	if results.SpfRecords != nil && len(*results.SpfRecords) > 0 {
-		// Check the main domain's SPF record (first in the list)
-		mainSPF := (*results.SpfRecords)[0]
+		// Find the main SPF record by skipping redirects
+		// Loop through records to find the last redirect or the first non-redirect
+		mainSPFIndex := 0
+		for i := 0; i < len(*results.SpfRecords); i++ {
+			spfRecord := (*results.SpfRecords)[i]
+			if spfRecord.Record != nil && strings.Contains(*spfRecord.Record, "redirect=") {
+				// This is a redirect, check if there's a next record
+				if i+1 < len(*results.SpfRecords) {
+					mainSPFIndex = i + 1
+				} else {
+					// Redirect exists but no target record found
+					break
+				}
+			} else {
+				// Found a non-redirect record
+				mainSPFIndex = i
+				break
+			}
+		}
+
+		mainSPF := (*results.SpfRecords)[mainSPFIndex]
 		if mainSPF.Valid {
 			// Full points for valid SPF
 			score += 15

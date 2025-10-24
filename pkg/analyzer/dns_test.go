@@ -83,12 +83,22 @@ func TestValidateSPF(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Valid SPF with redirect",
+			record:   "v=spf1 redirect=_spf.example.com",
+			expected: true,
+		},
+		{
+			name:     "Valid SPF with redirect and mechanisms",
+			record:   "v=spf1 ip4:192.0.2.0/24 redirect=_spf.example.com",
+			expected: true,
+		},
+		{
 			name:     "Invalid SPF - no version",
 			record:   "include:_spf.example.com -all",
 			expected: false,
 		},
 		{
-			name:     "Invalid SPF - no all mechanism",
+			name:     "Invalid SPF - no all mechanism or redirect",
 			record:   "v=spf1 include:_spf.example.com",
 			expected: false,
 		},
@@ -106,6 +116,51 @@ func TestValidateSPF(t *testing.T) {
 			result := analyzer.validateSPF(tt.record)
 			if result != tt.expected {
 				t.Errorf("validateSPF(%q) = %v, want %v", tt.record, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractSPFRedirect(t *testing.T) {
+	tests := []struct {
+		name             string
+		record           string
+		expectedRedirect string
+	}{
+		{
+			name:             "SPF with redirect",
+			record:           "v=spf1 redirect=_spf.example.com",
+			expectedRedirect: "_spf.example.com",
+		},
+		{
+			name:             "SPF with redirect and other mechanisms",
+			record:           "v=spf1 ip4:192.0.2.0/24 redirect=_spf.google.com",
+			expectedRedirect: "_spf.google.com",
+		},
+		{
+			name:             "SPF without redirect",
+			record:           "v=spf1 include:_spf.example.com -all",
+			expectedRedirect: "",
+		},
+		{
+			name:             "SPF with only all mechanism",
+			record:           "v=spf1 -all",
+			expectedRedirect: "",
+		},
+		{
+			name:             "Empty record",
+			record:           "",
+			expectedRedirect: "",
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractSPFRedirect(tt.record)
+			if result != tt.expectedRedirect {
+				t.Errorf("extractSPFRedirect(%q) = %q, want %q", tt.record, result, tt.expectedRedirect)
 			}
 		})
 	}
