@@ -71,7 +71,7 @@
 
         {#if contentAnalysis.html_issues && contentAnalysis.html_issues.length > 0}
             <div class="mt-3">
-                <h6>Content Issues</h6>
+                <h5>Content Issues</h5>
                 {#each contentAnalysis.html_issues as issue}
                     <div class="alert alert-{issue.severity === 'critical' || issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info'} py-2 px-3 mb-2">
                         <div class="d-flex justify-content-between align-items-start">
@@ -97,7 +97,7 @@
 
         {#if contentAnalysis.links && contentAnalysis.links.length > 0}
             <div class="mt-3">
-                <h6>Links ({contentAnalysis.links.length})</h6>
+                <h5>Links ({contentAnalysis.links.length})</h5>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
@@ -132,7 +132,7 @@
 
         {#if contentAnalysis.images && contentAnalysis.images.length > 0}
             <div class="mt-3">
-                <h6>Images ({contentAnalysis.images.length})</h6>
+                <h5>Images ({contentAnalysis.images.length})</h5>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>

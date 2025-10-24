@@ -63,8 +63,8 @@
             <!-- Reverse IP Section -->
             {#if receivedChain && receivedChain.length > 0}
                 <div class="mb-3 d-flex align-items-center gap-2">
-                    <h4 class="mb-0">
-                        Received by: <code>{receivedChain[0].from} ({receivedChain[0].reverse || "Unknown"} [{receivedChain[0].ip}])</code>
+                    <h4 class="mb-0 text-truncate">
+                        Received from: <code>{receivedChain[0].from} ({receivedChain[0].reverse || "Unknown"} [{receivedChain[0].ip}])</code>
                     </h4>
                 </div>
             {/if}
@@ -84,7 +84,7 @@
             <!-- Return-Path Domain Section -->
             <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <h4 class="mb-0">
+                    <h4 class="mb-0 text-truncate">
                         Return-Path Domain: <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
                     </h4>
                     {#if (domainAlignment && !domainAlignment.aligned && !domainAlignment.relaxed_aligned) || (domainAlignment && !domainAlignment.aligned && domainAlignment.relaxed_aligned && dnsResults.dmarc_record && dnsResults.dmarc_record.spf_alignment === "strict") || (!domainAlignment && dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain)}
@@ -116,7 +116,7 @@
 
             <!-- From Domain Section -->
             <div class="mb-3 d-flex align-items-center gap-2">
-                <h4 class="mb-0">
+                <h4 class="mb-0 text-truncate">
                     From Domain: <code>{dnsResults.from_domain}</code>
                 </h4>
                 {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}

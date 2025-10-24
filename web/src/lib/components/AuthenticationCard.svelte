@@ -12,7 +12,7 @@
 
     let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
 
-    function getAuthResultClass(result: string): string {
+    function getAuthResultClass(result: string, noneIsFail: boolean): string {
         switch (result) {
             case "pass":
                 return "text-success";
@@ -22,12 +22,14 @@
             case "softfail":
             case "neutral":
                 return "text-warning";
+            case "none":
+                return noneIsFail ? "text-danger" : "text-muted";
             default:
                 return "text-muted";
         }
     }
 
-    function getAuthResultIcon(result: string): string {
+    function getAuthResultIcon(result: string, noneIsFail: boolean): string {
         switch (result) {
             case "pass":
                 return "bi-check-circle-fill";
@@ -38,6 +40,8 @@
                 return "bi-exclamation-circle-fill";
             case "missing":
                 return "bi-dash-circle-fill";
+            case "none":
+                return noneIsFail ? "bi-x-circle-fill" : "bi-question-circle";
             default:
                 return "bi-question-circle";
         }
@@ -77,10 +81,10 @@
             {#if authentication.iprev}
                 <div class="list-group-item" id="authentication-iprev">
                     <div class="d-flex align-items-start">
-                        <i class="bi {getAuthResultIcon(authentication.iprev.result)} {getAuthResultClass(authentication.iprev.result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.iprev.result, true)} {getAuthResultClass(authentication.iprev.result, true)} me-2 fs-5"></i>
                         <div>
                             <strong>IP Reverse DNS</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.iprev.result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.iprev.result, true)}">
                                 {authentication.iprev.result}
                             </span>
                             {#if authentication.iprev.ip}
@@ -107,10 +111,10 @@
             <div class="list-group-item">
                 <div class="d-flex align-items-start" id="authentication-spf">
                     {#if authentication.spf}
-                        <i class="bi {getAuthResultIcon(authentication.spf.result)} {getAuthResultClass(authentication.spf.result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.spf.result, true)} {getAuthResultClass(authentication.spf.result, true)} me-2 fs-5"></i>
                         <div>
                             <strong>SPF</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.spf.result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.spf.result, true)}">
                                 {authentication.spf.result}
                             </span>
                             {#if authentication.spf.domain}
@@ -140,10 +144,10 @@
             <div class="list-group-item" id="authentication-dkim">
                 <div class="d-flex align-items-start">
                     {#if authentication.dkim && authentication.dkim.length > 0}
-                        <i class="bi {getAuthResultIcon(authentication.dkim[0].result)} {getAuthResultClass(authentication.dkim[0].result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.dkim[0].result, true)} {getAuthResultClass(authentication.dkim[0].result, true)} me-2 fs-5"></i>
                         <div>
                             <strong>DKIM</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dkim[0].result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dkim[0].result, true)}">
                                 {authentication.dkim[0].result}
                             </span>
                             {#if authentication.dkim[0].domain}
@@ -179,10 +183,10 @@
             <div class="list-group-item" id="authentication-dmarc">
                 <div class="d-flex align-items-start">
                     {#if authentication.dmarc}
-                        <i class="bi {getAuthResultIcon(authentication.dmarc.result)} {getAuthResultClass(authentication.dmarc.result)} me-2 fs-5"></i>
+                        <i class="bi {getAuthResultIcon(authentication.dmarc.result, true)} {getAuthResultClass(authentication.dmarc.result, true)} me-2 fs-5"></i>
                         <div>
                             <strong>DMARC</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dmarc.result)}">
+                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dmarc.result, true)}">
                                 {authentication.dmarc.result}
                             </span>
                             {#if authentication.dmarc.domain}
@@ -205,11 +209,13 @@
                                     </span>
                                 </div>
                             {/snippet}
-                            {#if authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
-                                {@const policy = authentication.dmarc.details.replace(/^.*policy.published-domain-policy=([^\s]+).*$/, "$1")}
-                                {@render DMARCPolicy(policy)}
-                            {:else if authentication.dmarc.domain}
-                                {@render DMARCPolicy(dnsResults.dmarc_record.policy)}
+                            {#if authentication.dmarc.result != "none"}
+                                {#if authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
+                                    {@const policy = authentication.dmarc.details.replace(/^.*policy.published-domain-policy=([^\s]+).*$/, "$1")}
+                                    {@render DMARCPolicy(policy)}
+                                {:else if authentication.dmarc.domain}
+                                    {@render DMARCPolicy(dnsResults.dmarc_record.policy)}
+                                {/if}
                             {/if}
                             {#if authentication.dmarc.details}
                                 <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dmarc.details}</pre>

@@ -42,7 +42,7 @@
 
         {#if summary}
             <div class="row g-3 text-start">
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#dns-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.dns_grade} score={summary.dns_score} />
@@ -50,7 +50,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#authentication-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.authentication_grade} score={summary.authentication_score} />
@@ -58,7 +58,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#rbl-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.blacklist_grade} score={summary.blacklist_score} />
@@ -66,7 +66,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#header-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.header_grade} score={summary.header_score} />
@@ -74,7 +74,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#spam-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.spam_grade} score={summary.spam_score} />
@@ -82,7 +82,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-6 col-lg">
+                <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#content-details" class="text-decoration-none">
                         <div class="p-2 bg-light rounded text-center summary-card">
                             <GradeDisplay grade={summary.content_grade} score={summary.content_score} />

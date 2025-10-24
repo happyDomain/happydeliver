@@ -102,7 +102,7 @@
 </script>
 
 <svelte:head>
-    <title>{test ? `Test ${test.id.slice(0, 7)} - happyDeliver` : "Loading..."}</title>
+    <title>{report ? `Test of ${report.dns_results.from_domain} ${report.test_id.slice(0, 7)}` : (test ? `Test ${test.id.slice(0, 7)}` : "Loading...")} - happyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

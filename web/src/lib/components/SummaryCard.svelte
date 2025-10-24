@@ -85,6 +85,41 @@
             segments.push({ text: " (lacks proper authentication)" });
         }
 
+        // SPF specific issues
+        if (spfResult && spfResult !== "pass") {
+            segments.push({ text: ". SPF check " });
+            if (spfResult === "fail") {
+                segments.push({
+                    text: "failed",
+                    highlight: { color: "danger", bold: true },
+                    link: "#authentication-spf"
+                });
+                segments.push({ text: ", the sending server is not authorized to send mail for this domain" });
+            } else if (spfResult === "softfail") {
+                segments.push({
+                    text: "soft-failed",
+                    highlight: { color: "warning", bold: true },
+                    link: "#authentication-spf"
+                });
+                segments.push({ text: ", the sending server may not be authorized" });
+            } else if (spfResult === "temperror" || spfResult === "permerror") {
+                segments.push({
+                    text: "encountered an error",
+                    highlight: { color: "warning", bold: true },
+                    link: "#authentication-spf"
+                });
+                segments.push({ text: ", check your SPF record configuration" });
+            } else if (spfResult === "none") {
+                segments.push({ text: "Your domain has " });
+                segments.push({
+                    text: "no SPF record",
+                    highlight: { color: "danger", bold: true },
+                    link: "#dns-spf"
+                });
+                segments.push({ text: ", you should add one to specify which servers can send email on your behalf" });
+            }
+        }
+
         // IP Reverse DNS (iprev) check
         const iprevResult = report.authentication?.iprev;
         if (iprevResult) {
@@ -207,7 +242,9 @@
                 if (dmarcRecord.policy === "reject") {
                     segments.push({ text: ", which is great" });
                 } else {
-                    segments.push({ text: ", consider switching to reject" });
+                    segments.push({ text: ", consider switching to '" });
+                    segments.push({ text: "reject", highlight: { monospace: true, bold: true } });
+                    segments.push({ text: "'" });
                 }
             }
         } else if (dmarcResult && dmarcResult.result === "fail") {
@@ -238,6 +275,8 @@
                     highlight: { color: "warning", bold: true },
                     link: "#dns-bimi"
                 });
+                segments.push({ text: ", you could " });
+                segments.push({ text: "add a record to decline participation", highlight: { bold: true } });
             } else if (bimiResult || bimiRecord) {
                 segments.push({ text: ". Your domain has " });
                 segments.push({
@@ -395,7 +434,7 @@
                     {segment.text}
                 {/if}
             {/each}
-            Overall, your email received a grade <GradeDisplay grade={report.grade} score={report.score} size="inline" />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{/if}! Check the details below 🔽
+            Overall, your email received a grade <GradeDisplay grade={report.grade} score={report.score} size="inline" />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}: you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}: you could have delivery issues with common providers.{:else if report.grade == "F"}: it will most likely be rejected by most providers.{:else}!{/if} Check the details below 🔽
         </p>
     </div>
 </div>

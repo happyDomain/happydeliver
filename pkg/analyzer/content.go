@@ -751,9 +751,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 				brokenLinks++
 			}
 		}
-		if brokenLinks == 0 {
-			score += 20
-		}
+		score += 20 * brokenLinks / len(results.Links)
 		// Too much links, 10 points penalty
 		if len(results.Links) > 30 {
 			score -= 10
@@ -771,11 +769,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 				noAltCount++
 			}
 		}
-		if noAltCount == 0 {
-			score += 15
-		} else if noAltCount < len(results.Images) {
-			score += 7
-		}
+		score += 15 * noAltCount / len(results.Images)
 	} else {
 		// No images is Ok
 		score += 15
@@ -795,20 +789,12 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 
 	// Penalize suspicious URLs (deduct up to 5 points)
 	if len(results.SuspiciousURLs) > 0 {
-		penalty := len(results.SuspiciousURLs)
-		if penalty > 5.0 {
-			penalty = 5
-		}
-		score -= penalty
+		score -= min(len(results.SuspiciousURLs), 5)
 	}
 
 	// Penalize harmful HTML tags (deduct 20 points per harmful tag, max 40 points)
 	if len(results.HarmfullIssues) > 0 {
-		penalty := len(results.HarmfullIssues) * 20
-		if penalty > 40 {
-			penalty = 40
-		}
-		score -= penalty
+		score -= min(len(results.HarmfullIssues)*20, 40)
 	}
 
 	// Ensure score is between 0 and 100

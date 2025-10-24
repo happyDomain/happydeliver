@@ -17,7 +17,7 @@
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">
                             <span class="badge bg-primary me-2">{receivedChain.length - i}</span>
-                            {hop.reverse || '-'}{#if hop.ip} <span class="text-muted">({hop.ip})</span>{/if} → {hop.by || 'Unknown'}
+                            {hop.reverse || '-'} {#if hop.ip}<span class="text-muted">({hop.ip})</span>{/if} → {hop.by || 'Unknown'}
                         </h6>
                         <small class="text-muted" title={hop.timestamp}>{hop.timestamp ? new Intl.DateTimeFormat('default', { dateStyle: 'long', 'timeStyle': 'short' }).format(new Date(hop.timestamp)) : '-'}</small>
                     </div>
