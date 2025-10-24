@@ -1,6 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { createTest as apiCreateTest } from "$lib/api";
+    import { appConfig } from "$lib/config";
     import { FeatureCard, HowItWorksStep } from "$lib/components";
 
     let loading = $state(false);
@@ -21,7 +22,27 @@
         }
     }
 
-    const features = [
+    function getRetentionTimeText(): string {
+        if (!$appConfig.report_retention) return "ever";
+
+        const seconds = $appConfig.report_retention / 1000000000;
+        const days = Math.floor(seconds / 86400);
+        const weeks = Math.floor(days / 7);
+        const months = Math.floor(days / 30);
+
+        if (months >= 1) {
+            return months === 1 ? "1 month" : `${months} months`;
+        } else if (weeks >= 1) {
+            return weeks === 1 ? "1 week" : `${weeks} weeks`;
+        } else if (days >= 1) {
+            return days === 1 ? "1 day" : `${days} days`;
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            return hours === 1 ? "1 hour" : `${hours} hours`;
+        }
+    }
+
+    const features = $derived([
         {
             icon: "bi-shield-check",
             title: "Authentication",
@@ -30,16 +51,31 @@
             variant: "primary" as const,
         },
         {
-            icon: "bi-patch-check",
+            icon: "bi-building-check",
             title: "BIMI Support",
             description:
                 "Brand Indicators for Message Identification - verify your brand logo configuration.",
             variant: "info" as const,
         },
         {
+            icon: "bi-link-45deg",
+            title: "ARC Verification",
+            description:
+                "Authenticated Received Chain validation for forwarded emails and mailing lists.",
+            variant: "primary" as const,
+        },
+        {
+            icon: "bi-check2-circle",
+            title: "Domain Alignment",
+            description:
+                "Verify alignment between From, Return-Path, and DKIM domains for DMARC compliance.",
+            variant: "success" as const,
+        },
+        {
             icon: "bi-globe",
             title: "DNS Records",
-            description: "Verify MX, SPF, DKIM, DMARC, and BIMI records are properly configured.",
+            description:
+                "Verify PTR, MX, SPF, DKIM, DMARC, and BIMI records are properly configured.",
             variant: "success" as const,
         },
         {
@@ -55,31 +91,31 @@
             variant: "danger" as const,
         },
         {
-            icon: "bi-file-text",
-            title: "Content Analysis",
-            description: "HTML structure, link validation, image analysis, and more.",
-            variant: "info" as const,
-        },
-        {
             icon: "bi-card-heading",
             title: "Header Quality",
             description: "Validate required headers, check for missing fields and alignment.",
             variant: "secondary" as const,
         },
         {
+            icon: "bi-file-text",
+            title: "Content Analysis",
+            description: "HTML structure, link validation, image analysis, and more.",
+            variant: "info" as const,
+        },
+        {
             icon: "bi-bar-chart",
             title: "Detailed Scoring",
             description:
-                "0-10 deliverability score with breakdown by category and recommendations.",
+                "A to F deliverability grade with breakdown by category and recommendations.",
             variant: "primary" as const,
         },
         {
             icon: "bi-lock",
             title: "Privacy First",
-            description: "Self-hosted solution, your data never leaves your infrastructure.",
+            description: `Self-hosted solution, your data never leaves your infrastructure. Reports retained for ${getRetentionTimeText()}.`,
             variant: "success" as const,
         },
-    ];
+    ]);
 
     const steps = [
         {
@@ -152,7 +188,7 @@
             </div>
         </div>
 
-        <div class="row g-4">
+        <div class="row g-4 justify-content-center">
             {#each features as feature}
                 <div class="col-md-6 col-lg-3">
                     <FeatureCard {...feature} />

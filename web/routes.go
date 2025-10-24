@@ -54,6 +54,10 @@ func init() {
 func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	appConfig := map[string]interface{}{}
 
+	if cfg.ReportRetention > 0 {
+		appConfig["report_retention"] = cfg.ReportRetention
+	}
+
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {
 		log.Println("Unable to generate JSON config to inject in web application")
 	} else {
