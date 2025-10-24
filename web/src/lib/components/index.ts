@@ -14,3 +14,4 @@ export { default as HeaderAnalysisCard } from "./HeaderAnalysisCard.svelte";
 export { default as PtrRecordsDisplay } from "./PtrRecordsDisplay.svelte";
 export { default as PtrForwardRecordsDisplay } from "./PtrForwardRecordsDisplay.svelte";
 export { default as TinySurvey } from "./TinySurvey.svelte";
+export { default as ErrorDisplay } from "./ErrorDisplay.svelte";

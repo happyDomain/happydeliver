@@ -14,6 +14,7 @@
         ContentAnalysisCard,
         HeaderAnalysisCard,
         TinySurvey,
+        ErrorDisplay,
     } from "$lib/components";
 
     let testId = $derived(page.params.test);
@@ -21,12 +22,43 @@
     let report = $state<Report | null>(null);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let errorStatus = $state<number>(500);
     let reanalyzing = $state(false);
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     let nextfetch = $state(23);
     let nbfetch = $state(0);
     let menuOpen = $state(false);
     let fetching = $state(false);
+
+    // Helper function to handle API errors
+    function handleApiError(apiError: unknown, defaultMessage: string) {
+        if (apiError && typeof apiError === "object") {
+            if ("message" in apiError) {
+                error = String(apiError.message);
+            } else {
+                error = defaultMessage;
+            }
+
+            // Determine status code based on error type
+            if ("error" in apiError) {
+                if (apiError.error === "rate_limit_exceeded") {
+                    errorStatus = 429;
+                } else if (apiError.error === "not_found") {
+                    errorStatus = 404;
+                } else {
+                    errorStatus = 500;
+                }
+            } else {
+                errorStatus = 500;
+            }
+        } else if (apiError instanceof Error) {
+            error = apiError.message;
+            errorStatus = 500;
+        } else {
+            error = defaultMessage;
+            errorStatus = 500;
+        }
+    }
 
     async function fetchTest() {
         if (!testId) return;
@@ -35,6 +67,9 @@
             nextfetch = Math.max(nextfetch, Math.floor(3 + nbfetch * 0.5));
         }
         nbfetch += 1;
+
+        // Clear any previous errors
+        error = null;
 
         // Set fetching state and ensure minimum 500ms display time
         fetching = true;
@@ -52,10 +87,15 @@
                     }
                     stopPolling();
                 }
+            } else if (testResponse.error) {
+                handleApiError(testResponse.error, "Failed to fetch test");
+                loading = false;
+                stopPolling();
+                return;
             }
             loading = false;
         } catch (err) {
-            error = err instanceof Error ? err.message : "Failed to fetch test";
+            handleApiError(err, "Failed to fetch test");
             loading = false;
             stopPolling();
         } finally {
@@ -107,7 +147,7 @@
         if (newTestId) {
             testChange(newTestId);
         }
-    })
+    });
 
     onDestroy(() => {
         stopPolling();
@@ -124,9 +164,11 @@
             const response = await reanalyzeReport({ path: { id: testId } });
             if (response.data) {
                 report = response.data;
+            } else if (response.error) {
+                handleApiError(response.error, "Failed to reanalyze report");
             }
         } catch (err) {
-            error = err instanceof Error ? err.message : "Failed to reanalyze report";
+            handleApiError(err, "Failed to reanalyze report");
         } finally {
             reanalyzing = false;
         }
@@ -162,14 +204,7 @@
             <p class="mt-3 text-muted">Loading test...</p>
         </div>
     {:else if error}
-        <div class="row justify-content-center">
-            <div class="col-lg-6">
-                <div class="alert alert-danger" role="alert">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    {error}
-                </div>
-            </div>
-        </div>
+        <ErrorDisplay status={errorStatus} message={error} showActions={false} />
     {:else if test && test.status !== "analyzed"}
         <!-- Pending State -->
         <PendingState
