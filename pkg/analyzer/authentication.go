@@ -532,7 +532,7 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 		}
 	}
 
-	// DKIM (20 points) - at least one passing signature
+	// DKIM (25 points) - at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		hasPass := false
 		for _, dkim := range *results.Dkim {
@@ -542,18 +542,18 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 			}
 		}
 		if hasPass {
-			score += 20
+			score += 25
 		} else {
 			// Has DKIM signatures but none passed
-			score += 7
+			score += 10
 		}
 	}
 
-	// DMARC (30 points)
+	// DMARC (25 points)
 	if results.Dmarc != nil {
 		switch results.Dmarc.Result {
 		case api.AuthResultResultPass:
-			score += 30
+			score += 25
 		case api.AuthResultResultNone:
 			score += 10
 		default: // fail

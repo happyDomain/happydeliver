@@ -265,7 +265,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 90, // SPF=30 + DKIM=30 + DMARC=30
+			expectedScore: 75, // SPF=25 + DKIM=25 + DMARC=25
 		},
 		{
 			name: "SPF and DKIM only",
@@ -277,7 +277,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 60, // SPF=30 + DKIM=30
+			expectedScore: 50, // SPF=25 + DKIM=25
 		},
 		{
 			name: "SPF fail, DKIM pass",
@@ -289,7 +289,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					{Result: api.AuthResultResultPass},
 				},
 			},
-			expectedScore: 30, // SPF=0 + DKIM=30
+			expectedScore: 25, // SPF=0 + DKIM=25
 		},
 		{
 			name: "SPF softfail",
@@ -298,7 +298,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultSoftfail,
 				},
 			},
-			expectedScore: 5,
+			expectedScore: 4,
 		},
 		{
 			name:          "No authentication",
@@ -315,7 +315,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 					Result: api.AuthResultResultPass,
 				},
 			},
-			expectedScore: 40, // SPF (30) + BIMI (10)
+			expectedScore: 35, // SPF (25) + BIMI (10)
 		},
 	}
 
