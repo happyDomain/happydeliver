@@ -24,6 +24,7 @@ package analyzer
 import (
 	"fmt"
 	"net"
+	"net/mail"
 	"regexp"
 	"strings"
 	"time"
@@ -153,6 +154,30 @@ func (h *HeaderAnalyzer) isValidMessageID(messageID string) bool {
 	return len(parts[0]) > 0 && len(parts[1]) > 0
 }
 
+// parseEmailDate attempts to parse an email date string using common email date formats
+// Returns the parsed time and an error if parsing fails
+func (h *HeaderAnalyzer) parseEmailDate(dateStr string) (time.Time, error) {
+	// Remove timezone name in parentheses if present
+	dateStr = regexp.MustCompile(`\s*\([^)]+\)\s*$`).ReplaceAllString(strings.TrimSpace(dateStr), "")
+
+	// Try parsing with common email date formats
+	formats := []string{
+		time.RFC1123Z, // "Mon, 02 Jan 2006 15:04:05 -0700"
+		time.RFC1123,  // "Mon, 02 Jan 2006 15:04:05 MST"
+		"Mon, 2 Jan 2006 15:04:05 -0700",
+		"Mon, 2 Jan 2006 15:04:05 MST",
+		"2 Jan 2006 15:04:05 -0700",
+	}
+
+	for _, format := range formats {
+		if parsedTime, err := time.Parse(format, dateStr); err == nil {
+			return parsedTime, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse date string: %s", dateStr)
+}
+
 // isNoReplyAddress checks if a header check represents a no-reply email address
 func (h *HeaderAnalyzer) isNoReplyAddress(headerCheck api.HeaderCheck) bool {
 	if !headerCheck.Present || headerCheck.Value == nil {
@@ -174,6 +199,39 @@ func (h *HeaderAnalyzer) isNoReplyAddress(headerCheck api.HeaderCheck) bool {
 	}
 
 	return false
+}
+
+// validateAddressHeader validates email address header using net/mail parser
+// and returns the normalized address string in "Name <email>" format
+func (h *HeaderAnalyzer) validateAddressHeader(value string) (string, error) {
+	// Try to parse as a single address first
+	if addr, err := mail.ParseAddress(value); err == nil {
+		return h.formatAddress(addr), nil
+	}
+
+	// If single address parsing fails, try parsing as an address list
+	// (for headers like To, Cc that can contain multiple addresses)
+	if addrs, err := mail.ParseAddressList(value); err != nil {
+		return "", err
+	} else {
+		// Join multiple addresses with ", "
+		result := ""
+		for i, addr := range addrs {
+			if i > 0 {
+				result += ", "
+			}
+			result += h.formatAddress(addr)
+		}
+		return result, nil
+	}
+}
+
+// formatAddress formats a mail.Address as "Name <email>" or just "email" if no name
+func (h *HeaderAnalyzer) formatAddress(addr *mail.Address) string {
+	if addr.Name != "" {
+		return fmt.Sprintf("%s <%s>", addr.Name, addr.Address)
+	}
+	return addr.Address
 }
 
 // GenerateHeaderAnalysis creates structured header analysis from email
@@ -262,7 +320,20 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 				headerIssues = append(headerIssues, "Invalid Message-ID format (should be <id@domain>)")
 			}
 		case "Date":
-			// Could add date validation here
+			// Validate date format
+			if _, err := h.parseEmailDate(value); err != nil {
+				valid = false
+				headerIssues = append(headerIssues, fmt.Sprintf("Invalid date format: %v", err))
+			}
+		case "From", "To", "Cc", "Bcc", "Reply-To", "Sender", "Resent-From", "Resent-To", "Return-Path":
+			// Parse address header using net/mail and get normalized address
+			if normalizedAddr, err := h.validateAddressHeader(value); err != nil {
+				valid = false
+				headerIssues = append(headerIssues, fmt.Sprintf("Invalid email address format: %v", err))
+			} else {
+				// Use the normalized address as the value
+				check.Value = &normalizedAddr
+			}
 		}
 
 		check.Valid = &valid
@@ -516,23 +587,9 @@ func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.Received
 	if matches := timestampRegex.FindStringSubmatch(normalized); len(matches) > 1 {
 		timestampStr := strings.TrimSpace(matches[1])
 
-		// Remove timezone name in parentheses if present
-		timestampStr = regexp.MustCompile(`\s*\([^)]+\)\s*$`).ReplaceAllString(timestampStr, "")
-
-		// Try parsing with common email date formats
-		formats := []string{
-			time.RFC1123Z, // "Mon, 02 Jan 2006 15:04:05 -0700"
-			time.RFC1123,  // "Mon, 02 Jan 2006 15:04:05 MST"
-			"Mon, 2 Jan 2006 15:04:05 -0700",
-			"Mon, 2 Jan 2006 15:04:05 MST",
-			"2 Jan 2006 15:04:05 -0700",
-		}
-
-		for _, format := range formats {
-			if parsedTime, err := time.Parse(format, timestampStr); err == nil {
-				hop.Timestamp = &parsedTime
-				break
-			}
+		// Use the dedicated date parsing function
+		if parsedTime, err := h.parseEmailDate(timestampStr); err == nil {
+			hop.Timestamp = &parsedTime
 		}
 	}
 

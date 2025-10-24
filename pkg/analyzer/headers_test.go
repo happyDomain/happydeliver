@@ -724,6 +724,184 @@ func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 	}
 }
 
+func TestHeaderAnalyzer_ParseEmailDate(t *testing.T) {
+	tests := []struct {
+		name        string
+		dateStr     string
+		expectError bool
+		expectYear  int
+		expectMonth int
+		expectDay   int
+	}{
+		{
+			name:        "RFC1123Z format",
+			dateStr:     "Mon, 02 Jan 2006 15:04:05 -0700",
+			expectError: false,
+			expectYear:  2006,
+			expectMonth: 1,
+			expectDay:   2,
+		},
+		{
+			name:        "RFC1123 format",
+			dateStr:     "Mon, 02 Jan 2006 15:04:05 MST",
+			expectError: false,
+			expectYear:  2006,
+			expectMonth: 1,
+			expectDay:   2,
+		},
+		{
+			name:        "Single digit day",
+			dateStr:     "Mon, 2 Jan 2006 15:04:05 -0700",
+			expectError: false,
+			expectYear:  2006,
+			expectMonth: 1,
+			expectDay:   2,
+		},
+		{
+			name:        "Without day of week",
+			dateStr:     "2 Jan 2006 15:04:05 -0700",
+			expectError: false,
+			expectYear:  2006,
+			expectMonth: 1,
+			expectDay:   2,
+		},
+		{
+			name:        "With timezone name in parentheses",
+			dateStr:     "Mon, 01 Jan 2024 12:00:00 +0000 (UTC)",
+			expectError: false,
+			expectYear:  2024,
+			expectMonth: 1,
+			expectDay:   1,
+		},
+		{
+			name:        "With timezone name in parentheses 2",
+			dateStr:     "Sun, 19 Oct 2025 09:40:33 +0000 (UTC)",
+			expectError: false,
+			expectYear:  2025,
+			expectMonth: 10,
+			expectDay:   19,
+		},
+		{
+			name:        "With CEST timezone",
+			dateStr:     "Fri, 24 Oct 2025 04:17:25 +0200 (CEST)",
+			expectError: false,
+			expectYear:  2025,
+			expectMonth: 10,
+			expectDay:   24,
+		},
+		{
+			name:        "Invalid date format",
+			dateStr:     "not a date",
+			expectError: true,
+		},
+		{
+			name:        "Empty string",
+			dateStr:     "",
+			expectError: true,
+		},
+		{
+			name:        "ISO 8601 format (should fail)",
+			dateStr:     "2024-01-01T12:00:00Z",
+			expectError: true,
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := analyzer.parseEmailDate(tt.dateStr)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("parseEmailDate(%q) expected error, got nil", tt.dateStr)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("parseEmailDate(%q) unexpected error: %v", tt.dateStr, err)
+					return
+				}
+
+				if result.Year() != tt.expectYear {
+					t.Errorf("Year = %d, want %d", result.Year(), tt.expectYear)
+				}
+				if int(result.Month()) != tt.expectMonth {
+					t.Errorf("Month = %d, want %d", result.Month(), tt.expectMonth)
+				}
+				if result.Day() != tt.expectDay {
+					t.Errorf("Day = %d, want %d", result.Day(), tt.expectDay)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckHeader_DateValidation(t *testing.T) {
+	tests := []struct {
+		name              string
+		dateValue         string
+		expectedValid     bool
+		expectedIssuesLen int
+	}{
+		{
+			name:              "Valid RFC1123Z date",
+			dateValue:         "Mon, 02 Jan 2006 15:04:05 -0700",
+			expectedValid:     true,
+			expectedIssuesLen: 0,
+		},
+		{
+			name:              "Valid date with timezone name",
+			dateValue:         "Mon, 01 Jan 2024 12:00:00 +0000 (UTC)",
+			expectedValid:     true,
+			expectedIssuesLen: 0,
+		},
+		{
+			name:              "Invalid date format",
+			dateValue:         "2024-01-01",
+			expectedValid:     false,
+			expectedIssuesLen: 1,
+		},
+		{
+			name:              "Invalid date string",
+			dateValue:         "not a date",
+			expectedValid:     false,
+			expectedIssuesLen: 1,
+		},
+		{
+			name:              "Empty date",
+			dateValue:         "",
+			expectedValid:     false,
+			expectedIssuesLen: 1,
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := &EmailMessage{
+				Header: createHeaderWithFields(map[string]string{
+					"Date": tt.dateValue,
+				}),
+			}
+
+			check := analyzer.checkHeader(email, "Date", "required")
+
+			if check.Valid != nil && *check.Valid != tt.expectedValid {
+				t.Errorf("Valid = %v, want %v", *check.Valid, tt.expectedValid)
+			}
+
+			issuesLen := 0
+			if check.Issues != nil {
+				issuesLen = len(*check.Issues)
+			}
+			if issuesLen != tt.expectedIssuesLen {
+				t.Errorf("Issues length = %d, want %d (issues: %v)", issuesLen, tt.expectedIssuesLen, check.Issues)
+			}
+		})
+	}
+}
+
 // Helper functions for testing
 func strPtr(s string) *string {
 	return &s
