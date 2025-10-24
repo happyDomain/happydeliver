@@ -181,7 +181,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 60, // 100 - round(2*100/5) = 100 - 40 = 60
+			expectedScore: 80, // 100 - round(2*100/5) = 100 - 40 = 60
 		},
 		{
 			name: "Score at threshold",

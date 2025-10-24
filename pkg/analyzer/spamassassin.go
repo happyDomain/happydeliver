@@ -214,7 +214,7 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssass
 		return 0, "F" // Failed spam test
 	} else {
 		// Linear scale between 0 and required threshold
-		percentage := 100 - int(math.Round(float64(score*100/result.RequiredScore)))
-		return percentage, ScoreToGrade(percentage - 15)
+		percentage := 100 - int(math.Round(float64(score*100/(2*result.RequiredScore))))
+		return percentage, ScoreToGrade(percentage - 5)
 	}
 }

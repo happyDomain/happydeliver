@@ -336,6 +336,7 @@
         // Content/spam assessment
         const spamAssassin = report.spamassassin;
         const contentScore = report.summary?.content_score || 0;
+        const spamScore = report.summary?.spam_score || 0;
 
         segments.push({ text: ". " });
         if (spamAssassin?.is_spam) {
@@ -353,13 +354,34 @@
                 highlight: { color: "warning", bold: true },
                 link: "#content-details"
             });
-        } else if (contentScore >= 100) {
+        } else if (contentScore >= 100 && spamScore >= 100) {
             segments.push({ text: "Content " });
             segments.push({
                 text: "looks great",
                 highlight: { color: "good", bold: true },
                 link: "#content-details"
             });
+        } else if (spamScore < 50) {
+            segments.push({ text: "Your " });
+            segments.push({
+                text: "spam score",
+                highlight: { color: "danger", bold: true },
+                link: "#spam-details"
+            });
+            segments.push({ text: " is low" });
+            if (report.spamassassin.tests.includes("EMPTY_MESSAGE")) {
+                segments.push({ text: " (you sent an empty message, which can cause this issue, retry with some real content)", highlight: { bold: true } });
+            }
+        } else if (spamScore < 90) {
+            segments.push({ text: "Pay attention to your " });
+            segments.push({
+                text: "spam score",
+                highlight: { color: "warning", bold: true },
+                link: "#spam-details"
+            });
+            if (report.spamassassin.tests.includes("EMPTY_MESSAGE")) {
+                segments.push({ text: " (you sent an empty message, which can cause this issue, retry with some real content)", highlight: { bold: true } });
+            }
         } else if (contentScore >= 80) {
             segments.push({ text: "Content " });
             segments.push({
