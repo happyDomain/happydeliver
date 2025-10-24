@@ -69,6 +69,39 @@ docker run -d \
   happydeliver:latest
 ```
 
+#### 3. Configure Network and DNS
+
+##### Open SMTP Port
+
+Port 25 (SMTP) must be accessible from the internet to receive test emails:
+
+```bash
+# Check if port 25 is listening
+netstat -ln | grep :25
+
+# Allow port 25 through firewall (example with ufw)
+sudo ufw allow 25/tcp
+
+# For iptables
+sudo iptables -A INPUT -p tcp --dport 25 -j ACCEPT
+```
+
+**Note:** Many ISPs and cloud providers block port 25 by default to prevent spam. You may need to request port 25 to be unblocked through your provider's support.
+
+##### Configure DNS Records
+
+Point your domain to the server's IP address.
+
+```
+yourdomain.com.  IN  A     203.0.113.10
+yourdomain.com.  IN  AAAA  2001:db8::10
+```
+
+Replace `yourdomain.com` with the value you set for `HAPPYDELIVER_DOMAIN` and IPs accordingly.
+
+There is no need for an MX record here since the same host will serve both HTTP and SMTP.
+
+
 ### Manual Build
 
 #### 1. Build
