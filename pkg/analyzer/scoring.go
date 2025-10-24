@@ -30,7 +30,7 @@ func ScoreToGrade(score int) string {
 	switch {
 	case score > 100:
 		return "A+"
-	case score > 95:
+	case score >= 95:
 		return "A"
 	case score >= 85:
 		return "B"

@@ -688,7 +688,7 @@ components:
       properties:
         result:
           type: string
-          enum: [pass, fail, none, neutral, softfail, temperror, permerror]
+          enum: [pass, fail, none, neutral, softfail, temperror, permerror, declined]
           description: Authentication result
           example: "pass"
         domain:

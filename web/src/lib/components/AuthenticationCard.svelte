@@ -22,6 +22,8 @@
             case "softfail":
             case "neutral":
                 return "text-warning";
+            case "declined":
+                return "text-info";
             case "none":
                 return noneIsFail ? "text-danger" : "text-muted";
             default:
@@ -40,6 +42,8 @@
                 return "bi-exclamation-circle-fill";
             case "missing":
                 return "bi-dash-circle-fill";
+            case "declined":
+                return "bi-dash-circle";
             case "none":
                 return noneIsFail ? "bi-x-circle-fill" : "bi-question-circle";
             default:

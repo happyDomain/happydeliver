@@ -566,7 +566,7 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 		switch results.Bimi.Result {
 		case api.AuthResultResultPass:
 			score += 10
-		case api.AuthResultResultNone:
+		case api.AuthResultResultDeclined:
 			score += 5
 		default: // fail
 			score += 0
