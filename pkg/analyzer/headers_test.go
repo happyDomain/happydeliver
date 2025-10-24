@@ -619,6 +619,16 @@ func TestParseReceivedHeader(t *testing.T) {
 			expectIp:      nil,
 			expectHasTs:   true,
 		},
+		{
+			name:          "Postfix local delivery with userid",
+			receivedValue: "by grunt.ycc.fr (Postfix, from userid 1000) id 67276801A8; Fri, 24 Oct 2025 04:17:25 +0200 (CEST)",
+			expectFrom:    nil,
+			expectBy:      strPtr("grunt.ycc.fr"),
+			expectWith:    nil,
+			expectId:      strPtr("67276801A8"),
+			expectIp:      nil,
+			expectHasTs:   true,
+		},
 	}
 
 	analyzer := NewHeaderAnalyzer()

@@ -450,11 +450,18 @@ func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.Received
 	// Normalize whitespace - Received headers can span multiple lines
 	normalized := strings.Join(strings.Fields(receivedValue), " ")
 
-	// Extract "from" field
-	fromRegex := regexp.MustCompile(`(?i)from\s+([^\s(]+)`)
-	if matches := fromRegex.FindStringSubmatch(normalized); len(matches) > 1 {
-		from := matches[1]
-		hop.From = &from
+	// Check if this is a "by-first" header (e.g., "by hostname (Postfix, from userid...)")
+	// vs standard "from-first" header (e.g., "from hostname ... by hostname")
+	isByFirst := regexp.MustCompile(`^by\s+`).MatchString(strings.TrimSpace(normalized))
+
+	// Extract "from" field - only if not in "by-first" format
+	// Avoid matching "from" inside parentheses after "by"
+	if !isByFirst {
+		fromRegex := regexp.MustCompile(`(?i)^from\s+([^\s(]+)`)
+		if matches := fromRegex.FindStringSubmatch(normalized); len(matches) > 1 {
+			from := matches[1]
+			hop.From = &from
+		}
 	}
 
 	// Extract "by" field
@@ -466,14 +473,16 @@ func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.Received
 
 	// Extract "with" field (protocol) - must come after "by" and before "id" or "for"
 	// This ensures we get the mail transfer protocol, not other "with" occurrences
-	withRegex := regexp.MustCompile(`(?i)by\s+[^\s(]+[^;]*?\s+with\s+([A-Z0-9]+)`)
+	// Avoid matching "with" inside parentheses (like in TLS details)
+	withRegex := regexp.MustCompile(`(?i)by\s+[^\s(]+[^;]*?\s+with\s+([A-Z0-9]+)(?:\s|;)`)
 	if matches := withRegex.FindStringSubmatch(normalized); len(matches) > 1 {
 		with := matches[1]
 		hop.With = &with
 	}
 
-	// Extract "id" field
-	idRegex := regexp.MustCompile(`(?i)id\s+([^\s;]+)`)
+	// Extract "id" field - should come after "with" or "by", not inside parentheses
+	// Match pattern: "id <value>" where value doesn't contain parentheses or semicolons
+	idRegex := regexp.MustCompile(`(?i)\s+id\s+([^\s;()]+)`)
 	if matches := idRegex.FindStringSubmatch(normalized); len(matches) > 1 {
 		id := matches[1]
 		hop.Id = &id
