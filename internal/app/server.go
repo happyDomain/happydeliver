@@ -25,7 +25,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
+	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -76,8 +78,26 @@ func RunServer(cfg *config.Config) error {
 	}
 	router := gin.Default()
 
-	// Register API routes
+	// Set up rate limiting (1 request per second per IP)
+	rateLimitStore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
+		Rate:  4 * time.Second,
+		Limit: 2,
+	})
+	rateLimiter := ratelimit.RateLimiter(rateLimitStore, &ratelimit.Options{
+		ErrorHandler: func(c *gin.Context, info ratelimit.Info) {
+			c.JSON(429, gin.H{
+				"error":   "rate_limit_exceeded",
+				"message": "Too many requests. Try again in " + time.Until(info.ResetTime).String(),
+			})
+		},
+		KeyFunc: func(c *gin.Context) string {
+			return c.ClientIP()
+		},
+	})
+
+	// Register API routes with rate limiting
 	apiGroup := router.Group("/api")
+	apiGroup.Use(rateLimiter)
 	api.RegisterHandlers(apiGroup, handler)
 	web.DeclareRoutes(cfg, router)
 
