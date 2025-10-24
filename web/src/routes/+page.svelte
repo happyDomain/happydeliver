@@ -151,7 +151,7 @@
                     and more. Open-source, self-hosted, and privacy-focused.
                 </p>
                 <button
-                    class="btn btn-success btn-lg px-5 py-3 shadow"
+                    class="btn btn-success btn-lg px-5 py-3 shadow cta-button"
                     onclick={createTest}
                     disabled={loading}
                 >
@@ -238,8 +238,18 @@
 
 <style>
     .hero {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background:
+            linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.9) 100%),
+            url("/img/report.webp");
+        background-size: cover;
+        background-position: center 25%;
+        background-repeat: no-repeat;
         color: white;
+    }
+
+    .hero h1,
+    .hero p {
+        text-shadow: black 0 0 1px;
     }
 
     .fade-in {
@@ -254,6 +264,33 @@
         to {
             opacity: 1;
             transform: translateY(0);
+        }
+    }
+
+    .cta-button {
+        position: relative;
+        animation: pulse 2s infinite;
+        transition: transform 0.2s ease;
+    }
+
+    .cta-button:hover:not(:disabled) {
+        animation: none;
+        transform: scale(1.05);
+    }
+
+    .cta-button:disabled {
+        animation: none;
+    }
+
+    @keyframes pulse {
+        0%,
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        50% {
+            transform: scale(1.08);
+            box-shadow: 0 1rem 2rem rgba(25, 135, 84, 0.5);
         }
     }
 </style>
