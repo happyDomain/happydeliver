@@ -24,6 +24,7 @@
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     let nextfetch = $state(23);
     let nbfetch = $state(0);
+    let menuOpen = $state(false);
 
     async function fetchTest() {
         if (nbfetch > 0) {
@@ -85,6 +86,7 @@
     async function handleReanalyze() {
         if (!testId || reanalyzing) return;
 
+        menuOpen = false;
         reanalyzing = true;
         error = null;
 
@@ -98,6 +100,18 @@
         } finally {
             reanalyzing = false;
         }
+    }
+
+    function handleExportJSON() {
+        const dataStr = JSON.stringify(report, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `report-${testId}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        menuOpen = false;
     }
 </script>
 
@@ -135,7 +149,47 @@
             <!-- Score Header -->
             <div class="row mb-4" id="score">
                 <div class="col-12">
-                    <ScoreCard grade={report.grade} score={report.score} summary={report.summary} />
+                    <div class="position-relative">
+                        <div class="position-absolute py-2 px-3" style="z-index: 2; right: 0">
+                            <div class="menu-container">
+                                <button
+                                    class="btn btn-outline-secondary"
+                                    type="button"
+                                    onclick={() => (menuOpen = !menuOpen)}
+                                    aria-label="Menu"
+                                >
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                {#if menuOpen}
+                                    <div class="menu-dropdown">
+                                        <button class="menu-item" onclick={handleExportJSON}>
+                                            <i class="bi bi-download me-2"></i>
+                                            Export JSON Report
+                                        </button>
+                                        <button
+                                            class="menu-item"
+                                            onclick={handleReanalyze}
+                                            disabled={reanalyzing}
+                                        >
+                                            <i class="bi bi-arrow-clockwise me-2"></i>
+                                            Reanalyze with Latest Version
+                                        </button>
+                                        <hr class="menu-divider" />
+                                        <a
+                                            class="menu-item"
+                                            href={`/api/report/${testId}/raw`}
+                                            target="_blank"
+                                            onclick={() => (menuOpen = false)}
+                                        >
+                                            <i class="bi bi-file-earmark-text me-2"></i>
+                                            View Raw Email
+                                        </a>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+                    <ScoreCard grade={report.grade} score={report.score} summary={report.summary} {reanalyzing} />
                 </div>
             </div>
 
@@ -233,19 +287,6 @@
             <!-- Action Buttons -->
             <div class="row">
                 <div class="col-12 text-center">
-                    <button
-                        class="btn btn-outline-secondary btn-lg me-3"
-                        onclick={handleReanalyze}
-                        disabled={reanalyzing}
-                    >
-                        {#if reanalyzing}
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Reanalyzing...
-                        {:else}
-                            <i class="bi bi-arrow-clockwise me-2"></i>
-                            Reanalyze with Latest Version
-                        {/if}
-                    </button>
                     <a href="/test/" class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-repeat me-2"></i>
                         Test Another Email
@@ -287,5 +328,52 @@
     .category-score {
         font-size: 1rem;
         font-weight: 700;
+    }
+
+    .menu-container {
+        position: relative;
+    }
+
+    .menu-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 0.25rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        min-width: 250px;
+        z-index: 1000;
+        padding: 0.5rem 0;
+    }
+
+    .menu-item {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 1rem;
+        background: none;
+        border: none;
+        text-align: left;
+        color: #212529;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+        font-size: 1rem;
+    }
+
+    .menu-item:hover:not(:disabled) {
+        background-color: #f8f9fa;
+    }
+
+    .menu-item:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .menu-divider {
+        margin: 0.5rem 0;
+        border: 0;
+        border-top: 1px solid #dee2e6;
     }
 </style>

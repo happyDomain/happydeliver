@@ -5,10 +5,11 @@
     interface Props {
         grade: string;
         score: number;
+        reanalyzing?: boolean;
         summary?: ScoreSummary;
     }
 
-    let { grade, score, summary }: Props = $props();
+    let { grade, score, reanalyzing, summary }: Props = $props();
 
     function getScoreLabel(score: number): string {
         if (score >= 90) return "Excellent";
@@ -19,25 +20,22 @@
     }
 </script>
 
-<style>
-    .summary-card {
-        transition: all 0.2s ease-in-out;
-        cursor: pointer;
-    }
-
-    .summary-card:hover {
-        background-color: #e2e6ea !important;
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-</style>
-
 <div class="card shadow-lg bg-white">
     <div class="card-body p-5 text-center">
         <div class="mb-3">
-            <GradeDisplay {grade} {score} size="large" />
+            {#if reanalyzing}
+                <div class="spinner-border spinner-border-lg text-muted display-1"></div>
+            {:else}
+                <GradeDisplay {grade} {score} size="large" />
+            {/if}
         </div>
-        <h3 class="fw-bold mb-2">{getScoreLabel(score)}</h3>
+        <h3 class="fw-bold mb-2">
+            {#if reanalyzing}
+                Analyzing in progress&hellip;
+            {:else}
+                {getScoreLabel(score)}
+            {/if}
+        </h3>
         <p class="text-muted mb-4">Overall Deliverability Score</p>
 
         {#if summary}
@@ -94,3 +92,16 @@
         {/if}
     </div>
 </div>
+
+<style>
+    .summary-card {
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+
+    .summary-card:hover {
+        background-color: #e2e6ea !important;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
