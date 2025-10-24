@@ -8,9 +8,10 @@
 
     interface Props {
         test: Test;
+        fetching?: boolean;
     }
 
-    let { test, nbfetch, nextfetch }: Props = $props();
+    let { test, nbfetch, nextfetch, fetching = false }: Props = $props();
 
     let lastForcedCheck = $state(Date.now() - 12345);
     function forceCheck() {
@@ -36,17 +37,23 @@
 
                 <div class="alert alert-info mb-4" role="alert">
                     <i class="bi bi-lightbulb me-2"></i>
-                    <strong>Tip:</strong> Send an email that represents your actual use case (newsletters,
-                    transactional emails, etc.) for the most accurate results.
+                    {#if nbfetch > 4}
+                        <strong>Tip:</strong> Check your mail is not stuck in the sending box.
+                    {:else}
+                        <strong>Tip:</strong> Send an email that represents your actual use case (newsletters,
+                        transactional emails, etc.) for the most accurate results.
+                    {/if}
                 </div>
 
                 <div class="d-flex align-items-center justify-content-center gap-2 text-muted">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
-                    {#if nextfetch}
+                    {#if fetching || nextfetch === 0}
+                        <small>Looking for new email...</small>
+                    {:else if nextfetch}
                         <div>
-                            <small
-                                >Next inbox check in {nextfetch} second{#if nextfetch > 1}s{/if}...</small
-                            >
+                            <small>
+                                Next inbox check in {nextfetch} second{#if nextfetch > 1}s{/if}...
+                            </small>
                             {#if nbfetch > 0}
                                 <button
                                     type="button"

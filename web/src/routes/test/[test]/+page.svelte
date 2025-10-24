@@ -25,12 +25,17 @@
     let nextfetch = $state(23);
     let nbfetch = $state(0);
     let menuOpen = $state(false);
+    let fetching = $state(false);
 
     async function fetchTest() {
         if (nbfetch > 0) {
             nextfetch = Math.max(nextfetch, Math.floor(3 + nbfetch * 0.5));
         }
         nbfetch += 1;
+
+        // Set fetching state and ensure minimum 500ms display time
+        fetching = true;
+        const startTime = Date.now();
 
         try {
             const testResponse = await getTest({ path: { id: testId } });
@@ -50,6 +55,16 @@
             error = err instanceof Error ? err.message : "Failed to fetch test";
             loading = false;
             stopPolling();
+        } finally {
+            // Ensure fetching state is displayed for at least 500ms
+            const elapsed = Date.now() - startTime;
+            if (elapsed < 500) {
+                setTimeout(() => {
+                    fetching = false;
+                }, 500 - elapsed);
+            } else {
+                fetching = false;
+            }
         }
     }
 
@@ -151,7 +166,13 @@
         </div>
     {:else if test && test.status !== "analyzed"}
         <!-- Pending State -->
-        <PendingState {nextfetch} {nbfetch} {test} on:force-inbox-check={() => fetchTest()} />
+        <PendingState
+            {nextfetch}
+            {nbfetch}
+            {test}
+            {fetching}
+            on:force-inbox-check={() => fetchTest()}
+        />
     {:else if report}
         <!-- Results State -->
         <div class="fade-in">
@@ -198,7 +219,12 @@
                             </div>
                         </div>
                     </div>
-                    <ScoreCard grade={report.grade} score={report.score} summary={report.summary} {reanalyzing} />
+                    <ScoreCard
+                        grade={report.grade}
+                        score={report.score}
+                        summary={report.summary}
+                        {reanalyzing}
+                    />
                 </div>
             </div>
 
