@@ -11,12 +11,25 @@
 
     let { grade, score, reanalyzing, summary }: Props = $props();
 
-    function getScoreLabel(score: number): string {
-        if (score >= 90) return "Excellent";
-        if (score >= 70) return "Good";
-        if (score >= 50) return "Fair";
-        if (score >= 30) return "Poor";
-        return "Critical";
+    function getScoreLabel(grade: string): string {
+        switch (grade) {
+            case "A+":
+                return "Excellent Deliverability";
+            case "A":
+                return "Good Deliverability";
+            case "B":
+                return "Fair Deliverability";
+            case "C":
+                return "Moderate Issues";
+            case "D":
+                return "Poor Deliverability";
+            case "E":
+                return "Critical Issues";
+            case "F":
+                return "Severe Problems";
+            default:
+                return "Unknown Status";
+        }
     }
 </script>
 
@@ -33,7 +46,7 @@
             {#if reanalyzing}
                 Analyzing in progress&hellip;
             {:else}
-                {getScoreLabel(score)}
+                {getScoreLabel(grade)}
             {/if}
         </h3>
         <p class="text-muted mb-4">Overall Deliverability Score</p>
