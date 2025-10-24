@@ -26,32 +26,46 @@ import (
 	"time"
 )
 
-func TestNewDNSAnalyzer(t *testing.T) {
+func TestValidateDKIM(t *testing.T) {
 	tests := []struct {
-		name            string
-		timeout         time.Duration
-		expectedTimeout time.Duration
+		name     string
+		record   string
+		expected bool
 	}{
 		{
-			name:            "Default timeout",
-			timeout:         0,
-			expectedTimeout: 10 * time.Second,
+			name:     "Valid DKIM with version",
+			record:   "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
+			expected: true,
 		},
 		{
-			name:            "Custom timeout",
-			timeout:         5 * time.Second,
-			expectedTimeout: 5 * time.Second,
+			name:     "Valid DKIM without version",
+			record:   "k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
+			expected: true,
+		},
+		{
+			name:     "Invalid DKIM - no public key",
+			record:   "v=DKIM1; k=rsa",
+			expected: false,
+		},
+		{
+			name:     "Invalid DKIM - wrong version",
+			record:   "v=DKIM2; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
+			expected: false,
+		},
+		{
+			name:     "Invalid DKIM - empty",
+			record:   "",
+			expected: false,
 		},
 	}
 
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewDNSAnalyzer(tt.timeout)
-			if analyzer.Timeout != tt.expectedTimeout {
-				t.Errorf("Timeout = %v, want %v", analyzer.Timeout, tt.expectedTimeout)
-			}
-			if analyzer.resolver == nil {
-				t.Error("Resolver should not be nil")
+			result := analyzer.validateDKIM(tt.record)
+			if result != tt.expected {
+				t.Errorf("validateDKIM(%q) = %v, want %v", tt.record, result, tt.expected)
 			}
 		})
 	}
