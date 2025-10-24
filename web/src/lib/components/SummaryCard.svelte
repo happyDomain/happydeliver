@@ -14,10 +14,11 @@
     }
 
     interface Props {
+        children?: import("svelte").Snippet;
         report: Report;
     }
 
-    let { report }: Props = $props();
+    let { children, report }: Props = $props();
 
     function buildSummary(): TextSegment[] {
         const segments: TextSegment[] = [];
@@ -455,7 +456,7 @@
             <i class="bi bi-card-text me-2"></i>
             Summary
         </h5>
-        <p class="card-text text-muted mb-0" style="line-height: 1.8;">
+        <p class="card-text text-muted" class:mb-0={!children} style="line-height: 1.8;">
             {#each summarySegments as segment}
                 {#if segment.link}
                     <a
@@ -474,6 +475,7 @@
             {/each}
             Overall, your email received a grade <GradeDisplay grade={report.grade} score={report.score} size="inline" />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}: you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}: you could have delivery issues with common providers.{:else if report.grade == "F"}: it will most likely be rejected by most providers.{:else}!{/if} Check the details below 🔽
         </p>
+        {@render children?.()}
     </div>
 </div>
 
