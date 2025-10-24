@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onDestroy } from "svelte";
     import { page } from "$app/state";
     import { getTest, getReport, reanalyzeReport } from "$lib/api";
     import type { Test, Report } from "$lib/api/types.gen";
@@ -74,10 +74,19 @@
         }
     }
 
-    onMount(() => {
-        fetchTest();
-        startPolling();
-    });
+    let lastTestId = null;
+    function testChange(newTestId) {
+        if (lastTestId != newTestId) {
+            lastTestId = newTestId;
+            test = null;
+            fetchTest();
+            startPolling();
+        }
+    }
+
+    $effect(() => {
+        testChange(page.params.test);
+    })
 
     onDestroy(() => {
         stopPolling();
