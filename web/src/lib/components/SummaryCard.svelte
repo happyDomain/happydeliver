@@ -283,24 +283,35 @@
                 segments.push({
                     text: "BIMI",
                     highlight: { color: "good", bold: true },
-                    link: "#dns-bimi"
+                    link: "#dns-bimi",
                 });
-                segments.push({ text: " for brand indicator display" });
-            } else if (bimiResult && bimiResult.details && bimiResult.details.indexOf("(No BIMI records found)") >= 0) {
+                if (bimiResult.details && bimiResult.details.indexOf("declined") == 0) {
+                    segments.push({ text: " declined to participate" });
+                } else {
+                    segments.push({ text: " for brand indicator display" });
+                }
+            } else if (
+                bimiResult &&
+                bimiResult.details &&
+                bimiResult.details.indexOf("(No BIMI records found)") >= 0
+            ) {
                 segments.push({ text: ". Your domain has no " });
                 segments.push({
                     text: "BIMI record",
                     highlight: { color: "warning", bold: true },
-                    link: "#dns-bimi"
+                    link: "#dns-bimi",
                 });
                 segments.push({ text: ", you could " });
-                segments.push({ text: "add a record to decline participation", highlight: { bold: true } });
+                segments.push({
+                    text: "add a record to decline participation",
+                    highlight: { bold: true },
+                });
             } else if (bimiResult || bimiRecord) {
                 segments.push({ text: ". Your domain has " });
                 segments.push({
                     text: "BIMI configured with issues",
                     highlight: { color: "warning", bold: true },
-                    link: "#dns-bimi"
+                    link: "#dns-bimi",
                 });
             }
         }
