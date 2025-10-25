@@ -4,12 +4,22 @@
     import "../app.css";
 
     import Logo from "$lib/components/Logo.svelte";
+    import { theme } from "$lib/stores/theme";
+    import { onMount } from "svelte";
 
     interface Props {
         children?: import("svelte").Snippet;
     }
 
     let { children }: Props = $props();
+
+    onMount(() => {
+        document.documentElement.setAttribute("data-bs-theme", $theme);
+    });
+
+    function toggleTheme() {
+        $theme = $theme === "light" ? "dark" : "light";
+    }
 </script>
 
 <div class="min-vh-100 d-flex flex-column">
@@ -17,11 +27,21 @@
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">
                 <i class="bi bi-envelope-check me-2"></i>
-                <Logo />
+                <Logo color={$theme === "light" ? "black" : "white"} />
             </a>
-            <span class="d-none d-md-inline navbar-text text-primary small">
-                Open-Source Email Deliverability Tester
-            </span>
+            <div>
+                <span class="d-none d-md-inline navbar-text text-primary small">
+                    Open-Source Email Deliverability Tester
+                </span>
+                <button
+                    class="btn btn-link ms-auto {$theme == 'light' ? 'text-dark' : 'text-light'}"
+                    onclick={toggleTheme}
+                    aria-label="Toggle theme"
+                    title="Toggle theme"
+                >
+                    <i class="bi bi-{$theme === 'light' ? 'moon-stars-fill' : 'sun-fill'}"></i>
+                </button>
+            </div>
         </div>
     </nav>
 

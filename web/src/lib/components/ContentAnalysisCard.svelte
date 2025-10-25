@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { ContentAnalysis } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
+    import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -13,7 +14,7 @@
 </script>
 
 <div class="card shadow-sm" id="content-details">
-    <div class="card-header bg-white">
+    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-file-text me-2"></i>
