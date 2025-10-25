@@ -2,7 +2,7 @@
     import type { Snippet } from "svelte";
     import type { ClassValue } from "svelte/elements";
 
-    import { appConfig } from "$lib/config";
+    import { appConfig } from "$lib/stores/config";
 
     interface Props {
         class: ClassValue;
