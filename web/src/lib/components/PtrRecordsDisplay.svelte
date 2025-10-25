@@ -27,9 +27,9 @@
         </div>
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
-                PTR records (reverse DNS) map IP addresses back to hostnames. Having proper PTR
-                records is important as many mail servers verify that the sending IP has a valid
-                reverse DNS entry.
+                PTR (pointer record), also known as reverse DNS maps IP addresses back to hostnames.
+                Having proper PTR records is important as many mail servers verify that the sending
+                IP has a valid reverse DNS entry.
             </p>
             {#if senderIp}
                 <div class="mt-2">
