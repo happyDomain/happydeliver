@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { createTest as apiCreateTest } from "$lib/api";
-    import { appConfig } from "$lib/config";
+    import { appConfig } from "$lib/stores/config";
     import { FeatureCard, HowItWorksStep } from "$lib/components";
 
     let loading = $state(false);
