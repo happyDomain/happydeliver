@@ -3,6 +3,8 @@
     import "bootstrap-icons/font/bootstrap-icons.css";
     import "../app.css";
 
+    import favicon from '$lib/assets/favicon.svg';
+
     import Logo from "$lib/components/Logo.svelte";
     import { theme } from "$lib/stores/theme";
     import { onMount } from "svelte";
@@ -21,6 +23,10 @@
         $theme = $theme === "light" ? "dark" : "light";
     }
 </script>
+
+<svelte:head>
+	<link rel="icon" href={favicon} />
+</svelte:head>
 
 <div class="min-vh-100 d-flex flex-column">
     <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
