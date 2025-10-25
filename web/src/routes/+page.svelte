@@ -252,6 +252,26 @@
         text-shadow: black 0 0 1px;
     }
 
+    /* Dark mode hero adjustments */
+    :global([data-bs-theme="dark"]) .hero {
+        background:
+            linear-gradient(135deg, rgba(50, 65, 140, 0.85) 0%, rgba(65, 40, 95, 0.9) 100%),
+            url("/img/report.webp");
+        background-size: cover;
+        background-position: center 25%;
+        background-repeat: no-repeat;
+    }
+
+    :global([data-bs-theme="dark"]) .hero h1,
+    :global([data-bs-theme="dark"]) .hero p {
+        text-shadow: black 0 0 3px;
+    }
+
+    /* Dark mode section background */
+    :global([data-bs-theme="dark"]) #steps {
+        background-color: var(--bs-secondary-bg) !important;
+    }
+
     .fade-in {
         animation: fadeIn 0.6s ease-out;
     }
@@ -292,5 +312,22 @@
             transform: scale(1.08);
             box-shadow: 0 1rem 2rem rgba(25, 135, 84, 0.5);
         }
+    }
+
+    @keyframes pulse-dark {
+        0%,
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+        }
+        50% {
+            transform: scale(1.08);
+            box-shadow: 0 1rem 2rem rgba(25, 135, 84, 0.7);
+        }
+    }
+
+    /* Dark mode pulse animation */
+    :global([data-bs-theme="dark"]) .cta-button {
+        animation: pulse-dark 2s infinite;
     }
 </style>

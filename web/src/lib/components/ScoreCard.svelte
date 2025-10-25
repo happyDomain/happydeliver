@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { ScoreSummary } from "$lib/api/types.gen";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import { theme } from "$lib/stores/theme";
 
     interface Props {
         grade: string;
@@ -33,7 +34,7 @@
     }
 </script>
 
-<div class="card shadow-lg bg-white">
+<div class="card shadow-lg {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
     <div class="card-body p-5 text-center">
         <div class="mb-3">
             {#if reanalyzing}
@@ -55,48 +56,90 @@
             <div class="row g-3 text-start">
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#dns-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.dns_grade} score={summary.dns_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.dns_grade}
+                                score={summary.dns_score}
+                            />
                             <small class="text-muted d-block">DNS</small>
                         </div>
                     </a>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#authentication-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.authentication_grade} score={summary.authentication_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.authentication_grade}
+                                score={summary.authentication_score}
+                            />
                             <small class="text-muted d-block">Authentication</small>
                         </div>
                     </a>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#rbl-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.blacklist_grade} score={summary.blacklist_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.blacklist_grade}
+                                score={summary.blacklist_score}
+                            />
                             <small class="text-muted d-block">Blacklists</small>
                         </div>
                     </a>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#header-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.header_grade} score={summary.header_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.header_grade}
+                                score={summary.header_score}
+                            />
                             <small class="text-muted d-block">Headers</small>
                         </div>
                     </a>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#spam-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.spam_grade} score={summary.spam_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.spam_grade}
+                                score={summary.spam_score}
+                            />
                             <small class="text-muted d-block">Spam Score</small>
                         </div>
                     </a>
                 </div>
                 <div class="col-sm-6 col-md-4 col-lg">
                     <a href="#content-details" class="text-decoration-none">
-                        <div class="p-2 bg-light rounded text-center summary-card">
-                            <GradeDisplay grade={summary.content_grade} score={summary.content_score} />
+                        <div
+                            class="p-2 rounded text-center summary-card"
+                            class:bg-light={$theme === 'light'}
+                            class:bg-secondary={$theme !== 'light'}
+                        >
+                            <GradeDisplay
+                                grade={summary.content_grade}
+                                score={summary.content_score}
+                            />
                             <small class="text-muted d-block">Content</small>
                         </div>
                     </a>
@@ -116,5 +159,10 @@
         background-color: #e2e6ea !important;
         transform: translateY(-2px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    :global([data-bs-theme="dark"]) .summary-card:hover {
+        background-color: #495057 !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 </style>

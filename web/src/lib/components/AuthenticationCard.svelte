@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
+    import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -62,7 +63,7 @@
 </script>
 
 <div class="card shadow-sm" id="authentication-details">
-    <div class="card-header bg-white">
+    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-check me-2"></i>
@@ -104,7 +105,7 @@
                                 </div>
                             {/if}
                             {#if authentication.iprev.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.iprev.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.iprev.details}</pre>
                             {/if}
                         </div>
                     </div>
@@ -128,7 +129,7 @@
                                 </div>
                             {/if}
                             {#if authentication.spf.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.spf.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.spf.details}</pre>
                             {/if}
                         </div>
                     {:else}
@@ -167,7 +168,7 @@
                                 </div>
                             {/if}
                             {#if authentication.dkim[0].details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dkim[0].details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.dkim[0].details}</pre>
                             {/if}
                         </div>
                     {:else}
@@ -206,7 +207,7 @@
                                 </div>
                             {/if}
                             {#if authentication.x_google_dkim.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.x_google_dkim.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.x_google_dkim.details}</pre>
                             {/if}
                         </div>
                     </div>
@@ -230,7 +231,7 @@
                                 </div>
                             {/if}
                             {#if authentication.x_aligned_from.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.x_aligned_from.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.x_aligned_from.details}</pre>
                             {/if}
                         </div>
                     </div>
@@ -276,7 +277,7 @@
                                 {/if}
                             {/if}
                             {#if authentication.dmarc.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.dmarc.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.dmarc.details}</pre>
                             {/if}
                         </div>
                     {:else}
@@ -303,7 +304,7 @@
                                 {authentication.bimi.result}
                             </span>
                             {#if authentication.bimi.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
                             {/if}
                         </div>
                     {:else if authentication.bimi && authentication.bimi.result == "none"}
@@ -315,7 +316,7 @@
                             </span>
                             <div class="text-muted small">Brand Indicators for Message Identification</div>
                             {#if authentication.bimi.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.bimi.details}</pre>
                             {/if}
                         </div>
                     {:else}
@@ -345,7 +346,7 @@
                                 <div class="text-muted small">Chain length: {authentication.arc.chain_length}</div>
                             {/if}
                             {#if authentication.arc.details}
-                                <pre class="p-2 mb-0 bg-light text-muted small" style="white-space: pre-wrap">{authentication.arc.details}</pre>
+                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.arc.details}</pre>
                             {/if}
                         </div>
                     </div>

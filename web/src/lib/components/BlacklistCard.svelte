@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { BlacklistCheck, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
+    import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
     import EmailPathCard from "./EmailPathCard.svelte";
 
@@ -15,7 +16,11 @@
 </script>
 
 <div class="card shadow-sm" id="rbl-details">
-    <div class="card-header bg-white">
+    <div
+        class="card-header"
+        class:bg-white={$theme === 'light'}
+        class:bg-dark={$theme !== 'light'}
+    >
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-exclamation me-2"></i>

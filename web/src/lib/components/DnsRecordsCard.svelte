@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { DomainAlignment, DnsResults, ReceivedHop } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
+    import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
@@ -27,7 +28,7 @@
 </script>
 
 <div class="card shadow-sm" id="dns-details">
-    <div class="card-header bg-white">
+    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-diagram-3 me-2"></i>
