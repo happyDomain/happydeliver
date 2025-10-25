@@ -42,6 +42,7 @@ type Config struct {
 	Email           EmailConfig
 	Analysis        AnalysisConfig
 	ReportRetention time.Duration // How long to keep reports. 0 = keep forever
+	RateLimit       uint          // API rate limit (requests per second per IP)
 	SurveyURL       url.URL       // URL for user feedback survey
 }
 
@@ -71,6 +72,7 @@ func DefaultConfig() *Config {
 		DevProxy:        "",
 		Bind:            ":8080",
 		ReportRetention: 0, // Keep reports forever by default
+		RateLimit:       1, // is in fact 2 requests per 2 seconds per IP (default)
 		Database: DatabaseConfig{
 			Type: "sqlite",
 			DSN:  "happydeliver.db",
