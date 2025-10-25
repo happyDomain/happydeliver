@@ -78,26 +78,30 @@ func RunServer(cfg *config.Config) error {
 	}
 	router := gin.Default()
 
-	// Set up rate limiting (1 request per second per IP)
-	rateLimitStore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-		Rate:  4 * time.Second,
-		Limit: 2,
-	})
-	rateLimiter := ratelimit.RateLimiter(rateLimitStore, &ratelimit.Options{
-		ErrorHandler: func(c *gin.Context, info ratelimit.Info) {
-			c.JSON(429, gin.H{
-				"error":   "rate_limit_exceeded",
-				"message": "Too many requests. Try again in " + time.Until(info.ResetTime).String(),
-			})
-		},
-		KeyFunc: func(c *gin.Context) string {
-			return c.ClientIP()
-		},
-	})
-
-	// Register API routes with rate limiting
 	apiGroup := router.Group("/api")
-	apiGroup.Use(rateLimiter)
+
+	if cfg.RateLimit > 0 {
+		// Set up rate limiting (2x to handle burst)
+		rateLimitStore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
+			Rate:  2 * time.Second,
+			Limit: 2 * cfg.RateLimit,
+		})
+		rateLimiter := ratelimit.RateLimiter(rateLimitStore, &ratelimit.Options{
+			ErrorHandler: func(c *gin.Context, info ratelimit.Info) {
+				c.JSON(429, gin.H{
+					"error":   "rate_limit_exceeded",
+					"message": "Too many requests. Try again in " + time.Until(info.ResetTime).String(),
+				})
+			},
+			KeyFunc: func(c *gin.Context) string {
+				return c.ClientIP()
+			},
+		})
+
+		apiGroup.Use(rateLimiter)
+	}
+
+	// Register API routes
 	api.RegisterHandlers(apiGroup, handler)
 	web.DeclareRoutes(cfg, router)
 
