@@ -33,6 +33,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/internal/version"
 )
 
 // EmailAnalyzer defines the interface for email analysis
@@ -278,7 +279,7 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 	mtaStatus := StatusComponentsMtaUp
 	c.JSON(http.StatusOK, Status{
 		Status:  overallStatus,
-		Version: "0.1.0-dev",
+		Version: version.Version,
 		Components: &struct {
 			Database *StatusComponentsDatabase `json:"database,omitempty"`
 			Mta      *StatusComponentsMta      `json:"mta,omitempty"`

@@ -21,7 +21,7 @@ steps:
   commands:
   - apk add --no-cache git
   - go generate ./...
-  - go build -tags netgo -ldflags '-w -X main.Version=${DRONE_BRANCH}-${DRONE_COMMIT} -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} ./cmd/happyDeliver
+  - go build -tags netgo -ldflags '-w -X git.happydns.org/happyDeliver/internal/version.Version=${DRONE_BRANCH}-${DRONE_COMMIT} -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} ./cmd/happyDeliver
   - ln happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} happydeliver
   environment:
     CGO_ENABLED: 0
@@ -35,7 +35,7 @@ steps:
   commands:
   - apk add --no-cache git
   - go generate ./...
-  - go build -tags netgo -ldflags '-w -X main.Version=${DRONE_TAG##v} -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
+  - go build -tags netgo -ldflags '-w -X git.happydns.org/happyDeliver/internal/version.Version=${DRONE_TAG##v} -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
   - ln happydeliver-${DRONE_STAGE_OS}-${DRONE_STAGE_ARCH} happydeliver
   environment:
     CGO_ENABLED: 0
@@ -47,7 +47,7 @@ steps:
   image: golang:1-alpine
   commands:
   - apk add --no-cache git
-  - go build -tags netgo -ldflags '-w -X "main.Version=${DRONE_BRANCH}-${DRONE_COMMIT}" -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-darwin-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
+  - go build -tags netgo -ldflags '-w -X "git.happydns.org/happyDeliver/internal/version.Version=${DRONE_BRANCH}-${DRONE_COMMIT}" -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-darwin-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
   environment:
     CGO_ENABLED: 0
     GOOS: darwin
@@ -61,7 +61,7 @@ steps:
   image: golang:1-alpine
   commands:
   - apk add --no-cache git
-  - go build -tags netgo -ldflags '-w -X "main.Version=${DRONE_TAG##v}" -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-darwin-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
+  - go build -tags netgo -ldflags '-w -X "git.happydns.org/happyDeliver/internal/version.Version=${DRONE_TAG##v}" -X main.build=${DRONE_BUILD_NUMBER}' -o happydeliver-darwin-${DRONE_STAGE_ARCH} ./cmd/happyDeliver/
   environment:
     CGO_ENABLED: 0
     GOOS: darwin

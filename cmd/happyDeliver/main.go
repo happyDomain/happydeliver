@@ -29,13 +29,12 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/app"
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/version"
 )
-
-const version = "0.1.0-dev"
 
 func main() {
 	fmt.Println("happyDeliver - Email Deliverability Testing Platform")
-	fmt.Printf("Version: %s\n", version)
+	fmt.Printf("Version: %s\n", version.Version)
 
 	cfg, err := config.ConsolidateConfig()
 	if err != nil {
@@ -54,7 +53,7 @@ func main() {
 			log.Fatalf("Analyzer error: %v", err)
 		}
 	case "version":
-		fmt.Println(version)
+		fmt.Println(version.Version)
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
