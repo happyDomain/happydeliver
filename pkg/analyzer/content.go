@@ -751,7 +751,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 				brokenLinks++
 			}
 		}
-		score += 20 * brokenLinks / len(results.Links)
+		score += 20 * (len(results.Links) - brokenLinks) / len(results.Links)
 		// Too much links, 10 points penalty
 		if len(results.Links) > 30 {
 			score -= 10
@@ -769,7 +769,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 				noAltCount++
 			}
 		}
-		score += 15 * noAltCount / len(results.Images)
+		score += 15 * (len(results.Images) - noAltCount) / len(results.Images)
 	} else {
 		// No images is Ok
 		score += 15
