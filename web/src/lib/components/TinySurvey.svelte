@@ -35,8 +35,8 @@
             responses.source = source;
         }
 
-        if ($appConfig.surveyUrl) {
-            fetch($appConfig.surveyUrl, {
+        if ($appConfig.survey_url) {
+            fetch($appConfig.survey_url, {
                 method: "POST",
                 body: JSON.stringify(responses),
                 headers: {
@@ -48,7 +48,7 @@
     }
 </script>
 
-{#if $appConfig.surveyUrl}
+{#if $appConfig.survey_url}
     <form class={className} onsubmit={submit}>
         {#if step === 0}
             {#if question}{@render question()}{:else}
