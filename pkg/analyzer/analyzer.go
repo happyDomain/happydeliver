@@ -44,6 +44,7 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		cfg.Analysis.DNSTimeout,
 		cfg.Analysis.HTTPTimeout,
 		cfg.Analysis.RBLs,
+		cfg.Analysis.CheckAllIPs,
 	)
 
 	return &EmailAnalyzer{

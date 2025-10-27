@@ -44,12 +44,13 @@ func NewReportGenerator(
 	dnsTimeout time.Duration,
 	httpTimeout time.Duration,
 	rbls []string,
+	checkAllIPs bool,
 ) *ReportGenerator {
 	return &ReportGenerator{
 		authAnalyzer:    NewAuthenticationAnalyzer(),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
-		rblChecker:      NewRBLChecker(dnsTimeout, rbls),
+		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),
 		headerAnalyzer:  NewHeaderAnalyzer(),
 	}

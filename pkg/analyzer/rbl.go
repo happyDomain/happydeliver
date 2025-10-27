@@ -34,9 +34,10 @@ import (
 
 // RBLChecker checks IP addresses against DNS-based blacklists
 type RBLChecker struct {
-	Timeout  time.Duration
-	RBLs     []string
-	resolver *net.Resolver
+	Timeout     time.Duration
+	RBLs        []string
+	CheckAllIPs bool // Check all IPs found in headers, not just the first one
+	resolver    *net.Resolver
 }
 
 // DefaultRBLs is a list of commonly used RBL providers
@@ -50,7 +51,7 @@ var DefaultRBLs = []string{
 }
 
 // NewRBLChecker creates a new RBL checker with configurable timeout and RBL list
-func NewRBLChecker(timeout time.Duration, rbls []string) *RBLChecker {
+func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *RBLChecker {
 	if timeout == 0 {
 		timeout = 5 * time.Second // Default timeout
 	}
@@ -58,8 +59,9 @@ func NewRBLChecker(timeout time.Duration, rbls []string) *RBLChecker {
 		rbls = DefaultRBLs
 	}
 	return &RBLChecker{
-		Timeout: timeout,
-		RBLs:    rbls,
+		Timeout:     timeout,
+		RBLs:        rbls,
+		CheckAllIPs: checkAllIPs,
 		resolver: &net.Resolver{
 			PreferGo: true,
 		},
@@ -95,6 +97,11 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 			if check.Listed {
 				results.ListedCount++
 			}
+		}
+
+		// Only check the first IP unless CheckAllIPs is enabled
+		if !r.CheckAllIPs {
+			break
 		}
 	}
 

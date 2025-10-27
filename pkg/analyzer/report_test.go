@@ -32,7 +32,7 @@ import (
 )
 
 func TestNewReportGenerator(t *testing.T) {
-	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs)
+	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs, false)
 	if gen == nil {
 		t.Fatal("Expected report generator, got nil")
 	}
@@ -55,7 +55,7 @@ func TestNewReportGenerator(t *testing.T) {
 }
 
 func TestAnalyzeEmail(t *testing.T) {
-	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs)
+	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs, false)
 
 	email := createTestEmail()
 
@@ -75,7 +75,7 @@ func TestAnalyzeEmail(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
-	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs)
+	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs, false)
 	testID := uuid.New()
 
 	email := createTestEmail()
@@ -130,7 +130,7 @@ func TestGenerateReport(t *testing.T) {
 }
 
 func TestGenerateReportWithSpamAssassin(t *testing.T) {
-	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs)
+	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs, false)
 	testID := uuid.New()
 
 	email := createTestEmailWithSpamAssassin()
@@ -150,7 +150,7 @@ func TestGenerateReportWithSpamAssassin(t *testing.T) {
 }
 
 func TestGenerateRawEmail(t *testing.T) {
-	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs)
+	gen := NewReportGenerator(10*time.Second, 10*time.Second, DefaultRBLs, false)
 
 	tests := []struct {
 		name     string

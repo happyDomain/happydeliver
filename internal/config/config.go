@@ -61,9 +61,10 @@ type EmailConfig struct {
 
 // AnalysisConfig contains timeout and behavior settings for email analysis
 type AnalysisConfig struct {
-	DNSTimeout  time.Duration
-	HTTPTimeout time.Duration
-	RBLs        []string
+	DNSTimeout   time.Duration
+	HTTPTimeout  time.Duration
+	RBLs         []string
+	CheckAllIPs  bool // Check all IPs found in headers, not just the first one
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -86,6 +87,7 @@ func DefaultConfig() *Config {
 			DNSTimeout:  5 * time.Second,
 			HTTPTimeout: 10 * time.Second,
 			RBLs:        []string{},
+			CheckAllIPs: false, // By default, only check the first IP
 		},
 	}
 }

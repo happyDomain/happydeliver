@@ -55,7 +55,7 @@ func TestNewRBLChecker(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checker := NewRBLChecker(tt.timeout, tt.rbls)
+			checker := NewRBLChecker(tt.timeout, tt.rbls, false)
 			if checker.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", checker.Timeout, tt.expectedTimeout)
 			}
@@ -97,7 +97,7 @@ func TestReverseIP(t *testing.T) {
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestIsPublicIP(t *testing.T) {
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -237,7 +237,7 @@ func TestExtractIPs(t *testing.T) {
 		},*/
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -322,7 +322,7 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -351,7 +351,7 @@ func TestGetUniqueListedIPs(t *testing.T) {
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 	listedIPs := checker.GetUniqueListedIPs(results)
 
 	expectedIPs := []string{"198.51.100.1", "198.51.100.2"}
@@ -376,7 +376,7 @@ func TestGetRBLsForIP(t *testing.T) {
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil)
+	checker := NewRBLChecker(5*time.Second, nil, false)
 
 	tests := []struct {
 		name         string

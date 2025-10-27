@@ -37,6 +37,7 @@ func declareFlags(o *Config) {
 	flag.DurationVar(&o.Analysis.DNSTimeout, "dns-timeout", o.Analysis.DNSTimeout, "Timeout when performing DNS query")
 	flag.DurationVar(&o.Analysis.HTTPTimeout, "http-timeout", o.Analysis.HTTPTimeout, "Timeout when performing HTTP query")
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
+	flag.BoolVar(&o.Analysis.CheckAllIPs, "check-all-ips", o.Analysis.CheckAllIPs, "Check all IPs found in email headers against RBLs (not just the first one)")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
