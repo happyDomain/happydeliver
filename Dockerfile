@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for happyDeliver with integrated MTA
 # Stage 1: Build the Svelte application
-FROM node:22-alpine AS nodebuild
+FROM node:24-alpine AS nodebuild
 
 WORKDIR /build
 
