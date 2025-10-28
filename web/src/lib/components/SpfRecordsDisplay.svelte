@@ -1,18 +1,27 @@
 <script lang="ts">
-    import type { SpfRecord } from "$lib/api/types.gen";
+    import type { DmarcRecord, SpfRecord } from "$lib/api/types.gen";
 
     interface Props {
         spfRecords?: SpfRecord[];
+        dmarcRecord?: DmarcRecord;
     }
 
-    let { spfRecords }: Props = $props();
+    let { spfRecords, dmarcRecord }: Props = $props();
+
+    // Check if DMARC has strict policy (quarantine or reject)
+    const dmarcStrict = $derived(
+        dmarcRecord?.valid &&
+        dmarcRecord?.policy &&
+        (dmarcRecord.policy === "quarantine" || dmarcRecord.policy === "reject")
+    );
 
     // Compute overall validity
     const spfIsValid = $derived(spfRecords?.reduce((acc, r) => acc && r.valid, true) ?? false);
     const spfCanBeImprove = $derived(
         spfRecords &&
             spfRecords.length > 0 &&
-            spfRecords.filter((r) => !r.record?.includes(" redirect="))[0]?.all_qualifier != "-",
+            spfRecords.filter((r) => !r.record?.includes(" redirect="))[0]?.all_qualifier != "-" &&
+            !dmarcStrict,
     );
 </script>
 
@@ -71,6 +80,8 @@
                                 <div class="alert small mt-2" class:alert-warning={spf.all_qualifier !== '-'} class:alert-success={spf.all_qualifier === '-'}>
                                     {#if spf.all_qualifier === '-'}
                                         All unauthorized servers will be rejected. This is the recommended strict policy.
+                                    {:else if dmarcStrict}
+                                        While your DMARC {dmarcRecord?.policy} policy provides some protection, consider using <code>-all</code> for better security with some old mailbox providers.
                                     {:else if spf.all_qualifier === '~'}
                                         Unauthorized servers will softfail. Consider using <code>-all</code> for stricter policy, though this rarely affects legitimate email deliverability.
                                     {:else if spf.all_qualifier === '+'}

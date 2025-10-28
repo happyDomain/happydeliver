@@ -242,6 +242,12 @@ func (d *DNSAnalyzer) calculateSPFScore(results *api.DNSResults) (score int) {
 			// Full points for valid SPF
 			score += 75
 
+			// Check if DMARC is configured with strict policy as all mechanism is less significant
+			dmarcStrict := results.DmarcRecord != nil &&
+				results.DmarcRecord.Valid && results.DmarcRecord.Policy != nil &&
+				(*results.DmarcRecord.Policy == "quarantine" ||
+					*results.DmarcRecord.Policy == "reject")
+
 			// Deduct points based on the all mechanism qualifier
 			if mainSPF.AllQualifier != nil {
 				switch *mainSPF.AllQualifier {
@@ -249,10 +255,16 @@ func (d *DNSAnalyzer) calculateSPFScore(results *api.DNSResults) (score int) {
 					// Strict fail - no deduction, this is the recommended policy
 					score += 25
 				case "~":
-					// Softfail - moderate penalty
+					// Softfail - if DMARC is quarantine or reject, treat it mostly like strict fail
+					if dmarcStrict {
+						score += 20
+					}
+					// Otherwise, moderate penalty (no points added or deducted)
 				case "+", "?":
 					// Pass/neutral - severe penalty
-					score -= 25
+					if !dmarcStrict {
+						score -= 25
+					}
 				}
 			} else {
 				// No 'all' mechanism qualifier extracted - severe penalty

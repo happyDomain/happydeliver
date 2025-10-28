@@ -111,7 +111,7 @@
             {/if}
 
             <!-- SPF Records (for Return-Path Domain) -->
-            <SpfRecordsDisplay spfRecords={dnsResults.spf_records} />
+            <SpfRecordsDisplay spfRecords={dnsResults.spf_records} dmarcRecord={dnsResults.dmarc_record} />
 
             <hr class="my-4">
 
