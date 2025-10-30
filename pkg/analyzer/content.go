@@ -220,6 +220,18 @@ func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
 
 				// Validate link
 				linkCheck := c.validateLink(href)
+
+				// Check for domain misalignment (phishing detection)
+				linkText := c.getNodeText(n)
+				if c.hasDomainMisalignment(href, linkText) {
+					linkCheck.IsSafe = false
+					if linkCheck.Warning == "" {
+						linkCheck.Warning = "Link text domain does not match actual URL domain (possible phishing)"
+					} else {
+						linkCheck.Warning += "; Link text domain does not match actual URL domain (possible phishing)"
+					}
+				}
+
 				results.Links = append(results.Links, linkCheck)
 
 				// Check for suspicious URLs
@@ -415,8 +427,131 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 	return check
 }
 
+// hasDomainMisalignment checks if the link text contains a different domain than the actual URL
+// This is a common phishing technique (e.g., text shows "paypal.com" but links to "evil.com")
+func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
+	// Parse the actual URL
+	parsedURL, err := url.Parse(href)
+	if err != nil {
+		return false
+	}
+
+	// Extract the actual destination domain/email based on scheme
+	var actualDomain string
+
+	if parsedURL.Scheme == "mailto" {
+		// Extract email address from mailto: URL
+		// Format can be: mailto:user@domain.com or mailto:user@domain.com?subject=...
+		mailtoAddr := parsedURL.Opaque
+
+		// Remove query parameters if present
+		if idx := strings.Index(mailtoAddr, "?"); idx != -1 {
+			mailtoAddr = mailtoAddr[:idx]
+		}
+
+		mailtoAddr = strings.TrimSpace(strings.ToLower(mailtoAddr))
+
+		// Extract domain from email address
+		if idx := strings.Index(mailtoAddr, "@"); idx != -1 {
+			actualDomain = mailtoAddr[idx+1:]
+		} else {
+			return false // Invalid mailto
+		}
+	} else if parsedURL.Scheme == "http" || parsedURL.Scheme == "https" {
+		// Check if URL has a host
+		if parsedURL.Host == "" {
+			return false
+		}
+
+		// Extract the actual URL's domain (remove port if present)
+		actualDomain = parsedURL.Host
+		if idx := strings.LastIndex(actualDomain, ":"); idx != -1 {
+			actualDomain = actualDomain[:idx]
+		}
+		actualDomain = strings.ToLower(actualDomain)
+	} else {
+		// Skip checks for other URL schemes (tel, etc.)
+		return false
+	}
+
+	// Normalize link text
+	linkText = strings.TrimSpace(linkText)
+	linkText = strings.ToLower(linkText)
+
+	// Skip if link text is empty, too short, or just generic text like "click here"
+	if linkText == "" || len(linkText) < 4 {
+		return false
+	}
+
+	// Common generic link texts that shouldn't trigger warnings
+	genericTexts := []string{
+		"click here", "read more", "learn more", "download", "subscribe",
+		"unsubscribe", "view online", "view in browser", "click", "here",
+		"update", "verify", "confirm", "continue", "get started",
+		// mailto-specific generic texts
+		"email us", "contact us", "send email", "get in touch", "reach out",
+		"contact", "email", "write to us",
+	}
+	for _, generic := range genericTexts {
+		if linkText == generic {
+			return false
+		}
+	}
+
+	// Extract domain-like patterns from link text using regex
+	// Matches patterns like "example.com", "www.example.com", "http://example.com"
+	domainRegex := regexp.MustCompile(`(?i)(?:https?://)?(?:www\.)?([a-z0-9][-a-z0-9]*\.)+[a-z]{2,}`)
+	matches := domainRegex.FindAllString(linkText, -1)
+
+	if len(matches) == 0 {
+		return false
+	}
+
+	// Check each domain-like pattern found in the text
+	for _, textDomain := range matches {
+		// Normalize the text domain
+		textDomain = strings.ToLower(textDomain)
+		textDomain = strings.TrimPrefix(textDomain, "http://")
+		textDomain = strings.TrimPrefix(textDomain, "https://")
+		textDomain = strings.TrimPrefix(textDomain, "www.")
+
+		// Remove trailing slashes and paths
+		if idx := strings.Index(textDomain, "/"); idx != -1 {
+			textDomain = textDomain[:idx]
+		}
+
+		// Compare domains - they should match or the actual URL should be a subdomain of the text domain
+		if textDomain != actualDomain {
+			// Check if actual domain is a subdomain of text domain
+			if !strings.HasSuffix(actualDomain, "."+textDomain) && !strings.HasSuffix(actualDomain, textDomain) {
+				// Check if they share the same base domain (last 2 parts)
+				textParts := strings.Split(textDomain, ".")
+				actualParts := strings.Split(actualDomain, ".")
+
+				if len(textParts) >= 2 && len(actualParts) >= 2 {
+					textBase := strings.Join(textParts[len(textParts)-2:], ".")
+					actualBase := strings.Join(actualParts[len(actualParts)-2:], ".")
+
+					if textBase != actualBase {
+						return true // Domain mismatch detected!
+					}
+				} else {
+					return true // Domain mismatch detected!
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // isSuspiciousURL checks if a URL looks suspicious
 func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) bool {
+	// Skip checks for mailto: URLs
+	if parsedURL.Scheme == "mailto" {
+		return false
+	}
+
 	// Check for IP address instead of domain
 	if c.isIPAddress(parsedURL.Host) {
 		return true

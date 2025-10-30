@@ -213,6 +213,16 @@ func TestIsSuspiciousURL(t *testing.T) {
 			url:      "https://mail.example.com/page",
 			expected: false,
 		},
+		{
+			name:     "Mailto with @ symbol",
+			url:      "mailto:support@example.com",
+			expected: false,
+		},
+		{
+			name:     "Mailto with multiple @ symbols",
+			url:      "mailto:user@subdomain@example.com",
+			expected: false,
+		},
 	}
 
 	analyzer := NewContentAnalyzer(5 * time.Second)
@@ -627,4 +637,277 @@ func findFirstLink(n *html.Node) *html.Node {
 
 func parseURL(urlStr string) (*url.URL, error) {
 	return url.Parse(urlStr)
+}
+
+func TestHasDomainMisalignment(t *testing.T) {
+	tests := []struct {
+		name     string
+		href     string
+		linkText string
+		expected bool
+		reason   string
+	}{
+		// Phishing cases - should return true
+		{
+			name:     "Obvious phishing - different domains",
+			href:     "https://evil.com/page",
+			linkText: "Click here to verify your paypal.com account",
+			expected: true,
+			reason:   "Link text shows 'paypal.com' but URL points to 'evil.com'",
+		},
+		{
+			name:     "Domain in link text differs from URL",
+			href:     "http://attacker.net",
+			linkText: "Visit google.com for more info",
+			expected: true,
+			reason:   "Link text shows 'google.com' but URL points to 'attacker.net'",
+		},
+		{
+			name:     "URL shown in text differs from actual URL",
+			href:     "https://phishing-site.xyz/login",
+			linkText: "https://www.bank.example.com/secure",
+			expected: true,
+			reason:   "Full URL in text doesn't match actual destination",
+		},
+		{
+			name:     "Similar but different domain",
+			href:     "https://paypa1.com/login",
+			linkText: "Login to your paypal.com account",
+			expected: true,
+			reason:   "Typosquatting: 'paypa1.com' vs 'paypal.com'",
+		},
+		{
+			name:     "Subdomain spoofing",
+			href:     "https://paypal.com.evil.com/login",
+			linkText: "Verify your paypal.com account",
+			expected: true,
+			reason:   "Domain is 'evil.com', not 'paypal.com'",
+		},
+		{
+			name:     "Multiple domains in text, none match",
+			href:     "https://badsite.com",
+			linkText: "Transfer from bank.com to paypal.com",
+			expected: true,
+			reason:   "Neither 'bank.com' nor 'paypal.com' matches 'badsite.com'",
+		},
+
+		// Legitimate cases - should return false
+		{
+			name:     "Exact domain match",
+			href:     "https://example.com/page",
+			linkText: "Visit example.com for more information",
+			expected: false,
+			reason:   "Domains match exactly",
+		},
+		{
+			name:     "Legitimate subdomain",
+			href:     "https://mail.google.com/inbox",
+			linkText: "Check your google.com email",
+			expected: false,
+			reason:   "Subdomain of the mentioned domain",
+		},
+		{
+			name:     "www prefix variation",
+			href:     "https://www.example.com/page",
+			linkText: "Visit example.com",
+			expected: false,
+			reason:   "www prefix is acceptable variation",
+		},
+		{
+			name:     "Generic link text - click here",
+			href:     "https://anywhere.com",
+			linkText: "click here",
+			expected: false,
+			reason:   "Generic text doesn't contain a domain",
+		},
+		{
+			name:     "Generic link text - read more",
+			href:     "https://example.com/article",
+			linkText: "Read more",
+			expected: false,
+			reason:   "Generic text doesn't contain a domain",
+		},
+		{
+			name:     "Generic link text - learn more",
+			href:     "https://example.com/info",
+			linkText: "Learn More",
+			expected: false,
+			reason:   "Generic text doesn't contain a domain (case insensitive)",
+		},
+		{
+			name:     "No domain in link text",
+			href:     "https://example.com/page",
+			linkText: "Click to continue",
+			expected: false,
+			reason:   "Link text has no domain reference",
+		},
+		{
+			name:     "Short link text",
+			href:     "https://example.com",
+			linkText: "Go",
+			expected: false,
+			reason:   "Text too short to contain meaningful domain",
+		},
+		{
+			name:     "Empty link text",
+			href:     "https://example.com",
+			linkText: "",
+			expected: false,
+			reason:   "Empty text cannot contain domain",
+		},
+		{
+			name:     "Mailto link - matching domain",
+			href:     "mailto:support@example.com",
+			linkText: "Email support@example.com",
+			expected: false,
+			reason:   "Mailto email matches text email",
+		},
+		{
+			name:     "Mailto link - domain mismatch (phishing)",
+			href:     "mailto:attacker@evil.com",
+			linkText: "Contact support@paypal.com for help",
+			expected: true,
+			reason:   "Mailto domain 'evil.com' doesn't match text domain 'paypal.com'",
+		},
+		{
+			name:     "Mailto link - generic text",
+			href:     "mailto:info@example.com",
+			linkText: "Contact us",
+			expected: false,
+			reason:   "Generic text without domain reference",
+		},
+		{
+			name:     "Mailto link - same domain different user",
+			href:     "mailto:sales@example.com",
+			linkText: "Email support@example.com",
+			expected: false,
+			reason:   "Both emails share the same domain",
+		},
+		{
+			name:     "Mailto link - text shows only domain",
+			href:     "mailto:info@example.com",
+			linkText: "Write to example.com",
+			expected: false,
+			reason:   "Text domain matches mailto domain",
+		},
+		{
+			name:     "Mailto link - domain in text doesn't match",
+			href:     "mailto:scam@phishing.net",
+			linkText: "Reply to customer-service@amazon.com",
+			expected: true,
+			reason:   "Mailto domain 'phishing.net' doesn't match 'amazon.com' in text",
+		},
+		{
+			name:     "Tel link",
+			href:     "tel:+1234567890",
+			linkText: "Call example.com support",
+			expected: false,
+			reason:   "Non-HTTP(S) links are excluded",
+		},
+		{
+			name:     "Same base domain with different subdomains",
+			href:     "https://www.example.com/page",
+			linkText: "Visit blog.example.com",
+			expected: false,
+			reason:   "Both share same base domain 'example.com'",
+		},
+		{
+			name:     "URL with path matches domain in text",
+			href:     "https://example.com/section/page",
+			linkText: "Go to example.com",
+			expected: false,
+			reason:   "Domain matches, path doesn't matter",
+		},
+		{
+			name:     "Generic text - subscribe",
+			href:     "https://newsletter.example.com/signup",
+			linkText: "Subscribe",
+			expected: false,
+			reason:   "Generic call-to-action text",
+		},
+		{
+			name:     "Generic text - unsubscribe",
+			href:     "https://example.com/unsubscribe?id=123",
+			linkText: "Unsubscribe",
+			expected: false,
+			reason:   "Generic unsubscribe text",
+		},
+		{
+			name:     "Generic text - download",
+			href:     "https://files.example.com/document.pdf",
+			linkText: "Download",
+			expected: false,
+			reason:   "Generic action text",
+		},
+		{
+			name:     "Descriptive text without domain",
+			href:     "https://shop.example.com/products",
+			linkText: "View our latest products",
+			expected: false,
+			reason:   "No domain mentioned in text",
+		},
+
+		// Edge cases
+		{
+			name:     "Domain-like text but not valid domain",
+			href:     "https://example.com",
+			linkText: "Save up to 50.00 dollars",
+			expected: false,
+			reason:   "50.00 looks like domain but isn't",
+		},
+		{
+			name:     "Text with http prefix matching domain",
+			href:     "https://example.com/page",
+			linkText: "Visit http://example.com",
+			expected: false,
+			reason:   "Domains match despite different protocols in display",
+		},
+		{
+			name:     "Port in URL should not affect matching",
+			href:     "https://example.com:8080/page",
+			linkText: "Go to example.com",
+			expected: false,
+			reason:   "Port number doesn't affect domain matching",
+		},
+		{
+			name:     "Whitespace in link text",
+			href:     "https://example.com",
+			linkText: "  example.com  ",
+			expected: false,
+			reason:   "Whitespace should be trimmed",
+		},
+		{
+			name:     "Multiple spaces in generic text",
+			href:     "https://example.com",
+			linkText: "click  here",
+			expected: false,
+			reason:   "Generic text with extra spaces",
+		},
+		{
+			name:     "Anchor fragment in URL",
+			href:     "https://example.com/page#section",
+			linkText: "example.com section",
+			expected: false,
+			reason:   "Fragment doesn't affect domain matching",
+		},
+		{
+			name:     "Query parameters in URL",
+			href:     "https://example.com/page?utm_source=email",
+			linkText: "Visit example.com",
+			expected: false,
+			reason:   "Query params don't affect domain matching",
+		},
+	}
+
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.hasDomainMisalignment(tt.href, tt.linkText)
+			if result != tt.expected {
+				t.Errorf("hasDomainMisalignment(%q, %q) = %v, want %v\nReason: %s",
+					tt.href, tt.linkText, result, tt.expected, tt.reason)
+			}
+		})
+	}
 }
