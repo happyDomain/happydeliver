@@ -22,60 +22,105 @@
 package analyzer
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestValidateSPF(t *testing.T) {
 	tests := []struct {
-		name     string
-		record   string
-		expected bool
+		name        string
+		record      string
+		expectError bool
+		errorMsg    string // Expected error message (substring match)
 	}{
 		{
-			name:     "Valid SPF with -all",
-			record:   "v=spf1 include:_spf.example.com -all",
-			expected: true,
+			name:        "Valid SPF with -all",
+			record:      "v=spf1 include:_spf.example.com -all",
+			expectError: false,
 		},
 		{
-			name:     "Valid SPF with ~all",
-			record:   "v=spf1 ip4:192.0.2.0/24 ~all",
-			expected: true,
+			name:        "Valid SPF with ~all",
+			record:      "v=spf1 ip4:192.0.2.0/24 ~all",
+			expectError: false,
 		},
 		{
-			name:     "Valid SPF with +all",
-			record:   "v=spf1 +all",
-			expected: true,
+			name:        "Valid SPF with +all",
+			record:      "v=spf1 +all",
+			expectError: false,
 		},
 		{
-			name:     "Valid SPF with ?all",
-			record:   "v=spf1 mx ?all",
-			expected: true,
+			name:        "Valid SPF with ?all",
+			record:      "v=spf1 mx ?all",
+			expectError: false,
 		},
 		{
-			name:     "Valid SPF with redirect",
-			record:   "v=spf1 redirect=_spf.example.com",
-			expected: true,
+			name:        "Valid SPF with redirect",
+			record:      "v=spf1 redirect=_spf.example.com",
+			expectError: false,
 		},
 		{
-			name:     "Valid SPF with redirect and mechanisms",
-			record:   "v=spf1 ip4:192.0.2.0/24 redirect=_spf.example.com",
-			expected: true,
+			name:        "Valid SPF with redirect and mechanisms",
+			record:      "v=spf1 ip4:192.0.2.0/24 redirect=_spf.example.com",
+			expectError: false,
 		},
 		{
-			name:     "Invalid SPF - no version",
-			record:   "include:_spf.example.com -all",
-			expected: false,
+			name:        "Valid SPF with multiple mechanisms",
+			record:      "v=spf1 a mx ip4:192.0.2.0/24 include:_spf.example.com -all",
+			expectError: false,
 		},
 		{
-			name:     "Invalid SPF - no all mechanism or redirect",
-			record:   "v=spf1 include:_spf.example.com",
-			expected: false,
+			name:        "Valid SPF with exp modifier",
+			record:      "v=spf1 mx exp=explain.example.com -all",
+			expectError: false,
 		},
 		{
-			name:     "Invalid SPF - wrong version",
-			record:   "v=spf2 include:_spf.example.com -all",
-			expected: false,
+			name:        "Invalid SPF - no version",
+			record:      "include:_spf.example.com -all",
+			expectError: true,
+			errorMsg:    "must start with 'v=spf1'",
+		},
+		{
+			name:        "Invalid SPF - no all mechanism or redirect",
+			record:      "v=spf1 include:_spf.example.com",
+			expectError: true,
+			errorMsg:    "should end with an 'all' mechanism",
+		},
+		{
+			name:        "Invalid SPF - wrong version",
+			record:      "v=spf2 include:_spf.example.com -all",
+			expectError: true,
+			errorMsg:    "must start with 'v=spf1'",
+		},
+		{
+			name:        "Invalid SPF - include= instead of include:",
+			record:      "v=spf1 include=icloud.com ~all",
+			expectError: true,
+			errorMsg:    "should use ':' not '='",
+		},
+		{
+			name:        "Invalid SPF - a= instead of a:",
+			record:      "v=spf1 a=example.com -all",
+			expectError: true,
+			errorMsg:    "should use ':' not '='",
+		},
+		{
+			name:        "Invalid SPF - mx= instead of mx:",
+			record:      "v=spf1 mx=example.com -all",
+			expectError: true,
+			errorMsg:    "should use ':' not '='",
+		},
+		{
+			name:        "Invalid SPF - unknown mechanism",
+			record:      "v=spf1 foobar -all",
+			expectError: true,
+			errorMsg:    "unknown mechanism",
+		},
+		{
+			name:        "Invalid SPF - unknown modifier",
+			record:      "v=spf1 -all unknown=value",
+			expectError: true,
+			errorMsg:    "unknown modifier",
 		},
 	}
 
@@ -83,9 +128,17 @@ func TestValidateSPF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.validateSPF(tt.record)
-			if result != tt.expected {
-				t.Errorf("validateSPF(%q) = %v, want %v", tt.record, result, tt.expected)
+			err := analyzer.validateSPF(tt.record)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("validateSPF(%q) expected error but got nil", tt.record)
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("validateSPF(%q) error = %q, want error containing %q", tt.record, err.Error(), tt.errorMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validateSPF(%q) unexpected error: %v", tt.record, err)
+				}
 			}
 		})
 	}

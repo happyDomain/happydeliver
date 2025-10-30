@@ -103,14 +103,14 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	// Basic validation
-	valid := d.validateSPF(spfRecord)
+	validationErr := d.validateSPF(spfRecord)
 
 	// Extract the "all" mechanism qualifier
 	var allQualifier *api.SPFRecordAllQualifier
 	var errMsg *string
 
-	if !valid {
-		errMsg = api.PtrTo("SPF record appears malformed")
+	if validationErr != nil {
+		errMsg = api.PtrTo(validationErr.Error())
 	} else {
 		// Extract qualifier from the "all" mechanism
 		if strings.HasSuffix(spfRecord, " -all") {
@@ -130,7 +130,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	results = append(results, api.SPFRecord{
 		Domain:       &domain,
 		Record:       &spfRecord,
-		Valid:        valid,
+		Valid:        validationErr == nil,
 		AllQualifier: allQualifier,
 		Error:        errMsg,
 	})
@@ -183,16 +183,90 @@ func (d *DNSAnalyzer) extractSPFRedirect(record string) string {
 	return ""
 }
 
+// isValidSPFMechanism checks if a token is a valid SPF mechanism or modifier
+func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
+	// Remove qualifier prefix if present (+, -, ~, ?)
+	mechanism := strings.TrimLeft(token, "+-~?")
+
+	// Check if it's a modifier (contains =)
+	if strings.Contains(mechanism, "=") {
+		// Only allow known modifiers: redirect= and exp=
+		if strings.HasPrefix(mechanism, "redirect=") || strings.HasPrefix(mechanism, "exp=") {
+			return nil
+		}
+
+		// Check if it's a common mistake (using = instead of :)
+		parts := strings.SplitN(mechanism, "=", 2)
+		if len(parts) == 2 {
+			mechanismName := parts[0]
+			knownMechanisms := []string{"include", "a", "mx", "ptr", "exists"}
+			for _, known := range knownMechanisms {
+				if mechanismName == known {
+					return fmt.Errorf("invalid syntax '%s': mechanism '%s' should use ':' not '='", token, mechanismName)
+				}
+			}
+		}
+
+		return fmt.Errorf("unknown modifier '%s'", token)
+	}
+
+	// Check standalone mechanisms (no domain/value required)
+	if mechanism == "all" || mechanism == "a" || mechanism == "mx" || mechanism == "ptr" {
+		return nil
+	}
+
+	// Check mechanisms with domain/value
+	knownPrefixes := []string{
+		"include:",
+		"a:", "a/",
+		"mx:", "mx/",
+		"ptr:",
+		"ip4:",
+		"ip6:",
+		"exists:",
+	}
+
+	for _, prefix := range knownPrefixes {
+		if strings.HasPrefix(mechanism, prefix) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("unknown mechanism '%s'", token)
+}
+
 // validateSPF performs basic SPF record validation
-func (d *DNSAnalyzer) validateSPF(record string) bool {
+func (d *DNSAnalyzer) validateSPF(record string) error {
 	// Must start with v=spf1
 	if !strings.HasPrefix(record, "v=spf1") {
-		return false
+		return fmt.Errorf("SPF record must start with 'v=spf1'")
+	}
+
+	// Parse and validate each token in the SPF record
+	tokens := strings.Fields(record)
+	hasRedirect := false
+
+	for i, token := range tokens {
+		// Skip the version tag
+		if i == 0 && token == "v=spf1" {
+			continue
+		}
+
+		// Check if it's a valid mechanism
+		if err := d.isValidSPFMechanism(token); err != nil {
+			return err
+		}
+
+		// Track if we have a redirect modifier
+		mechanism := strings.TrimLeft(token, "+-~?")
+		if strings.HasPrefix(mechanism, "redirect=") {
+			hasRedirect = true
+		}
 	}
 
 	// Check for redirect= modifier (which replaces the need for an 'all' mechanism)
-	if strings.Contains(record, "redirect=") {
-		return true
+	if hasRedirect {
+		return nil
 	}
 
 	// Check for common syntax issues
@@ -206,7 +280,11 @@ func (d *DNSAnalyzer) validateSPF(record string) bool {
 		}
 	}
 
-	return hasValidEnding
+	if !hasValidEnding {
+		return fmt.Errorf("SPF record should end with an 'all' mechanism (e.g., '-all', '~all') or have a 'redirect=' modifier")
+	}
+
+	return nil
 }
 
 // hasSPFStrictFail checks if SPF record has strict -all mechanism
