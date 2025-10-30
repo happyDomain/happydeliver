@@ -130,6 +130,17 @@
             }
         }
 
+        // SPF DNS record check
+        const spfRecord = report.dns_results?.spf_record;
+        if (spfRecord && !spfRecord.valid && spfRecord.record) {
+            segments.push({ text: ". Your SPF record is " });
+            segments.push({
+                text: "invalid",
+                highlight: { color: "danger", bold: true },
+                link: "#dns-spf",
+            });
+        }
+
         // IP Reverse DNS (iprev) check
         const iprevResult = report.authentication?.iprev;
         if (iprevResult) {
@@ -217,6 +228,28 @@
             }
         }
 
+        // DKIM DNS record check
+        const dkimRecords = report.dns_results?.dkim_records;
+        if (dkimRecords && Object.keys(dkimRecords).length > 0) {
+            const invalidDkimKeys = Object.entries(dkimRecords)
+                .filter(([_, record]) => !record.valid && record.record)
+                .map(([key, _]) => key);
+
+            if (invalidDkimKeys.length > 0) {
+                segments.push({ text: ". Your DKIM record" });
+                if (invalidDkimKeys.length > 1) {
+                    segments.push({ text: "s are " });
+                } else {
+                    segments.push({ text: " is " });
+                }
+                segments.push({
+                    text: "invalid",
+                    highlight: { color: "danger", bold: true },
+                    link: "#dns-dkim",
+                });
+            }
+        }
+
         // DMARC policy check
         const dmarcRecord = report.dns_results?.dmarc_record;
         if (dmarcRecord) {
@@ -235,9 +268,9 @@
                 segments.push({ text: "none", highlight: { monospace: true, bold: true } });
                 segments.push({ text: "' policy", highlight: { bold: true } });
             } else if (!dmarcRecord.valid) {
-                segments.push({ text: ". Your DMARC record has " });
+                segments.push({ text: ". Your DMARC record is " });
                 segments.push({
-                    text: "issues",
+                    text: "invalid",
                     highlight: { color: "danger", bold: true },
                     link: "#dns-dmarc",
                 });
