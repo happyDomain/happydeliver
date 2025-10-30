@@ -274,7 +274,10 @@
                 <div class="col-12">
                     <SummaryCard {report}>
                         <div class="d-flex justify-content-end me-lg-5">
-                            <TinySurvey class="bg-primary-subtle rounded-4 p-3 text-center" />
+                            <TinySurvey
+                                class="bg-primary-subtle rounded-4 p-3 text-center"
+                                source={report.id}
+                            />
                         </div>
                     </SummaryCard>
                 </div>
