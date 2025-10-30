@@ -331,6 +331,13 @@
                 });
                 if (bimiResult.details && bimiResult.details.indexOf("declined") == 0) {
                     segments.push({ text: " declined to participate" });
+                } else if (bimiResult?.result === "fail") {
+                    segments.push({ text: " but " });
+                    segments.push({
+                        text: "has issues",
+                        highlight: { color: "danger", bold: true },
+                        link: "#authentication-bimi",
+                    });
                 } else {
                     segments.push({ text: " for brand indicator display" });
                 }
