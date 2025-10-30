@@ -275,8 +275,11 @@
         }
 
         // BIMI
-        if (dmarcRecord && dmarcRecord.valid && dmarcRecord.policy != "none") {
-            const bimiResult = report.authentication?.bimi;
+        const bimiResult = report.authentication?.bimi;
+        if (
+            (dmarcRecord && dmarcRecord.valid && dmarcRecord.policy != "none") &&
+            (!bimiResult || bimiResult.result !== "skipped")
+        ) {
             const bimiRecord = report.dns_results?.bimi_record;
             if (bimiRecord?.valid) {
                 segments.push({ text: ". Your domain includes " });
