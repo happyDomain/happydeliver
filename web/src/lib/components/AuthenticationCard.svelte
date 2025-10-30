@@ -197,6 +197,7 @@
                         <i class="bi {getAuthResultIcon(authentication.x_google_dkim.result, false)} {getAuthResultClass(authentication.x_google_dkim.result, false)} me-2 fs-5"></i>
                         <div>
                             <strong>X-Google-DKIM</strong>
+                            <i class="bi bi-info-circle text-muted ms-1" title="Google's internal DKIM signature for messages routed through Gmail infrastructure"></i>
                             <span class="text-uppercase ms-2 {getAuthResultClass(authentication.x_google_dkim.result, false)}">
                                 {authentication.x_google_dkim.result}
                             </span>
@@ -227,6 +228,7 @@
                         <i class="bi {getAuthResultIcon(authentication.x_aligned_from.result, false)} {getAuthResultClass(authentication.x_aligned_from.result, false)} me-2 fs-5"></i>
                         <div>
                             <strong>X-Aligned-From</strong>
+                            <i class="bi bi-info-circle text-muted ms-1" title="Check that Mail From and Header From addresses are in alignment. See Domain Alignment section."></i>
                             <span class="text-uppercase ms-2 {getAuthResultClass(authentication.x_aligned_from.result, false)}">
                                 {authentication.x_aligned_from.result}
                             </span>
