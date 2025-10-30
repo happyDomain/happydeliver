@@ -19,6 +19,7 @@
                 return "text-success";
             case "fail":
             case "missing":
+            case "invalid":
                 return "text-danger";
             case "softfail":
             case "neutral":
@@ -40,6 +41,7 @@
                 return "bi-x-circle-fill";
             case "softfail":
             case "neutral":
+            case "invalid":
                 return "bi-exclamation-circle-fill";
             case "missing":
                 return "bi-dash-circle-fill";
