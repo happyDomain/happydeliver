@@ -147,31 +147,35 @@
 
             <!-- DKIM (Required) -->
             <div class="list-group-item" id="authentication-dkim">
-                <div class="d-flex align-items-start">
-                    {#if authentication.dkim && authentication.dkim.length > 0}
-                        <i class="bi {getAuthResultIcon(authentication.dkim[0].result, true)} {getAuthResultClass(authentication.dkim[0].result, true)} me-2 fs-5"></i>
-                        <div>
-                            <strong>DKIM</strong>
-                            <span class="text-uppercase ms-2 {getAuthResultClass(authentication.dkim[0].result, true)}">
-                                {authentication.dkim[0].result}
-                            </span>
-                            {#if authentication.dkim[0].domain}
-                                <div class="small">
-                                    <strong>Domain:</strong>
-                                    <span class="text-muted">{authentication.dkim[0].domain}</span>
-                                </div>
-                            {/if}
-                            {#if authentication.dkim[0].selector}
-                                <div class="small">
-                                    <strong>Selector:</strong>
-                                    <span class="text-muted">{authentication.dkim[0].selector}</span>
-                                </div>
-                            {/if}
-                            {#if authentication.dkim[0].details}
-                                <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{authentication.dkim[0].details}</pre>
-                            {/if}
+                {#if authentication.dkim && authentication.dkim.length > 0}
+                    {#each authentication.dkim as dkim, i}
+                        <div class="d-flex align-items-start" class:mt-3={i > 0}>
+                            <i class="bi {getAuthResultIcon(dkim.result, true)} {getAuthResultClass(dkim.result, true)} me-2 fs-5"></i>
+                            <div>
+                                <strong>DKIM{authentication.dkim.length > 1 ? ` #${i + 1}` : ''}</strong>
+                                <span class="text-uppercase ms-2 {getAuthResultClass(dkim.result, true)}">
+                                    {dkim.result}
+                                </span>
+                                {#if dkim.domain}
+                                    <div class="small">
+                                        <strong>Domain:</strong>
+                                        <span class="text-muted">{dkim.domain}</span>
+                                    </div>
+                                {/if}
+                                {#if dkim.selector}
+                                    <div class="small">
+                                        <strong>Selector:</strong>
+                                        <span class="text-muted">{dkim.selector}</span>
+                                    </div>
+                                {/if}
+                                {#if dkim.details}
+                                    <pre class="p-2 mb-0 {$theme === 'light' ? 'bg-light' : 'bg-secondary'} text-muted small" style="white-space: pre-wrap">{dkim.details}</pre>
+                                {/if}
+                            </div>
                         </div>
-                    {:else}
+                    {/each}
+                {:else}
+                    <div class="d-flex align-items-start">
                         <i class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass('missing', true)} me-2 fs-5"></i>
                         <div>
                             <strong>DKIM</strong>
@@ -180,8 +184,8 @@
                             </span>
                             <div class="text-muted small">DKIM signature is required for proper email authentication</div>
                         </div>
-                    {/if}
-                </div>
+                    </div>
+                {/if}
             </div>
 
             <!-- X-Google-DKIM (Optional) -->

@@ -97,13 +97,18 @@ func (a *AuthenticationAnalyzer) calculateDKIMScore(results *api.AuthenticationR
 	// Expect at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		hasPass := false
+		hasNonPass := false
 		for _, dkim := range *results.Dkim {
 			if dkim.Result == api.AuthResultResultPass {
 				hasPass = true
-				break
+			} else {
+				hasNonPass = true
 			}
 		}
-		if hasPass {
+		if hasPass && hasNonPass {
+			// Could be better
+			return 90
+		} else if hasPass {
 			return 100
 		} else {
 			// Has DKIM signatures but none passed
