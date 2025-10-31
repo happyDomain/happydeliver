@@ -3,7 +3,7 @@
     import { onMount } from "svelte";
     import { checkBlacklist } from "$lib/api";
     import type { BlacklistCheckResponse } from "$lib/api/types.gen";
-    import { GradeDisplay, BlacklistCard } from "$lib/components";
+    import { BlacklistCard, GradeDisplay, TinySurvey } from "$lib/components";
     import { theme } from "$lib/stores/theme";
 
     let ip = $derived($page.params.ip);
@@ -128,6 +128,12 @@
                                         <small class="text-muted d-block">Blacklist Score</small>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="d-flex justify-content-end me-lg-5">
+                                <TinySurvey
+                                    class="bg-primary-subtle rounded-4 p-3 text-center"
+                                    source={"rbl-" + result.ip}
+                                />
                             </div>
                         </div>
                     </div>

@@ -3,7 +3,7 @@
     import { onMount } from "svelte";
     import { testDomain } from "$lib/api";
     import type { DomainTestResponse } from "$lib/api/types.gen";
-    import { GradeDisplay, DnsRecordsCard } from "$lib/components";
+    import { DnsRecordsCard, GradeDisplay, TinySurvey } from "$lib/components";
     import { theme } from "$lib/stores/theme";
 
     let domain = $derived($page.params.domain);
@@ -123,6 +123,12 @@
                                         <small class="text-muted d-block">DNS</small>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="d-flex justify-content-end me-lg-5 mt-3">
+                                <TinySurvey
+                                    class="bg-primary-subtle rounded-4 p-3 text-center"
+                                    source={"rbl-" + result.ip}
+                                />
                             </div>
                         </div>
                     </div>
