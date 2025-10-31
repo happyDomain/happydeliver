@@ -124,6 +124,70 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	return results
 }
 
+// AnalyzeDomainOnly performs DNS validation for a domain without email context
+// This is useful for checking domain configuration without sending an actual email
+func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *api.DNSResults {
+	results := &api.DNSResults{
+		FromDomain: domain,
+	}
+
+	// Check MX records
+	results.FromMxRecords = d.checkMXRecords(domain)
+
+	// Check SPF records
+	results.SpfRecords = d.checkSPFRecords(domain)
+
+	// Check DMARC record
+	results.DmarcRecord = d.checkDMARCRecord(domain)
+
+	// Check BIMI record with default selector
+	results.BimiRecord = d.checkBIMIRecord(domain, "default")
+
+	return results
+}
+
+// CalculateDomainOnlyScore calculates the DNS score for domain-only tests
+// Returns a score from 0-100 where higher is better
+// This version excludes PTR and DKIM checks since they require email context
+func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *api.DNSResults) (int, string) {
+	if results == nil {
+		return 0, ""
+	}
+
+	score := 0
+
+	// MX Records: 30 points (only one domain to check)
+	mxScore := d.calculateMXScore(results)
+	// Since calculateMXScore checks both From and RP domains,
+	// and we only have From domain, we use the full score
+	score += 30 * mxScore / 100
+
+	// SPF Records: 30 points
+	score += 30 * d.calculateSPFScore(results) / 100
+
+	// DMARC Record: 40 points
+	score += 40 * d.calculateDMARCScore(results) / 100
+
+	// BIMI Record: only bonus
+	if results.BimiRecord != nil && results.BimiRecord.Valid {
+		if score >= 100 {
+			return 100, "A+"
+		}
+	}
+
+	// Ensure score doesn't exceed maximum
+	if score > 100 {
+		score = 100
+	}
+
+	// Ensure score is non-negative
+	if score < 0 {
+		score = 0
+	}
+
+	return score, ScoreToGradeKind(score)
+}
+
 // CalculateDNSScore calculates the DNS score from records results
 // Returns a score from 0-100 where higher is better
 // senderIP is the original sender IP address used for FCrDNS verification

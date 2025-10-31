@@ -169,6 +169,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /domain:
+    post:
+      tags:
+        - tests
+      summary: Test a domain's email configuration
+      description: Analyzes DNS records (MX, SPF, DMARC, BIMI) for a domain without requiring an actual email to be sent. Returns results immediately.
+      operationId: testDomain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainTestRequest'
+      responses:
+        '200':
+          description: Domain test completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainTestResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /status:
     get:
       tags:
@@ -1112,3 +1145,40 @@ components:
         details:
           type: string
           description: Additional error details
+
+    DomainTestRequest:
+      type: object
+      required:
+        - domain
+      properties:
+        domain:
+          type: string
+          pattern: '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+          description: Domain name to test (e.g., example.com)
+          example: "example.com"
+
+    DomainTestResponse:
+      type: object
+      required:
+        - domain
+        - score
+        - grade
+        - dns_results
+      properties:
+        domain:
+          type: string
+          description: The tested domain name
+          example: "example.com"
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Overall domain configuration score (0-100)
+          example: 85
+        grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score
+          example: "A"
+        dns_results:
+          $ref: '#/components/schemas/DNSResults'

@@ -108,3 +108,14 @@ func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) ([]byt
 
 	return reportJSON, nil
 }
+
+// AnalyzeDomain performs DNS analysis for a domain and returns the results
+func (a *APIAdapter) AnalyzeDomain(domain string) (*api.DNSResults, int, string) {
+	// Perform DNS analysis
+	dnsResults := a.analyzer.generator.dnsAnalyzer.AnalyzeDomainOnly(domain)
+
+	// Calculate score
+	score, grade := a.analyzer.generator.dnsAnalyzer.CalculateDomainOnlyScore(dnsResults)
+
+	return dnsResults, score, grade
+}

@@ -45,6 +45,26 @@ func ScoreToGrade(score int) string {
 	}
 }
 
+// ScoreToGradeKind converts a percentage score (0-100) to a letter grade, be kind in gradation
+func ScoreToGradeKind(score int) string {
+	switch {
+	case score > 100:
+		return "A+"
+	case score >= 90:
+		return "A"
+	case score >= 80:
+		return "B"
+	case score >= 60:
+		return "C"
+	case score >= 45:
+		return "D"
+	case score >= 30:
+		return "E"
+	default:
+		return "F"
+	}
+}
+
 // ScoreToReportGrade converts a percentage score to an api.ReportGrade
 func ScoreToReportGrade(score int) api.ReportGrade {
 	return api.ReportGrade(ScoreToGrade(score))

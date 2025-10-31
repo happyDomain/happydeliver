@@ -233,6 +233,13 @@
                 {/if}
             </button>
         </div>
+
+        <div class="text-center mt-4">
+            <a href="/domain" class="btn btn-secondary btn-lg">
+                <i class="bi bi-globe me-2"></i>
+                Or Test Domain Only
+            </a>
+        </div>
     </div>
 </section>
 

@@ -40,6 +40,7 @@ import (
 // This interface breaks the circular dependency with pkg/analyzer
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
+	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -289,4 +290,54 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 		},
 		Uptime: &uptime,
 	})
+}
+
+// TestDomain performs synchronous domain analysis
+// (POST /domain)
+func (h *APIHandler) TestDomain(c *gin.Context) {
+	var request DomainTestRequest
+
+	// Bind and validate request
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Perform domain analysis
+	dnsResults, score, grade := h.analyzer.AnalyzeDomain(request.Domain)
+
+	// Convert grade string to DomainTestResponseGrade enum
+	var responseGrade DomainTestResponseGrade
+	switch grade {
+	case "A+":
+		responseGrade = DomainTestResponseGradeA
+	case "A":
+		responseGrade = DomainTestResponseGradeA1
+	case "B":
+		responseGrade = DomainTestResponseGradeB
+	case "C":
+		responseGrade = DomainTestResponseGradeC
+	case "D":
+		responseGrade = DomainTestResponseGradeD
+	case "E":
+		responseGrade = DomainTestResponseGradeE
+	case "F":
+		responseGrade = DomainTestResponseGradeF
+	default:
+		responseGrade = DomainTestResponseGradeF
+	}
+
+	// Build response
+	response := DomainTestResponse{
+		Domain:     request.Domain,
+		Score:      score,
+		Grade:      responseGrade,
+		DnsResults: *dnsResults,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
