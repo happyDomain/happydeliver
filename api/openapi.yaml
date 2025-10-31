@@ -1164,6 +1164,7 @@ components:
         - score
         - grade
         - dns_results
+        - is_disposable
       properties:
         domain:
           type: string
@@ -1182,3 +1183,7 @@ components:
           example: "A"
         dns_results:
           $ref: '#/components/schemas/DNSResults'
+        is_disposable:
+          type: boolean
+          description: Whether the domain is a known disposable/temporary email provider
+          example: false

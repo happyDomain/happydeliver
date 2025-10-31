@@ -40,7 +40,7 @@ import (
 // This interface breaks the circular dependency with pkg/analyzer
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
-	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string)
+	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string, isDisposable bool)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -308,7 +308,7 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 	}
 
 	// Perform domain analysis
-	dnsResults, score, grade := h.analyzer.AnalyzeDomain(request.Domain)
+	dnsResults, score, grade, isDisposable := h.analyzer.AnalyzeDomain(request.Domain)
 
 	// Convert grade string to DomainTestResponseGrade enum
 	var responseGrade DomainTestResponseGrade
@@ -333,10 +333,11 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 
 	// Build response
 	response := DomainTestResponse{
-		Domain:     request.Domain,
-		Score:      score,
-		Grade:      responseGrade,
-		DnsResults: *dnsResults,
+		Domain:       request.Domain,
+		Score:        score,
+		Grade:        responseGrade,
+		DnsResults:   *dnsResults,
+		IsDisposable: isDisposable,
 	}
 
 	c.JSON(http.StatusOK, response)
