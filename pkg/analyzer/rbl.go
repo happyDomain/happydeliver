@@ -108,6 +108,28 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 	return results
 }
 
+// CheckIP checks a single IP address against all configured RBLs
+func (r *RBLChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
+	// Validate that it's a valid IP address
+	if !r.isPublicIP(ip) {
+		return nil, 0, fmt.Errorf("invalid or non-public IP address: %s", ip)
+	}
+
+	var checks []api.BlacklistCheck
+	listedCount := 0
+
+	// Check the IP against all RBLs
+	for _, rbl := range r.RBLs {
+		check := r.checkIP(ip, rbl)
+		checks = append(checks, check)
+		if check.Listed {
+			listedCount++
+		}
+	}
+
+	return checks, listedCount, nil
+}
+
 // extractIPs extracts IP addresses from Received headers
 func (r *RBLChecker) extractIPs(email *EmailMessage) []string {
 	var ips []string

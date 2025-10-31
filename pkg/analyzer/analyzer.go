@@ -119,3 +119,23 @@ func (a *APIAdapter) AnalyzeDomain(domain string) (*api.DNSResults, int, string)
 
 	return dnsResults, score, grade
 }
+
+// CheckBlacklistIP checks a single IP address against DNS blacklists
+func (a *APIAdapter) CheckBlacklistIP(ip string) ([]api.BlacklistCheck, int, int, string, error) {
+	// Check the IP against all configured RBLs
+	checks, listedCount, err := a.analyzer.generator.rblChecker.CheckIP(ip)
+	if err != nil {
+		return nil, 0, 0, "", err
+	}
+
+	// Calculate score using the existing function
+	// Create a minimal RBLResults structure for scoring
+	results := &RBLResults{
+		Checks:      map[string][]api.BlacklistCheck{ip: checks},
+		IPsChecked:  []string{ip},
+		ListedCount: listedCount,
+	}
+	score, grade := a.analyzer.generator.rblChecker.CalculateRBLScore(results)
+
+	return checks, listedCount, score, grade, nil
+}

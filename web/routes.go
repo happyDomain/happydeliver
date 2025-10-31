@@ -63,6 +63,10 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 		appConfig["survey_url"] = cfg.SurveyURL.String()
 	}
 
+	if len(cfg.Analysis.RBLs) > 0 {
+		appConfig["rbls"] = cfg.Analysis.RBLs
+	}
+
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {
 		log.Println("Unable to generate JSON config to inject in web application")
 	} else {

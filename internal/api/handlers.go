@@ -41,6 +41,7 @@ import (
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string)
+	CheckBlacklistIP(ip string) (checks []BlacklistCheck, listedCount int, score int, grade string, err error)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -337,6 +338,44 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 		Score:      score,
 		Grade:      responseGrade,
 		DnsResults: *dnsResults,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// CheckBlacklist checks an IP address against DNS blacklists
+// (POST /blacklist)
+func (h *APIHandler) CheckBlacklist(c *gin.Context) {
+	var request BlacklistCheckRequest
+
+	// Bind and validate request
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Perform blacklist check using analyzer
+	checks, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Error{
+			Error:   "invalid_ip",
+			Message: "Invalid IP address",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Build response
+	response := BlacklistCheckResponse{
+		Ip:          request.Ip,
+		Checks:      checks,
+		ListedCount: listedCount,
+		Score:       score,
+		Grade:       BlacklistCheckResponseGrade(grade),
 	}
 
 	c.JSON(http.StatusOK, response)

@@ -29,6 +29,7 @@ interface AppConfig {
 const defaultConfig: AppConfig = {
     report_retention: 0,
     survey_url: "",
+    rbls: [],
 };
 
 function getConfigFromScriptTag(): AppConfig | null {

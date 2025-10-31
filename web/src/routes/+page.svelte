@@ -235,9 +235,13 @@
         </div>
 
         <div class="text-center mt-4">
-            <a href="/domain" class="btn btn-secondary btn-lg">
+            <a href="/domain" class="btn btn-secondary btn-lg me-2">
                 <i class="bi bi-globe me-2"></i>
-                Or Test Domain Only
+                Test Domain Only
+            </a>
+            <a href="/blacklist" class="btn btn-secondary btn-lg">
+                <i class="bi bi-shield-exclamation me-2"></i>
+                Check IP Blacklist
             </a>
         </div>
     </div>
