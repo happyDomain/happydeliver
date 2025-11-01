@@ -16,10 +16,16 @@
     function getAuthResultClass(result: string, noneIsFail: boolean): string {
         switch (result) {
             case "pass":
+            case "domain_pass":
+            case "orgdomain_pass":
                 return "text-success";
+            case "error":
             case "fail":
             case "missing":
             case "invalid":
+            case "null":
+            case "null_smtp":
+            case "null_header":
                 return "text-danger";
             case "softfail":
             case "neutral":
@@ -36,12 +42,18 @@
     function getAuthResultIcon(result: string, noneIsFail: boolean): string {
         switch (result) {
             case "pass":
+            case "domain_pass":
+            case "orgdomain_pass":
                 return "bi-check-circle-fill";
             case "fail":
                 return "bi-x-circle-fill";
             case "softfail":
             case "neutral":
             case "invalid":
+            case "null":
+            case "error":
+            case "null_smtp":
+            case "null_header":
                 return "bi-exclamation-circle-fill";
             case "missing":
                 return "bi-dash-circle-fill";

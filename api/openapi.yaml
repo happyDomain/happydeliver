@@ -760,7 +760,7 @@ components:
       properties:
         result:
           type: string
-          enum: [pass, fail, invalid, missing, none, neutral, softfail, temperror, permerror, declined]
+          enum: [pass, fail, invalid, missing, none, neutral, softfail, temperror, permerror, declined, domain_pass, orgdomain_pass]
           description: Authentication result
           example: "pass"
         domain:

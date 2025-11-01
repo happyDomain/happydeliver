@@ -335,7 +335,6 @@
                             headerAnalysis={report.header_analysis}
                             headerGrade={report.summary?.header_grade}
                             headerScore={report.summary?.header_score}
-                            xAlignedFrom={report.authentication?.x_aligned_from}
                         />
                     </div>
                 </div>
