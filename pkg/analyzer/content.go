@@ -659,30 +659,47 @@ func (c *ContentAnalyzer) calculateTextPlainConsistency(plainText, htmlText stri
 		return 0.0
 	}
 
-	// Count common words
-	commonWords := 0
-	plainWordSet := make(map[string]bool)
+	// Count common words by building sets
+	plainWordSet := make(map[string]int)
 	for _, word := range plainWords {
-		plainWordSet[word] = true
+		plainWordSet[word]++
 	}
 
+	htmlWordSet := make(map[string]int)
 	for _, word := range htmlWords {
-		if plainWordSet[word] {
-			commonWords++
+		htmlWordSet[word]++
+	}
+
+	// Count matches: for each unique word, count minimum occurrences in both texts
+	commonWords := 0
+	for word, plainCount := range plainWordSet {
+		if htmlCount, exists := htmlWordSet[word]; exists {
+			// Count the minimum occurrences between both texts
+			if plainCount < htmlCount {
+				commonWords += plainCount
+			} else {
+				commonWords += htmlCount
+			}
 		}
 	}
 
-	// Calculate ratio (Jaccard similarity approximation)
-	maxWords := len(plainWords)
-	if len(htmlWords) > maxWords {
-		maxWords = len(htmlWords)
-	}
-
-	if maxWords == 0 {
+	// Calculate ratio using total words from both texts (union approach)
+	// This provides a balanced measure: perfect match = 1.0, partial overlap = 0.3-0.8
+	totalWords := len(plainWords) + len(htmlWords)
+	if totalWords == 0 {
 		return 0.0
 	}
 
-	return float32(commonWords) / float32(maxWords)
+	// Divide by average word count for better scoring
+	avgWords := float32(totalWords) / 2.0
+	ratio := float32(commonWords) / avgWords
+
+	// Cap at 1.0 for perfect matches
+	if ratio > 1.0 {
+		ratio = 1.0
+	}
+
+	return ratio
 }
 
 // normalizeText normalizes text for comparison
