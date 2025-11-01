@@ -128,7 +128,8 @@ func TestValidateSPF(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := analyzer.validateSPF(tt.record)
+			// Test as main record (isMainRecord = true) since these tests check overall SPF validity
+			err := analyzer.validateSPF(tt.record, true)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("validateSPF(%q) expected error but got nil", tt.record)
@@ -138,6 +139,74 @@ func TestValidateSPF(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Errorf("validateSPF(%q) unexpected error: %v", tt.record, err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateSPF_IncludedRecords(t *testing.T) {
+	tests := []struct {
+		name         string
+		record       string
+		isMainRecord bool
+		expectError  bool
+		errorMsg     string
+	}{
+		{
+			name:         "Main record without 'all' - should error",
+			record:       "v=spf1 include:_spf.example.com",
+			isMainRecord: true,
+			expectError:  true,
+			errorMsg:     "should end with an 'all' mechanism",
+		},
+		{
+			name:         "Included record without 'all' - should NOT error",
+			record:       "v=spf1 include:_spf.example.com",
+			isMainRecord: false,
+			expectError:  false,
+		},
+		{
+			name:         "Included record with only mechanisms - should NOT error",
+			record:       "v=spf1 ip4:192.0.2.0/24 mx",
+			isMainRecord: false,
+			expectError:  false,
+		},
+		{
+			name:         "Main record with only mechanisms - should error",
+			record:       "v=spf1 ip4:192.0.2.0/24 mx",
+			isMainRecord: true,
+			expectError:  true,
+			errorMsg:     "should end with an 'all' mechanism",
+		},
+		{
+			name:         "Included record with 'all' - valid",
+			record:       "v=spf1 ip4:192.0.2.0/24 -all",
+			isMainRecord: false,
+			expectError:  false,
+		},
+		{
+			name:         "Main record with 'all' - valid",
+			record:       "v=spf1 ip4:192.0.2.0/24 -all",
+			isMainRecord: true,
+			expectError:  false,
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := analyzer.validateSPF(tt.record, tt.isMainRecord)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("validateSPF(%q, isMainRecord=%v) expected error but got nil", tt.record, tt.isMainRecord)
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("validateSPF(%q, isMainRecord=%v) error = %q, want error containing %q", tt.record, tt.isMainRecord, err.Error(), tt.errorMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validateSPF(%q, isMainRecord=%v) unexpected error: %v", tt.record, tt.isMainRecord, err)
 				}
 			}
 		})

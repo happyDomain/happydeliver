@@ -33,11 +33,12 @@ import (
 // checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
 func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]api.SPFRecord {
 	visited := make(map[string]bool)
-	return d.resolveSPFRecords(domain, visited, 0)
+	return d.resolveSPFRecords(domain, visited, 0, true)
 }
 
 // resolveSPFRecords recursively resolves SPF records including include: directives
-func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int) *[]api.SPFRecord {
+// isMainRecord indicates if this is the primary domain's record (not an included one)
+func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int, isMainRecord bool) *[]api.SPFRecord {
 	const maxDepth = 10 // Prevent infinite recursion
 
 	if depth > maxDepth {
@@ -103,7 +104,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	// Basic validation
-	validationErr := d.validateSPF(spfRecord)
+	validationErr := d.validateSPF(spfRecord, isMainRecord)
 
 	// Extract the "all" mechanism qualifier
 	var allQualifier *api.SPFRecordAllQualifier
@@ -140,7 +141,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	if redirectDomain != "" {
 		// redirect= replaces the current domain's policy entirely
 		// Only follow if no other mechanisms matched (per RFC 7208)
-		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1)
+		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1, false)
 		if redirectRecords != nil {
 			results = append(results, *redirectRecords...)
 		}
@@ -150,7 +151,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	// Extract and resolve include: directives
 	includes := d.extractSPFIncludes(spfRecord)
 	for _, includeDomain := range includes {
-		includedRecords := d.resolveSPFRecords(includeDomain, visited, depth+1)
+		includedRecords := d.resolveSPFRecords(includeDomain, visited, depth+1, false)
 		if includedRecords != nil {
 			results = append(results, *includedRecords...)
 		}
@@ -236,7 +237,8 @@ func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 }
 
 // validateSPF performs basic SPF record validation
-func (d *DNSAnalyzer) validateSPF(record string) error {
+// isMainRecord indicates if this is the primary domain's record (not an included one)
+func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 	// Must start with v=spf1
 	if !strings.HasPrefix(record, "v=spf1") {
 		return fmt.Errorf("SPF record must start with 'v=spf1'")
@@ -269,19 +271,22 @@ func (d *DNSAnalyzer) validateSPF(record string) error {
 		return nil
 	}
 
-	// Check for common syntax issues
-	// Should have a final mechanism (all, +all, -all, ~all, ?all)
-	validEndings := []string{" all", " +all", " -all", " ~all", " ?all"}
-	hasValidEnding := false
-	for _, ending := range validEndings {
-		if strings.HasSuffix(record, ending) {
-			hasValidEnding = true
-			break
+	// Only check for 'all' mechanism on the main record, not on included records
+	if isMainRecord {
+		// Check for common syntax issues
+		// Should have a final mechanism (all, +all, -all, ~all, ?all)
+		validEndings := []string{" all", " +all", " -all", " ~all", " ?all"}
+		hasValidEnding := false
+		for _, ending := range validEndings {
+			if strings.HasSuffix(record, ending) {
+				hasValidEnding = true
+				break
+			}
 		}
-	}
 
-	if !hasValidEnding {
-		return fmt.Errorf("SPF record should end with an 'all' mechanism (e.g., '-all', '~all') or have a 'redirect=' modifier")
+		if !hasValidEnding {
+			return fmt.Errorf("SPF record should end with an 'all' mechanism (e.g., '-all', '~all') or have a 'redirect=' modifier")
+		}
 	}
 
 	return nil
