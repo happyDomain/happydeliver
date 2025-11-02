@@ -33,8 +33,8 @@ import (
 )
 
 func main() {
-	fmt.Println("happyDeliver - Email Deliverability Testing Platform")
-	fmt.Printf("Version: %s\n", version.Version)
+	fmt.Fprintln(os.Stderr, "happyDeliver - Email Deliverability Testing Platform")
+	fmt.Fprintf(os.Stderr, "Version: %s\n", version.Version)
 
 	cfg, err := config.ConsolidateConfig()
 	if err != nil {
@@ -52,6 +52,18 @@ func main() {
 		if err := app.RunAnalyzer(cfg, flag.Args()[1:], os.Stdin, os.Stdout); err != nil {
 			log.Fatalf("Analyzer error: %v", err)
 		}
+	case "backup":
+		if err := app.RunBackup(cfg); err != nil {
+			log.Fatalf("Backup error: %v", err)
+		}
+	case "restore":
+		inputFile := ""
+		if len(flag.Args()) >= 2 {
+			inputFile = flag.Args()[1]
+		}
+		if err := app.RunRestore(cfg, inputFile); err != nil {
+			log.Fatalf("Restore error: %v", err)
+		}
 	case "version":
 		fmt.Println(version.Version)
 	default:
@@ -63,9 +75,11 @@ func main() {
 
 func printUsage() {
 	fmt.Println("\nCommand availables:")
-	fmt.Println("  happyDeliver server          - Start the API server")
-	fmt.Println("  happyDeliver analyze [-json] - Analyze email from stdin and output results to terminal")
-	fmt.Println("  happyDeliver version         - Print version information")
+	fmt.Println("  happyDeliver server            - Start the API server")
+	fmt.Println("  happyDeliver analyze [-json]   - Analyze email from stdin and output results to terminal")
+	fmt.Println("  happyDeliver backup            - Backup database to stdout as JSON")
+	fmt.Println("  happyDeliver restore [file]    - Restore database from JSON file or stdin")
+	fmt.Println("  happyDeliver version           - Print version information")
 	fmt.Println("")
 	flag.Usage()
 }

@@ -147,3 +147,33 @@ func (s *DBStorage) Close() error {
 	}
 	return sqlDB.Close()
 }
+
+// GetAllReports retrieves all reports from the database
+func GetAllReports(s Storage) ([]Report, error) {
+	dbStorage, ok := s.(*DBStorage)
+	if !ok {
+		return nil, fmt.Errorf("storage type does not support GetAllReports")
+	}
+
+	var reports []Report
+	if err := dbStorage.db.Find(&reports).Error; err != nil {
+		return nil, fmt.Errorf("failed to retrieve reports: %w", err)
+	}
+
+	return reports, nil
+}
+
+// CreateReportFromBackup creates a report from backup data, preserving timestamps
+func CreateReportFromBackup(s Storage, report *Report) (*Report, error) {
+	dbStorage, ok := s.(*DBStorage)
+	if !ok {
+		return nil, fmt.Errorf("storage type does not support CreateReportFromBackup")
+	}
+
+	// Use Create to insert the report with all fields including timestamps
+	if err := dbStorage.db.Create(report).Error; err != nil {
+		return nil, fmt.Errorf("failed to create report from backup: %w", err)
+	}
+
+	return report, nil
+}
