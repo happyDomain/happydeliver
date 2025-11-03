@@ -34,9 +34,10 @@
         </div>
         <div class="card-body">
             <p class="card-text small text-muted mb-2">
-                DMARC builds on SPF and DKIM by telling receiving servers what to do with emails
-                that fail authentication checks. It also enables reporting so you can monitor your
-                email security.
+                DMARC enforces domain alignment requirements (regardless of the policy). It builds
+                on SPF and DKIM by telling receiving servers what to do with emails that fail
+                authentication checks. It also enables reporting so you can monitor your email
+                security.
             </p>
 
             <hr />
