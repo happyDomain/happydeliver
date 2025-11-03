@@ -59,40 +59,6 @@ func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *api.AuthResult {
 	return result
 }
 
-// parseLegacyDKIM attempts to parse DKIM from DKIM-Signature header
-func (a *AuthenticationAnalyzer) parseLegacyDKIM(email *EmailMessage) []api.AuthResult {
-	var results []api.AuthResult
-
-	// Get all DKIM-Signature headers
-	dkimHeaders := email.Header[textprotoCanonical("DKIM-Signature")]
-	for _, dkimHeader := range dkimHeaders {
-		result := api.AuthResult{
-			Result: api.AuthResultResultNone, // We can't determine pass/fail from signature alone
-		}
-
-		// Extract domain (d=)
-		domainRe := regexp.MustCompile(`d=([^\s;]+)`)
-		if matches := domainRe.FindStringSubmatch(dkimHeader); len(matches) > 1 {
-			domain := matches[1]
-			result.Domain = &domain
-		}
-
-		// Extract selector (s=)
-		selectorRe := regexp.MustCompile(`s=([^\s;]+)`)
-		if matches := selectorRe.FindStringSubmatch(dkimHeader); len(matches) > 1 {
-			selector := matches[1]
-			result.Selector = &selector
-		}
-
-		details := "DKIM signature present (verification status unknown)"
-		result.Details = &details
-
-		results = append(results, result)
-	}
-
-	return results
-}
-
 func (a *AuthenticationAnalyzer) calculateDKIMScore(results *api.AuthenticationResults) (score int) {
 	// Expect at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {

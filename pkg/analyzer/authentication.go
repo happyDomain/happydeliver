@@ -50,13 +50,6 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *api
 		results.Spf = a.parseLegacySPF(email)
 	}
 
-	if results.Dkim == nil || len(*results.Dkim) == 0 {
-		dkimResults := a.parseLegacyDKIM(email)
-		if len(dkimResults) > 0 {
-			results.Dkim = &dkimResults
-		}
-	}
-
 	// Parse ARC headers if not already parsed from Authentication-Results
 	if results.Arc == nil {
 		results.Arc = a.parseARCHeaders(email)
