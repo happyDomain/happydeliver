@@ -24,6 +24,7 @@ package analyzer
 import (
 	"net/mail"
 	"net/textproto"
+	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -110,7 +111,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate header analysis first
-			analysis := analyzer.GenerateHeaderAnalysis(tt.email)
+			analysis := analyzer.GenerateHeaderAnalysis(tt.email, nil)
 			score, _ := analyzer.CalculateHeaderScore(analysis)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
@@ -360,7 +361,7 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 				}),
 			}
 
-			alignment := analyzer.analyzeDomainAlignment(email)
+			alignment := analyzer.analyzeDomainAlignment(email, nil)
 
 			if alignment == nil {
 				t.Fatal("Expected non-nil alignment")
@@ -698,7 +699,7 @@ func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 		"from relay.example.com (relay.example.com [192.0.2.2]) by mail.example.com with SMTP id DEF456; Mon, 01 Jan 2024 11:59:00 +0000",
 	}
 
-	analysis := analyzer.GenerateHeaderAnalysis(email)
+	analysis := analyzer.GenerateHeaderAnalysis(email, nil)
 
 	if analysis == nil {
 		t.Fatal("GenerateHeaderAnalysis returned nil")
@@ -922,4 +923,157 @@ func equalStrPtr(a, b *string) bool {
 		return false
 	}
 	return *a == *b
+}
+
+func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
+	tests := []struct {
+		name                 string
+		fromHeader           string
+		returnPath           string
+		dkimDomains          []string
+		expectStrictAligned  bool
+		expectRelaxedAligned bool
+		expectIssuesContain  string
+	}{
+		{
+			name:                 "DKIM strict alignment with From domain",
+			fromHeader:           "sender@example.com",
+			returnPath:           "",
+			dkimDomains:          []string{"example.com"},
+			expectStrictAligned:  true,
+			expectRelaxedAligned: true,
+			expectIssuesContain:  "",
+		},
+		{
+			name:                 "DKIM relaxed alignment only",
+			fromHeader:           "sender@mail.example.com",
+			returnPath:           "",
+			dkimDomains:          []string{"example.com"},
+			expectStrictAligned:  false,
+			expectRelaxedAligned: true,
+			expectIssuesContain:  "relaxed alignment",
+		},
+		{
+			name:                 "DKIM no alignment",
+			fromHeader:           "sender@example.com",
+			returnPath:           "",
+			dkimDomains:          []string{"different.com"},
+			expectStrictAligned:  false,
+			expectRelaxedAligned: false,
+			expectIssuesContain:  "do not align",
+		},
+		{
+			name:                 "Multiple DKIM signatures - one aligns",
+			fromHeader:           "sender@example.com",
+			returnPath:           "",
+			dkimDomains:          []string{"different.com", "example.com"},
+			expectStrictAligned:  true,
+			expectRelaxedAligned: true,
+			expectIssuesContain:  "",
+		},
+		{
+			name:                 "Return-Path misaligned but DKIM aligned",
+			fromHeader:           "sender@example.com",
+			returnPath:           "bounce@different.com",
+			dkimDomains:          []string{"example.com"},
+			expectStrictAligned:  true,
+			expectRelaxedAligned: true,
+			expectIssuesContain:  "Return-Path",
+		},
+		{
+			name:                 "Return-Path aligned, no DKIM",
+			fromHeader:           "sender@example.com",
+			returnPath:           "bounce@example.com",
+			dkimDomains:          []string{},
+			expectStrictAligned:  true,
+			expectRelaxedAligned: true,
+			expectIssuesContain:  "",
+		},
+		{
+			name:                 "Both Return-Path and DKIM misaligned",
+			fromHeader:           "sender@example.com",
+			returnPath:           "bounce@other.com",
+			dkimDomains:          []string{"different.com"},
+			expectStrictAligned:  false,
+			expectRelaxedAligned: false,
+			expectIssuesContain:  "do not",
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := &EmailMessage{
+				Header: createHeaderWithFields(map[string]string{
+					"From":        tt.fromHeader,
+					"Return-Path": tt.returnPath,
+				}),
+			}
+
+			// Create authentication results with DKIM signatures
+			var authResults *api.AuthenticationResults
+			if len(tt.dkimDomains) > 0 {
+				dkimResults := make([]api.AuthResult, 0, len(tt.dkimDomains))
+				for _, domain := range tt.dkimDomains {
+					dkimResults = append(dkimResults, api.AuthResult{
+						Result: api.AuthResultResultPass,
+						Domain: &domain,
+					})
+				}
+				authResults = &api.AuthenticationResults{
+					Dkim: &dkimResults,
+				}
+			}
+
+			alignment := analyzer.analyzeDomainAlignment(email, authResults)
+
+			if alignment == nil {
+				t.Fatal("Expected non-nil alignment")
+			}
+
+			if alignment.Aligned == nil {
+				t.Fatal("Expected non-nil Aligned field")
+			}
+
+			if *alignment.Aligned != tt.expectStrictAligned {
+				t.Errorf("Aligned = %v, want %v", *alignment.Aligned, tt.expectStrictAligned)
+			}
+
+			if alignment.RelaxedAligned == nil {
+				t.Fatal("Expected non-nil RelaxedAligned field")
+			}
+
+			if *alignment.RelaxedAligned != tt.expectRelaxedAligned {
+				t.Errorf("RelaxedAligned = %v, want %v", *alignment.RelaxedAligned, tt.expectRelaxedAligned)
+			}
+
+			// Check DKIM domains are populated
+			if len(tt.dkimDomains) > 0 {
+				if alignment.DkimDomains == nil {
+					t.Error("Expected DkimDomains to be populated")
+				} else if len(*alignment.DkimDomains) != len(tt.dkimDomains) {
+					t.Errorf("Expected %d DKIM domains, got %d", len(tt.dkimDomains), len(*alignment.DkimDomains))
+				}
+			}
+
+			// Check issues contain expected string
+			if tt.expectIssuesContain != "" {
+				if alignment.Issues == nil || len(*alignment.Issues) == 0 {
+					t.Errorf("Expected issues to contain '%s', but no issues found", tt.expectIssuesContain)
+				} else {
+					found := false
+					for _, issue := range *alignment.Issues {
+						if strings.Contains(strings.ToLower(issue), strings.ToLower(tt.expectIssuesContain)) {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Expected issues to contain '%s', but found: %v", tt.expectIssuesContain, *alignment.Issues)
+					}
+				}
+			}
+		})
+	}
 }

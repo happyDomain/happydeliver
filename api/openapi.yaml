@@ -664,6 +664,21 @@ components:
           description: Reverse DNS (PTR record) for the IP address
           example: "mail.example.com"
 
+    DKIMDomainInfo:
+      type: object
+      required:
+        - domain
+        - org_domain
+      properties:
+        domain:
+          type: string
+          description: DKIM signature domain
+          example: "mail.example.com"
+        org_domain:
+          type: string
+          description: Organizational domain extracted from DKIM domain (using Public Suffix List)
+          example: "example.com"
+
     DomainAlignment:
       type: object
       properties:
@@ -686,9 +701,8 @@ components:
         dkim_domains:
           type: array
           items:
-            type: string
-          description: Domains from DKIM signatures
-          example: ["example.com"]
+            $ref: '#/components/schemas/DKIMDomainInfo'
+          description: Domains from DKIM signatures with their organizational domains
         aligned:
           type: boolean
           description: Whether all domains align (strict alignment - exact match)

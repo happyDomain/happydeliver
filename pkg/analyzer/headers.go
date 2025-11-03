@@ -52,13 +52,14 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 	maxGrade := 6
 	headers := *analysis.Headers
 
-	// RP and From alignment (20 points)
-	if analysis.DomainAlignment.Aligned != nil && *analysis.DomainAlignment.Aligned {
-		score += 20
-	} else if analysis.DomainAlignment.RelaxedAligned != nil && *analysis.DomainAlignment.RelaxedAligned {
-		score += 15
-	} else {
+	// RP and From alignment (25 points)
+	if analysis.DomainAlignment.Aligned == nil || !*analysis.DomainAlignment.RelaxedAligned {
+		// Bad domain alignment, cap grade to C
 		maxGrade -= 2
+	} else if *analysis.DomainAlignment.Aligned {
+		score += 25
+	} else if *analysis.DomainAlignment.RelaxedAligned {
+		score += 20
 	}
 
 	// Check required headers (RFC 5322) - 30 points
@@ -79,7 +80,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 		maxGrade = 1
 	}
 
-	// Check recommended headers (20 points)
+	// Check recommended headers (15 points)
 	recommendedHeaders := []string{"subject", "to"}
 
 	// Add reply-to when from is a no-reply address
@@ -95,7 +96,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 			presentRecommended++
 		}
 	}
-	score += presentRecommended * 20 / recommendedCount
+	score += presentRecommended * 15 / recommendedCount
 
 	if presentRecommended < recommendedCount {
 		maxGrade -= 1
@@ -235,7 +236,7 @@ func (h *HeaderAnalyzer) formatAddress(addr *mail.Address) string {
 }
 
 // GenerateHeaderAnalysis creates structured header analysis from email
-func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.HeaderAnalysis {
+func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults *api.AuthenticationResults) *api.HeaderAnalysis {
 	if email == nil {
 		return nil
 	}
@@ -281,7 +282,7 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage) *api.Header
 	}
 
 	// Domain alignment
-	domainAlignment := h.analyzeDomainAlignment(email)
+	domainAlignment := h.analyzeDomainAlignment(email, authResults)
 	if domainAlignment != nil {
 		analysis.DomainAlignment = domainAlignment
 	}
@@ -352,8 +353,8 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 	return check
 }
 
-// analyzeDomainAlignment checks domain alignment between headers
-func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.DomainAlignment {
+// analyzeDomainAlignment checks domain alignment between headers and DKIM signatures
+func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults *api.AuthenticationResults) *api.DomainAlignment {
 	alignment := &api.DomainAlignment{
 		Aligned:        api.PtrTo(true),
 		RelaxedAligned: api.PtrTo(true),
@@ -383,14 +384,45 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.Domain
 		}
 	}
 
+	// Extract DKIM domains from authentication results
+	var dkimDomains []api.DKIMDomainInfo
+	if authResults != nil && authResults.Dkim != nil {
+		for _, dkim := range *authResults.Dkim {
+			if dkim.Domain != nil && *dkim.Domain != "" {
+				domain := *dkim.Domain
+				orgDomain := h.getOrganizationalDomain(domain)
+				dkimDomains = append(dkimDomains, api.DKIMDomainInfo{
+					Domain:    domain,
+					OrgDomain: orgDomain,
+				})
+			}
+		}
+	}
+	if len(dkimDomains) > 0 {
+		alignment.DkimDomains = &dkimDomains
+	}
+
 	// Check alignment (strict and relaxed)
 	issues := []string{}
-	if alignment.FromDomain != nil && alignment.ReturnPathDomain != nil {
+
+	// hasReturnPath and hasDKIM track whether we have these fields to check
+	hasReturnPath := alignment.FromDomain != nil && alignment.ReturnPathDomain != nil
+	hasDKIM := alignment.FromDomain != nil && len(dkimDomains) > 0
+
+	// If neither Return-Path nor DKIM is present, keep default alignment (true)
+	// Otherwise, at least one must be aligned for overall alignment to be true
+	strictAligned := !hasReturnPath && !hasDKIM
+	relaxedAligned := !hasReturnPath && !hasDKIM
+
+	// Check Return-Path alignment
+	rpStrictAligned := false
+	rpRelaxedAligned := false
+	if hasReturnPath {
 		fromDomain := *alignment.FromDomain
 		rpDomain := *alignment.ReturnPathDomain
 
 		// Strict alignment: exact match (case-insensitive)
-		strictAligned := strings.EqualFold(fromDomain, rpDomain)
+		rpStrictAligned = strings.EqualFold(fromDomain, rpDomain)
 
 		// Relaxed alignment: organizational domain match
 		var fromOrgDomain, rpOrgDomain string
@@ -400,19 +432,66 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage) *api.Domain
 		if alignment.ReturnPathOrgDomain != nil {
 			rpOrgDomain = *alignment.ReturnPathOrgDomain
 		}
-		relaxedAligned := strings.EqualFold(fromOrgDomain, rpOrgDomain)
+		rpRelaxedAligned = strings.EqualFold(fromOrgDomain, rpOrgDomain)
 
-		*alignment.Aligned = strictAligned
-		*alignment.RelaxedAligned = relaxedAligned
-
-		if !strictAligned {
-			if relaxedAligned {
+		if !rpStrictAligned {
+			if rpRelaxedAligned {
 				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not exactly match From domain (%s), but satisfies relaxed alignment (organizational domain: %s)", rpDomain, fromDomain, fromOrgDomain))
 			} else {
 				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not match From domain (%s) - neither strict nor relaxed alignment", rpDomain, fromDomain))
 			}
 		}
+
+		strictAligned = rpStrictAligned
+		relaxedAligned = rpRelaxedAligned
 	}
+
+	// Check DKIM alignment
+	dkimStrictAligned := false
+	dkimRelaxedAligned := false
+	if hasDKIM {
+		fromDomain := *alignment.FromDomain
+		var fromOrgDomain string
+		if alignment.FromOrgDomain != nil {
+			fromOrgDomain = *alignment.FromOrgDomain
+		}
+
+		for _, dkimDomain := range dkimDomains {
+			// Check strict alignment for this DKIM signature
+			if strings.EqualFold(fromDomain, dkimDomain.Domain) {
+				dkimStrictAligned = true
+			}
+
+			// Check relaxed alignment for this DKIM signature
+			if strings.EqualFold(fromOrgDomain, dkimDomain.OrgDomain) {
+				dkimRelaxedAligned = true
+			}
+		}
+
+		if !dkimStrictAligned && !dkimRelaxedAligned {
+			// List all DKIM domains that failed alignment
+			dkimDomainsList := []string{}
+			for _, dkimDomain := range dkimDomains {
+				dkimDomainsList = append(dkimDomainsList, dkimDomain.Domain)
+			}
+			issues = append(issues, fmt.Sprintf("DKIM signature domains (%s) do not align with From domain (%s) - neither strict nor relaxed alignment", strings.Join(dkimDomainsList, ", "), fromDomain))
+		} else if !dkimStrictAligned && dkimRelaxedAligned {
+			// DKIM has relaxed alignment but not strict
+			issues = append(issues, fmt.Sprintf("DKIM signature domains satisfy relaxed alignment with From domain (%s) but not strict alignment (organizational domain: %s)", fromDomain, fromOrgDomain))
+		}
+
+		// Overall alignment requires at least one method (Return-Path OR DKIM) to be aligned
+		// For DMARC compliance, at least one of SPF or DKIM must be aligned
+		if dkimStrictAligned {
+			strictAligned = true
+		}
+		if dkimRelaxedAligned {
+			relaxedAligned = true
+		}
+	}
+
+	*alignment.Aligned = strictAligned
+	*alignment.RelaxedAligned = relaxedAligned
 
 	if len(issues) > 0 {
 		alignment.Issues = &issues
