@@ -170,6 +170,10 @@ ENV HAPPYDELIVER_DATABASE_TYPE=sqlite HAPPYDELIVER_DATABASE_DSN=/var/lib/happyde
 # Volume for persistent data
 VOLUME ["/var/lib/happydeliver", "/var/log/happydeliver"]
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/api/status || exit 1
+
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
