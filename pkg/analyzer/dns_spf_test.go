@@ -122,6 +122,31 @@ func TestValidateSPF(t *testing.T) {
 			expectError: true,
 			errorMsg:    "unknown modifier",
 		},
+		{
+			name:        "Valid SPF with RFC 6652 ra modifier",
+			record:      "v=spf1 mx ra=postmaster -all",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with RFC 6652 rp modifier",
+			record:      "v=spf1 mx rp=100 -all",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with RFC 6652 rr modifier",
+			record:      "v=spf1 mx rr=all -all",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with all RFC 6652 modifiers",
+			record:      "v=spf1 mx ra=postmaster rp=50 rr=fail -all",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with RFC 6652 modifiers and redirect",
+			record:      "v=spf1 ip4:192.0.2.0/24 ra=abuse redirect=_spf.example.com",
+			expectError: false,
+		},
 	}
 
 	analyzer := NewDNSAnalyzer(5 * time.Second)

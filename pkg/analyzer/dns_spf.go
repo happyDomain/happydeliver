@@ -191,8 +191,12 @@ func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 
 	// Check if it's a modifier (contains =)
 	if strings.Contains(mechanism, "=") {
-		// Only allow known modifiers: redirect= and exp=
-		if strings.HasPrefix(mechanism, "redirect=") || strings.HasPrefix(mechanism, "exp=") {
+		// Allow known modifiers: redirect=, exp=, and RFC 6652 modifiers (ra=, rp=, rr=)
+		if strings.HasPrefix(mechanism, "redirect=") ||
+			strings.HasPrefix(mechanism, "exp=") ||
+			strings.HasPrefix(mechanism, "ra=") ||
+			strings.HasPrefix(mechanism, "rp=") ||
+			strings.HasPrefix(mechanism, "rr=") {
 			return nil
 		}
 
