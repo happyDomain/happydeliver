@@ -627,7 +627,7 @@ func (c *ContentAnalyzer) extractTextFromHTML(htmlContent string) string {
 	var extract func(*html.Node)
 	extract = func(n *html.Node) {
 		if n.Type == html.TextNode {
-			text.WriteString(n.Data)
+			text.WriteString(" " + n.Data)
 		}
 		// Skip script and style tags
 		if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
@@ -639,7 +639,7 @@ func (c *ContentAnalyzer) extractTextFromHTML(htmlContent string) string {
 	}
 	extract(doc)
 
-	return text.String()
+	return strings.TrimSpace(text.String())
 }
 
 // calculateTextPlainConsistency compares plain text and HTML versions
