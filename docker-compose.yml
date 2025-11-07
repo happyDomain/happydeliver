@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: happydeliver:latest
+    image: happydomain/happydeliver:latest
     container_name: happydeliver
     hostname: mail.happydeliver.local
 
