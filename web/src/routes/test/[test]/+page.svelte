@@ -84,8 +84,8 @@
                     const reportResponse = await getReport({ path: { id: testId } });
                     if (reportResponse.data) {
                         report = reportResponse.data;
+                        stopPolling();
                     }
-                    stopPolling();
                 }
             } else if (testResponse.error) {
                 handleApiError(testResponse.error, "Failed to fetch test");
