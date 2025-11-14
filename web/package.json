@@ -16,7 +16,7 @@
         "generate:api": "openapi-ts"
     },
     "devDependencies": {
-        "@eslint/compat": "^1.4.0",
+        "@eslint/compat": "^2.0.0",
         "@eslint/js": "^9.36.0",
         "@hey-api/openapi-ts": "0.86.10",
         "@sveltejs/adapter-static": "^3.0.9",
