@@ -86,6 +86,12 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	router.GET("/_app/immutable/*_", func(c *gin.Context) { c.Writer.Header().Set("Cache-Control", "public, max-age=604800, immutable") }, serveOrReverse("", cfg))
 
 	router.GET("/", serveOrReverse("/", cfg))
+	router.GET("/blacklist/", serveOrReverse("/", cfg))
+	router.GET("/blacklist/:ip", serveOrReverse("/", cfg))
+	router.GET("/domain/", serveOrReverse("/", cfg))
+	router.GET("/domain/:domain", serveOrReverse("/", cfg))
+	router.GET("/test/", serveOrReverse("/", cfg))
+	router.GET("/test/:testid", serveOrReverse("/", cfg))
 	router.GET("/favicon.png", func(c *gin.Context) { c.Writer.Header().Set("Cache-Control", "public, max-age=604800, immutable") }, serveOrReverse("", cfg))
 	router.GET("/img/*path", serveOrReverse("", cfg))
 
