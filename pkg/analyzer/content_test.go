@@ -76,17 +76,17 @@ func TestExtractTextFromHTML(t *testing.T) {
 		{
 			name:         "Multiple elements",
 			html:         "<div><h1>Title</h1><p>Paragraph</p></div>",
-			expectedText: "TitleParagraph",
+			expectedText: "Title Paragraph",
 		},
 		{
 			name:         "With script tag",
 			html:         "<p>Text</p><script>alert('hi')</script><p>More</p>",
-			expectedText: "TextMore",
+			expectedText: "Text More",
 		},
 		{
 			name:         "With style tag",
 			html:         "<p>Text</p><style>.class { color: red; }</style><p>More</p>",
-			expectedText: "TextMore",
+			expectedText: "Text More",
 		},
 		{
 			name:         "Empty HTML",

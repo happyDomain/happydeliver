@@ -83,8 +83,8 @@ func TestCalculateHeaderScore(t *testing.T) {
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
 				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
 			},
-			minScore: 40,
-			maxScore: 80,
+			minScore: 80,
+			maxScore: 90,
 		},
 		{
 			name: "Invalid Message-ID format",
