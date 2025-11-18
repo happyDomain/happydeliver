@@ -69,7 +69,48 @@ docker run -d \
   happydeliver:latest
 ```
 
-#### 3. Configure Network and DNS
+#### 3. Configure TLS Certificates (Optional but Recommended)
+
+To enable TLS encryption for incoming SMTP connections, you can configure Postfix to use your SSL/TLS certificates. This is highly recommended for production deployments.
+
+##### Using docker-compose
+
+Add the certificate paths to your `docker-compose.yml`:
+
+```yaml
+environment:
+  - POSTFIX_CERT_FILE=/etc/ssl/certs/mail.yourdomain.com.crt
+  - POSTFIX_KEY_FILE=/etc/ssl/private/mail.yourdomain.com.key
+volumes:
+  - /path/to/your/certificate.crt:/etc/ssl/certs/mail.yourdomain.com.crt:ro
+  - /path/to/your/private.key:/etc/ssl/private/mail.yourdomain.com.key:ro
+```
+
+##### Using docker run
+
+```bash
+docker run -d \
+  --name happydeliver \
+  -p 25:25 \
+  -p 8080:8080 \
+  -e HAPPYDELIVER_DOMAIN=yourdomain.com \
+  -e HOSTNAME=mail.yourdomain.com \
+  -e POSTFIX_CERT_FILE=/etc/ssl/certs/mail.yourdomain.com.crt \
+  -e POSTFIX_KEY_FILE=/etc/ssl/private/mail.yourdomain.com.key \
+  -v /path/to/your/certificate.crt:/etc/ssl/certs/mail.yourdomain.com.crt:ro \
+  -v /path/to/your/private.key:/etc/ssl/private/mail.yourdomain.com.key:ro \
+  -v $(pwd)/data:/var/lib/happydeliver \
+  -v $(pwd)/logs:/var/log/happydeliver \
+  happydeliver:latest
+```
+
+**Notes:**
+- The certificate file should contain the full certificate chain (certificate + intermediate CAs)
+- The private key file must be readable by the postfix user inside the container
+- TLS is configured with `smtpd_tls_security_level = may`, which means it's opportunistic (STARTTLS supported but not required)
+- If both environment variables are not set, Postfix will run without TLS support
+
+#### 4. Configure Network and DNS
 
 ##### Open SMTP Port
 

@@ -25,6 +25,15 @@ echo "Configuring Postfix..."
 sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/postfix/main.cf
 sed -i "s/__DOMAIN__/${HAPPYDELIVER_DOMAIN}/g" /etc/postfix/main.cf
 
+# Add certificates to postfix
+[ -n "${POSTFIX_CERT_FILE}" ] && [ -n "${POSTFIX_KEY_FILE}" ] && {
+    cat <<EOF >> /etc/postfix/main.cf
+smtpd_tls_cert_file = ${POSTFIX_CERT_FILE}
+smtpd_tls_key_file = ${POSTFIX_KEY_FILE}
+smtpd_tls_security_level = may
+EOF
+}
+
 # Replace placeholders in configurations
 sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/authentication_milter.json
 
