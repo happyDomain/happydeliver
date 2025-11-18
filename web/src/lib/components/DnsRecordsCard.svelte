@@ -10,6 +10,7 @@
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
+    import DnssecDisplay from "./DnssecDisplay.svelte";
 
     interface Props {
         domainAlignment?: DomainAlignment;
@@ -150,6 +151,9 @@
 
                 <!-- BIMI Record -->
                 <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} />
+
+                <!-- DNSSEC -->
+                <DnssecDisplay dnssecEnabled={dnsResults.dnssec_enabled} domain={dnsResults.from_domain} />
         {/if}
     </div>
 </div>

@@ -942,6 +942,10 @@ components:
           $ref: '#/components/schemas/DMARCRecord'
         bimi_record:
           $ref: '#/components/schemas/BIMIRecord'
+        dnssec_enabled:
+          type: boolean
+          description: Whether the From domain has DNSSEC enabled with valid chain of trust
+          example: true
         ptr_records:
           type: array
           items:

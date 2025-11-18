@@ -127,6 +127,12 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	// Check BIMI record (for From domain - branding is based on visible sender)
 	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default")
 
+	// Check DNSSEC status (for From domain)
+	dnssecEnabled, err := d.resolver.IsDNSSECEnabled(nil, fromDomain)
+	if err == nil {
+		results.DnssecEnabled = &dnssecEnabled
+	}
+
 	return results
 }
 
@@ -148,6 +154,12 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *api.DNSResults {
 
 	// Check BIMI record with default selector
 	results.BimiRecord = d.checkBIMIRecord(domain, "default")
+
+	// Check DNSSEC status
+	dnssecEnabled, err := d.resolver.IsDNSSECEnabled(nil, domain)
+	if err == nil {
+		results.DnssecEnabled = &dnssecEnabled
+	}
 
 	return results
 }
@@ -204,11 +216,16 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults, senderIP string
 
 	score := 0
 
+	// DNSSEC: 10 points
+	if results.DnssecEnabled != nil && *results.DnssecEnabled {
+		score += 10
+	}
+
 	// PTR and Forward DNS: 20 points
 	score += 20 * d.calculatePTRScore(results, senderIP) / 100
 
-	// MX Records: 20 points (10 for From domain, 10 for Return-Path domain)
-	score += 20 * d.calculateMXScore(results) / 100
+	// MX Records: 10 points (5 for From domain, 5 for Return-Path domain)
+	score += 10 * d.calculateMXScore(results) / 100
 
 	// SPF Records: 20 points
 	score += 20 * d.calculateSPFScore(results) / 100

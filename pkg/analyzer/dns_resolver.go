@@ -48,6 +48,10 @@ type DNSResolver interface {
 	// LookupHost looks up the given hostname using the local resolver.
 	// It returns a slice of that host's addresses (IPv4 and IPv6).
 	LookupHost(ctx context.Context, host string) ([]string, error)
+
+	// IsDNSSECEnabled checks if the given domain has DNSSEC enabled by querying for DNSKEY records.
+	// Returns true if the domain has DNSSEC configured and the chain of trust is valid.
+	IsDNSSECEnabled(ctx context.Context, domain string) (bool, error)
 }
 
 // StandardDNSResolver is the default DNS resolver implementation that uses goresolver with DNSSEC validation.
@@ -193,4 +197,41 @@ func (r *StandardDNSResolver) LookupHost(ctx context.Context, host string) ([]st
 	}
 
 	return allAddrs, nil
+}
+
+// IsDNSSECEnabled checks if the given domain has DNSSEC enabled by querying for DNSKEY records.
+// It uses DNSSEC validation to ensure the chain of trust is valid.
+// Returns true if DNSSEC is properly configured and validated, false otherwise.
+func (r *StandardDNSResolver) IsDNSSECEnabled(ctx context.Context, domain string) (bool, error) {
+	// Ensure the domain ends with a dot for DNS queries
+	queryName := domain
+	if !strings.HasSuffix(queryName, ".") {
+		queryName = queryName + "."
+	}
+
+	// Query for DNSKEY records with DNSSEC validation
+	// If this succeeds, it means:
+	// 1. The domain has DNSKEY records (DNSSEC is configured)
+	// 2. The DNSSEC chain of trust is valid (validated by StrictNSQuery)
+	rrs, err := r.resolver.StrictNSQuery(queryName, dns.TypeDNSKEY)
+	if err != nil {
+		// DNSSEC is not enabled or validation failed
+		return false, nil
+	}
+
+	// Check if we got any DNSKEY records
+	if len(rrs) == 0 {
+		return false, nil
+	}
+
+	// Verify we actually have DNSKEY records (not just any RR type)
+	hasDNSKEY := false
+	for _, rr := range rrs {
+		if _, ok := rr.(*dns.DNSKEY); ok {
+			hasDNSKEY = true
+			break
+		}
+	}
+
+	return hasDNSKEY, nil
 }
