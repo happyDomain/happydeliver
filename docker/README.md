@@ -109,12 +109,13 @@ Default configuration for the Docker environment:
 
 The container accepts these environment variables:
 
-- `DOMAIN`: Email domain for test addresses (default: happydeliver.local)
-- `HOSTNAME`: Container hostname (default: mail.happydeliver.local)
+- `HAPPYDELIVER_DOMAIN`: Email domain for test addresses (default: happydeliver.local)
+
+Note that the hostname of the container is used to filter the authentication tests results.
 
 Example:
 ```bash
-docker run -e DOMAIN=example.com -e HOSTNAME=mail.example.com ...
+docker run -e HAPPYDELIVER_DOMAIN=example.com --hostname mail.example.com ...
 ```
 
 ## Volumes

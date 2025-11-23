@@ -5,12 +5,12 @@ services:
       dockerfile: Dockerfile
     image: happydomain/happydeliver:latest
     container_name: happydeliver
+    # Set a hostname
     hostname: mail.happydeliver.local
 
     environment:
-      # Set your domain and hostname
-      DOMAIN: happydeliver.local
-      HOSTNAME: mail.happydeliver.local
+      # Set your domain
+      HAPPYDELIVER_DOMAIN: happydeliver.local
 
     ports:
       # SMTP port

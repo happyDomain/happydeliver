@@ -37,7 +37,7 @@ git clone https://git.nemunai.re/happyDomain/happyDeliver.git
 cd happydeliver
 
 # Edit docker-compose.yml to set your domain
-# Change HAPPYDELIVER_DOMAIN and HOSTNAME environment variables
+# Change HAPPYDELIVER_DOMAIN environment variable and hostname
 
 # Build and start
 docker-compose up -d
@@ -63,7 +63,7 @@ docker run -d \
   -p 25:25 \
   -p 8080:8080 \
   -e HAPPYDELIVER_DOMAIN=yourdomain.com \
-  -e HOSTNAME=mail.yourdomain.com \
+  --hostname mail.yourdomain.com \
   -v $(pwd)/data:/var/lib/happydeliver \
   -v $(pwd)/logs:/var/log/happydeliver \
   happydeliver:latest
@@ -94,9 +94,9 @@ docker run -d \
   -p 25:25 \
   -p 8080:8080 \
   -e HAPPYDELIVER_DOMAIN=yourdomain.com \
-  -e HOSTNAME=mail.yourdomain.com \
   -e POSTFIX_CERT_FILE=/etc/ssl/certs/mail.yourdomain.com.crt \
   -e POSTFIX_KEY_FILE=/etc/ssl/private/mail.yourdomain.com.key \
+  --hostname mail.yourdomain.com \
   -v /path/to/your/certificate.crt:/etc/ssl/certs/mail.yourdomain.com.crt:ro \
   -v /path/to/your/private.key:/etc/ssl/private/mail.yourdomain.com.key:ro \
   -v $(pwd)/data:/var/lib/happydeliver \

@@ -4,7 +4,7 @@ set -e
 echo "Starting happyDeliver container..."
 
 # Get environment variables with defaults
-HOSTNAME="${HOSTNAME:-mail.happydeliver.local}"
+[ -n "${HOSTNAME}" ] || HOSTNAME=$(hostname)
 HAPPYDELIVER_DOMAIN="${HAPPYDELIVER_DOMAIN:-happydeliver.local}"
 
 echo "Hostname: $HOSTNAME"
