@@ -15,8 +15,10 @@
         }
 
         // Basic IPv4/IPv6 validation
-        const ipv4Pattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        const ipv6Pattern = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
+        const ipv4Pattern =
+            /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        const ipv6Pattern =
+            /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
 
         if (!ipv4Pattern.test(ip.trim()) && !ipv6Pattern.test(ip.trim())) {
             error = "Please enter a valid IPv4 or IPv6 address (e.g., 192.0.2.1)";
@@ -48,7 +50,8 @@
                     Check IP Blacklist Status
                 </h1>
                 <p class="lead text-muted">
-                    Test an IP address against multiple DNS-based blacklists (RBLs) to check its reputation.
+                    Test an IP address against multiple DNS-based blacklists (RBLs) to check its
+                    reputation.
                 </p>
             </div>
 
@@ -103,7 +106,9 @@
                             </h3>
                             <ul class="list-unstyled mb-0 small">
                                 {#each $appConfig.rbls as rbl}
-                                    <li class="mb-2"><i class="bi bi-arrow-right me-2"></i>{rbl}</li>
+                                    <li class="mb-2">
+                                        <i class="bi bi-arrow-right me-2"></i>{rbl}
+                                    </li>
                                 {/each}
                             </ul>
                         </div>
@@ -118,7 +123,9 @@
                                 Why Check Blacklists?
                             </h3>
                             <p class="small mb-2">
-                                DNS-based blacklists (RBLs) are used by email servers to identify and block spam sources. Being listed can severely impact email deliverability.
+                                DNS-based blacklists (RBLs) are used by email servers to identify
+                                and block spam sources. Being listed can severely impact email
+                                deliverability.
                             </p>
                             <p class="small mb-3">
                                 This tool checks your IP against multiple popular RBLs to help you:
@@ -128,7 +135,8 @@
                                     <i class="bi bi-arrow-right me-2"></i>Monitor IP reputation
                                 </li>
                                 <li class="mb-1">
-                                    <i class="bi bi-arrow-right me-2"></i>Identify deliverability issues
+                                    <i class="bi bi-arrow-right me-2"></i>Identify deliverability
+                                    issues
                                 </li>
                                 <li class="mb-1">
                                     <i class="bi bi-arrow-right me-2"></i>Take corrective action
@@ -146,7 +154,8 @@
                     Need Complete Email Analysis?
                 </h3>
                 <p class="small mb-2">
-                    For comprehensive deliverability testing including DKIM verification, content analysis, spam scoring, and more:
+                    For comprehensive deliverability testing including DKIM verification, content
+                    analysis, spam scoring, and more:
                 </p>
                 <a href="/" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-envelope-plus me-1"></i>
@@ -159,7 +168,9 @@
 
 <style>
     .card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
     }
 
     .card:hover {

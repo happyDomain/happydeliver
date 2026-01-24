@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { ErrorDisplay } from "$lib/components";
 
-    let status = $derived($page.status);
-    let message = $derived($page.error?.message || "An unexpected error occurred");
+    let status = $derived(page.status);
+    let message = $derived(page.error?.message || "An unexpected error occurred");
 
     function getErrorTitle(status: number): string {
         switch (status) {

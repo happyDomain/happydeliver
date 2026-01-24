@@ -61,14 +61,26 @@
                         </thead>
                         <tbody>
                             {#each Object.entries(spamassassin.test_details) as [testName, detail]}
-                                <tr class={detail.score > 0 ? 'table-warning' : detail.score < 0 ? 'table-success' : ''}>
+                                <tr
+                                    class={detail.score > 0
+                                        ? "table-warning"
+                                        : detail.score < 0
+                                          ? "table-success"
+                                          : ""}
+                                >
                                     <td class="font-monospace">{testName}</td>
                                     <td class="text-end">
-                                        <span class={detail.score > 0 ? 'text-danger fw-bold' : detail.score < 0 ? 'text-success fw-bold' : 'text-muted'}>
-                                            {detail.score > 0 ? '+' : ''}{detail.score.toFixed(1)}
+                                        <span
+                                            class={detail.score > 0
+                                                ? "text-danger fw-bold"
+                                                : detail.score < 0
+                                                  ? "text-success fw-bold"
+                                                  : "text-muted"}
+                                        >
+                                            {detail.score > 0 ? "+" : ""}{detail.score.toFixed(1)}
                                         </span>
                                     </td>
-                                    <td class="small">{detail.description || ''}</td>
+                                    <td class="small">{detail.description || ""}</td>
                                 </tr>
                             {/each}
                         </tbody>
@@ -80,7 +92,11 @@
                 <strong>Tests Triggered:</strong>
                 <div class="mt-2">
                     {#each spamassassin.tests as test}
-                        <span class="badge {$theme === 'light' ? 'bg-light text-dark' : 'bg-secondary'} me-1 mb-1">{test}</span>
+                        <span
+                            class="badge {$theme === 'light'
+                                ? 'bg-light text-dark'
+                                : 'bg-secondary'} me-1 mb-1">{test}</span
+                        >
                     {/each}
                 </div>
             </div>
@@ -89,7 +105,10 @@
         {#if spamassassin.report}
             <details class="mt-3">
                 <summary class="cursor-pointer fw-bold">Raw Report</summary>
-                <pre class="mt-2 small {$theme === 'light' ? 'bg-light' : 'bg-secondary'} p-3 rounded">{spamassassin.report}</pre>
+                <pre
+                    class="mt-2 small {$theme === 'light'
+                        ? 'bg-light'
+                        : 'bg-secondary'} p-3 rounded">{spamassassin.report}</pre>
             </details>
         {/if}
     </div>

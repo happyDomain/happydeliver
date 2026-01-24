@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { ScoreSummary } from "$lib/api/types.gen";
-    import GradeDisplay from "./GradeDisplay.svelte";
     import { theme } from "$lib/stores/theme";
+    import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
         grade: string;
@@ -58,13 +58,10 @@
                     <a href="#dns-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
-                            <GradeDisplay
-                                grade={summary.dns_grade}
-                                score={summary.dns_score}
-                            />
+                            <GradeDisplay grade={summary.dns_grade} score={summary.dns_score} />
                             <small class="text-muted d-block">DNS</small>
                         </div>
                     </a>
@@ -73,8 +70,8 @@
                     <a href="#authentication-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
                             <GradeDisplay
                                 grade={summary.authentication_grade}
@@ -88,8 +85,8 @@
                     <a href="#rbl-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
                             <GradeDisplay
                                 grade={summary.blacklist_grade}
@@ -103,8 +100,8 @@
                     <a href="#header-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
                             <GradeDisplay
                                 grade={summary.header_grade}
@@ -118,13 +115,10 @@
                     <a href="#spam-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
-                            <GradeDisplay
-                                grade={summary.spam_grade}
-                                score={summary.spam_score}
-                            />
+                            <GradeDisplay grade={summary.spam_grade} score={summary.spam_score} />
                             <small class="text-muted d-block">Spam Score</small>
                         </div>
                     </a>
@@ -133,8 +127,8 @@
                     <a href="#content-details" class="text-decoration-none">
                         <div
                             class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === 'light'}
-                            class:bg-secondary={$theme !== 'light'}
+                            class:bg-light={$theme === "light"}
+                            class:bg-secondary={$theme !== "light"}
                         >
                             <GradeDisplay
                                 grade={summary.content_grade}

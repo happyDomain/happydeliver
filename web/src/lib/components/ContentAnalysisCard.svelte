@@ -36,16 +36,28 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 <div class="d-flex align-items-center mb-2">
-                    <i class="bi {contentAnalysis.has_html ? 'bi-check-circle text-success' : 'bi-x-circle text-muted'} me-2"></i>
+                    <i
+                        class="bi {contentAnalysis.has_html
+                            ? 'bi-check-circle text-success'
+                            : 'bi-x-circle text-muted'} me-2"
+                    ></i>
                     <span>HTML Part</span>
                 </div>
                 <div class="d-flex align-items-center mb-2">
-                    <i class="bi {contentAnalysis.has_plaintext ? 'bi-check-circle text-success' : 'bi-x-circle text-muted'} me-2"></i>
+                    <i
+                        class="bi {contentAnalysis.has_plaintext
+                            ? 'bi-check-circle text-success'
+                            : 'bi-x-circle text-muted'} me-2"
+                    ></i>
                     <span>Plaintext Part</span>
                 </div>
-                {#if typeof contentAnalysis.has_unsubscribe_link === 'boolean'}
+                {#if typeof contentAnalysis.has_unsubscribe_link === "boolean"}
                     <div class="d-flex align-items-center mb-2">
-                        <i class="bi {contentAnalysis.has_unsubscribe_link ? 'bi-check-circle text-success' : 'bi-x-circle text-warning'} me-2"></i>
+                        <i
+                            class="bi {contentAnalysis.has_unsubscribe_link
+                                ? 'bi-check-circle text-success'
+                                : 'bi-x-circle text-warning'} me-2"
+                        ></i>
                         <span>Unsubscribe Link</span>
                     </div>
                 {/if}
@@ -74,7 +86,14 @@
             <div class="mt-3">
                 <h5>Content Issues</h5>
                 {#each contentAnalysis.html_issues as issue}
-                    <div class="alert alert-{issue.severity === 'critical' || issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info'} py-2 px-3 mb-2">
+                    <div
+                        class="alert alert-{issue.severity === 'critical' ||
+                        issue.severity === 'high'
+                            ? 'danger'
+                            : issue.severity === 'medium'
+                              ? 'warning'
+                              : 'info'} py-2 px-3 mb-2"
+                    >
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <strong>{issue.type}</strong>
@@ -118,11 +137,17 @@
                                         {/if}
                                     </td>
                                     <td>
-                                        <span class="badge {link.status === 'valid' ? 'bg-success' : link.status === 'broken' ? 'bg-danger' : 'bg-warning'}">
+                                        <span
+                                            class="badge {link.status === 'valid'
+                                                ? 'bg-success'
+                                                : link.status === 'broken'
+                                                  ? 'bg-danger'
+                                                  : 'bg-warning'}"
+                                        >
                                             {link.status}
                                         </span>
                                     </td>
-                                    <td>{link.http_code || '-'}</td>
+                                    <td>{link.http_code || "-"}</td>
                                 </tr>
                             {/each}
                         </tbody>
@@ -146,11 +171,11 @@
                         <tbody>
                             {#each contentAnalysis.images as image}
                                 <tr>
-                                    <td><small class="text-break">{image.src || '-'}</small></td>
+                                    <td><small class="text-break">{image.src || "-"}</small></td>
                                     <td>
                                         {#if image.has_alt}
                                             <i class="bi bi-check-circle text-success me-1"></i>
-                                            <small>{image.alt_text || 'Present'}</small>
+                                            <small>{image.alt_text || "Present"}</small>
                                         {:else}
                                             <i class="bi bi-x-circle text-warning me-1"></i>
                                             <small class="text-muted">Missing</small>

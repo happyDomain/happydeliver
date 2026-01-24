@@ -13,7 +13,8 @@
         }
 
         // Basic domain validation
-        const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?(\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?)*$/;
+        const domainPattern =
+            /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?(\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?)*$/;
         if (!domainPattern.test(domain.trim())) {
             error = "Please enter a valid domain name (e.g., example.com)";
             return;
@@ -99,10 +100,18 @@
                                 What's Checked
                             </h3>
                             <ul class="list-unstyled mb-0 small">
-                                <li class="mb-2"><i class="bi bi-arrow-right me-2"></i>MX Records</li>
-                                <li class="mb-2"><i class="bi bi-arrow-right me-2"></i>SPF Records</li>
-                                <li class="mb-2"><i class="bi bi-arrow-right me-2"></i>DMARC Policy</li>
-                                <li class="mb-2"><i class="bi bi-arrow-right me-2"></i>BIMI Support</li>
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>MX Records
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>SPF Records
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>DMARC Policy
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>BIMI Support
+                                </li>
                                 <li class="mb-0">
                                     <i class="bi bi-arrow-right me-2"></i>Disposable Domain Check
                                 </li>
@@ -149,7 +158,9 @@
 
 <style>
     .card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
     }
 
     .card:hover {

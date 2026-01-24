@@ -318,7 +318,9 @@
         // BIMI
         const bimiResult = report.authentication?.bimi;
         if (
-            (dmarcRecord && dmarcRecord.valid && dmarcRecord.policy != "none") &&
+            dmarcRecord &&
+            dmarcRecord.valid &&
+            dmarcRecord.policy != "none" &&
             (!bimiResult || bimiResult.result !== "skipped")
         ) {
             const bimiRecord = report.dns_results?.bimi_record;
@@ -523,19 +525,39 @@
                 {#if segment.link}
                     <a
                         href={segment.link}
-                        class="summary-link {segment.highlight ? getColorClass(segment.highlight.color) : ''} {segment.highlight?.bold ? 'highlighted' : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}"
+                        class="summary-link {segment.highlight
+                            ? getColorClass(segment.highlight.color)
+                            : ''} {segment.highlight?.bold ? 'highlighted' : ''} {segment.highlight
+                            ?.emphasis
+                            ? 'fst-italic'
+                            : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}"
                     >
                         {segment.text}
                     </a>
                 {:else if segment.highlight}
-                    <span class="{getColorClass(segment.highlight.color)} {segment.highlight.bold ? 'highlighted' : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}">
+                    <span
+                        class="{getColorClass(segment.highlight.color)} {segment.highlight.bold
+                            ? 'highlighted'
+                            : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment
+                            .highlight?.monospace
+                            ? 'font-monospace'
+                            : ''}"
+                    >
                         {segment.text}
                     </span>
                 {:else}
                     {segment.text}
                 {/if}
             {/each}
-            Overall, your email received a grade <GradeDisplay grade={report.grade} score={report.score} size="inline" />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}: you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}: you could have delivery issues with common providers.{:else if report.grade == "F"}: it will most likely be rejected by most providers.{:else}!{/if} Check the details below 🔽
+            Overall, your email received a grade <GradeDisplay
+                grade={report.grade}
+                score={report.score}
+                size="inline"
+            />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}:
+                you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}:
+                you could have delivery issues with common providers.{:else if report.grade == "F"}:
+                it will most likely be rejected by most providers.{:else}!{/if} Check the details below
+            🔽
         </p>
         {@render children?.()}
     </div>

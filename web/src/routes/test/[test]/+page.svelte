@@ -1,20 +1,21 @@
 <script lang="ts">
-    import { onDestroy } from "svelte";
     import { page } from "$app/state";
-    import { getTest, getReport, reanalyzeReport } from "$lib/api";
-    import type { Test, Report } from "$lib/api/types.gen";
+    import { onDestroy } from "svelte";
+
+    import { getReport, getTest, reanalyzeReport } from "$lib/api";
+    import type { Report, Test } from "$lib/api/types.gen";
     import {
-        ScoreCard,
-        SummaryCard,
-        SpamAssassinCard,
-        PendingState,
         AuthenticationCard,
-        DnsRecordsCard,
         BlacklistCard,
         ContentAnalysisCard,
-        HeaderAnalysisCard,
-        TinySurvey,
+        DnsRecordsCard,
         ErrorDisplay,
+        HeaderAnalysisCard,
+        PendingState,
+        ScoreCard,
+        SpamAssassinCard,
+        SummaryCard,
+        TinySurvey,
     } from "$lib/components";
 
     let testId = $derived(page.params.test);
@@ -188,7 +189,13 @@
 </script>
 
 <svelte:head>
-    <title>{report ? `Test${report.dns_results ? ` of ${report.dns_results.from_domain}` : ''} ${report.test_id?.slice(0, 7) || ''}` : (test ? `Test ${test.id.slice(0, 7)}` : "Loading...")} - happyDeliver</title>
+    <title>
+        {report
+            ? `Test${report.dns_results ? ` of ${report.dns_results.from_domain}` : ""} ${report.test_id?.slice(0, 7) || ""}`
+            : test
+              ? `Test ${test.id.slice(0, 7)}`
+              : "Loading..."} - happyDeliver
+    </title>
 </svelte:head>
 
 <div class="container py-5">

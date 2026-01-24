@@ -44,10 +44,7 @@
     }
 </script>
 
-<strong
-    class={getSizeClass(size)}
-    style="color: {getGradeColor(grade)}; font-weight: 700;"
->
+<strong class={getSizeClass(size)} style="color: {getGradeColor(grade)}; font-weight: 700;">
     {#if grade}
         {grade}
     {:else}

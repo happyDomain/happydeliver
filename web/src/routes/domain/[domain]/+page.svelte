@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { onMount } from "svelte";
+
     import { testDomain } from "$lib/api";
     import type { DomainTestResponse } from "$lib/api/types.gen";
     import { DnsRecordsCard, GradeDisplay, TinySurvey } from "$lib/components";
     import { theme } from "$lib/stores/theme";
 
-    let domain = $derived($page.params.domain);
+    let domain = $derived(page.params.domain);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let result = $state<DomainTestResponse | null>(null);
@@ -80,7 +81,8 @@
                 <!-- Error State -->
                 <div class="card shadow-sm">
                     <div class="card-body text-center py-5">
-                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
+                        ></i>
                         <h3 class="h4 mt-4">Analysis Failed</h3>
                         <p class="text-muted mb-4">{error}</p>
                         <button class="btn btn-primary" onclick={analyzeDomain}>
@@ -105,8 +107,9 @@
                                             <i class="bi bi-exclamation-triangle me-2"></i>
                                             <strong>Disposable Email Provider Detected</strong>
                                             <p class="mb-0 mt-1 small">
-                                                This domain is a known temporary/disposable email service.
-                                                Emails from this domain may have lower deliverability.
+                                                This domain is a known temporary/disposable email
+                                                service. Emails from this domain may have lower
+                                                deliverability.
                                             </p>
                                         </div>
                                     {:else}
@@ -116,8 +119,8 @@
                                 <div class="offset-md-3 col-md-3 text-center">
                                     <div
                                         class="p-2 rounded text-center summary-card"
-                                        class:bg-light={$theme === 'light'}
-                                        class:bg-secondary={$theme !== 'light'}
+                                        class:bg-light={$theme === "light"}
+                                        class:bg-secondary={$theme !== "light"}
                                     >
                                         <GradeDisplay score={result.score} grade={result.grade} />
                                         <small class="text-muted d-block">DNS</small>
@@ -150,8 +153,8 @@
                             </h3>
                             <p class="mb-3">
                                 This domain-only test checks DNS configuration. For comprehensive
-                                deliverability testing including DKIM verification, content analysis,
-                                spam scoring, and blacklist checks:
+                                deliverability testing including DKIM verification, content
+                                analysis, spam scoring, and blacklist checks:
                             </p>
                             <a href="/" class="btn btn-primary">
                                 <i class="bi bi-envelope-plus me-2"></i>

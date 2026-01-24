@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ClassValue } from "svelte/elements";
+
     import type { MxRecord } from "$lib/api/types.gen";
 
     interface Props {

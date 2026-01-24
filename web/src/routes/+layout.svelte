@@ -1,9 +1,9 @@
 <script lang="ts">
-    import "bootstrap/dist/css/bootstrap.min.css";
     import "bootstrap-icons/font/bootstrap-icons.css";
+    import "bootstrap/dist/css/bootstrap.min.css";
     import "../app.css";
 
-    import favicon from '$lib/assets/favicon.svg';
+    import favicon from "$lib/assets/favicon.svg";
 
     import Logo from "$lib/components/Logo.svelte";
     import { theme } from "$lib/stores/theme";
@@ -25,7 +25,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+    <link rel="icon" href={favicon} />
 </svelte:head>
 
 <div class="min-vh-100 d-flex flex-column">
