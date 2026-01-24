@@ -1,11 +1,18 @@
 :root {
     --bs-primary: #1cb487;
     --bs-primary-rgb: 28, 180, 135;
+    --bs-link-color-rgb: 28, 180, 135;
+    --bs-link-hover-color-rgb: 17, 112, 84;
+    --bs-tertiary-bg: #e7e8e8;
 }
 
 body {
     font-family:
         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.bg-tertiary {
+    background-color: var(--bs-tertiary-bg);
 }
 
 /* Animations */
