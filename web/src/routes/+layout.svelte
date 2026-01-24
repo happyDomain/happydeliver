@@ -55,7 +55,26 @@
         {@render children?.()}
     </main>
 
-    <footer class="pt-3 pb-2 bg-dark text-light">
+    <footer
+        id="footer-classic"
+        class="px-4 px-md-5 py-2 bg-tertiary d-flex justify-content-between"
+    >
+        <a href="https://happydeliver.org/" target="_blank">Powered by happyDeliver</a>
+        <ul class="d-flex footer-nav">
+            <li>
+                <a
+                    href="https://git.happydomain.org/happydeliver/-/blob/master/api/openapi.yaml?ref_type=heads"
+                    target="_blank"
+                >
+                    API
+                </a>
+            </li>
+            <li><a href="https://git.happydomain.org/happydeliver" target="_blank">Git</a></li>
+            <li><a href="https://feedback.happydeliver.org/" target="_blank">Feedback</a></li>
+        </ul>
+    </footer>
+
+    <footer id="footer-happydomain" class="d-none pt-3 pb-2 bg-dark text-light">
         <div class="container mb-4">
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4">
                 <div class="col">
@@ -144,6 +163,27 @@
         border-top: 3px solid #9332bb;
     }
 
+    footer a {
+        text-decoration: none;
+    }
+
+    .footer-nav {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        gap: 0;
+    }
+
+    .footer-nav li {
+        display: flex;
+        align-items: center;
+    }
+
+    .footer-nav li:not(:last-child)::after {
+        content: "|";
+        margin: 0 0.5rem;
+    }
+
     .footer-links {
         list-style: none;
         padding: 0;
@@ -155,7 +195,6 @@
 
     .footer-links a {
         color: rgba(255, 255, 255, 0.7);
-        text-decoration: none;
         transition: color 0.3s;
     }
 
