@@ -66,6 +66,10 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 		appConfig["rbls"] = cfg.Analysis.RBLs
 	}
 
+	if cfg.CustomLogoURL != "" {
+		appConfig["custom_logo_url"] = cfg.CustomLogoURL
+	}
+
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {
 		log.Println("Unable to generate JSON config to inject in web application")
 	} else {

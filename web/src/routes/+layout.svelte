@@ -6,6 +6,7 @@
     import favicon from "$lib/assets/favicon.svg";
 
     import Logo from "$lib/components/Logo.svelte";
+    import { appConfig } from "$lib/stores/config";
     import { theme } from "$lib/stores/theme";
     import { onMount } from "svelte";
 
@@ -32,8 +33,12 @@
     <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">
-                <i class="bi bi-envelope-check me-2"></i>
-                <Logo color={$theme === "light" ? "black" : "white"} />
+                {#if $appConfig.custom_logo_url}
+                    <img src={$appConfig.custom_logo_url} alt="Logo" style="height: 25px;" />
+                {:else}
+                    <i class="bi bi-envelope-check me-2"></i>
+                    <Logo color={$theme === "light" ? "black" : "white"} />
+                {/if}
             </a>
             <div>
                 <span class="d-none d-md-inline navbar-text text-primary small">

@@ -24,6 +24,7 @@ import { writable } from "svelte/store";
 interface AppConfig {
     report_retention?: number;
     survey_url?: string;
+    custom_logo_url?: string;
 }
 
 const defaultConfig: AppConfig = {

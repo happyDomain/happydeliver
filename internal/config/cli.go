@@ -41,6 +41,7 @@ func declareFlags(o *Config) {
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
+	flag.StringVar(&o.CustomLogoURL, "custom-logo-url", o.CustomLogoURL, "URL for custom logo image in the web UI")
 
 	// Others flags are declared in some other files likes sources, storages, ... when they need specials configurations
 }

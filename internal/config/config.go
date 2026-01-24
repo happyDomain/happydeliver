@@ -44,6 +44,7 @@ type Config struct {
 	ReportRetention time.Duration // How long to keep reports. 0 = keep forever
 	RateLimit       uint          // API rate limit (requests per second per IP)
 	SurveyURL       url.URL       // URL for user feedback survey
+	CustomLogoURL   string        // URL for custom logo image in the web UI
 }
 
 // DatabaseConfig contains database connection settings
