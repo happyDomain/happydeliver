@@ -34,7 +34,7 @@ RUN go generate ./... && \
 # Stage 3: Prepare perl and spamass-milt
 FROM alpine:3 AS pl
 
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     apk add --no-cache \
     build-base \
     libmilter-dev \
@@ -55,7 +55,7 @@ RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/a
     perl-json-xs \
     perl-list-moreutils \
     perl-moose \
-    perl-net-idn-encode@testing \
+    perl-net-idn-encode@edge \
     perl-net-ssleay \
     perl-netaddr-ip \
     perl-package-stash \
@@ -86,7 +86,7 @@ RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milt
 FROM alpine:3
 
 # Install all required packages
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     apk add --no-cache \
     bash \
     ca-certificates \
@@ -106,7 +106,7 @@ RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/a
     perl-json-xs \
     perl-list-moreutils \
     perl-moose \
-    perl-net-idn-encode@testing \
+    perl-net-idn-encode@edge \
     perl-net-ssleay \
     perl-netaddr-ip \
     perl-package-stash \
