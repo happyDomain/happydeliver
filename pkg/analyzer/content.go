@@ -439,7 +439,8 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 	// Extract the actual destination domain/email based on scheme
 	var actualDomain string
 
-	if parsedURL.Scheme == "mailto" {
+	switch parsedURL.Scheme {
+	case "mailto":
 		// Extract email address from mailto: URL
 		// Format can be: mailto:user@domain.com or mailto:user@domain.com?subject=...
 		mailtoAddr := parsedURL.Opaque
@@ -457,7 +458,8 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 		} else {
 			return false // Invalid mailto
 		}
-	} else if parsedURL.Scheme == "http" || parsedURL.Scheme == "https" {
+	case "http":
+	case "https":
 		// Check if URL has a host
 		if parsedURL.Host == "" {
 			return false
@@ -469,7 +471,7 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 			actualDomain = actualDomain[:idx]
 		}
 		actualDomain = strings.ToLower(actualDomain)
-	} else {
+	default:
 		// Skip checks for other URL schemes (tel, etc.)
 		return false
 	}
@@ -492,10 +494,8 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 		"email us", "contact us", "send email", "get in touch", "reach out",
 		"contact", "email", "write to us",
 	}
-	for _, generic := range genericTexts {
-		if linkText == generic {
-			return false
-		}
+	if slices.Contains(genericTexts, linkText) {
+		return false
 	}
 
 	// Extract domain-like patterns from link text using regex
@@ -562,10 +562,8 @@ func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) boo
 		"bit.ly", "tinyurl.com", "goo.gl", "ow.ly", "t.co",
 		"buff.ly", "is.gd", "bl.ink", "short.io",
 	}
-	for _, shortener := range shorteners {
-		if strings.ToLower(parsedURL.Host) == shortener {
-			return true
-		}
+	if slices.Contains(shorteners, strings.ToLower(parsedURL.Host)) {
+		return true
 	}
 
 	// Check for excessive subdomains (possible obfuscation)
