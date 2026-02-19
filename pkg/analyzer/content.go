@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -37,8 +38,9 @@ import (
 
 // ContentAnalyzer analyzes email content (HTML, links, images)
 type ContentAnalyzer struct {
-	Timeout    time.Duration
-	httpClient *http.Client
+	Timeout             time.Duration
+	httpClient          *http.Client
+	listUnsubscribeURLs []string // URLs from List-Unsubscribe header
 }
 
 // NewContentAnalyzer creates a new content analyzer with configurable timeout
@@ -109,6 +111,9 @@ func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
 	results := &ContentResults{}
 
 	results.IsMultipart = len(email.Parts) > 1
+
+	// Parse List-Unsubscribe header URLs for use in link detection
+	c.listUnsubscribeURLs = email.GetListUnsubscribeURLs()
 
 	// Get HTML and text parts
 	htmlParts := email.GetHTMLParts()
@@ -331,6 +336,11 @@ func (c *ContentAnalyzer) getAttr(n *html.Node, key string) string {
 
 // isUnsubscribeLink checks if a link is an unsubscribe link
 func (c *ContentAnalyzer) isUnsubscribeLink(href string, node *html.Node) bool {
+	// First check: does the href match a URL from the List-Unsubscribe header?
+	if slices.Contains(c.listUnsubscribeURLs, href) {
+		return true
+	}
+
 	// Check href for unsubscribe keywords
 	lowerHref := strings.ToLower(href)
 	unsubKeywords := []string{"unsubscribe", "opt-out", "optout", "remove", "list-unsubscribe"}

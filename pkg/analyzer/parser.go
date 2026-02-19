@@ -301,3 +301,20 @@ func (e *EmailMessage) GetHeaderValue(key string) string {
 func (e *EmailMessage) HasHeader(key string) bool {
 	return e.Header.Get(key) != ""
 }
+
+// GetListUnsubscribeURLs parses the List-Unsubscribe header and returns all URLs.
+// The header format is: <url1>, <url2>, ...
+func (e *EmailMessage) GetListUnsubscribeURLs() []string {
+	value := e.Header.Get("List-Unsubscribe")
+	if value == "" {
+		return nil
+	}
+	var urls []string
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "<") && strings.HasSuffix(part, ">") {
+			urls = append(urls, part[1:len(part)-1])
+		}
+	}
+	return urls
+}
