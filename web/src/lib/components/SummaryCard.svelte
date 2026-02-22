@@ -422,6 +422,17 @@
             });
         }
 
+        // One-click unsubscribe check
+        const unsubscribeMethods = report.content_analysis?.unsubscribe_methods;
+        if (unsubscribeMethods && unsubscribeMethods.length > 0 && !unsubscribeMethods.includes("one-click")) {
+            segments.push({ text: ". This email could benefit from " });
+            segments.push({
+                text: "one-click unsubscribe",
+                highlight: { color: "warning", bold: true },
+                link: "#content-details",
+            });
+        }
+
         // Content/spam assessment
         const spamAssassin = report.spamassassin;
         const contentScore = report.summary?.content_score || 0;

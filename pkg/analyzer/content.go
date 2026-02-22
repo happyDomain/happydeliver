@@ -38,9 +38,10 @@ import (
 
 // ContentAnalyzer analyzes email content (HTML, links, images)
 type ContentAnalyzer struct {
-	Timeout             time.Duration
-	httpClient          *http.Client
-	listUnsubscribeURLs []string // URLs from List-Unsubscribe header
+	Timeout                time.Duration
+	httpClient             *http.Client
+	listUnsubscribeURLs    []string // URLs from List-Unsubscribe header
+	hasOneClickUnsubscribe bool     // True if List-Unsubscribe-Post: List-Unsubscribe=One-Click
 }
 
 // NewContentAnalyzer creates a new content analyzer with configurable timeout
@@ -114,6 +115,10 @@ func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
 
 	// Parse List-Unsubscribe header URLs for use in link detection
 	c.listUnsubscribeURLs = email.GetListUnsubscribeURLs()
+
+	// Check for one-click unsubscribe support
+	listUnsubscribePost := email.Header.Get("List-Unsubscribe-Post")
+	c.hasOneClickUnsubscribe = strings.EqualFold(strings.TrimSpace(listUnsubscribePost), "List-Unsubscribe=One-Click")
 
 	// Get HTML and text parts
 	htmlParts := email.GetHTMLParts()
@@ -732,6 +737,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 		HasHtml:            api.PtrTo(results.HTMLContent != ""),
 		HasPlaintext:       api.PtrTo(results.TextContent != ""),
 		HasUnsubscribeLink: api.PtrTo(results.HasUnsubscribe),
+		UnsubscribeMethods: &[]api.ContentAnalysisUnsubscribeMethods{},
 	}
 
 	// Calculate text-to-image ratio (inverse of image-to-text)
@@ -878,8 +884,19 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 
 	// Unsubscribe methods
 	if results.HasUnsubscribe {
-		methods := []api.ContentAnalysisUnsubscribeMethods{api.Link}
-		analysis.UnsubscribeMethods = &methods
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.Link)
+	}
+
+	for _, url := range c.listUnsubscribeURLs {
+		if strings.HasPrefix(url, "mailto:") {
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.Mailto)
+		} else if strings.HasPrefix(url, "http:") || strings.HasPrefix(url, "https:") {
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.ListUnsubscribeHeader)
+		}
+	}
+
+	if slices.Contains(*analysis.UnsubscribeMethods, api.ListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.OneClick)
 	}
 
 	return analysis
