@@ -343,7 +343,7 @@ func (c *ContentAnalyzer) isUnsubscribeLink(href string, node *html.Node) bool {
 
 	// Check href for unsubscribe keywords
 	lowerHref := strings.ToLower(href)
-	unsubKeywords := []string{"unsubscribe", "opt-out", "optout", "remove", "list-unsubscribe"}
+	unsubKeywords := []string{"unsubscribe", "opt-out", "optout", "remove", "list-unsubscribe", "отписване", "desubscripció", "zrušit odběr", "dad-danysgrifio", "afmeld", "abmelden", "διαγραφή", "darse de baja", "poistu postituslistalta", "se désabonner", "ביטול רישום", "leiratkozás", "cancella iscrizione", "登録を取り消す", "구독 해지", "വരിക്കാരനല്ലാതാകുക", "uitschrijven", "meld av", "odsubskrybuj", "cancelar assinatura", "cancelar subscrição", "dezabonare", "отписаться", "avsluta prenumeration", "zrušiť odber", "odjava", "üyeliği sonlandır", "відписатися", "hủy đăng ký", "退订", "退訂"}
 	for _, keyword := range unsubKeywords {
 		if strings.Contains(lowerHref, keyword) {
 			return true

@@ -144,6 +144,74 @@ func TestIsUnsubscribeLink(t *testing.T) {
 			linkText: "Read more",
 			expected: false,
 		},
+		// Multilingual keyword detection - URL path
+		{
+			name:     "German abmelden in URL",
+			href:     "https://example.com/abmelden?id=42",
+			linkText: "Click here",
+			expected: true,
+		},
+		{
+			name:     "French se-desabonner slug in URL (no accent/space - not detected by keyword)",
+			href:     "https://example.com/se-desabonner?id=42",
+			linkText: "Click here",
+			expected: false,
+		},
+		// Multilingual keyword detection - link text
+		{
+			name:     "German Abmelden in link text",
+			href:     "https://example.com/manage?id=42&lang=de",
+			linkText: "Abmelden",
+			expected: true,
+		},
+		{
+			name:     "French Se désabonner in link text",
+			href:     "https://example.com/manage?id=42&lang=fr",
+			linkText: "Se désabonner",
+			expected: true,
+		},
+		{
+			name:     "Russian Отписаться in link text",
+			href:     "https://example.com/manage?id=42&lang=ru",
+			linkText: "Отписаться",
+			expected: true,
+		},
+		{
+			name:     "Chinese 退订 in link text",
+			href:     "https://example.com/manage?id=42&lang=zh",
+			linkText: "退订",
+			expected: true,
+		},
+		{
+			name:     "Japanese 登録を取り消す in link text",
+			href:     "https://example.com/manage?id=42&lang=ja",
+			linkText: "登録を取り消す",
+			expected: true,
+		},
+		{
+			name:     "Korean 구독 해지 in link text",
+			href:     "https://example.com/manage?id=42&lang=ko",
+			linkText: "구독 해지",
+			expected: true,
+		},
+		{
+			name:     "Dutch Uitschrijven in link text",
+			href:     "https://example.com/manage?id=42&lang=nl",
+			linkText: "Uitschrijven",
+			expected: true,
+		},
+		{
+			name:     "Polish Odsubskrybuj in link text",
+			href:     "https://example.com/manage?id=42&lang=pl",
+			linkText: "Odsubskrybuj",
+			expected: true,
+		},
+		{
+			name:     "Turkish Üyeliği sonlandır in link text",
+			href:     "https://example.com/manage?id=42&lang=tr",
+			linkText: "Üyeliği sonlandır",
+			expected: true,
+		},
 	}
 
 	analyzer := NewContentAnalyzer(5 * time.Second)
