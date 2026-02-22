@@ -21,6 +21,11 @@
     );
 
     const hasForwardRecords = $derived(ptrForwardRecords && ptrForwardRecords.length > 0);
+
+    let showDifferent = $state(false);
+    const differentCount = $derived(
+        ptrForwardRecords ? ptrForwardRecords.filter((ip) => ip !== senderIp).length : 0,
+    );
 </script>
 
 {#if ptrRecords && ptrRecords.length > 0}
@@ -63,15 +68,31 @@
                     <div class="mb-2">
                         <strong>Forward Resolution (A/AAAA):</strong>
                         {#each ptrForwardRecords as ip}
-                            <div class="d-flex gap-2 align-items-center mt-1">
-                                {#if senderIp && ip === senderIp}
-                                    <span class="badge bg-success">Match</span>
-                                {:else}
-                                    <span class="badge bg-warning">Different</span>
-                                {/if}
-                                <code>{ip}</code>
-                            </div>
+                            {#if ip === senderIp || !fcrDnsIsValid || showDifferent}
+                                <div class="d-flex gap-2 align-items-center mt-1">
+                                    {#if senderIp && ip === senderIp}
+                                        <span class="badge bg-success">Match</span>
+                                    {:else}
+                                        <span class="badge bg-secondary">Different</span>
+                                    {/if}
+                                    <code>{ip}</code>
+                                </div>
+                            {/if}
                         {/each}
+                        {#if fcrDnsIsValid && differentCount > 0}
+                            <div class="mt-1">
+                                <button
+                                    class="btn btn-link btn-sm p-0 text-muted"
+                                    onclick={() => (showDifferent = !showDifferent)}
+                                >
+                                    {#if showDifferent}
+                                        Hide other IPs
+                                    {:else}
+                                        Show {differentCount} other IP{differentCount > 1 ? 's' : ''} (not the sender)
+                                    {/if}
+                                </button>
+                            </div>
+                        {/if}
                     </div>
                     {#if fcrDnsIsValid}
                         <div class="alert alert-success mb-0 mt-2">
