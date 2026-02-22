@@ -15,6 +15,10 @@ mkdir -p /var/spool/postfix/authentication_milter
 chown mail:mail /var/spool/postfix/authentication_milter
 chmod 750 /var/spool/postfix/authentication_milter
 
+mkdir -p /var/spool/postfix/rspamd
+chown rspamd:mail /var/spool/postfix/rspamd
+chmod 750 /var/spool/postfix/rspamd
+
 # Create log directory
 mkdir -p /var/log/happydeliver /var/cache/authentication_milter /var/spool/authentication_milter /var/lib/authentication_milter /run/authentication_milter
 chown happydeliver:happydeliver /var/log/happydeliver

@@ -50,7 +50,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.Spa
 	}
 
 	// Parse X-Spam-Status header
-	if statusHeader, ok := headers["X-Spam-Status"]; ok {
+	if statusHeader, ok := headers["X-Spam-Status"]; ok && statusHeader != "" {
 		a.parseSpamStatus(statusHeader, result)
 	}
 

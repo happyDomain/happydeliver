@@ -333,6 +333,8 @@ components:
           $ref: '#/components/schemas/AuthenticationResults'
         spamassassin:
           $ref: '#/components/schemas/SpamAssassinResult'
+        rspamd:
+          $ref: '#/components/schemas/RspamdResult'
         dns_results:
           $ref: '#/components/schemas/DNSResults'
         blacklists:
@@ -401,7 +403,7 @@ components:
           type: integer
           minimum: 0
           maximum: 100
-          description: SpamAssassin score (in percentage)
+          description: Spam filter score (SpamAssassin + rspamd combined, in percentage)
           example: 15
         spam_grade:
           type: string
@@ -843,6 +845,17 @@ components:
         - is_spam
         - test_details
       properties:
+        deliverability_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: SpamAssassin deliverability score (0-100, higher is better)
+          example: 80
+        deliverability_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade for SpamAssassin deliverability score
+          example: "B"
         version:
           type: string
           description: SpamAssassin version
@@ -904,6 +917,78 @@ components:
           type: string
           description: Human-readable description of what this test checks
           example: "Bayes spam probability is 0 to 1%"
+
+    RspamdResult:
+      type: object
+      required:
+        - score
+        - threshold
+        - is_spam
+        - symbols
+      properties:
+        deliverability_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: rspamd deliverability score (0-100, higher is better)
+          example: 85
+        deliverability_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade for rspamd deliverability score
+          example: "A"
+        score:
+          type: number
+          format: float
+          description: rspamd spam score
+          example: -3.91
+        threshold:
+          type: number
+          format: float
+          description: Score threshold for spam classification
+          example: 15.0
+        action:
+          type: string
+          description: rspamd action (no action, add header, rewrite subject, soft reject, reject)
+          example: "no action"
+        is_spam:
+          type: boolean
+          description: Whether message is classified as spam (action is reject or soft reject)
+          example: false
+        server:
+          type: string
+          description: rspamd server that processed the message
+          example: "rspamd.example.com"
+        symbols:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/RspamdSymbol'
+          description: Map of triggered rspamd symbols to their details
+          example:
+            BAYES_HAM:
+              name: "BAYES_HAM"
+              score: -1.9
+              params: "0.02"
+
+    RspamdSymbol:
+      type: object
+      required:
+        - name
+        - score
+      properties:
+        name:
+          type: string
+          description: Symbol name
+          example: "BAYES_HAM"
+        score:
+          type: number
+          format: float
+          description: Score contribution of this symbol
+          example: -1.9
+        params:
+          type: string
+          description: Symbol parameters or options
+          example: "0.02"
 
     DNSResults:
       type: object

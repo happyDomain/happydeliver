@@ -33,6 +33,7 @@ import (
 type ReportGenerator struct {
 	authAnalyzer    *AuthenticationAnalyzer
 	spamAnalyzer    *SpamAssassinAnalyzer
+	rspamdAnalyzer  *RspamdAnalyzer
 	dnsAnalyzer     *DNSAnalyzer
 	rblChecker      *RBLChecker
 	contentAnalyzer *ContentAnalyzer
@@ -49,6 +50,7 @@ func NewReportGenerator(
 	return &ReportGenerator{
 		authAnalyzer:    NewAuthenticationAnalyzer(),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
+		rspamdAnalyzer:  NewRspamdAnalyzer(),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),
@@ -65,6 +67,7 @@ type AnalysisResults struct {
 	Headers        *api.HeaderAnalysis
 	RBL            *RBLResults
 	SpamAssassin   *api.SpamAssassinResult
+	Rspamd         *api.RspamdResult
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -79,6 +82,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Authentication, results.Headers)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
+	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(email)
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
 
 	return results
@@ -134,10 +138,26 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		blacklistScore, blacklistGrade = r.rblChecker.CalculateRBLScore(results.RBL)
 	}
 
-	spamScore := 0
+	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
+	rspamdScore, rspamdGrade := r.rspamdAnalyzer.CalculateRspamdScore(results.Rspamd)
+
+	// Combine SpamAssassin and rspamd scores 50/50.
+	// If only one filter ran (the other returns "" grade), use that filter's score alone.
+	var spamScore int
 	var spamGrade string
-	if results.SpamAssassin != nil {
-		spamScore, spamGrade = r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
+	switch {
+	case saGrade == "" && rspamdGrade == "":
+		spamScore = 0
+		spamGrade = ""
+	case saGrade == "":
+		spamScore = rspamdScore
+		spamGrade = rspamdGrade
+	case rspamdGrade == "":
+		spamScore = saScore
+		spamGrade = saGrade
+	default:
+		spamScore = (saScore + rspamdScore) / 2
+		spamGrade = MinGrade(saGrade, rspamdGrade)
 	}
 
 	report.Summary = &api.ScoreSummary{
@@ -177,8 +197,21 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		report.Blacklists = &results.RBL.Checks
 	}
 
-	// Add SpamAssassin result
+	// Add SpamAssassin result with individual deliverability score
+	if results.SpamAssassin != nil {
+		saGradeTyped := api.SpamAssassinResultDeliverabilityGrade(saGrade)
+		results.SpamAssassin.DeliverabilityScore = api.PtrTo(saScore)
+		results.SpamAssassin.DeliverabilityGrade = &saGradeTyped
+	}
 	report.Spamassassin = results.SpamAssassin
+
+	// Add rspamd result with individual deliverability score
+	if results.Rspamd != nil {
+		rspamdGradeTyped := api.RspamdResultDeliverabilityGrade(rspamdGrade)
+		results.Rspamd.DeliverabilityScore = api.PtrTo(rspamdScore)
+		results.Rspamd.DeliverabilityGrade = &rspamdGradeTyped
+	}
+	report.Rspamd = results.Rspamd
 
 	// Add raw headers
 	if results.Email != nil && results.Email.RawHeaders != "" {

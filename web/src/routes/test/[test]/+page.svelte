@@ -12,6 +12,7 @@
         ErrorDisplay,
         HeaderAnalysisCard,
         PendingState,
+        RspamdCard,
         ScoreCard,
         SpamAssassinCard,
         SummaryCard,
@@ -347,16 +348,19 @@
                 </div>
             {/if}
 
-            <!-- Additional Information -->
-            {#if report.spamassassin}
+            <!-- Spam filter analysis -->
+            {#if report.spamassassin || report.rspamd}
                 <div class="row mb-4" id="spam">
-                    <div class="col-12">
-                        <SpamAssassinCard
-                            spamassassin={report.spamassassin}
-                            spamGrade={report.summary?.spam_grade}
-                            spamScore={report.summary?.spam_score}
-                        />
-                    </div>
+                    {#if report.spamassassin}
+                        <div class={report.rspamd ? "col-lg-6 mb-4 mb-lg-0" : "col-12"}>
+                            <SpamAssassinCard spamassassin={report.spamassassin} />
+                        </div>
+                    {/if}
+                    {#if report.rspamd}
+                        <div class={report.spamassassin ? "col-lg-6" : "col-12"}>
+                            <RspamdCard rspamd={report.rspamd} />
+                        </div>
+                    {/if}
                 </div>
             {/if}
 

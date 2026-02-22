@@ -6,11 +6,9 @@
 
     interface Props {
         spamassassin: SpamAssassinResult;
-        spamGrade?: string;
-        spamScore?: number;
     }
 
-    let { spamassassin, spamGrade, spamScore }: Props = $props();
+    let { spamassassin }: Props = $props();
 </script>
 
 <div class="card shadow-sm" id="spam-details">
@@ -21,13 +19,13 @@
                 SpamAssassin Analysis
             </span>
             <span>
-                {#if spamScore !== undefined}
-                    <span class="badge bg-{getScoreColorClass(spamScore)}">
-                        {spamScore}%
+                {#if spamassassin.deliverability_score !== undefined}
+                    <span class="badge bg-{getScoreColorClass(spamassassin.deliverability_score)}">
+                        {spamassassin.deliverability_score}%
                     </span>
                 {/if}
-                {#if spamGrade !== undefined}
-                    <GradeDisplay grade={spamGrade} size="small" />
+                {#if spamassassin.deliverability_grade !== undefined}
+                    <GradeDisplay grade={spamassassin.deliverability_grade} size="small" />
                 {/if}
             </span>
         </h4>

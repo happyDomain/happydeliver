@@ -121,6 +121,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     perl-xml-libxml \
     postfix \
     postfix-pcre \
+    rspamd \
     spamassassin \
     spamassassin-client \
     supervisor \
@@ -143,8 +144,11 @@ RUN mkdir -p /etc/happydeliver \
     /var/lib/authentication_milter \
     /var/spool/postfix/authentication_milter \
     /var/spool/postfix/spamassassin \
+    /var/spool/postfix/rspamd \
     && chown -R happydeliver:happydeliver /var/lib/happydeliver /var/log/happydeliver \
-    && chown -R mail:mail /var/spool/postfix/authentication_milter /var/spool/postfix/spamassassin
+    && chown -R mail:mail /var/spool/postfix/authentication_milter /var/spool/postfix/spamassassin \
+    && chown rspamd:mail /var/spool/postfix/rspamd \
+    && chmod 750 /var/spool/postfix/rspamd
 
 # Copy the built application
 COPY --from=builder /build/happyDeliver /usr/local/bin/happyDeliver
@@ -154,6 +158,7 @@ RUN chmod +x /usr/local/bin/happyDeliver
 COPY docker/postfix/ /etc/postfix/
 COPY docker/authentication_milter/authentication_milter.json /etc/authentication_milter.json
 COPY docker/spamassassin/ /etc/mail/spamassassin/
+COPY docker/rspamd/local.d/ /etc/rspamd/local.d/
 COPY docker/supervisor/ /etc/supervisor/
 COPY docker/entrypoint.sh /entrypoint.sh
 

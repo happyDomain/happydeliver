@@ -6,7 +6,7 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ## Features
 
-- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, BIMI, ARC, SpamAssassin scores, DNS records, blacklist status, content quality, and more
+- **Complete Email Analysis**: Analyzes SPF, DKIM, DMARC, BIMI, ARC, SpamAssassin and rspamd scores, DNS records, blacklist status, content quality, and more
 - **REST API**: Full-featured API for creating tests and retrieving reports
 - **LMTP Server**: Built-in LMTP server for seamless MTA integration
 - **Scoring System**: Gives A to F grades and scoring with weighted factors across dns, authentication, spam, blacklists, content, and headers
@@ -26,6 +26,7 @@ The easiest way to run happyDeliver is using the all-in-one Docker container tha
 - **Postfix MTA**: Receives emails on port 25
 - **authentication_milter**: Entreprise grade email authentication
 - **SpamAssassin**: Spam scoring and analysis
+- **rspamd**: Second spam filter for cross-validated scoring
 - **happyDeliver API**: REST API server on port 8080
 - **SQLite Database**: Persistent storage for tests and reports
 
@@ -162,7 +163,7 @@ The server will start on `http://localhost:8080` by default.
 
 #### 3. Integrate with your existing e-mail setup
 
-It is expected your setup annotate the email with eg. opendkim, spamassassin, ...
+It is expected your setup annotate the email with eg. opendkim, spamassassin, rspamd, ...
 happyDeliver will not perform thoses checks, it relies instead on standard software to have real world annotations.
 
 Choose one of the following way to integrate happyDeliver in your existing setup:
@@ -269,7 +270,7 @@ The deliverability score is calculated from A to F based on:
 - **Authentication**: IPRev, SPF, DKIM, DMARC, BIMI and ARC validation
 - **Blacklist**: RBL/DNSBL checks
 - **Headers**: Required headers, MIME structure, Domain alignment
-- **Spam**: SpamAssassin score
+- **Spam**: SpamAssassin and rspamd scores (combined 50/50)
 - **Content**: HTML quality, links, images, unsubscribe
 
 ## Funding

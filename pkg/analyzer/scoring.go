@@ -69,3 +69,31 @@ func ScoreToGradeKind(score int) string {
 func ScoreToReportGrade(score int) api.ReportGrade {
 	return api.ReportGrade(ScoreToGrade(score))
 }
+
+// gradeRank returns a numeric rank for a grade (lower = worse)
+func gradeRank(grade string) int {
+	switch grade {
+	case "A+":
+		return 6
+	case "A":
+		return 5
+	case "B":
+		return 4
+	case "C":
+		return 3
+	case "D":
+		return 2
+	case "E":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// MinGrade returns the minimal (worse) grade between the two given grades
+func MinGrade(a, b string) string {
+	if gradeRank(a) <= gradeRank(b) {
+		return a
+	}
+	return b
+}
