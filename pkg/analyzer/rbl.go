@@ -34,10 +34,11 @@ import (
 
 // RBLChecker checks IP addresses against DNS-based blacklists
 type RBLChecker struct {
-	Timeout     time.Duration
-	RBLs        []string
-	CheckAllIPs bool // Check all IPs found in headers, not just the first one
-	resolver    *net.Resolver
+	Timeout          time.Duration
+	RBLs             []string
+	CheckAllIPs      bool // Check all IPs found in headers, not just the first one
+	resolver         *net.Resolver
+	informationalSet map[string]bool
 }
 
 // DefaultRBLs is a list of commonly used RBL providers
@@ -48,6 +49,8 @@ var DefaultRBLs = []string{
 	"b.barracudacentral.org", // Barracuda
 	"cbl.abuseat.org",        // CBL (Composite Blocking List)
 	"dnsbl-1.uceprotect.net", // UCEPROTECT Level 1
+	"dnsbl-2.uceprotect.net", // UCEPROTECT Level 2 (informational)
+	"dnsbl-3.uceprotect.net", // UCEPROTECT Level 3 (informational)
 	"spam.spamrats.com",      // SpamRats SPAM
 	"dyna.spamrats.com",      // SpamRats dynamic IPs
 	"psbl.surriel.com",       // PSBL
@@ -58,6 +61,13 @@ var DefaultRBLs = []string{
 	"bl.nszones.com",         // NSZones
 }
 
+// DefaultInformationalRBLs lists RBLs that are checked but not counted in the score.
+// These are typically broader lists where being listed is less definitive.
+var DefaultInformationalRBLs = []string{
+	"dnsbl-2.uceprotect.net", // UCEPROTECT Level 2: entire netblocks, may cause false positives
+	"dnsbl-3.uceprotect.net", // UCEPROTECT Level 3: entire ASes, too broad for scoring
+}
+
 // NewRBLChecker creates a new RBL checker with configurable timeout and RBL list
 func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *RBLChecker {
 	if timeout == 0 {
@@ -66,21 +76,25 @@ func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *RBLC
 	if len(rbls) == 0 {
 		rbls = DefaultRBLs
 	}
+	informationalSet := make(map[string]bool, len(DefaultInformationalRBLs))
+	for _, rbl := range DefaultInformationalRBLs {
+		informationalSet[rbl] = true
+	}
 	return &RBLChecker{
-		Timeout:     timeout,
-		RBLs:        rbls,
-		CheckAllIPs: checkAllIPs,
-		resolver: &net.Resolver{
-			PreferGo: true,
-		},
+		Timeout:          timeout,
+		RBLs:             rbls,
+		CheckAllIPs:      checkAllIPs,
+		resolver:         &net.Resolver{PreferGo: true},
+		informationalSet: informationalSet,
 	}
 }
 
 // RBLResults represents the results of RBL checks
 type RBLResults struct {
-	Checks      map[string][]api.BlacklistCheck // Map of IP -> list of RBL checks for that IP
-	IPsChecked  []string
-	ListedCount int
+	Checks              map[string][]api.BlacklistCheck // Map of IP -> list of RBL checks for that IP
+	IPsChecked          []string
+	ListedCount         int // Total listings including informational RBLs
+	RelevantListedCount int // Listings on scoring (non-informational) RBLs only
 }
 
 // CheckEmail checks all IPs found in the email headers against RBLs
@@ -104,6 +118,9 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 			results.Checks[ip] = append(results.Checks[ip], check)
 			if check.Listed {
 				results.ListedCount++
+				if !r.informationalSet[rbl] {
+					results.RelevantListedCount++
+				}
 			}
 		}
 
@@ -276,14 +293,20 @@ func (r *RBLChecker) reverseIP(ipStr string) string {
 	return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 }
 
-// CalculateRBLScore calculates the blacklist contribution to deliverability
+// CalculateRBLScore calculates the blacklist contribution to deliverability.
+// Informational RBLs are not counted in the score.
 func (r *RBLChecker) CalculateRBLScore(results *RBLResults) (int, string) {
 	if results == nil || len(results.IPsChecked) == 0 {
 		// No IPs to check, give benefit of doubt
 		return 100, ""
 	}
 
-	percentage := 100 - results.ListedCount*100/len(r.RBLs)
+	scoringRBLCount := len(r.RBLs) - len(r.informationalSet)
+	if scoringRBLCount <= 0 {
+		return 100, "A+"
+	}
+
+	percentage := 100 - results.RelevantListedCount*100/scoringRBLCount
 	return percentage, ScoreToGrade(percentage)
 }
 
