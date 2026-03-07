@@ -3,7 +3,7 @@
     import { onDestroy } from "svelte";
 
     import { getReport, getTest, reanalyzeReport } from "$lib/api";
-    import type { Report, Test } from "$lib/api/types.gen";
+    import type { BlacklistCheck, Report, Test } from "$lib/api/types.gen";
     import {
         AuthenticationCard,
         BlacklistCard,
@@ -17,7 +17,10 @@
         SpamAssassinCard,
         SummaryCard,
         TinySurvey,
+        WhitelistCard,
     } from "$lib/components";
+
+    type BlacklistRecords = Record<string, BlacklistCheck[]>;
 
     let testId = $derived(page.params.test);
     let test = $state<Test | null>(null);
@@ -321,17 +324,46 @@
             {/if}
 
             <!-- Blacklist Checks -->
-            {#if report.blacklists && Object.keys(report.blacklists).length > 0}
-                <div class="row mb-4" id="blacklist">
-                    <div class="col-12">
-                        <BlacklistCard
-                            blacklists={report.blacklists}
-                            blacklistGrade={report.summary?.blacklist_grade}
-                            blacklistScore={report.summary?.blacklist_score}
-                            receivedChain={report.header_analysis?.received_chain}
-                        />
+            {#snippet blacklistChecks(blacklists: BlacklistRecords, report: Report)}
+                <BlacklistCard
+                    {blacklists}
+                    blacklistGrade={report.summary?.blacklist_grade}
+                    blacklistScore={report.summary?.blacklist_score}
+                    receivedChain={report.header_analysis?.received_chain}
+                />
+            {/snippet}
+
+            <!-- Whitelist Checks -->
+            {#snippet whitelistChecks(whitelists: BlacklistRecords)}
+                <WhitelistCard {whitelists} />
+            {/snippet}
+
+            <!-- Blacklist & Whitelist Checks -->
+            {#if report.blacklists && report.whitelists && Object.keys(report.blacklists).length == 1 && Object.keys(report.whitelists).length == 1}
+                <div class="row mb-4">
+                    <div class="col-6" id="blacklist">
+                        {@render blacklistChecks(report.blacklists, report)}
+                    </div>
+                    <div class="col-6" id="whitelist">
+                        {@render whitelistChecks(report.whitelists)}
                     </div>
                 </div>
+            {:else}
+                {#if report.blacklists && Object.keys(report.blacklists).length > 0}
+                    <div class="row mb-4" id="blacklist">
+                        <div class="col-12">
+                            {@render blacklistChecks(report.blacklists, report)}
+                        </div>
+                    </div>
+                {/if}
+
+                {#if report.whitelists && Object.keys(report.whitelists).length > 0}
+                    <div class="row mb-4" id="whitelist">
+                        <div class="col-12">
+                            {@render whitelistChecks(report.whitelists)}
+                        </div>
+                    </div>
+                {/if}
             {/if}
 
             <!-- Header Analysis -->

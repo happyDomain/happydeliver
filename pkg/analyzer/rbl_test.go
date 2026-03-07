@@ -59,8 +59,8 @@ func TestNewRBLChecker(t *testing.T) {
 			if checker.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", checker.Timeout, tt.expectedTimeout)
 			}
-			if len(checker.RBLs) != tt.expectedRBLs {
-				t.Errorf("RBLs count = %d, want %d", len(checker.RBLs), tt.expectedRBLs)
+			if len(checker.Lists) != tt.expectedRBLs {
+				t.Errorf("RBLs count = %d, want %d", len(checker.Lists), tt.expectedRBLs)
 			}
 			if checker.resolver == nil {
 				t.Error("Resolver should not be nil")
@@ -265,7 +265,7 @@ func TestExtractIPs(t *testing.T) {
 func TestGetBlacklistScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		results       *RBLResults
+		results       *DNSListResults
 		expectedScore int
 	}{
 		{
@@ -275,14 +275,14 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 		{
 			name: "No IPs checked",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked: []string{},
 			},
 			expectedScore: 100,
 		},
 		{
 			name: "Not listed on any RBL",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 0,
 			},
@@ -290,7 +290,7 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 		{
 			name: "Listed on 1 RBL",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 1,
 			},
@@ -298,7 +298,7 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 		{
 			name: "Listed on 2 RBLs",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 2,
 			},
@@ -306,7 +306,7 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 		{
 			name: "Listed on 3 RBLs",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 3,
 			},
@@ -314,7 +314,7 @@ func TestGetBlacklistScore(t *testing.T) {
 		},
 		{
 			name: "Listed on 4+ RBLs",
-			results: &RBLResults{
+			results: &DNSListResults{
 				IPsChecked:  []string{"198.51.100.1"},
 				ListedCount: 4,
 			},
@@ -326,7 +326,7 @@ func TestGetBlacklistScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, _ := checker.CalculateRBLScore(tt.results)
+			score, _ := checker.CalculateScore(tt.results)
 			if score != tt.expectedScore {
 				t.Errorf("GetBlacklistScore() = %v, want %v", score, tt.expectedScore)
 			}
@@ -335,7 +335,7 @@ func TestGetBlacklistScore(t *testing.T) {
 }
 
 func TestGetUniqueListedIPs(t *testing.T) {
-	results := &RBLResults{
+	results := &DNSListResults{
 		Checks: map[string][]api.BlacklistCheck{
 			"198.51.100.1": {
 				{Rbl: "zen.spamhaus.org", Listed: true},
@@ -363,7 +363,7 @@ func TestGetUniqueListedIPs(t *testing.T) {
 }
 
 func TestGetRBLsForIP(t *testing.T) {
-	results := &RBLResults{
+	results := &DNSListResults{
 		Checks: map[string][]api.BlacklistCheck{
 			"198.51.100.1": {
 				{Rbl: "zen.spamhaus.org", Listed: true},
@@ -402,7 +402,7 @@ func TestGetRBLsForIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rbls := checker.GetRBLsForIP(results, tt.ip)
+			rbls := checker.GetListsForIP(results, tt.ip)
 
 			if len(rbls) != len(tt.expectedRBLs) {
 				t.Errorf("Got %d RBLs, want %d", len(rbls), len(tt.expectedRBLs))

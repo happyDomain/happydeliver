@@ -44,6 +44,7 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		cfg.Analysis.DNSTimeout,
 		cfg.Analysis.HTTPTimeout,
 		cfg.Analysis.RBLs,
+		cfg.Analysis.DNSWLs,
 		cfg.Analysis.CheckAllIPs,
 	)
 
@@ -130,12 +131,12 @@ func (a *APIAdapter) CheckBlacklistIP(ip string) ([]api.BlacklistCheck, int, int
 
 	// Calculate score using the existing function
 	// Create a minimal RBLResults structure for scoring
-	results := &RBLResults{
+	results := &DNSListResults{
 		Checks:      map[string][]api.BlacklistCheck{ip: checks},
 		IPsChecked:  []string{ip},
 		ListedCount: listedCount,
 	}
-	score, grade := a.analyzer.generator.rblChecker.CalculateRBLScore(results)
+	score, grade := a.analyzer.generator.rblChecker.CalculateScore(results)
 
 	return checks, listedCount, score, grade, nil
 }

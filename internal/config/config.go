@@ -65,6 +65,7 @@ type AnalysisConfig struct {
 	DNSTimeout   time.Duration
 	HTTPTimeout  time.Duration
 	RBLs         []string
+	DNSWLs       []string
 	CheckAllIPs  bool // Check all IPs found in headers, not just the first one
 }
 
@@ -88,6 +89,7 @@ func DefaultConfig() *Config {
 			DNSTimeout:  5 * time.Second,
 			HTTPTimeout: 10 * time.Second,
 			RBLs:        []string{},
+			DNSWLs:      []string{},
 			CheckAllIPs: false, // By default, only check the first IP
 		},
 	}

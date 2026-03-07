@@ -32,13 +32,15 @@ import (
 	"git.happydns.org/happyDeliver/internal/api"
 )
 
-// RBLChecker checks IP addresses against DNS-based blacklists
-type RBLChecker struct {
+// DNSListChecker checks IP addresses against DNS-based block/allow lists.
+// It handles both RBL (blacklist) and DNSWL (whitelist) semantics via flags.
+type DNSListChecker struct {
 	Timeout          time.Duration
-	RBLs             []string
+	Lists            []string
 	CheckAllIPs      bool // Check all IPs found in headers, not just the first one
+	filterErrorCodes bool // When true (RBL mode), treat 127.255.255.253/254/255 as operational errors
 	resolver         *net.Resolver
-	informationalSet map[string]bool
+	informationalSet map[string]bool // Lists whose hits don't count toward the score
 }
 
 // DefaultRBLs is a list of commonly used RBL providers
@@ -68,10 +70,16 @@ var DefaultInformationalRBLs = []string{
 	"dnsbl-3.uceprotect.net", // UCEPROTECT Level 3: entire ASes, too broad for scoring
 }
 
+// DefaultDNSWLs is a list of commonly used DNSWL providers
+var DefaultDNSWLs = []string{
+	"list.dnswl.org",   // DNSWL.org — the main DNS whitelist
+	"swl.spamhaus.org", // Spamhaus Safe Whitelist
+}
+
 // NewRBLChecker creates a new RBL checker with configurable timeout and RBL list
-func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *RBLChecker {
+func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *DNSListChecker {
 	if timeout == 0 {
-		timeout = 5 * time.Second // Default timeout
+		timeout = 5 * time.Second
 	}
 	if len(rbls) == 0 {
 		rbls = DefaultRBLs
@@ -80,30 +88,48 @@ func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *RBLC
 	for _, rbl := range DefaultInformationalRBLs {
 		informationalSet[rbl] = true
 	}
-	return &RBLChecker{
+	return &DNSListChecker{
 		Timeout:          timeout,
-		RBLs:             rbls,
+		Lists:            rbls,
 		CheckAllIPs:      checkAllIPs,
+		filterErrorCodes: true,
 		resolver:         &net.Resolver{PreferGo: true},
 		informationalSet: informationalSet,
 	}
 }
 
-// RBLResults represents the results of RBL checks
-type RBLResults struct {
-	Checks              map[string][]api.BlacklistCheck // Map of IP -> list of RBL checks for that IP
-	IPsChecked          []string
-	ListedCount         int // Total listings including informational RBLs
-	RelevantListedCount int // Listings on scoring (non-informational) RBLs only
+// NewDNSWLChecker creates a new DNSWL checker with configurable timeout and DNSWL list
+func NewDNSWLChecker(timeout time.Duration, dnswls []string, checkAllIPs bool) *DNSListChecker {
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	if len(dnswls) == 0 {
+		dnswls = DefaultDNSWLs
+	}
+	return &DNSListChecker{
+		Timeout:          timeout,
+		Lists:            dnswls,
+		CheckAllIPs:      checkAllIPs,
+		filterErrorCodes: false,
+		resolver:         &net.Resolver{PreferGo: true},
+		informationalSet: make(map[string]bool),
+	}
 }
 
-// CheckEmail checks all IPs found in the email headers against RBLs
-func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
-	results := &RBLResults{
+// DNSListResults represents the results of DNS list checks
+type DNSListResults struct {
+	Checks              map[string][]api.BlacklistCheck // Map of IP -> list of checks for that IP
+	IPsChecked          []string
+	ListedCount         int // Total listings including informational entries
+	RelevantListedCount int // Listings on scoring (non-informational) lists only
+}
+
+// CheckEmail checks all IPs found in the email headers against the configured lists
+func (r *DNSListChecker) CheckEmail(email *EmailMessage) *DNSListResults {
+	results := &DNSListResults{
 		Checks: make(map[string][]api.BlacklistCheck),
 	}
 
-	// Extract IPs from Received headers
 	ips := r.extractIPs(email)
 	if len(ips) == 0 {
 		return results
@@ -111,20 +137,18 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 
 	results.IPsChecked = ips
 
-	// Check each IP against all RBLs
 	for _, ip := range ips {
-		for _, rbl := range r.RBLs {
-			check := r.checkIP(ip, rbl)
+		for _, list := range r.Lists {
+			check := r.checkIP(ip, list)
 			results.Checks[ip] = append(results.Checks[ip], check)
 			if check.Listed {
 				results.ListedCount++
-				if !r.informationalSet[rbl] {
+				if !r.informationalSet[list] {
 					results.RelevantListedCount++
 				}
 			}
 		}
 
-		// Only check the first IP unless CheckAllIPs is enabled
 		if !r.CheckAllIPs {
 			break
 		}
@@ -133,9 +157,8 @@ func (r *RBLChecker) CheckEmail(email *EmailMessage) *RBLResults {
 	return results
 }
 
-// CheckIP checks a single IP address against all configured RBLs
-func (r *RBLChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
-	// Validate that it's a valid IP address
+// CheckIP checks a single IP address against all configured lists
+func (r *DNSListChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
 	if !r.isPublicIP(ip) {
 		return nil, 0, fmt.Errorf("invalid or non-public IP address: %s", ip)
 	}
@@ -143,9 +166,8 @@ func (r *RBLChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
 	var checks []api.BlacklistCheck
 	listedCount := 0
 
-	// Check the IP against all RBLs
-	for _, rbl := range r.RBLs {
-		check := r.checkIP(ip, rbl)
+	for _, list := range r.Lists {
+		check := r.checkIP(ip, list)
 		checks = append(checks, check)
 		if check.Listed {
 			listedCount++
@@ -156,27 +178,19 @@ func (r *RBLChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
 }
 
 // extractIPs extracts IP addresses from Received headers
-func (r *RBLChecker) extractIPs(email *EmailMessage) []string {
+func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
 	var ips []string
 	seenIPs := make(map[string]bool)
 
-	// Get all Received headers
 	receivedHeaders := email.Header["Received"]
-
-	// Regex patterns for IP addresses
-	// Match IPv4: xxx.xxx.xxx.xxx
 	ipv4Pattern := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
 
-	// Look for IPs in Received headers
 	for _, received := range receivedHeaders {
-		// Find all IPv4 addresses
 		matches := ipv4Pattern.FindAllString(received, -1)
 		for _, match := range matches {
-			// Skip private/reserved IPs
 			if !r.isPublicIP(match) {
 				continue
 			}
-			// Avoid duplicates
 			if !seenIPs[match] {
 				ips = append(ips, match)
 				seenIPs[match] = true
@@ -184,13 +198,10 @@ func (r *RBLChecker) extractIPs(email *EmailMessage) []string {
 		}
 	}
 
-	// If no IPs found in Received headers, try X-Originating-IP
 	if len(ips) == 0 {
 		originatingIP := email.Header.Get("X-Originating-IP")
 		if originatingIP != "" {
-			// Extract IP from formats like "[192.0.2.1]" or "192.0.2.1"
 			cleanIP := strings.TrimSuffix(strings.TrimPrefix(originatingIP, "["), "]")
-			// Remove any whitespace
 			cleanIP = strings.TrimSpace(cleanIP)
 			matches := ipv4Pattern.FindString(cleanIP)
 			if matches != "" && r.isPublicIP(matches) {
@@ -203,19 +214,16 @@ func (r *RBLChecker) extractIPs(email *EmailMessage) []string {
 }
 
 // isPublicIP checks if an IP address is public (not private, loopback, or reserved)
-func (r *RBLChecker) isPublicIP(ipStr string) bool {
+func (r *DNSListChecker) isPublicIP(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return false
 	}
 
-	// Check if it's a private network
 	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return false
 	}
 
-	// Additional checks for reserved ranges
-	// 0.0.0.0/8, 192.0.0.0/24, 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2), 203.0.113.0/24 (TEST-NET-3)
 	if ip.IsUnspecified() {
 		return false
 	}
@@ -223,51 +231,43 @@ func (r *RBLChecker) isPublicIP(ipStr string) bool {
 	return true
 }
 
-// checkIP checks a single IP against a single RBL
-func (r *RBLChecker) checkIP(ip, rbl string) api.BlacklistCheck {
+// checkIP checks a single IP against a single DNS list
+func (r *DNSListChecker) checkIP(ip, list string) api.BlacklistCheck {
 	check := api.BlacklistCheck{
-		Rbl: rbl,
+		Rbl: list,
 	}
 
-	// Reverse the IP for DNSBL query
 	reversedIP := r.reverseIP(ip)
 	if reversedIP == "" {
 		check.Error = api.PtrTo("Failed to reverse IP address")
 		return check
 	}
 
-	// Construct DNSBL query: reversed-ip.rbl-domain
-	query := fmt.Sprintf("%s.%s", reversedIP, rbl)
+	query := fmt.Sprintf("%s.%s", reversedIP, list)
 
-	// Perform DNS lookup with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
 
 	addrs, err := r.resolver.LookupHost(ctx, query)
 	if err != nil {
-		// Most likely not listed (NXDOMAIN)
 		if dnsErr, ok := err.(*net.DNSError); ok {
 			if dnsErr.IsNotFound {
 				check.Listed = false
 				return check
 			}
 		}
-		// Other DNS errors
 		check.Error = api.PtrTo(fmt.Sprintf("DNS lookup failed: %v", err))
 		return check
 	}
 
-	// If we got a response, check the return code
 	if len(addrs) > 0 {
-		check.Response = api.PtrTo(addrs[0]) // Return code (e.g., 127.0.0.2)
+		check.Response = api.PtrTo(addrs[0])
 
-		// Check for RBL error codes: 127.255.255.253, 127.255.255.254, 127.255.255.255
-		// These indicate RBL operational issues, not actual listings
-		if addrs[0] == "127.255.255.253" || addrs[0] == "127.255.255.254" || addrs[0] == "127.255.255.255" {
+		// In RBL mode, 127.255.255.253/254/255 indicate operational errors, not real listings.
+		if r.filterErrorCodes && (addrs[0] == "127.255.255.253" || addrs[0] == "127.255.255.254" || addrs[0] == "127.255.255.255") {
 			check.Listed = false
-			check.Error = api.PtrTo(fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", rbl, addrs[0]))
+			check.Error = api.PtrTo(fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", list, addrs[0]))
 		} else {
-			// Normal listing response
 			check.Listed = true
 		}
 	}
@@ -275,50 +275,47 @@ func (r *RBLChecker) checkIP(ip, rbl string) api.BlacklistCheck {
 	return check
 }
 
-// reverseIP reverses an IPv4 address for DNSBL queries
+// reverseIP reverses an IPv4 address for DNSBL/DNSWL queries
 // Example: 192.0.2.1 -> 1.2.0.192
-func (r *RBLChecker) reverseIP(ipStr string) string {
+func (r *DNSListChecker) reverseIP(ipStr string) string {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return ""
 	}
 
-	// Convert to IPv4
 	ipv4 := ip.To4()
 	if ipv4 == nil {
 		return "" // IPv6 not supported yet
 	}
 
-	// Reverse the octets
 	return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 }
 
-// CalculateRBLScore calculates the blacklist contribution to deliverability.
-// Informational RBLs are not counted in the score.
-func (r *RBLChecker) CalculateRBLScore(results *RBLResults) (int, string) {
+// CalculateScore calculates the list contribution to deliverability.
+// Informational lists are not counted in the score.
+func (r *DNSListChecker) CalculateScore(results *DNSListResults) (int, string) {
 	if results == nil || len(results.IPsChecked) == 0 {
-		// No IPs to check, give benefit of doubt
 		return 100, ""
 	}
 
-	scoringRBLCount := len(r.RBLs) - len(r.informationalSet)
-	if scoringRBLCount <= 0 {
+	scoringListCount := len(r.Lists) - len(r.informationalSet)
+	if scoringListCount <= 0 {
 		return 100, "A+"
 	}
 
-	percentage := 100 - results.RelevantListedCount*100/scoringRBLCount
+	percentage := 100 - results.RelevantListedCount*100/scoringListCount
 	return percentage, ScoreToGrade(percentage)
 }
 
-// GetUniqueListedIPs returns a list of unique IPs that are listed on at least one RBL
-func (r *RBLChecker) GetUniqueListedIPs(results *RBLResults) []string {
+// GetUniqueListedIPs returns a list of unique IPs that are listed on at least one entry
+func (r *DNSListChecker) GetUniqueListedIPs(results *DNSListResults) []string {
 	var listedIPs []string
 
-	for ip, rblChecks := range results.Checks {
-		for _, check := range rblChecks {
+	for ip, checks := range results.Checks {
+		for _, check := range checks {
 			if check.Listed {
 				listedIPs = append(listedIPs, ip)
-				break // Only add the IP once
+				break
 			}
 		}
 	}
@@ -326,17 +323,17 @@ func (r *RBLChecker) GetUniqueListedIPs(results *RBLResults) []string {
 	return listedIPs
 }
 
-// GetRBLsForIP returns all RBLs that list a specific IP
-func (r *RBLChecker) GetRBLsForIP(results *RBLResults, ip string) []string {
-	var rbls []string
+// GetListsForIP returns all lists that match a specific IP
+func (r *DNSListChecker) GetListsForIP(results *DNSListResults, ip string) []string {
+	var lists []string
 
-	if rblChecks, exists := results.Checks[ip]; exists {
-		for _, check := range rblChecks {
+	if checks, exists := results.Checks[ip]; exists {
+		for _, check := range checks {
 			if check.Listed {
-				rbls = append(rbls, check.Rbl)
+				lists = append(lists, check.Rbl)
 			}
 		}
 	}
 
-	return rbls
+	return lists
 }
