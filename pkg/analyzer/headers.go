@@ -320,6 +320,10 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 				valid = false
 				headerIssues = append(headerIssues, "Invalid Message-ID format (should be <id@domain>)")
 			}
+			if len(email.Header["Message-Id"]) > 1 {
+				valid = false
+				headerIssues = append(headerIssues, fmt.Sprintf("Multiple Message-ID headers found (%d); only one is allowed", len(email.Header["Message-Id"])))
+			}
 		case "Date":
 			// Validate date format
 			if _, err := h.parseEmailDate(value); err != nil {
