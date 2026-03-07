@@ -113,7 +113,7 @@
             } else if (spfResult === "temperror" || spfResult === "permerror") {
                 segments.push({
                     text: "encountered an error",
-                    highlight: { color: "warning", bold: true },
+                    highlight: { color: "danger", bold: true },
                     link: "#authentication-spf",
                 });
                 segments.push({ text: ", check your SPF record configuration" });
