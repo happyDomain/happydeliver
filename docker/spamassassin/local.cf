@@ -48,3 +48,14 @@ rbl_timeout 5
 # Don't use user-specific rules
 user_scores_dsn_timeout 3
 user_scores_sql_override 0
+
+# Disable Validity network rules
+dns_query_restriction deny sa-trusted.bondedsender.org
+dns_query_restriction deny sa-accredit.habeas.com
+dns_query_restriction deny bl.score.senderscore.com
+score RCVD_IN_VALIDITY_CERTIFIED_BLOCKED 0
+score RCVD_IN_VALIDITY_RPBL_BLOCKED 0
+score RCVD_IN_VALIDITY_SAFE_BLOCKED 0
+score RCVD_IN_VALIDITY_CERTIFIED 0
+score RCVD_IN_VALIDITY_RPBL 0
+score RCVD_IN_VALIDITY_SAFE 0
