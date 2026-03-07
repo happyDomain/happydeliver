@@ -350,6 +350,19 @@ components:
                 listed: false
               - rbl: "bl.spamcop.net"
                 listed: false
+        whitelists:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/BlacklistCheck'
+          description: Map of IP addresses to their DNS whitelist check results (informational only)
+          example:
+            "192.0.2.1":
+              - rbl: "list.dnswl.org"
+                listed: false
+              - rbl: "swl.spamhaus.org"
+                listed: false
         content_analysis:
           $ref: '#/components/schemas/ContentAnalysis'
         header_analysis:

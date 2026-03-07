@@ -59,8 +59,8 @@ func TestNewRBLChecker(t *testing.T) {
 			if checker.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", checker.Timeout, tt.expectedTimeout)
 			}
-			if len(checker.RBLs) != tt.expectedRBLs {
-				t.Errorf("RBLs count = %d, want %d", len(checker.RBLs), tt.expectedRBLs)
+			if len(checker.Lists) != tt.expectedRBLs {
+				t.Errorf("RBLs count = %d, want %d", len(checker.Lists), tt.expectedRBLs)
 			}
 			if checker.resolver == nil {
 				t.Error("Resolver should not be nil")
@@ -326,7 +326,7 @@ func TestGetBlacklistScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, _ := checker.CalculateRBLScore(tt.results)
+			score, _ := checker.CalculateScore(tt.results)
 			if score != tt.expectedScore {
 				t.Errorf("GetBlacklistScore() = %v, want %v", score, tt.expectedScore)
 			}
@@ -402,7 +402,7 @@ func TestGetRBLsForIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rbls := checker.GetRBLsForIP(results, tt.ip)
+			rbls := checker.GetListsForIP(results, tt.ip)
 
 			if len(rbls) != len(tt.expectedRBLs) {
 				t.Errorf("Got %d RBLs, want %d", len(rbls), len(tt.expectedRBLs))

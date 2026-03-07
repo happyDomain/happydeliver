@@ -35,7 +35,8 @@ type ReportGenerator struct {
 	spamAnalyzer    *SpamAssassinAnalyzer
 	rspamdAnalyzer  *RspamdAnalyzer
 	dnsAnalyzer     *DNSAnalyzer
-	rblChecker      *RBLChecker
+	rblChecker      *DNSListChecker
+	dnswlChecker    *DNSListChecker
 	contentAnalyzer *ContentAnalyzer
 	headerAnalyzer  *HeaderAnalyzer
 }
@@ -45,6 +46,7 @@ func NewReportGenerator(
 	dnsTimeout time.Duration,
 	httpTimeout time.Duration,
 	rbls []string,
+	dnswls []string,
 	checkAllIPs bool,
 ) *ReportGenerator {
 	return &ReportGenerator{
@@ -53,6 +55,7 @@ func NewReportGenerator(
 		rspamdAnalyzer:  NewRspamdAnalyzer(),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
+		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),
 		headerAnalyzer:  NewHeaderAnalyzer(),
 	}
@@ -65,7 +68,8 @@ type AnalysisResults struct {
 	Content        *ContentResults
 	DNS            *api.DNSResults
 	Headers        *api.HeaderAnalysis
-	RBL            *RBLResults
+	RBL            *DNSListResults
+	DNSWL          *DNSListResults
 	SpamAssassin   *api.SpamAssassinResult
 	Rspamd         *api.RspamdResult
 }
@@ -81,6 +85,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Authentication, results.Headers)
 	results.RBL = r.rblChecker.CheckEmail(email)
+	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(email)
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
@@ -135,7 +140,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	blacklistScore := 0
 	var blacklistGrade string
 	if results.RBL != nil {
-		blacklistScore, blacklistGrade = r.rblChecker.CalculateRBLScore(results.RBL)
+		blacklistScore, blacklistGrade = r.rblChecker.CalculateScore(results.RBL)
 	}
 
 	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
@@ -195,6 +200,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	// Add blacklist checks as a map of IP -> array of BlacklistCheck
 	if results.RBL != nil && len(results.RBL.Checks) > 0 {
 		report.Blacklists = &results.RBL.Checks
+	}
+
+	// Add whitelist checks as a map of IP -> array of BlacklistCheck (informational only)
+	if results.DNSWL != nil && len(results.DNSWL.Checks) > 0 {
+		report.Whitelists = &results.DNSWL.Checks
 	}
 
 	// Add SpamAssassin result with individual deliverability score
