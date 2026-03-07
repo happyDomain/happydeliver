@@ -48,6 +48,14 @@ var DefaultRBLs = []string{
 	"b.barracudacentral.org", // Barracuda
 	"cbl.abuseat.org",        // CBL (Composite Blocking List)
 	"dnsbl-1.uceprotect.net", // UCEPROTECT Level 1
+	"spam.spamrats.com",      // SpamRats SPAM
+	"dyna.spamrats.com",      // SpamRats dynamic IPs
+	"psbl.surriel.com",       // PSBL
+	"dnsbl.dronebl.org",      // DroneBL
+	"bl.mailspike.net",       // Mailspike BL
+	"z.mailspike.net",        // Mailspike Z
+	"bl.rbl-dns.com",         // RBL-DNS
+	"bl.nszones.com",         // NSZones
 }
 
 // NewRBLChecker creates a new RBL checker with configurable timeout and RBL list
