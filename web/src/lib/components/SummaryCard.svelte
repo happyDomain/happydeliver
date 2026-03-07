@@ -331,7 +331,7 @@
                     highlight: { color: "good", bold: true },
                     link: "#dns-bimi",
                 });
-                if (bimiResult.details && bimiResult.details.indexOf("declined") == 0) {
+                if (bimiResult?.details && bimiResult.details.indexOf("declined") == 0) {
                     segments.push({ text: " declined to participate" });
                 } else if (bimiResult?.result === "fail") {
                     segments.push({ text: " but " });
