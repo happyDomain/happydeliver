@@ -19,6 +19,7 @@
             case "domain_pass":
             case "orgdomain_pass":
                 return "text-success";
+            case "permerror":
             case "error":
             case "fail":
             case "missing":
@@ -51,6 +52,7 @@
             case "neutral":
             case "invalid":
             case "null":
+            case "permerror":
             case "error":
             case "null_smtp":
             case "null_header":
