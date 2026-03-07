@@ -130,7 +130,7 @@
                             <div class="d-flex justify-content-end me-lg-5 mt-3">
                                 <TinySurvey
                                     class="bg-primary-subtle rounded-4 p-3 text-center"
-                                    source={"rbl-" + result.ip}
+                                    source={"domain-" + result.domain}
                                 />
                             </div>
                         </div>

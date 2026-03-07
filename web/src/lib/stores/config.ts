@@ -25,6 +25,7 @@ interface AppConfig {
     report_retention?: number;
     survey_url?: string;
     custom_logo_url?: string;
+    rbls?: string[];
 }
 
 const defaultConfig: AppConfig = {

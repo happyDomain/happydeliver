@@ -28,7 +28,7 @@
             });
 
             if (response.response.ok) {
-                result = response.data;
+                result = response.data ?? null;
             } else if (response.error) {
                 error = response.error.message || "Failed to check IP address";
             }
