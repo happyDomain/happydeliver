@@ -109,6 +109,13 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int
 		maxGrade -= 1
 	}
 
+	// Check MIME-Version header (-5 points if present but not "1.0")
+	if check, exists := headers["mime-version"]; exists && check.Present {
+		if check.Valid != nil && !*check.Valid {
+			score -= 5
+		}
+	}
+
 	// Check Message-ID format (10 points)
 	if check, exists := headers["message-id"]; exists && check.Present {
 		// If Valid is set and true, award points
@@ -266,6 +273,10 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults
 		headers[strings.ToLower(headerName)] = *check
 	}
 
+	// Check MIME-Version header (recommended but absence is not penalized)
+	mimeVersionCheck := h.checkHeader(email, "MIME-Version", "recommended")
+	headers[strings.ToLower("MIME-Version")] = *mimeVersionCheck
+
 	// Check optional headers
 	optionalHeaders := []string{"List-Unsubscribe", "List-Unsubscribe-Post"}
 	for _, headerName := range optionalHeaders {
@@ -329,6 +340,11 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 			if _, err := h.parseEmailDate(value); err != nil {
 				valid = false
 				headerIssues = append(headerIssues, fmt.Sprintf("Invalid date format: %v", err))
+			}
+		case "MIME-Version":
+			if value != "1.0" {
+				valid = false
+				headerIssues = append(headerIssues, fmt.Sprintf("MIME-Version should be '1.0', got '%s'", value))
 			}
 		case "From", "To", "Cc", "Bcc", "Reply-To", "Sender", "Resent-From", "Resent-To", "Return-Path":
 			// Parse address header using net/mail and get normalized address
