@@ -9,6 +9,7 @@
         BlacklistCard,
         ContentAnalysisCard,
         DnsRecordsCard,
+        EmailPathCard,
         ErrorDisplay,
         HeaderAnalysisCard,
         PendingState,
@@ -294,6 +295,15 @@
                 </div>
             </div>
 
+            <!-- Received Chain -->
+            {#if report.header_analysis?.received_chain && report.header_analysis.received_chain.length > 0}
+                <div class="row mb-4" id="received-chain">
+                    <div class="col-12">
+                        <EmailPathCard receivedChain={report.header_analysis.received_chain} />
+                    </div>
+                </div>
+            {/if}
+
             <!-- DNS Records -->
             {#if report.dns_results}
                 <div class="row mb-4" id="dns">
@@ -329,7 +339,6 @@
                     {blacklists}
                     blacklistGrade={report.summary?.blacklist_grade}
                     blacklistScore={report.summary?.blacklist_score}
-                    receivedChain={report.header_analysis?.received_chain}
                 />
             {/snippet}
 
