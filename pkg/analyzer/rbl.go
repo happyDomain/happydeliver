@@ -27,6 +27,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/api"
@@ -155,18 +156,26 @@ func (r *DNSListChecker) CheckEmail(email *EmailMessage) *DNSListResults {
 	return results
 }
 
-// CheckIP checks a single IP address against all configured lists
+// CheckIP checks a single IP address against all configured lists in parallel
 func (r *DNSListChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
 	if !r.isPublicIP(ip) {
 		return nil, 0, fmt.Errorf("invalid or non-public IP address: %s", ip)
 	}
 
-	var checks []api.BlacklistCheck
-	listedCount := 0
+	checks := make([]api.BlacklistCheck, len(r.Lists))
+	var wg sync.WaitGroup
 
-	for _, list := range r.Lists {
-		check := r.checkIP(ip, list)
-		checks = append(checks, check)
+	for i, list := range r.Lists {
+		wg.Add(1)
+		go func(i int, list string) {
+			defer wg.Done()
+			checks[i] = r.checkIP(ip, list)
+		}(i, list)
+	}
+	wg.Wait()
+
+	listedCount := 0
+	for _, check := range checks {
 		if check.Listed {
 			listedCount++
 		}
