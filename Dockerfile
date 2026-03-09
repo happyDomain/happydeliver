@@ -170,7 +170,12 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 25 8080
 
 # Default configuration
-ENV HAPPYDELIVER_DATABASE_TYPE=sqlite HAPPYDELIVER_DATABASE_DSN=/var/lib/happydeliver/happydeliver.db HAPPYDELIVER_DOMAIN=happydeliver.local HAPPYDELIVER_ADDRESS_PREFIX=test- HAPPYDELIVER_DNS_TIMEOUT=5s HAPPYDELIVER_HTTP_TIMEOUT=10s HAPPYDELIVER_RBL=zen.spamhaus.org,bl.spamcop.net,b.barracudacentral.org,dnsbl.sorbs.net,dnsbl-1.uceprotect.net,bl.mailspike.net
+ENV HAPPYDELIVER_DATABASE_TYPE=sqlite \
+    HAPPYDELIVER_DATABASE_DSN=/var/lib/happydeliver/happydeliver.db \
+    HAPPYDELIVER_DOMAIN=happydeliver.local \
+    HAPPYDELIVER_ADDRESS_PREFIX=test- \
+    HAPPYDELIVER_DNS_TIMEOUT=5s \
+    HAPPYDELIVER_HTTP_TIMEOUT=10s
 
 # Volume for persistent data
 VOLUME ["/var/lib/happydeliver", "/var/log/happydeliver"]
