@@ -982,6 +982,9 @@ components:
               name: "BAYES_HAM"
               score: -1.9
               params: "0.02"
+        report:
+          type: string
+          description: Full rspamd report (raw X-Spamd-Result header)
 
     RspamdSymbol:
       type: object

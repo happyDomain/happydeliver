@@ -58,6 +58,8 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 	// Parse X-Spamd-Result header (primary source for score, threshold, and symbols)
 	// Format: "default: False [-3.91 / 15.00];\n\tSYMBOL(score)[params]; ..."
 	if spamdResult, ok := headers["X-Spamd-Result"]; ok {
+		report := strings.ReplaceAll(spamdResult, "; ", ";\n")
+		result.Report = &report
 		a.parseSpamdResult(spamdResult, result)
 	}
 

@@ -17,8 +17,7 @@
 
     const effectiveAction = $derived.by(() => {
         const rejectThreshold = rspamd.threshold > 0 ? rspamd.threshold : 15;
-        if (rspamd.score >= rejectThreshold)
-            return { label: "Reject", cls: "bg-danger" };
+        if (rspamd.score >= rejectThreshold) return { label: "Reject", cls: "bg-danger" };
         if (rspamd.score >= RSPAMD_ADD_HEADER_THRESHOLD)
             return { label: "Add header", cls: "bg-warning text-dark" };
         if (rspamd.score >= RSPAMD_GREYLIST_THRESHOLD)
@@ -31,7 +30,7 @@
     <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
-                <i class="bi bi-shield-exclamation me-2"></i>
+                <i class="bi bi-bug me-2"></i>
                 rspamd Analysis
             </span>
             <span>
@@ -108,10 +107,32 @@
                 </div>
             </div>
         {/if}
+
+        {#if rspamd.report}
+            <details class="mt-3">
+                <summary class="cursor-pointer fw-bold">Raw Report</summary>
+                <pre
+                    class="mt-2 small {$theme === 'light'
+                        ? 'bg-light'
+                        : 'bg-secondary'} p-3 rounded">{rspamd.report}</pre>
+            </details>
+        {/if}
     </div>
 </div>
 
 <style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    details summary {
+        user-select: none;
+    }
+
+    details summary:hover {
+        color: var(--bs-primary);
+    }
+
     /* Darker table colors in dark mode */
     :global([data-bs-theme="dark"]) .table-warning {
         --bs-table-bg: rgba(255, 193, 7, 0.2);
