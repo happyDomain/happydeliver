@@ -1346,7 +1346,7 @@ components:
       type: object
       required:
         - ip
-        - checks
+        - blacklists
         - listed_count
         - score
         - grade
@@ -1355,7 +1355,7 @@ components:
           type: string
           description: The IP address that was checked
           example: "192.0.2.1"
-        checks:
+        blacklists:
           type: array
           items:
             $ref: '#/components/schemas/BlacklistCheck'
@@ -1375,3 +1375,8 @@ components:
           enum: [A+, A, B, C, D, E, F]
           description: Letter grade representation of the score
           example: "A+"
+        whitelists:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlacklistCheck'
+          description: List of DNS whitelist check results (informational only)

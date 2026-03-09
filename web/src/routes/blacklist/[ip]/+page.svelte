@@ -3,7 +3,7 @@
     import { onMount } from "svelte";
     import { checkBlacklist } from "$lib/api";
     import type { BlacklistCheckResponse } from "$lib/api/types.gen";
-    import { BlacklistCard, GradeDisplay, TinySurvey } from "$lib/components";
+    import { BlacklistCard, GradeDisplay, TinySurvey, WhitelistCard } from "$lib/components";
     import { theme } from "$lib/stores/theme";
 
     let ip = $derived($page.params.ip);
@@ -122,8 +122,8 @@
                                             >
                                             <p class="mb-0 mt-1 small">
                                                 This IP address is listed on {result.listed_count} of
-                                                {result.checks.length} checked blacklist{result
-                                                    .checks.length > 1
+                                                {result.blacklists.length} checked blacklist{result
+                                                    .blacklists.length > 1
                                                     ? "s"
                                                     : ""}.
                                             </p>
@@ -150,12 +150,23 @@
                         </div>
                     </div>
 
-                    <!-- Blacklist Results Card -->
-                    <BlacklistCard
-                        blacklists={{ [result.ip]: result.checks }}
-                        blacklistScore={result.score}
-                        blacklistGrade={result.grade}
-                    />
+                    <div class="row">
+                        <!-- Blacklist Results Card -->
+                        <div class="col col-lg-6">
+                            <BlacklistCard
+                                blacklists={{ [result.ip]: result.blacklists }}
+                                blacklistScore={result.score}
+                                blacklistGrade={result.grade}
+                            />
+                        </div>
+
+                        <!-- Whitelist Results Card -->
+                        {#if result.whitelists && result.whitelists.length > 0}
+                            <div class="col col-lg-6">
+                                <WhitelistCard whitelists={{ [result.ip]: result.whitelists }} />
+                            </div>
+                        {/if}
+                    </div>
 
                     <!-- Information Card -->
                     <div class="card shadow-sm mt-4">

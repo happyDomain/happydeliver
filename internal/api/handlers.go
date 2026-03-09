@@ -41,7 +41,7 @@ import (
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string)
-	CheckBlacklistIP(ip string) (checks []BlacklistCheck, listedCount int, score int, grade string, err error)
+	CheckBlacklistIP(ip string) (checks []BlacklistCheck, whitelists []BlacklistCheck, listedCount int, score int, grade string, err error)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -359,7 +359,7 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 	}
 
 	// Perform blacklist check using analyzer
-	checks, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
+	checks, whitelists, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, Error{
 			Error:   "invalid_ip",
@@ -372,7 +372,8 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 	// Build response
 	response := BlacklistCheckResponse{
 		Ip:          request.Ip,
-		Checks:      checks,
+		Blacklists:  checks,
+		Whitelists:  &whitelists,
 		ListedCount: listedCount,
 		Score:       score,
 		Grade:       BlacklistCheckResponseGrade(grade),
