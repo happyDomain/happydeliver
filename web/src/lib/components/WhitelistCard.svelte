@@ -11,7 +11,7 @@
 
 <div class="card shadow-sm" id="dnswl-details">
     <div class="card-header" class:bg-white={$theme === "light"} class:bg-dark={$theme !== "light"}>
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 d-flex flex-wrap justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-check me-2"></i>
                 Whitelist Checks
@@ -25,7 +25,7 @@
             no impact on the overall score.
         </p>
 
-        <div class="row row-cols-1 row-cols-lg-2">
+        <div class="row row-cols-1 row-cols-lg-2 overflow-auto">
             {#each Object.entries(whitelists) as [ip, checks]}
                 <div class="col mb-3">
                     <h5 class="text-muted">
