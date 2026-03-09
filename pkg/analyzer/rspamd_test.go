@@ -104,6 +104,26 @@ func TestParseSpamdResult(t *testing.T) {
 			expectedIsSpam:    true,
 			expectedSymbols:   map[string]float32{},
 		},
+		{
+			name: "Zero threshold with symbols containing nested brackets in params",
+			header: "default: False [0.90 / 0.00];\n" +
+				"\tARC_REJECT(1.00)[cannot verify 1 of 1 signatures: {[1] = sig:mail-tester.local:signature has incorrect length: 12}];\n" +
+				"\tMIME_GOOD(-0.10)[multipart/alternative,text/plain];\n" +
+				"\tMIME_TRACE(0.00)[0:+,1:+,2:~]",
+			expectedScore:     0.90,
+			expectedThreshold: rspamdDefaultAddHeaderThreshold,
+			expectedIsSpam:    false,
+			expectedSymbols: map[string]float32{
+				"ARC_REJECT": 1.00,
+				"MIME_GOOD":  -0.10,
+				"MIME_TRACE": 0.00,
+			},
+			expectedSymParams: map[string]string{
+				"ARC_REJECT": "cannot verify 1 of 1 signatures: {[1] = sig:mail-tester.local:signature has incorrect length: 12}",
+				"MIME_GOOD":  "multipart/alternative,text/plain",
+				"MIME_TRACE": "0:+,1:+,2:~",
+			},
+		},
 	}
 
 	analyzer := NewRspamdAnalyzer()

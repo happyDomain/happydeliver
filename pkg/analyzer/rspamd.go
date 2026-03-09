@@ -111,8 +111,9 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *api.RspamdResul
 	}
 
 	// Parse symbols: SYMBOL(score)[params]
-	// Each symbol entry is separated by ";"
-	symbolRe := regexp.MustCompile(`(\w+)\((-?\d+\.?\d*)\)(?:\[([^\]]*)\])?`)
+	// Each symbol entry is separated by ";", so within each part we use a
+	// greedy match to capture params that may contain nested brackets.
+	symbolRe := regexp.MustCompile(`(\w+)\((-?\d+\.?\d*)\)(?:\[(.*)\])?`)
 	for _, part := range strings.Split(header, ";") {
 		part = strings.TrimSpace(part)
 		matches := symbolRe.FindStringSubmatch(part)
