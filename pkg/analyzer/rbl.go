@@ -53,8 +53,6 @@ var DefaultRBLs = []string{
 	"dnsbl-1.uceprotect.net", // UCEPROTECT Level 1
 	"dnsbl-2.uceprotect.net", // UCEPROTECT Level 2 (informational)
 	"dnsbl-3.uceprotect.net", // UCEPROTECT Level 3 (informational)
-	"spam.spamrats.com",      // SpamRats SPAM
-	"dyna.spamrats.com",      // SpamRats dynamic IPs
 	"psbl.surriel.com",       // PSBL
 	"dnsbl.dronebl.org",      // DroneBL
 	"bl.mailspike.net",       // Mailspike BL
