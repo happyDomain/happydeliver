@@ -54,7 +54,7 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 }
 
 // AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.AuthenticationResults, headersResults *api.HeaderAnalysis) *api.DNSResults {
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *api.HeaderAnalysis) *api.DNSResults {
 	// Extract domain from From address
 	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
 		return &api.DNSResults{
@@ -104,19 +104,14 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, authResults *api.Authentic
 	// SPF validates the MAIL FROM command, which corresponds to Return-Path
 	results.SpfRecords = d.checkSPFRecords(spfDomain)
 
-	// Check DKIM records (from authentication results)
-	// DKIM can be for any domain, but typically the From domain
-	if authResults != nil && authResults.Dkim != nil {
-		for _, dkim := range *authResults.Dkim {
-			if dkim.Domain != nil && dkim.Selector != nil {
-				dkimRecord := d.checkDKIMRecord(*dkim.Domain, *dkim.Selector)
-				if dkimRecord != nil {
-					if results.DkimRecords == nil {
-						results.DkimRecords = new([]api.DKIMRecord)
-					}
-					*results.DkimRecords = append(*results.DkimRecords, *dkimRecord)
-				}
+	// Check DKIM records by parsing DKIM-Signature headers directly
+	for _, sig := range parseDKIMSignatures(email.Header["DKIM-Signature"]) {
+		dkimRecord := d.checkDKIMRecord(sig.Domain, sig.Selector)
+		if dkimRecord != nil {
+			if results.DkimRecords == nil {
+				results.DkimRecords = new([]api.DKIMRecord)
 			}
+			*results.DkimRecords = append(*results.DkimRecords, *dkimRecord)
 		}
 	}
 

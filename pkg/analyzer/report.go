@@ -83,7 +83,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
-	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Authentication, results.Headers)
+	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)

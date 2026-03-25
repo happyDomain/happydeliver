@@ -29,6 +29,38 @@ import (
 	"git.happydns.org/happyDeliver/internal/api"
 )
 
+// DKIMHeader holds the domain and selector extracted from a DKIM-Signature header.
+type DKIMHeader struct {
+	Domain   string
+	Selector string
+}
+
+// parseDKIMSignatures extracts domain and selector from DKIM-Signature header values.
+func parseDKIMSignatures(signatures []string) []DKIMHeader {
+	var results []DKIMHeader
+	for _, sig := range signatures {
+		var domain, selector string
+		for _, part := range strings.Split(sig, ";") {
+			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(kv) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(kv[0])
+			val := strings.TrimSpace(kv[1])
+			switch key {
+			case "d":
+				domain = val
+			case "s":
+				selector = val
+			}
+		}
+		if domain != "" && selector != "" {
+			results = append(results, DKIMHeader{Domain: domain, Selector: selector})
+		}
+	}
+	return results
+}
+
 // checkapi.DKIMRecord looks up and validates DKIM record for a domain and selector
 func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *api.DKIMRecord {
 	// DKIM records are at: selector._domainkey.domain
