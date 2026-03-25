@@ -13,6 +13,12 @@
 
     let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
 
+    let allRequiredMissing = $derived(
+        !authentication.spf &&
+            (!authentication.dkim || authentication.dkim.length === 0) &&
+            !authentication.dmarc,
+    );
+
     function getAuthResultClass(result: string, noneIsFail: boolean): string {
         switch (result) {
             case "pass":
@@ -97,6 +103,28 @@
             </span>
         </h4>
     </div>
+    {#if allRequiredMissing}
+        <div class="card-body border-bottom">
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>No authentication results found.</strong>
+                <p class="mb-0 mt-1">
+                    This usually means either:
+                </p>
+                <ul class="mb-0 mt-1">
+                    <li>
+                        The receiving mail server is not configured to verify email authentication
+                        (no <code>Authentication-Results</code> header was found in the message).
+                    </li>
+                    <li>
+                        The <code>Authentication-Results</code> header exists but the receiver
+                        hostname does not match the configured
+                        <code>--receiver-hostname</code> value.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    {/if}
     <div class="list-group list-group-flush">
         <!-- IPREV -->
         {#if authentication.iprev}
