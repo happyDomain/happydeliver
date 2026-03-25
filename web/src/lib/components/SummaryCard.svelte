@@ -25,16 +25,32 @@
 
         // Email sender information
         const mailFrom = report.header_analysis?.headers?.from?.value || "an unknown sender";
-        const hasDkim = report.authentication?.dkim && report.authentication?.dkim.length > 0;
-        const dkimPassed = hasDkim && report.authentication?.dkim?.some((d) => d.result === "pass");
+        const hasDkim =
+            report.dns_results?.dkim_records && report.dns_results?.dkim_records?.length > 0;
+        const dkimPassed =
+            report.authentication?.dkim &&
+            report.authentication?.dkim.length > 0 &&
+            report.authentication?.dkim?.some((d) => d.result === "pass");
 
         segments.push({ text: "Received a " });
         segments.push({
-            text: dkimPassed ? "DKIM-signed" : "non-DKIM-signed",
-            highlight: { color: dkimPassed ? "good" : "danger", bold: true },
-            link: "#authentication-dkim",
+            text: hasDkim ? "DKIM-signed" : "non-DKIM-signed",
+            highlight: {
+                color: hasDkim ? (dkimPassed ? "good" : "warning") : "danger",
+                bold: true,
+            },
+            link: hasDkim && dkimPassed ? "#authentication-dkim" : "#dns-details",
         });
-        segments.push({ text: " email from " });
+        segments.push({ text: " email" });
+        if (hasDkim && !dkimPassed) {
+            segments.push({ text: " with " });
+            segments.push({
+                text: "an invalid signature",
+                highlight: { color: "danger", bold: true },
+                link: "#authentication-dkim",
+            });
+        }
+        segments.push({ text: " from " });
         segments.push({
             text: mailFrom,
             highlight: { emphasis: true },
