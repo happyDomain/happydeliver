@@ -51,6 +51,13 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 		return nil
 	}
 
+	// Require at least X-Spamd-Result or X-Rspamd-Score to produce a meaningful report
+	_, hasSpamdResult := headers["X-Spamd-Result"]
+	_, hasRspamdScore := headers["X-Rspamd-Score"]
+	if !hasSpamdResult && !hasRspamdScore {
+		return nil
+	}
+
 	result := &api.RspamdResult{
 		Symbols: make(map[string]api.RspamdSymbol),
 	}

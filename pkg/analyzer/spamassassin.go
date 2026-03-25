@@ -45,6 +45,14 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.Spa
 		return nil
 	}
 
+	// Require at least X-Spam-Status, X-Spam-Score, or X-Spam-Flag to produce a meaningful report
+	_, hasStatus := headers["X-Spam-Status"]
+	_, hasScore := headers["X-Spam-Score"]
+	_, hasFlag := headers["X-Spam-Flag"]
+	if !hasStatus && !hasScore && !hasFlag {
+		return nil
+	}
+
 	result := &api.SpamAssassinResult{
 		TestDetails: make(map[string]api.SpamTestDetail),
 	}
