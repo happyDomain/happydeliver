@@ -41,6 +41,7 @@ type EmailAnalyzer struct {
 // NewEmailAnalyzer creates a new email analyzer with the given configuration
 func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 	generator := NewReportGenerator(
+		cfg.Email.ReceiverHostname,
 		cfg.Analysis.DNSTimeout,
 		cfg.Analysis.HTTPTimeout,
 		cfg.Analysis.RBLs,

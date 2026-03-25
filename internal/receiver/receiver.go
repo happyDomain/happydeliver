@@ -98,6 +98,17 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 
 	log.Printf("Analysis complete. Grade: %s. Score: %d/100", result.Report.Grade, result.Report.Score)
 
+	// Warn if the last Received hop doesn't match the expected receiver hostname
+	if r.config.Email.ReceiverHostname != "" &&
+		result.Report.HeaderAnalysis != nil &&
+		result.Report.HeaderAnalysis.ReceivedChain != nil &&
+		len(*result.Report.HeaderAnalysis.ReceivedChain) > 0 {
+		lastHop := (*result.Report.HeaderAnalysis.ReceivedChain)[0]
+		if lastHop.By != nil && *lastHop.By != r.config.Email.ReceiverHostname {
+			log.Printf("WARNING: Last Received hop 'by' field (%s) does not match expected receiver hostname (%s): check your RECEIVER_HOSTNAME config as authentication results will be false", *lastHop.By, r.config.Email.ReceiverHostname)
+		}
+	}
+
 	// Marshal report to JSON
 	reportJSON, err := json.Marshal(result.Report)
 	if err != nil {

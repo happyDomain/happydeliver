@@ -43,6 +43,7 @@ type ReportGenerator struct {
 
 // NewReportGenerator creates a new report generator
 func NewReportGenerator(
+	receiverHostname string,
 	dnsTimeout time.Duration,
 	httpTimeout time.Duration,
 	rbls []string,
@@ -50,7 +51,7 @@ func NewReportGenerator(
 	checkAllIPs bool,
 ) *ReportGenerator {
 	return &ReportGenerator{
-		authAnalyzer:    NewAuthenticationAnalyzer(),
+		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
 		rspamdAnalyzer:  NewRspamdAnalyzer(),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),

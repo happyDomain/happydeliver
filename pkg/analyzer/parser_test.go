@@ -106,9 +106,6 @@ Content-Type: text/html; charset=utf-8
 }
 
 func TestGetAuthenticationResults(t *testing.T) {
-	// Force hostname
-	hostname = "example.com"
-
 	rawEmail := `From: sender@example.com
 To: recipient@example.com
 Subject: Test Email
@@ -123,7 +120,7 @@ Body content.
 		t.Fatalf("Failed to parse email: %v", err)
 	}
 
-	authResults := email.GetAuthenticationResults()
+	authResults := email.GetAuthenticationResults("example.com")
 	if len(authResults) != 2 {
 		t.Errorf("Expected 2 Authentication-Results headers, got: %d", len(authResults))
 	}

@@ -28,15 +28,8 @@ import (
 	"mime/multipart"
 	"net/mail"
 	"net/textproto"
-	"os"
 	"strings"
 )
-
-var hostname = ""
-
-func init() {
-	hostname, _ = os.Hostname()
-}
 
 // EmailMessage represents a parsed email message
 type EmailMessage struct {
@@ -218,18 +211,18 @@ func buildRawHeaders(header mail.Header) string {
 }
 
 // GetAuthenticationResults extracts Authentication-Results headers
-// If hostname is provided, only returns headers that begin with that hostname
-func (e *EmailMessage) GetAuthenticationResults() []string {
+// If receiverHostname is provided, only returns headers that begin with that hostname
+func (e *EmailMessage) GetAuthenticationResults(receiverHostname string) []string {
 	allResults := e.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")]
 
 	// If no hostname specified, return all results
-	if hostname == "" {
+	if receiverHostname == "" {
 		return allResults
 	}
 
 	// Filter results that begin with the specified hostname
 	var filtered []string
-	prefix := hostname + ";"
+	prefix := receiverHostname + ";"
 	for _, result := range allResults {
 		// Trim whitespace and check if it starts with hostname;
 		trimmed := strings.TrimSpace(result)

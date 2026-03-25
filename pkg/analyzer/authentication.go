@@ -28,11 +28,13 @@ import (
 )
 
 // AuthenticationAnalyzer analyzes email authentication results
-type AuthenticationAnalyzer struct{}
+type AuthenticationAnalyzer struct {
+	receiverHostname string
+}
 
 // NewAuthenticationAnalyzer creates a new authentication analyzer
-func NewAuthenticationAnalyzer() *AuthenticationAnalyzer {
-	return &AuthenticationAnalyzer{}
+func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer {
+	return &AuthenticationAnalyzer{receiverHostname: receiverHostname}
 }
 
 // AnalyzeAuthentication extracts and analyzes authentication results from email headers
@@ -40,7 +42,7 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *api
 	results := &api.AuthenticationResults{}
 
 	// Parse Authentication-Results headers
-	authHeaders := email.GetAuthenticationResults()
+	authHeaders := email.GetAuthenticationResults(a.receiverHostname)
 	for _, header := range authHeaders {
 		a.parseAuthenticationResultsHeader(header, results)
 	}

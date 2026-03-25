@@ -34,6 +34,11 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+func getHostname() string {
+	h, _ := os.Hostname()
+	return h
+}
+
 // Config represents the application configuration
 type Config struct {
 	DevProxy        string
@@ -58,6 +63,7 @@ type EmailConfig struct {
 	Domain            string
 	TestAddressPrefix string
 	LMTPAddr          string
+	ReceiverHostname  string
 }
 
 // AnalysisConfig contains timeout and behavior settings for email analysis
@@ -84,6 +90,7 @@ func DefaultConfig() *Config {
 			Domain:            "happydeliver.local",
 			TestAddressPrefix: "test-",
 			LMTPAddr:          "127.0.0.1:2525",
+			ReceiverHostname:  getHostname(),
 		},
 		Analysis: AnalysisConfig{
 			DNSTimeout:  5 * time.Second,

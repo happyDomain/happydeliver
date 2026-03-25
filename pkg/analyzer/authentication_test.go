@@ -100,7 +100,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 		},
 	}
 
-	scorer := NewAuthenticationAnalyzer()
+	scorer := NewAuthenticationAnalyzer("")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 		},
 	}
 
-	analyzer := NewAuthenticationAnalyzer()
+	analyzer := NewAuthenticationAnalyzer("")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -353,7 +353,7 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 
 func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 	// This test verifies that only the first occurrence of each auth method is parsed
-	analyzer := NewAuthenticationAnalyzer()
+	analyzer := NewAuthenticationAnalyzer("")
 
 	t.Run("Multiple SPF results - only first is parsed", func(t *testing.T) {
 		header := "mail.example.com; spf=pass smtp.mailfrom=first@example.com; spf=fail smtp.mailfrom=second@example.com"
