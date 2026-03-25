@@ -166,7 +166,24 @@ The server will start on `http://localhost:8080` by default.
 It is expected your setup annotate the email with eg. opendkim, spamassassin, rspamd, ...
 happyDeliver will not perform thoses checks, it relies instead on standard software to have real world annotations.
 
-Choose one of the following way to integrate happyDeliver in your existing setup:
+#### Receiver Hostname
+
+happyDeliver filters `Authentication-Results` headers by hostname to only trust headers added by your MTA (and not headers that may have been injected by the sender). By default, it uses the system hostname (`os.Hostname()`).
+
+If your MTA's `authserv-id` (the hostname at the beginning of `Authentication-Results` headers) differs from the machine running happyDeliver, you must set it explicitly:
+
+```bash
+./happyDeliver server -receiver-hostname mail.example.com
+```
+
+Or via environment variable:
+```bash
+HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com ./happyDeliver server
+```
+
+**How to find the correct value:** look at the `Authentication-Results` headers in a received email. They start with the authserv-id, e.g. `Authentication-Results: mail.example.com; spf=pass ...` — in this case, use `mail.example.com`.
+
+If the value is misconfigured, happyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
 
 #### Postfix LMTP Transport
 

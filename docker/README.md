@@ -110,12 +110,36 @@ Default configuration for the Docker environment:
 The container accepts these environment variables:
 
 - `HAPPYDELIVER_DOMAIN`: Email domain for test addresses (default: happydeliver.local)
+- `HAPPYDELIVER_RECEIVER_HOSTNAME`: Hostname used to filter `Authentication-Results` headers (see below)
+- `POSTFIX_CERT_FILE` / `POSTFIX_KEY_FILE`: TLS certificate and key paths for Postfix SMTP
 
-Note that the hostname of the container is used to filter the authentication tests results.
+### Receiver Hostname
 
-Example:
+happyDeliver filters `Authentication-Results` headers by hostname to only trust results from the expected MTA. By default, it uses the system hostname (i.e., the container's `--hostname`).
+
+In the all-in-one Docker container, the container hostname is also used as the `authserv-id` in the embedded Postfix and authentication_milter, so everything matches automatically.
+
+**When bypassing the embedded Postfix** (e.g., routing emails from your own MTA via LMTP), your MTA's `authserv-id` will likely differ from the container hostname. In that case, set `HAPPYDELIVER_RECEIVER_HOSTNAME` to your MTA's hostname:
+
+```bash
+docker run -d \
+  -e HAPPYDELIVER_DOMAIN=example.com \
+  -e HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com \
+  ...
+```
+
+To find the correct value, look at the `Authentication-Results` headers in a received email — they start with the authserv-id, e.g. `Authentication-Results: mail.example.com; spf=pass ...`.
+
+If the value is misconfigured, happyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
+
+Example (all-in-one, no override needed):
 ```bash
 docker run -e HAPPYDELIVER_DOMAIN=example.com --hostname mail.example.com ...
+```
+
+Example (external MTA integration):
+```bash
+docker run -e HAPPYDELIVER_DOMAIN=example.com -e HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com ...
 ```
 
 ## Volumes
