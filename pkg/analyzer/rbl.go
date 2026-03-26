@@ -305,11 +305,11 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults) (int, string) {
 		return 100, ""
 	}
 
-	scoringListCount := len(r.Lists) - len(r.informationalSet)
-	if scoringListCount <= 0 {
+	if results.ListedCount <= 0 {
 		return 100, "A+"
 	}
 
+	scoringListCount := len(r.Lists) - len(r.informationalSet)
 	percentage := 100 - results.RelevantListedCount*100/scoringListCount
 	return percentage, ScoreToGrade(percentage)
 }
