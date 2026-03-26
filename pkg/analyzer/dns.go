@@ -105,7 +105,7 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *api.Header
 	results.SpfRecords = d.checkSPFRecords(spfDomain)
 
 	// Check DKIM records by parsing DKIM-Signature headers directly
-	for _, sig := range parseDKIMSignatures(email.Header["DKIM-Signature"]) {
+	for _, sig := range parseDKIMSignatures(email.Header["Dkim-Signature"]) {
 		dkimRecord := d.checkDKIMRecord(sig.Domain, sig.Selector)
 		if dkimRecord != nil {
 			if results.DkimRecords == nil {
