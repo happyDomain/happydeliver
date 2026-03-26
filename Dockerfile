@@ -175,7 +175,8 @@ ENV HAPPYDELIVER_DATABASE_TYPE=sqlite \
     HAPPYDELIVER_DOMAIN=happydeliver.local \
     HAPPYDELIVER_ADDRESS_PREFIX=test- \
     HAPPYDELIVER_DNS_TIMEOUT=5s \
-    HAPPYDELIVER_HTTP_TIMEOUT=10s
+    HAPPYDELIVER_HTTP_TIMEOUT=10s \
+    HAPPYDELIVER_RSPAMD_API_URL=http://127.0.0.1:11334
 
 # Volume for persistent data
 VOLUME ["/var/lib/happydeliver", "/var/log/happydeliver"]

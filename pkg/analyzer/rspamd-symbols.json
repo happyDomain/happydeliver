@@ -1,0 +1,6646 @@
+[
+  {
+    "group": "arc",
+    "rules": [
+      {
+        "symbol": "ARC_ALLOW",
+        "weight": -1.0,
+        "description": "ARC checks success",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_REJECT",
+        "weight": 1.0,
+        "description": "ARC checks failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_NA",
+        "weight": 0.0,
+        "description": "ARC signature absent",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_INVALID",
+        "weight": 0.500000,
+        "description": "ARC structure invalid",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_DNSFAIL",
+        "weight": 0.0,
+        "description": "ARC DNS error",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "rbl",
+    "rules": [
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_NA_BOT",
+        "weight": 1.500000,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_0",
+        "weight": 4.0,
+        "description": "SenderScore Reputation: Very Bad (0-9).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_2",
+        "weight": 3.0,
+        "description": "SenderScore Reputation: Bad (20-29).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_RED",
+        "weight": 0.500000,
+        "description": "A domain in the message is listed in URIBL.com red",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_NA",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+noauth"
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_CSS",
+        "weight": 1.0,
+        "description": "Received address is listed in Spamhaus CSS",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries (DWL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from SenderScore RPBL"
+      },
+      {
+        "symbol": "RBL_VIRUSFREE_BOTNET",
+        "weight": 2.0,
+        "description": "From address is listed in virusfree.cz BL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_HI",
+        "weight": -3.500000,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, high trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_VIRUSFREE_UNKNOWN",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_BAD",
+        "weight": 1.0,
+        "description": "From address is listed in Mailspike RBL - bad reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_SBL",
+        "weight": 4.0,
+        "description": "From address is listed in Spamhaus SBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_BLOCKLISTDE",
+        "weight": 3.0,
+        "description": "Received address is listed in Blocklist (https://www.blocklist.de/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CRACKED_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as cracked",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_CRACKED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_4",
+        "weight": 2.0,
+        "description": "SenderScore Reputation: Bad (40-49).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PH_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_PRST_NA_BOT",
+        "weight": 3.500000,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+pristine+noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_8",
+        "weight": 0.0,
+        "description": "SenderScore Reputation: Neutral (80-89).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_MED",
+        "weight": -0.200000,
+        "description": "Sender listed at https://www.dnswl.org, medium trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_NONE",
+        "weight": 0.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, no trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MSBL_EBL",
+        "weight": 7.500000,
+        "description": "MSBL emailbl (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_XBL",
+        "weight": 4.0,
+        "description": "From address is listed in Spamhaus XBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_NA",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_BOT",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+botnet"
+      },
+      {
+        "symbol": "SURBL_HASHBL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_NA_BOT",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+noauth+botnet"
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_SBL",
+        "weight": 3.0,
+        "description": "Received address is listed in Spamhaus SBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_POSSIBLE",
+        "weight": 0.0,
+        "description": "From address is listed in Mailspike RWL - possibly legit",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_HI",
+        "weight": -0.500000,
+        "description": "Sender listed at https://www.dnswl.org, high trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_PBL",
+        "weight": 2.0,
+        "description": "From address is listed in Spamhaus PBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_LOW",
+        "weight": -1.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, low trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_7",
+        "weight": 0.500000,
+        "description": "SenderScore Reputation: Bad (70-79).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey Fresh15 URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_MALWARE",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_MALWARE",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_BLOCKLISTDE",
+        "weight": 4.0,
+        "description": "From address is listed in Blocklist (https://www.blocklist.de/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_SPAM",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ABUSE_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as abused",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_MALWARE",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_PHISH",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_DROP",
+        "weight": 6.0,
+        "description": "Received address is listed in Spamhaus DROP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_NA",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+noauth"
+      },
+      {
+        "symbol": "DBL_ABUSE_REDIR",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as spammed redirector domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CT_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as a clicktracker",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_EMAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_SUS_ATT_NA",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+suspect_attachments+noauth"
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_XBL",
+        "weight": 1.0,
+        "description": "Received address is listed in Spamhaus XBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_GOOD",
+        "weight": -0.100000,
+        "description": "From address is listed in Mailspike RWL - good reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_PRST",
+        "weight": 4.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+pristine"
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_VERYBAD",
+        "weight": 1.500000,
+        "description": "From address is listed in Mailspike RBL - very bad reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM_IPV6",
+        "weight": 1.0,
+        "description": "From address is listed in Spameatingmonkey RBL (IPv6)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MW_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_NA",
+        "weight": 0.0,
+        "description": "From address is listed in SenderScore RPBL - noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_9",
+        "weight": -1.0,
+        "description": "SenderScore Reputation: Good (90-100).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLOCKED",
+        "weight": 0.0,
+        "description": "URIBL.com: query refused, likely due to policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_GREY",
+        "weight": 2.500000,
+        "description": "A domain in the message is listed in URIBL.com grey",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_BLOCKED",
+        "weight": 0.0,
+        "description": "SURBL: query blocked by policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_LOW",
+        "weight": -0.100000,
+        "description": "Sender listed at https://www.dnswl.org, low trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_PHISH",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit phish",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_NONE",
+        "weight": 0.0,
+        "description": "Sender listed at https://www.dnswl.org, no trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_PRST_NA",
+        "weight": 4.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+pristine+noauth"
+      },
+      {
+        "symbol": "MSBL_EBL_GREY",
+        "weight": 0.500000,
+        "description": "MSBL emailbl grey list (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_1",
+        "weight": 3.500000,
+        "description": "SenderScore Reputation: Bad (10-19).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_BOT",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - botnet"
+      },
+      {
+        "symbol": "SEM_URIBL_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_NEUTRAL",
+        "weight": 0.0,
+        "description": "Neutral result from Mailspike",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_ABUSE",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_6",
+        "weight": 1.0,
+        "description": "SenderScore Reputation: Bad (60-69).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL",
+        "weight": 3.500000,
+        "description": "A domain in the message is listed in Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_PBL",
+        "weight": 0.0,
+        "description": "Received address is listed in Spamhaus PBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DM_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as belonging to a disposable email service",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_5",
+        "weight": 1.500000,
+        "description": "SenderScore Reputation: Bad (50-59).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_WORST",
+        "weight": 2.0,
+        "description": "From address is listed in Mailspike RBL - worst possible reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_BOTNET",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_PRST_NA",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+pristine+noauth"
+      },
+      {
+        "symbol": "DWL_DNSWL",
+        "weight": 0.0,
+        "description": "Unrecognised result from https://www.dnswl.org (DWL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_CSS",
+        "weight": 2.0,
+        "description": "From address is listed in Spamhaus CSS",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - pristine"
+      },
+      {
+        "symbol": "DWL_DNSWL_MED",
+        "weight": -2.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, medium trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_DROP",
+        "weight": 7.0,
+        "description": "From address is listed in Spamhaus DROP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognized result from SenderScore Reputation list.",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus DBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MAILSPIKE",
+        "weight": 0.0,
+        "description": "Unrecognised result from Mailspike",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score"
+      },
+      {
+        "symbol": "RBL_SPAMHAUS",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus ZEN",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL",
+        "weight": 0.0,
+        "description": "Unrecognised result from https://www.dnswl.org",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_VERYGOOD",
+        "weight": -0.200000,
+        "description": "From address is listed in Mailspike RWL - very good reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_3",
+        "weight": 2.500000,
+        "description": "SenderScore Reputation: Bad (30-39).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_MULTI",
+        "weight": 0.0,
+        "description": "Unrecognised result from URIBL.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15",
+        "weight": 3.0,
+        "description": "A domain in the message is listed in Spameatingmonkey Fresh15 URIBL (registered in the past 15 days, .AERO,.BIZ,.COM,.INFO,.NAME,.NET,.PRO,.SK,.TEL,.US only)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM",
+        "weight": 1.0,
+        "description": "From address is listed in Spameatingmonkey RBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_EXCELLENT",
+        "weight": -0.400000,
+        "description": "From address is listed in Mailspike RWL - excellent reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_EMAILBL",
+        "weight": 2.500000,
+        "description": "Rspamd emailbl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLACK",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in URIBL.com black",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_URIBL",
+        "weight": 4.500000,
+        "description": "Rspamd uribl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_MULTI",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_NA_BOT",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - noauth+botnet"
+      },
+      {
+        "symbol": "DBL_PROHIBIT",
+        "weight": 0.0,
+        "description": "DBL uribl IP queries prohibited!",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BOTNET",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_PHISH",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "dnswl",
+    "rules": [
+      {
+        "symbol": "RCVD_IN_DNSWL_MED",
+        "weight": -0.200000,
+        "description": "Sender listed at https://www.dnswl.org, medium trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_LOW",
+        "weight": -0.100000,
+        "description": "Sender listed at https://www.dnswl.org, low trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_NONE",
+        "weight": 0.0,
+        "description": "Sender listed at https://www.dnswl.org, no trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL",
+        "weight": 0.0,
+        "description": "Unrecognised result from https://www.dnswl.org (DWL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL",
+        "weight": 0.0,
+        "description": "Unrecognised result from https://www.dnswl.org",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries (DWL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_HI",
+        "weight": -0.500000,
+        "description": "Sender listed at https://www.dnswl.org, high trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_LOW",
+        "weight": -1.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, low trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_NONE",
+        "weight": 0.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, no trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_HI",
+        "weight": -3.500000,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, high trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_MED",
+        "weight": -2.0,
+        "description": "Message has a valid dkim signature originated from domain listed at https://www.dnswl.org, medium trust",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "dmarc",
+    "rules": [
+      {
+        "symbol": "DMARC_POLICY_ALLOW",
+        "weight": -0.500000,
+        "description": "DMARC permit policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DMARC",
+        "weight": 6.0,
+        "description": "Mail comes from the whitelisted domain and has failed DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_REJECT",
+        "weight": 2.0,
+        "description": "DMARC reject policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_ALLOW_WITH_FAILURES",
+        "weight": -0.500000,
+        "description": "DMARC permit policy with DKIM/SPF failure",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_SOFTFAIL",
+        "weight": 0.100000,
+        "description": "DMARC failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_DMARC",
+        "weight": -7.0,
+        "description": "Mail comes from the whitelisted domain and has valid DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_NA",
+        "weight": 0.0,
+        "description": "No DMARC record",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_QUARANTINE",
+        "weight": 1.500000,
+        "description": "DMARC quarantine policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_DNSFAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_BAD_POLICY",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "statistics",
+    "rules": [
+      {
+        "symbol": "BAYES_SPAM",
+        "weight": 5.100000,
+        "description": "Message probably spam, probability: ",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BAYES_HAM",
+        "weight": -3.0,
+        "description": "Message probably ham, probability: ",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "dkim",
+    "rules": [
+      {
+        "symbol": "R_DKIM_ALLOW",
+        "weight": -0.200000,
+        "description": "DKIM verification succeed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_DKIM",
+        "weight": -1.0,
+        "description": "Mail comes from the whitelisted domain and has a valid DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_REJECT",
+        "weight": 1.0,
+        "description": "DKIM verification failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_SPF_DKIM",
+        "weight": -3.0,
+        "description": "Mail comes from the whitelisted domain and has valid SPF and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DMARC",
+        "weight": 6.0,
+        "description": "Mail comes from the whitelisted domain and has failed DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_TEMPFAIL",
+        "weight": 0.0,
+        "description": "DKIM verification soft-failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_CHECK",
+        "weight": 0.0,
+        "description": "DKIM check callback",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DKIM",
+        "weight": 2.0,
+        "description": "Mail comes from the whitelisted domain and has non-valid DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_PERMFAIL",
+        "weight": 0.0,
+        "description": "DKIM verification hard-failed (invalid)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_SPF_DKIM",
+        "weight": 3.0,
+        "description": "Mail comes from the whitelisted domain and has no valid SPF policy or a bad DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_NA",
+        "weight": 0.0,
+        "description": "Missing DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_TRACE",
+        "weight": 0.0,
+        "description": "DKIM trace symbol",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_DMARC",
+        "weight": -7.0,
+        "description": "Mail comes from the whitelisted domain and has valid DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "sem",
+    "rules": [
+      {
+        "symbol": "SEM_URIBL_FRESH15_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey Fresh15 URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15",
+        "weight": 3.0,
+        "description": "A domain in the message is listed in Spameatingmonkey Fresh15 URIBL (registered in the past 15 days, .AERO,.BIZ,.COM,.INFO,.NAME,.NET,.PRO,.SK,.TEL,.US only)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL",
+        "weight": 3.500000,
+        "description": "A domain in the message is listed in Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM",
+        "weight": 1.0,
+        "description": "From address is listed in Spameatingmonkey RBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM_IPV6",
+        "weight": 1.0,
+        "description": "From address is listed in Spameatingmonkey RBL (IPv6)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "neural",
+    "rules": []
+  },
+  {
+    "group": "policies",
+    "rules": [
+      {
+        "symbol": "R_SPF_NA",
+        "weight": 0.0,
+        "description": "Missing SPF record",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_TEMPFAIL",
+        "weight": 0.0,
+        "description": "DKIM verification soft-failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_SOFTFAIL",
+        "weight": 0.100000,
+        "description": "DMARC failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_ALLOW",
+        "weight": -1.0,
+        "description": "ARC checks success",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_ALLOW",
+        "weight": -0.200000,
+        "description": "SPF verification allows sending",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_NA",
+        "weight": 0.0,
+        "description": "Missing DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_BAD_POLICY",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPF_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_NA",
+        "weight": 0.0,
+        "description": "No DMARC record",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_ALLOW_WITH_FAILURES",
+        "weight": -0.500000,
+        "description": "DMARC permit policy with DKIM/SPF failure",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_PLUSALL",
+        "weight": 4.0,
+        "description": "SPF record allows to send from any IP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_SOFTFAIL",
+        "weight": 0.0,
+        "description": "SPF verification soft-failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_INVALID",
+        "weight": 0.500000,
+        "description": "ARC structure invalid",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_DNSFAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_PERMFAIL",
+        "weight": 0.0,
+        "description": "DKIM verification hard-failed (invalid)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_TRACE",
+        "weight": 0.0,
+        "description": "DKIM trace symbol",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_ALLOW",
+        "weight": -0.500000,
+        "description": "DMARC permit policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_CHECK",
+        "weight": 0.0,
+        "description": "DKIM check callback",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_DNSFAIL",
+        "weight": 0.0,
+        "description": "ARC DNS error",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_REJECT",
+        "weight": 1.0,
+        "description": "ARC checks failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_PERMFAIL",
+        "weight": 0.0,
+        "description": "SPF record is malformed or persistent DNS error",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_NA",
+        "weight": 0.0,
+        "description": "ARC signature absent",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_NEUTRAL",
+        "weight": 0.0,
+        "description": "SPF policy is neutral",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_QUARANTINE",
+        "weight": 1.500000,
+        "description": "DMARC quarantine policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_FAIL",
+        "weight": 1.0,
+        "description": "SPF verification failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_DNSFAIL",
+        "weight": 0.0,
+        "description": "SPF DNS failure",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_REJECT",
+        "weight": 2.0,
+        "description": "DMARC reject policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_ALLOW",
+        "weight": -0.200000,
+        "description": "DKIM verification succeed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_DKIM_REJECT",
+        "weight": 1.0,
+        "description": "DKIM verification failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ARC_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "surbl",
+    "rules": [
+      {
+        "symbol": "DBL_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_BOTNET",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_PROHIBIT",
+        "weight": 0.0,
+        "description": "DBL uribl IP queries prohibited!",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPAMHAUS_ZEN_URIBL",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus ZEN URIBL"
+      },
+      {
+        "symbol": "MSBL_EBL",
+        "weight": 7.500000,
+        "description": "MSBL emailbl (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PH_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BOTNET",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_EMAILBL",
+        "weight": 2.500000,
+        "description": "Rspamd emailbl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CT_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as a clicktracker",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL",
+        "weight": 3.500000,
+        "description": "A domain in the message is listed in Spameatingmonkey URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_URIBL",
+        "weight": 4.500000,
+        "description": "Rspamd uribl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spameatingmonkey Fresh15 URIBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_SBL",
+        "weight": 6.500000,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus SBL"
+      },
+      {
+        "symbol": "URIBL_BLACK",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in URIBL.com black",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ABUSE_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as abused",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_REDIR",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as spammed redirector domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_PBL",
+        "weight": 0.010000,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus PBL"
+      },
+      {
+        "symbol": "DBL_ABUSE_PHISH",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit phish",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MSBL_EBL_GREY",
+        "weight": 0.500000,
+        "description": "MSBL emailbl grey list (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_SPAM",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CRACKED_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as cracked",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_GREY",
+        "weight": 2.500000,
+        "description": "A domain in the message is listed in URIBL.com grey",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_RED",
+        "weight": 0.500000,
+        "description": "A domain in the message is listed in URIBL.com red",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_DROP",
+        "weight": 5.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus DROP"
+      },
+      {
+        "symbol": "DBL_PHISH",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_MULTI",
+        "weight": 0.0,
+        "description": "Unrecognised result from URIBL.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_MALWARE",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus DBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_MALWARE",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MW_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_XBL",
+        "weight": 3.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus XBL"
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15",
+        "weight": 3.0,
+        "description": "A domain in the message is listed in Spameatingmonkey Fresh15 URIBL (registered in the past 15 days, .AERO,.BIZ,.COM,.INFO,.NAME,.NET,.PRO,.SK,.TEL,.US only)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_SBL_CSS",
+        "weight": 5.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus CSS"
+      },
+      {
+        "symbol": "DM_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as belonging to a disposable email service",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLOCKED",
+        "weight": 0.0,
+        "description": "URIBL.com: query refused, likely due to policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_BLOCKED",
+        "weight": 0.0,
+        "description": "SURBL: query blocked by policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "mime",
+    "rules": [
+      {
+        "symbol": "MIME_BASE64_TEXT_BOGUS",
+        "weight": 1.0,
+        "description": "Has text part encoded in base64 that does not contain any 8bit characters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CTYPE_MIXED_BOGUS",
+        "weight": 1.0,
+        "description": "multipart/mixed without non-textual part",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CTYPE_MISSING_DISPOSITION",
+        "weight": 4.0,
+        "description": "Binary content-type not specified as an attachment",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BASE64_TEXT",
+        "weight": 0.100000,
+        "description": "Has text part encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "multimap",
+    "rules": [
+      {
+        "symbol": "DISPOSABLE_FROM",
+        "weight": 0.0,
+        "description": "From a Disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_ENVFROM",
+        "weight": 0.0,
+        "description": "Envelope From is a Disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_TO",
+        "weight": 0.0,
+        "description": "To a disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_REPLYTO",
+        "weight": 0.0,
+        "description": "Reply-To a disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_CC",
+        "weight": 0.0,
+        "description": "To a disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_TO",
+        "weight": 0.0,
+        "description": "To is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_ENVRCPT",
+        "weight": 0.0,
+        "description": "Envelope Recipient is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_ENVFROM",
+        "weight": 0.0,
+        "description": "Envelope From is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_MDN",
+        "weight": 0.500000,
+        "description": "Disposition-Notification-To is a disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_MDN",
+        "weight": 0.0,
+        "description": "Disposition-Notification-To is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_FROM",
+        "weight": 0.0,
+        "description": "From is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_REPLYTO",
+        "weight": 0.0,
+        "description": "Reply-To is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DISPOSABLE_ENVRCPT",
+        "weight": 0.0,
+        "description": "Envelope Recipient is a Disposable e-mail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_CC",
+        "weight": 0.0,
+        "description": "To is a Freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REDIRECTOR_URL",
+        "weight": 0.0,
+        "description": "The presence of a redirector in the mail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "excessqp",
+    "rules": [
+      {
+        "symbol": "CC_EXCESS_QP",
+        "weight": 1.200000,
+        "description": "Cc header is unnecessarily encoded in quoted-printable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJ_EXCESS_QP",
+        "weight": 1.200000,
+        "description": "Subject header is unnecessarily encoded in quoted-printable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_EXCESS_QP",
+        "weight": 1.200000,
+        "description": "Reply-To header is unnecessarily encoded in quoted-printable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_EXCESS_QP",
+        "weight": 1.200000,
+        "description": "From header is unnecessarily encoded in quoted-printable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_EXCESS_QP",
+        "weight": 1.200000,
+        "description": "To header is unnecessarily encoded in quoted-printable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "upstream_spam_filters",
+    "rules": [
+      {
+        "symbol": "UNITEDINTERNET_SPAM",
+        "weight": 5.0,
+        "description": "United Internet says this message is spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "KLMS_SPAM",
+        "weight": 5.0,
+        "description": "Kaspersky Security for Mail Server says this message is spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MICROSOFT_SPAM",
+        "weight": 4.0,
+        "description": "Microsoft says the message is spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PRECEDENCE_BULK",
+        "weight": 0.0,
+        "description": "Message marked as bulk",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPAM_FLAG",
+        "weight": 5.0,
+        "description": "Message was already marked as spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "headers",
+    "rules": [
+      {
+        "symbol": "FAKE_RECEIVED_smtp_yandex_ru",
+        "weight": 4.0,
+        "description": "Fake smtp.yandex.ru Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_RCONFIRM_MISMATCH",
+        "weight": 2.0,
+        "description": "Read confirmation address is different to from address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_ZERO",
+        "weight": 0.0,
+        "description": "No recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MAILER_1C_8",
+        "weight": 0.0,
+        "description": "Sent with 1C:Enterprise 8",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPTO_QUOTE_YAHOO",
+        "weight": 2.0,
+        "description": "Quoted Reply-To header from Yahoo (seems to be forged)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_SEVEN",
+        "weight": 0.0,
+        "description": "Message has 7-11 Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_ZERO",
+        "weight": 0.0,
+        "description": "Message has no Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPOOF_DISPLAY_NAME",
+        "weight": 8.0,
+        "description": "Display name is being used to spoof and trick the recipient",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_EQ_ADDR_ALL",
+        "weight": 0.0,
+        "description": "All of the recipients have display names that are the same as their address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_FROM",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_ENDS_EXCLAIM",
+        "weight": 0.0,
+        "description": "Subject ends with an exclamation mark",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_IMS",
+        "weight": 3.0,
+        "description": "Forged X-Mailer: Internet Mail Service",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_SENDER",
+        "weight": 0.300000,
+        "description": "Sender is forged (different From: header and smtp MAIL FROM: addresses)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_ONE",
+        "weight": 0.0,
+        "description": "Message has one Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_RCPT_8BIT",
+        "weight": 6.0,
+        "description": "Invalid 8bit character in recipients headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_THEBAT_BOUN",
+        "weight": 2.0,
+        "description": "Forged The Bat! MUA headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MAIL_RU_MAILER",
+        "weight": 0.0,
+        "description": "Sent with Mail.Ru webmail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_CC_EMPTY_DELIMITER",
+        "weight": 1.0,
+        "description": "Cc header has no delimiter between header name and header value",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "OLD_X_MAILER",
+        "weight": 2.0,
+        "description": "X-Mailer header has a very old MUA version",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_GENERIC_RECEIVED4",
+        "weight": 3.600000,
+        "description": "Forged generic Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FAKE_REPLY",
+        "weight": 1.0,
+        "description": "Fake reply",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "STRONGMAIL",
+        "weight": 6.0,
+        "description": "Sent via rogue \"strongmail\" MTA",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO_FIVE",
+        "weight": 0.0,
+        "description": "Message has X-Priority header set to 5 or higher",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_MIME_VERSION",
+        "weight": 2.0,
+        "description": "MIME-Version header is missing in MIME message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_RCVD",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_DOUBLE_IP_SPAM",
+        "weight": 2.0,
+        "description": "Has two Received headers containing bare IP addresses",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_REPLYTO",
+        "weight": 0.0,
+        "description": "Has Reply-To header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_MA_MISSING_HTML",
+        "weight": 1.0,
+        "description": "MIME multipart/alternative missing text/html part",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_DN_EQ_FROM_DN",
+        "weight": 0.0,
+        "description": "Reply-To display name matches From",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_DOM_EQ_TO_DOM",
+        "weight": 0.0,
+        "description": "Reply-To domain matches the To domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "X_PHPOS_FAKE",
+        "weight": 3.0,
+        "description": "Fake X-PHP-Originating-Script header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENVFROM_VERP",
+        "weight": 0.0,
+        "description": "Envelope From is a VERP address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_EQ_ENVFROM",
+        "weight": 0.0,
+        "description": "From address is the same as the envelope",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_ORG_HEADER",
+        "weight": 0.0,
+        "description": "Has Organization header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_TO",
+        "weight": 2.0,
+        "description": "To header is missing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BROKEN_HEADERS",
+        "weight": 10.0,
+        "description": "Headers structure is likely broken",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_DN_EQ_ADDR",
+        "weight": 1.0,
+        "description": "From header display name is the same as the address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_REPLYTO_NEQ_FROM_DOM",
+        "weight": 3.0,
+        "description": "The From and Reply-To addresses in the email are from different freemail services",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_HELO_LOCALHOST",
+        "weight": 0.0,
+        "description": "Localhost HELO seen in Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_BAD_CTE_7BIT",
+        "weight": 3.500000,
+        "description": "Detects bad Content-Transfer-Encoding for text parts",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_FROM_EMPTY_DELIMITER",
+        "weight": 1.0,
+        "description": "From header has no delimiter between header name and header value",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_HAS_QUESTION",
+        "weight": 0.0,
+        "description": "Subject contains a question mark",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO_ZERO",
+        "weight": 0.0,
+        "description": "Message has X-Priority header set to 0",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_SOME",
+        "weight": 0.0,
+        "description": "Some of the recipients have display names",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ONCE_RECEIVED",
+        "weight": 0.100000,
+        "description": "One received header in a message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INFO_TO_INFO_LU",
+        "weight": 2.0,
+        "description": "info@ From/To address with List-Unsubscribe headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_DOM_EQ_FROM_DOM",
+        "weight": 0.0,
+        "description": "Reply-To domain matches the From domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_MA_MISSING_TEXT",
+        "weight": 2.0,
+        "description": "MIME multipart/alternative missing text/plain part",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_TWO",
+        "weight": 0.0,
+        "description": "Two recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_THREE",
+        "weight": 0.0,
+        "description": "3-5 recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO",
+        "weight": 0.0,
+        "description": "X-Priority check callback rule",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_NONE",
+        "weight": 0.0,
+        "description": "None of the recipients have display names",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_TWO",
+        "weight": 0.0,
+        "description": "Message has two Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CTE_CASE",
+        "weight": 0.500000,
+        "description": "[78]Bit .vs. [78]bit",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_HAS_EXCLAIM",
+        "weight": 0.0,
+        "description": "Subject contains an exclamation mark",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_XM_UA",
+        "weight": 0.0,
+        "description": "Message has neither X-Mailer nor User-Agent header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "X_PHP_FORGED_0X",
+        "weight": 4.0,
+        "description": "X-PHP-Originating-Script header appears forged",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "APPLE_IOS_MAILER",
+        "weight": 0.0,
+        "description": "Sent with Apple iPhone/iPad Mail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_LIST_UNSUB",
+        "weight": -0.010000,
+        "description": "Has List-Unsubscribe header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENVFROM_INVALID",
+        "weight": 2.0,
+        "description": "Envelope from does not have a valid format",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_GENERIC_RECEIVED3",
+        "weight": 3.600000,
+        "description": "Forged generic Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_MIXED_CHARSET",
+        "weight": 5.0,
+        "description": "Mixed characters in a message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_MSGID",
+        "weight": 1.700000,
+        "description": "Message-ID header is incorrect",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_DOM_NEQ_FROM_DOM",
+        "weight": 0.0,
+        "description": "Reply-To domain does not match the From domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_ENDS_SPACES",
+        "weight": 0.500000,
+        "description": "Subject ends with space characters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_TWELVE",
+        "weight": 0.0,
+        "description": "Message has 12 or more Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NEQ_DISPLAY_NAME",
+        "weight": 4.0,
+        "description": "Display name contains an email address different to the From address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BROKEN_CONTENT_TYPE",
+        "weight": 1.500000,
+        "description": "Message has part with broken content type",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_DATE",
+        "weight": 1.0,
+        "description": "Date header is missing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MSGID_YAHOO",
+        "weight": 2.0,
+        "description": "Forged Yahoo Message-ID header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_EQ_ADDR_SOME",
+        "weight": 0.0,
+        "description": "Some of the recipients have display names that are the same as their address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_RCVD_SPAMBOTS",
+        "weight": 3.0,
+        "description": "Spambots signatures in received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_MISSING_CHARSET",
+        "weight": 0.500000,
+        "description": "Charset header is missing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_MID",
+        "weight": 2.500000,
+        "description": "Message-ID header is missing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_FORGED_MDN",
+        "weight": 2.0,
+        "description": "Read confirmation address is different to return path",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPOOF_REPLYTO",
+        "weight": 6.0,
+        "description": "Reply-To is being used to spoof and trick the recipient to send an off-domain reply",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_DATE_EMPTY_DELIMITER",
+        "weight": 1.0,
+        "description": "Date header has no delimiter between header name and header value",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_MATCH_ENVRCPT_SOME",
+        "weight": 0.0,
+        "description": "Some of the recipients match the envelope",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_RECIPIENTS_MAILLIST",
+        "weight": 0.0,
+        "description": "Recipients are not the same as RCPT TO: mail command, but a message from a maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_FROM",
+        "weight": 2.0,
+        "description": "Missing From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_SEVEN",
+        "weight": 0.0,
+        "description": "7-11 recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_UNPARSEABLE",
+        "weight": 1.0,
+        "description": "Reply-To header could not be parsed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO_ONE",
+        "weight": 0.0,
+        "description": "Message has X-Priority header set to 1",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_GT_50",
+        "weight": 0.0,
+        "description": "50+ recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_TLS_LAST",
+        "weight": 0.0,
+        "description": "Last hop used encrypted transports",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NAME_HAS_TITLE",
+        "weight": 1.0,
+        "description": "From header display name has a title (Mr/Mrs/Dr)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PREVIOUSLY_DELIVERED",
+        "weight": 0.0,
+        "description": "Message either to a list or was forwarded",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_HELO_USER",
+        "weight": 3.0,
+        "description": "HELO User spam pattern",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_X_MAILER",
+        "weight": 4.500000,
+        "description": "Forged X-Mailer header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_HTTP_URL_IN_FROM",
+        "weight": 5.0,
+        "description": "HTTP URL preceded by the start of a line, quote, or whitespace, with normal or URL-encoded colons in From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DOM_EQ_FROM_DOM",
+        "weight": 0.0,
+        "description": "To domain is the same as the From domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_TWELVE",
+        "weight": 0.0,
+        "description": "12-50 recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_OUTLOOK_TAGS",
+        "weight": 2.100000,
+        "description": "Message pretends to be send from Outlook but has 'strange' tags",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NO_DN",
+        "weight": 0.0,
+        "description": "From header does not have a display name",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_DATE",
+        "weight": 1.500000,
+        "description": "Malformed Date header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_NO_SPACE_IN_FROM",
+        "weight": 1.0,
+        "description": "No space in From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_OUTLOOK_HTML",
+        "weight": 5.0,
+        "description": "Forged Outlook HTML signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_DISPLAY_CALLBACK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_ADDR_EQ_FROM",
+        "weight": 0.0,
+        "description": "Reply-To header is identical to SMTP From",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_SENDER_MAILLIST",
+        "weight": 0.0,
+        "description": "Sender is not the same as MAIL FROM: envelope, but a message is from a maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_WRAPPED_IN_SPACES",
+        "weight": 2.0,
+        "description": "To address is wrapped in spaces inside angle brackets (e.g. display-name < local-part@domain >)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DIRECT_TO_MX",
+        "weight": 0.0,
+        "description": "Message has been directly delivered from MUA to local MX",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_FIVE",
+        "weight": 0.0,
+        "description": "Message has 5-7 Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_GENERIC_RECEIVED",
+        "weight": 3.600000,
+        "description": "Forged generic Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_ENDS_QUESTION",
+        "weight": 1.0,
+        "description": "Subject ends with a question mark",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_CALLBACK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_RECIPIENTS",
+        "weight": 2.0,
+        "description": "Recipients are not the same as RCPT TO: mail command",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TRACKER_ID",
+        "weight": 3.840000,
+        "description": "Spam string at the end of message to make statistics fault",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NEQ_ENVFROM",
+        "weight": 0.0,
+        "description": "From address is different to the envelope",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CT_EXTRA_SEMI",
+        "weight": 1.0,
+        "description": "Content-Type header ends with a semi-colon",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MAILLIST",
+        "weight": -0.200000,
+        "description": "Message seems to be from maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO_TWO",
+        "weight": 0.0,
+        "description": "Message has X-Priority header set to 2",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_FIVE",
+        "weight": 0.0,
+        "description": "5-7 recipients",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_SUBJECT",
+        "weight": 2.0,
+        "description": "Subject header is missing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CD_MM_BODY",
+        "weight": 2.0,
+        "description": "Content-Description header reads \"Mail message body\", commonly seen in spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "YANDEX_RU_MAILER",
+        "weight": 0.0,
+        "description": "Sent with Yandex webmail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "GOOGLE_FORWARDING_MID_MISSING",
+        "weight": 2.500000,
+        "description": "Message was missing Message-ID pre-forwarding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_NEEDS_ENCODING",
+        "weight": 1.0,
+        "description": "To header needs encoding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NEEDS_ENCODING",
+        "weight": 1.0,
+        "description": "From header needs encoding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_NEEDS_ENCODING",
+        "weight": 1.0,
+        "description": "Subject needs encoding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_EQ_TO_ADDR",
+        "weight": 5.0,
+        "description": "Reply-To is the same as the To address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_EMAIL_HAS_TITLE",
+        "weight": 2.0,
+        "description": "Reply-To header has title",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCPT_COUNT_ONE",
+        "weight": 0.0,
+        "description": "One recipient",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_EQ_FROM",
+        "weight": 0.0,
+        "description": "To address matches the From address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_MIME",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_RECIPS",
+        "weight": 1.500000,
+        "description": "Recipients seems to be autogenerated (works if recipients count is more than 5)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FAKE_RECEIVED_mail_ru",
+        "weight": 4.0,
+        "description": "Fake HELO mail.ru in Received header from non-mail.ru sender address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_XOIP",
+        "weight": 0.0,
+        "description": "Has X-Originating-IP header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_DOM_NEQ_TO_DOM",
+        "weight": 0.0,
+        "description": "Reply-To domain does not match the To domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "EMPTY_SUBJECT",
+        "weight": 1.0,
+        "description": "Subject header is empty",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "STOX_REPLY_TYPE",
+        "weight": 1.0,
+        "description": "Reply-type in Content-Type header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_HEADER_CTYPE_ONLY",
+        "weight": 2.0,
+        "description": "Only Content-Type header without other MIME headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BOUNCE",
+        "weight": -0.100000,
+        "description": "(Non) Delivery Status Notification",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SORTED_RECIPS",
+        "weight": 3.500000,
+        "description": "Recipients list seems to be sorted",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_POSTFIX_RECEIVED",
+        "weight": 3.0,
+        "description": "Invalid Postfix Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENVFROM_PRVS",
+        "weight": 0.0,
+        "description": "Envelope From is a PRVS address that matches the From address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_RECEIVED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_MIMEOLE",
+        "weight": 2.0,
+        "description": "Mime-OLE is needed but absent (e.g. fake Outlook or fake Exchange)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_HAS_DN",
+        "weight": 0.0,
+        "description": "From header has a display name",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_NO_TLS_LAST",
+        "weight": 0.100000,
+        "description": "Last hop did not use encrypted transports",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_FROM_8BIT",
+        "weight": 6.0,
+        "description": "Invalid 8bit character in From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RATWARE_MS_HASH",
+        "weight": 2.0,
+        "description": "Forged Exchange messages",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ONCE_RECEIVED_STRICT",
+        "weight": 4.0,
+        "description": "One received header with 'bad' patterns inside",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "XM_CASE",
+        "weight": 0.500000,
+        "description": "X-mailer .vs. X-Mailer",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DATE_IN_PAST",
+        "weight": 1.0,
+        "description": "Message date is in the past",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MULTIPLE_UNIQUE_HEADERS",
+        "weight": 7.0,
+        "description": "Repeated unique headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PRIO_THREE",
+        "weight": 0.0,
+        "description": "Message has X-Priority header set to 3 or 4",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_REPLYTO",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_MIXED_CHARSET_URL",
+        "weight": 7.0,
+        "description": "Mixed characters in a URL inside message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MV_CASE",
+        "weight": 0.500000,
+        "description": "Mime-Version .vs. MIME-Version",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_UNDISC_RCPT",
+        "weight": 3.0,
+        "description": "Recipients are absent or undisclosed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "APPLE_MAILER",
+        "weight": 0.0,
+        "description": "Sent with Apple Mail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_ALL",
+        "weight": 0.0,
+        "description": "All the recipients have display names",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "GOOGLE_FORWARDING_MID_BROKEN",
+        "weight": 1.700000,
+        "description": "Message had invalid Message-ID pre-forwarding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_INVALID",
+        "weight": 2.0,
+        "description": "From header does not have a valid format",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DATE_IN_FUTURE",
+        "weight": 4.0,
+        "description": "Message date is in the future",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_NAME_EXCESS_SPACE",
+        "weight": 1.0,
+        "description": "From header display name contains excess whitespace",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_GENERIC_RECEIVED2",
+        "weight": 3.600000,
+        "description": "Forged generic Received header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_COUNT_THREE",
+        "weight": 0.0,
+        "description": "Message has 3-5 Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_EQ_FROM",
+        "weight": 0.0,
+        "description": "Reply-To header is identical to From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MULTIPLE_FROM",
+        "weight": 8.0,
+        "description": "Multiple addresses in From header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_CD_HEADER",
+        "weight": 0.0,
+        "description": "Has Content-Description header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_TLS_ALL",
+        "weight": 0.0,
+        "description": "All hops used encrypted transports",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_MATCH_ENVRCPT_ALL",
+        "weight": 0.0,
+        "description": "All of the recipients match the envelope",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_VIA_SMTP_AUTH",
+        "weight": 0.0,
+        "description": "Authenticated hand-off was seen in Received headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_DN_RECIPIENTS",
+        "weight": 2.0,
+        "description": "To header display name is \"Recipients\"",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_HTML_ONLY",
+        "weight": 0.200000,
+        "description": "Message has only an HTML part",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_INTERSPIRE_SIG",
+        "weight": 1.0,
+        "description": "Has Interspire fingerprint",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJECT_HAS_CURRENCY",
+        "weight": 1.0,
+        "description": "Subject contains currency",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJ_BOUNCE_WORDS",
+        "weight": 0.0,
+        "description": "Words/phrases typical for DSN",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_REPLYTO_EMPTY_DELIMITER",
+        "weight": 1.0,
+        "description": "Reply-To header has no delimiter between header name and header value",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HEADER_TO_EMPTY_DELIMITER",
+        "weight": 1.0,
+        "description": "To header has no delimiter between header name and header value",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "phishing",
+    "rules": [
+      {
+        "symbol": "PH_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HACKED_WP_PHISHING",
+        "weight": 4.500000,
+        "description": "Phish message sent by hacked Wordpress instance",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_REDIRECTOR_NESTED",
+        "weight": 1.0,
+        "description": "URL redirector nested limit has been reached"
+      },
+      {
+        "symbol": "REDIRECTOR_FALSE",
+        "weight": 0.0,
+        "description": "Phishing exclusion symbol for known redirectors",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHED_EXCLUDED",
+        "weight": 0.0,
+        "description": "Phished URL found in exclusions list",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHING",
+        "weight": 4.0,
+        "description": "Phished URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHED_OPENPHISH",
+        "weight": 7.0,
+        "description": "Phished URL found in openphish.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHED_GENERIC_SERVICE",
+        "weight": 0.0,
+        "description": "Phished URL found in generic service",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHED_WHITELISTED",
+        "weight": 0.0,
+        "description": "Phishing exclusion symbol for known exceptions",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISHED_PHISHTANK",
+        "weight": 7.0,
+        "description": "Phished URL found in phishtank.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "excessb64",
+    "rules": [
+      {
+        "symbol": "FROM_EXCESS_BASE64",
+        "weight": 1.500000,
+        "description": "From header is unnecessarily encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REPLYTO_EXCESS_BASE64",
+        "weight": 1.500000,
+        "description": "Reply-To header is unnecessarily encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TO_EXCESS_BASE64",
+        "weight": 1.500000,
+        "description": "To header is unnecessarily encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CC_EXCESS_BASE64",
+        "weight": 1.500000,
+        "description": "Cc header is unnecessarily encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUBJ_EXCESS_BASE64",
+        "weight": 1.500000,
+        "description": "Subject header is unnecessarily encoded in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "forwarding",
+    "rules": [
+      {
+        "symbol": "FWD_MAILRU",
+        "weight": 0.0,
+        "description": "Message was forwarded by Mail.ru",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORWARDED",
+        "weight": 0.0,
+        "description": "Message was forwarded",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FWD_GOOGLE",
+        "weight": 0.0,
+        "description": "Message was forwarded by Google",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FWD_SIEVE",
+        "weight": 0.0,
+        "description": "Message was forwarded using Sieve",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FWD_CPANEL",
+        "weight": 0.0,
+        "description": "Message was forwarded using cPanel",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FWD_YANDEX",
+        "weight": 0.0,
+        "description": "Message was forwarded by Yandex",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FWD_SRS",
+        "weight": 0.0,
+        "description": "Message was forwarded using Sender Rewriting Scheme (SRS)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "url",
+    "rules": [
+      {
+        "symbol": "HAS_FILE_URL",
+        "weight": 2.0,
+        "description": "Contains file:// URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_BAD_UNICODE",
+        "weight": 3.0,
+        "description": "URL contains invalid Unicode",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_USER_PASSWORD",
+        "weight": 2.0,
+        "description": "URL contains user field",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_OBFUSCATED_TEXT",
+        "weight": 5.0,
+        "description": "Obfuscated URL found in message text",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_VERY_LONG",
+        "weight": 1.500000,
+        "description": "URL is very long",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_HOMOGRAPH_ATTACK",
+        "weight": 5.0,
+        "description": "URL uses homograph attack (mixed scripts)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_SUSPICIOUS_TLD",
+        "weight": 3.0,
+        "description": "URL uses suspicious TLD",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_GOOGLE_REDIR",
+        "weight": 1.0,
+        "description": "Has google.com/url or alike Google redirection URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URI_COUNT_ODD",
+        "weight": 1.0,
+        "description": "Odd number of URIs in multipart/alternative message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_ZERO_WIDTH_SPACES",
+        "weight": 7.0,
+        "description": "URL contains zero-width spaces",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_USER_LONG",
+        "weight": 3.0,
+        "description": "URL user field is long (>128 chars)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_GOOGLE_FIREBASE_URL",
+        "weight": 2.0,
+        "description": "Contains firebasestorage.googleapis.com URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_IPFS_GATEWAY_URL",
+        "weight": 6.0,
+        "description": "Message contains InterPlanetary File System (IPFS) gateway URL, likely malicious",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_RTL_OVERRIDE",
+        "weight": 6.0,
+        "description": "URL uses RTL override character",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_NUMERIC_PRIVATE_IP",
+        "weight": 0.500000,
+        "description": "URL uses private IP range",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_BACKSLASH_PATH",
+        "weight": 2.0,
+        "description": "URL uses backslashes",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_NUMERIC_IP",
+        "weight": 1.500000,
+        "description": "URL uses numeric IP address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_USER_VERY_LONG",
+        "weight": 5.0,
+        "description": "URL user field is very long (>256 chars)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_ONION_URI",
+        "weight": 0.0,
+        "description": "Contains .onion hidden service URI",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_EXCESSIVE_DOTS",
+        "weight": 2.0,
+        "description": "URL has excessive dots in hostname",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_SUSPECT_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_NO_TLD",
+        "weight": 2.0,
+        "description": "URL has no TLD",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "OMOGRAPH_URL",
+        "weight": 5.0,
+        "description": "URL contains both latin and non-latin characters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_MULTIPLE_AT_SIGNS",
+        "weight": 3.0,
+        "description": "URL has multiple @ signs",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_NUMERIC_IP_USER",
+        "weight": 4.0,
+        "description": "URL uses numeric IP with user field",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_GUC_PROXY_URI",
+        "weight": 1.0,
+        "description": "Has googleusercontent.com proxy URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "rspamdbl",
+    "rules": [
+      {
+        "symbol": "RSPAMD_URIBL",
+        "weight": 4.500000,
+        "description": "Rspamd uribl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_EMAILBL",
+        "weight": 2.500000,
+        "description": "Rspamd emailbl, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "blocked",
+    "rules": [
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_BLOCKED",
+        "weight": 0.0,
+        "description": "SURBL: query blocked by policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_BLOCKED",
+        "weight": 0.0,
+        "description": "https://www.dnswl.org: Resolver blocked due to excessive queries (DWL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLOCKED",
+        "weight": 0.0,
+        "description": "URIBL.com: query refused, likely due to policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243"
+      },
+      {
+        "symbol": "DBL_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "blocklistde",
+    "rules": [
+      {
+        "symbol": "RECEIVED_BLOCKLISTDE",
+        "weight": 3.0,
+        "description": "Received address is listed in Blocklist (https://www.blocklist.de/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_BLOCKLISTDE",
+        "weight": 4.0,
+        "description": "From address is listed in Blocklist (https://www.blocklist.de/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "mime_types",
+    "rules": [
+      {
+        "symbol": "MIME_DOUBLE_BAD_EXTENSION",
+        "weight": 3.0,
+        "description": "Bad extension cloaking",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_TRACE",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_ARCHIVE_IN_ARCHIVE",
+        "weight": 5.0,
+        "description": "Archive within another archive",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_UNKNOWN",
+        "weight": 0.100000,
+        "description": "Missing or unknown content-type",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENCRYPTED_PGP",
+        "weight": -0.500000,
+        "description": "Message is encrypted with PGP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_GOOD",
+        "weight": -0.100000,
+        "description": "Known content-type",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BOGUS_ENCRYPTED_AND_TEXT",
+        "weight": 10.0,
+        "description": "Bogus mix of encrypted and text/html payloads",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD_EXTENSION",
+        "weight": 2.0,
+        "description": "Bad extension",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_EXE_IN_GEN_SPLIT_RAR",
+        "weight": 5.0,
+        "description": "EXE file in RAR archive with generic split extension (e.g. .001)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_ENCRYPTED_ARCHIVE",
+        "weight": 2.0,
+        "description": "Encrypted archive in a message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD",
+        "weight": 1.0,
+        "description": "Known bad content-type",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SIGNED_SMIME",
+        "weight": -2.0,
+        "description": "Message is signed with S/MIME",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_TYPES_CALLBACK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD_UNICODE",
+        "weight": 2.0,
+        "description": "Filename with known obscured unicode characters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SIGNED_PGP",
+        "weight": -2.0,
+        "description": "Message is signed with PGP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_OBFUSCATED_ARCHIVE",
+        "weight": 2.0,
+        "description": "Archive has files with clear obfuscation signs",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENCRYPTED_SMIME",
+        "weight": -0.500000,
+        "description": "Message is encrypted with S/MIME",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD_ATTACHMENT",
+        "weight": 4.0,
+        "description": "Invalid attachment mime type",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "antivirus",
+    "rules": []
+  },
+  {
+    "group": "spf",
+    "rules": [
+      {
+        "symbol": "R_SPF_FAIL",
+        "weight": 1.0,
+        "description": "SPF verification failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPF_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_SPF_DKIM",
+        "weight": -3.0,
+        "description": "Mail comes from the whitelisted domain and has valid SPF and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DMARC",
+        "weight": 6.0,
+        "description": "Mail comes from the whitelisted domain and has failed DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_SPF_DKIM",
+        "weight": 3.0,
+        "description": "Mail comes from the whitelisted domain and has no valid SPF policy or a bad DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_PERMFAIL",
+        "weight": 0.0,
+        "description": "SPF record is malformed or persistent DNS error",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_ALLOW",
+        "weight": -0.200000,
+        "description": "SPF verification allows sending",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_SOFTFAIL",
+        "weight": 0.0,
+        "description": "SPF verification soft-failed",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_NEUTRAL",
+        "weight": 0.0,
+        "description": "SPF policy is neutral",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_PLUSALL",
+        "weight": 4.0,
+        "description": "SPF record allows to send from any IP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_DMARC",
+        "weight": -7.0,
+        "description": "Mail comes from the whitelisted domain and has valid DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_DNSFAIL",
+        "weight": 0.0,
+        "description": "SPF DNS failure",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SPF_NA",
+        "weight": 0.0,
+        "description": "Missing SPF record",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_SPF",
+        "weight": 1.0,
+        "description": "Mail comes from the whitelisted domain and has no valid SPF policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_SPF",
+        "weight": -1.0,
+        "description": "Mail comes from the whitelisted domain and has a valid SPF policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "hfilter",
+    "rules": [
+      {
+        "symbol": "HFILTER_URL_ONELINE",
+        "weight": 2.500000,
+        "description": "One line URL and text in body",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_3",
+        "weight": 2.0,
+        "description": "Helo host checks (medium)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_1",
+        "weight": 0.500000,
+        "description": "Hostname checks (very low)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_4",
+        "weight": 2.500000,
+        "description": "Helo host checks (hard)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_BAREIP",
+        "weight": 3.0,
+        "description": "Helo host is bare ip",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_4",
+        "weight": 2.500000,
+        "description": "Hostname checks (hard)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_1",
+        "weight": 0.500000,
+        "description": "Helo host checks (very low)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_5",
+        "weight": 3.0,
+        "description": "Helo host checks (very hard)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_NORESOLVE_MX",
+        "weight": 0.200000,
+        "description": "MX found in Helo and no resolve",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_3",
+        "weight": 2.0,
+        "description": "Hostname checks (medium)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_RCPT_BOUNCEMOREONE",
+        "weight": 1.500000,
+        "description": "Message from bounce and over 1 recipient",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_FROMHOST_NORES_A_OR_MX",
+        "weight": 1.500000,
+        "description": "FROM host no resolve to A or MX",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_2",
+        "weight": 1.0,
+        "description": "Helo host checks (low)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_BADIP",
+        "weight": 4.500000,
+        "description": "Helo host is very bad ip",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_2",
+        "weight": 1.0,
+        "description": "Hostname checks (low)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_5",
+        "weight": 3.0,
+        "description": "Hostname checks (very hard)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_FROM_BOUNCE",
+        "weight": 0.0,
+        "description": "Bounce message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RDNS_DNSFAIL",
+        "weight": 0.0,
+        "description": "PTR verification DNS error",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_NOT_FQDN",
+        "weight": 2.0,
+        "description": "Helo not FQDN",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_NORES_A_OR_MX",
+        "weight": 0.300000,
+        "description": "Helo no resolve to A or MX",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_FROMHOST_NORESOLVE_MX",
+        "weight": 0.500000,
+        "description": "MX found in FROM host and no resolve",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_FROMHOST_NOT_FQDN",
+        "weight": 3.0,
+        "description": "FROM host not FQDN",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HOSTNAME_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Unknown client hostname (PTR or FCrDNS verification failed)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RDNS_NONE",
+        "weight": 2.0,
+        "description": "Cannot resolve reverse DNS for sender's IP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_HELO_IP_A",
+        "weight": 1.0,
+        "description": "Helo A IP != hostname IP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HFILTER_URL_ONLY",
+        "weight": 2.200000,
+        "description": "URL only in body",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "spamhaus",
+    "rules": [
+      {
+        "symbol": "RBL_SPAMHAUS_DROP",
+        "weight": 7.0,
+        "description": "From address is listed in Spamhaus DROP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_PBL",
+        "weight": 2.0,
+        "description": "From address is listed in Spamhaus PBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_BOTNET",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_PROHIBIT",
+        "weight": 0.0,
+        "description": "DBL uribl IP queries prohibited!",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPAMHAUS_ZEN_URIBL",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus ZEN URIBL"
+      },
+      {
+        "symbol": "RBL_SPAMHAUS",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus ZEN",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED",
+        "weight": 0.0,
+        "description": "You are exceeding the query limit, please see https://www.spamhaus.org/returnc/vol/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BOTNET",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as botnet C&C",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_PBL",
+        "weight": 0.0,
+        "description": "Received address is listed in Spamhaus PBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_SBL",
+        "weight": 6.500000,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus SBL"
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_SBL",
+        "weight": 4.0,
+        "description": "From address is listed in Spamhaus SBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_SBL",
+        "weight": 3.0,
+        "description": "Received address is listed in Spamhaus SBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_REDIR",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in Spamhaus DBL as spammed redirector domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_CSS",
+        "weight": 2.0,
+        "description": "From address is listed in Spamhaus CSS",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_PHISH",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit phish",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_XBL",
+        "weight": 1.0,
+        "description": "Received address is listed in Spamhaus XBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_SPAM",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as spam",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_PBL",
+        "weight": 0.010000,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus PBL"
+      },
+      {
+        "symbol": "URIBL_DROP",
+        "weight": 5.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus DROP"
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_CSS",
+        "weight": 1.0,
+        "description": "Received address is listed in Spamhaus CSS",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_PHISH",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_ABUSE_MALWARE",
+        "weight": 6.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as abused legit malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SPAMHAUS_XBL",
+        "weight": 4.0,
+        "description": "From address is listed in Spamhaus XBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL",
+        "weight": 0.0,
+        "description": "Unrecognised result from Spamhaus DBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_MALWARE",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in Spamhaus DBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_BLOCKED_OPENRESOLVER",
+        "weight": 0.0,
+        "description": "You are querying Spamhaus from an open resolver, please see https://www.spamhaus.org/returnc/pub/",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_XBL",
+        "weight": 3.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus XBL"
+      },
+      {
+        "symbol": "URIBL_SBL_CSS",
+        "weight": 5.0,
+        "description": "A domain in the message body resolves to an IP listed in Spamhaus CSS"
+      },
+      {
+        "symbol": "RECEIVED_SPAMHAUS_DROP",
+        "weight": 6.0,
+        "description": "Received address is listed in Spamhaus DROP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "ebl",
+    "rules": [
+      {
+        "symbol": "MSBL_EBL",
+        "weight": 7.500000,
+        "description": "MSBL emailbl (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MSBL_EBL_GREY",
+        "weight": 0.500000,
+        "description": "MSBL emailbl grey list (https://www.msbl.org/)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "surblorg",
+    "rules": [
+      {
+        "symbol": "CRACKED_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as cracked",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_BLOCKED",
+        "weight": 0.0,
+        "description": "SURBL: query blocked by policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PH_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as phishing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ABUSE_SURBL",
+        "weight": 5.0,
+        "description": "A domain in the message is listed in SURBL as abused",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CT_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as a clicktracker",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MW_SURBL_MULTI",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in SURBL as malware",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DM_SURBL",
+        "weight": 0.0,
+        "description": "A domain in the message is listed in SURBL as belonging to a disposable email service",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "uribl",
+    "rules": [
+      {
+        "symbol": "URIBL_GREY",
+        "weight": 2.500000,
+        "description": "A domain in the message is listed in URIBL.com grey",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_MULTI",
+        "weight": 0.0,
+        "description": "Unrecognised result from URIBL.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLOCKED",
+        "weight": 0.0,
+        "description": "URIBL.com: query refused, likely due to policy/overusage",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_BLACK",
+        "weight": 7.500000,
+        "description": "A domain in the message is listed in URIBL.com black",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_RED",
+        "weight": 0.500000,
+        "description": "A domain in the message is listed in URIBL.com red",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "external_services",
+    "rules": []
+  },
+  {
+    "group": "experimental",
+    "rules": [
+      {
+        "symbol": "XM_UA_NO_VERSION",
+        "weight": 0.010000,
+        "description": "X-Mailer/User-Agent header has no version number",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "composite",
+    "rules": [
+      {
+        "symbol": "SUSPICIOUS_AUTH_ORIGIN",
+        "weight": 0.0,
+        "description": "Message authenticated, but from a suspicios origin (potentially an injector)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_RECIPIENTS_FORWARDING",
+        "weight": 0.0,
+        "description": "FORGED_RECIPIENTS & g:forwarding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "UNDISC_RCPTS_BULK",
+        "weight": 3.0,
+        "description": "Missing or undisclosed recipients with a bulk signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_URL_IN_SUSPICIOUS_MESSAGE",
+        "weight": 1.0,
+        "description": "Message contains redirector, anonymous or IPFS gateway URL and is marked by fuzzy/bayes/SURBL/RBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_UNAUTH_PBL",
+        "weight": 2.0,
+        "description": "Relayed through Spamhaus PBL IP without sufficient authentication (possibly indicating an open relay)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "APPLE_MAILER_COMMON",
+        "weight": 0.0,
+        "description": "Message was sent by 'Apple Mail' and has common symbols in place",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_SENDER_MAILLIST",
+        "weight": 0.0,
+        "description": "Sender is not the same as MAIL FROM: envelope, but a message is from a maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHISH_EMOTION",
+        "weight": 1.0,
+        "description": "Phish message with subject trying to address users emotion",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DMARC_POLICY_ALLOW_WITH_FAILURES",
+        "weight": -0.500000,
+        "description": "DMARC permit policy with DKIM/SPF failure",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "AUTH_NA_OR_FAIL",
+        "weight": 1.0,
+        "description": "No authenticating method SPF/DKIM/DMARC/ARC was successful",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "REDIRECTOR_URL_ONLY",
+        "weight": 1.0,
+        "description": "Message only contains a redirector URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_RECIPIENTS_MAILLIST",
+        "weight": 0.0,
+        "description": "Recipients are not the same as RCPT TO: mail command, but a message from a maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_SENDER_VERP_SRS",
+        "weight": 0.0,
+        "description": "FORGED_SENDER & (ENVFROM_PRVS | ENVFROM_VERP)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_ANON_DOMAIN",
+        "weight": 0.100000,
+        "description": "Contains one or more domains trying to disguise owner/destination",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BROKEN_HEADERS_MAILLIST",
+        "weight": 0.0,
+        "description": "Negate BROKEN_HEADERS when message comes via some mailing list",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "AUTOGEN_PHP_SPAMMY",
+        "weight": 1.0,
+        "description": "Message was generated by PHP script and contains some spam indicators",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "APPLE_IOS_MAILER_COMMON",
+        "weight": 0.0,
+        "description": "Message was sent by 'Apple iOS Mail' and has common symbols in place",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "IP_SCORE_FREEMAIL",
+        "weight": 0.0,
+        "description": "Negate IP_SCORE when message comes from FreeMail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "VIOLATED_DIRECT_SPF",
+        "weight": 3.500000,
+        "description": "Has no Received (or no trusted received relays) and SPF policy fails or soft fails",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "AUTH_NA",
+        "weight": 1.0,
+        "description": "Authenticating message via SPF/DKIM/DMARC/ARC not available",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_REPLYTO_NEQ_FROM",
+        "weight": 2.0,
+        "description": "Reply-To is a Freemail address and it not match From header or SMTP From, also From is not another Freemail",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD_EXT_IN_OBFUSCATED_ARCHIVE",
+        "weight": 8.0,
+        "description": "Attachment with bad extension and archive that has filename with clear obfuscation signs",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BAD_REP_POLICIES",
+        "weight": 0.100000,
+        "description": "Contains valid policies but are also marked by fuzzy/bayes/SURBL/RBL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_MID_ALLOWED",
+        "weight": 0.0,
+        "description": "MISSING_MID_ALLOWED",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_MAILLIST",
+        "weight": 0.0,
+        "description": "Avoid false positives for FORGED_MUA_* in maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPF_FAIL_FORWARDING",
+        "weight": 0.0,
+        "description": "g:forwarding & (R_SPF_SOFTFAIL | R_SPF_FAIL)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INVALID_MSGID_ALLOWED",
+        "weight": 0.0,
+        "description": "INVALID_MSGID_ALLOWED",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_DKIM_ARC_DNSWL_HI",
+        "weight": -1.0,
+        "description": "Sufficiently DKIM/ARC signed and received from IP with high trust at DNSWL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_SENDER_FORWARDING",
+        "weight": 0.0,
+        "description": "Forged sender, but message is forwarded",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MIME_BAD_EXT_WITH_BAD_UNICODE",
+        "weight": 8.0,
+        "description": "Attachment with bad extension and filename that has known obscured unicode characters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_DKIM_ARC_DNSWL_MED",
+        "weight": -0.500000,
+        "description": "Sufficiently DKIM/ARC signed and received from IP with medium trust at DNSWL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_MIXED",
+        "weight": 0.0,
+        "description": "-R_DKIM_ALLOW & (R_DKIM_TEMPFAIL | R_DKIM_PERMFAIL | R_DKIM_REJECT)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BOUNCE_NO_AUTH",
+        "weight": 1.0,
+        "description": "(AUTH_NA | AUTH_NA_OR_FAIL) & (BOUNCE | SUBJ_BOUNCE_WORDS)",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "mid",
+    "rules": [
+      {
+        "symbol": "MID_END_EQ_FROM_USER_PART",
+        "weight": 4.0,
+        "description": "Message-ID RHS (after @) and MIME from local part are the same",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "CHECK_MID",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "KNOWN_MID",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "KNOWN_NO_MID",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "KNOWN_MID_CALLBACK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "fuzzy",
+    "rules": [
+      {
+        "symbol": "FUZZY_DENIED",
+        "weight": 12.0,
+        "description": "Denied fuzzy hash, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_PROB",
+        "weight": 5.0,
+        "description": "Probable fuzzy hash, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_ENCRYPTION_REQUIRED",
+        "weight": 0.0,
+        "description": "Fuzzy encryption is required by a server",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_WHITE",
+        "weight": -2.100000,
+        "description": "Whitelisted fuzzy hash, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_FORBIDDEN",
+        "weight": 0.0,
+        "description": "Fuzzy access denied",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_RATELIMITED",
+        "weight": 0.0,
+        "description": "Fuzzy rate limit is reached",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_UNKNOWN",
+        "weight": 5.0,
+        "description": "Generic fuzzy hash match, bl.rspamd.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FUZZY_CALLBACK",
+        "weight": 0.0,
+        "description": "Fuzzy check callback",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "senderscore",
+    "rules": [
+      {
+        "symbol": "RBL_SENDERSCORE_NA",
+        "weight": 0.0,
+        "description": "From address is listed in SenderScore RPBL - noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_2",
+        "weight": 3.0,
+        "description": "SenderScore Reputation: Bad (20-29).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_NA",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_9",
+        "weight": -1.0,
+        "description": "SenderScore Reputation: Good (90-100).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_4",
+        "weight": 2.0,
+        "description": "SenderScore Reputation: Bad (40-49).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_1",
+        "weight": 3.500000,
+        "description": "SenderScore Reputation: Bad (10-19).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_UNKNOWN",
+        "weight": 0.0,
+        "description": "Unrecognized result from SenderScore Reputation list.",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_NA",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_8",
+        "weight": 0.0,
+        "description": "SenderScore Reputation: Neutral (80-89).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_PRST_NA",
+        "weight": 4.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+pristine+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_NA",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_NA_BOT",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST_BOT",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - pristine+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_SUS_ATT_NA",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+suspect_attachments+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_6",
+        "weight": 1.0,
+        "description": "SenderScore Reputation: Bad (60-69).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_PRST",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - pristine"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_0",
+        "weight": 4.0,
+        "description": "SenderScore Reputation: Very Bad (0-9).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SCORE_PRST",
+        "weight": 4.0,
+        "description": "From address is listed in SenderScore RPBL - sender_score+pristine"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_3",
+        "weight": 2.500000,
+        "description": "SenderScore Reputation: Bad (30-39).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_5",
+        "weight": 1.500000,
+        "description": "SenderScore Reputation: Bad (50-59).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_PRST_NA",
+        "weight": 3.0,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+pristine+noauth"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_NA_BOT",
+        "weight": 1.0,
+        "description": "From address is listed in SenderScore RPBL - noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_7",
+        "weight": 0.500000,
+        "description": "SenderScore Reputation: Bad (70-79).",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_NA_BOT",
+        "weight": 1.500000,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_SUS_ATT_PRST_NA_BOT",
+        "weight": 3.500000,
+        "description": "From address is listed in SenderScore RPBL - suspect_attachments+pristine+noauth+botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_BOT",
+        "weight": 2.0,
+        "description": "From address is listed in SenderScore RPBL - botnet"
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_BLOCKED",
+        "weight": 0.0,
+        "description": "Excessive number of queries to SenderScore RPBL, more info: https://knowledge.validity.com/hc/en-us/articles/20961730681243",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "aliases",
+    "rules": [
+      {
+        "symbol": "TAGGED_RCPT",
+        "weight": 0.0,
+        "description": "Recipient has plus-tags",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "TAGGED_FROM",
+        "weight": 0.0,
+        "description": "From address has plus-tags",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INTERNAL_MAIL",
+        "weight": 0.0,
+        "description": "Mail from local to local domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ALIASES_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "LOCAL_INBOUND",
+        "weight": 0.0,
+        "description": "Mail from external to local domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ALIAS_RESOLVED",
+        "weight": 0.0,
+        "description": "Address was resolved through aliases",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "LOCAL_OUTBOUND",
+        "weight": 0.0,
+        "description": "Mail from local to external domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "malware",
+    "rules": [
+      {
+        "symbol": "EXE_ARCHIVE_CLICKBAIT_FILENAME",
+        "weight": 9.0,
+        "description": "exe file in archive with clickbait filename",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "EXE_ARCHIVE_CLICKBAIT_SUBJECT",
+        "weight": 9.0,
+        "description": "exe file in archive with clickbait subject",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISIDENTIFIED_RAR",
+        "weight": 4.0,
+        "description": "rar with wrong extension",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "EXE_IN_ARCHIVE",
+        "weight": 1.500000,
+        "description": "exe file in archive",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "EXE_IN_MISIDENTIFIED_RAR",
+        "weight": 5.0,
+        "description": "rar with wrong extension containing exe file",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SINGLE_FILE_ARCHIVE_WITH_EXE",
+        "weight": 5.0,
+        "description": "single file container bearing executable",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "mailspike",
+    "rules": [
+      {
+        "symbol": "MAILSPIKE",
+        "weight": 0.0,
+        "description": "Unrecognised result from Mailspike",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_BAD",
+        "weight": 1.0,
+        "description": "From address is listed in Mailspike RBL - bad reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_VERYBAD",
+        "weight": 1.500000,
+        "description": "From address is listed in Mailspike RBL - very bad reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_GOOD",
+        "weight": -0.100000,
+        "description": "From address is listed in Mailspike RWL - good reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_VERYGOOD",
+        "weight": -0.200000,
+        "description": "From address is listed in Mailspike RWL - very good reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_POSSIBLE",
+        "weight": 0.0,
+        "description": "From address is listed in Mailspike RWL - possibly legit",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_EXCELLENT",
+        "weight": -0.400000,
+        "description": "From address is listed in Mailspike RWL - excellent reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RWL_MAILSPIKE_NEUTRAL",
+        "weight": 0.0,
+        "description": "Neutral result from Mailspike",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_MAILSPIKE_WORST",
+        "weight": 2.0,
+        "description": "From address is listed in Mailspike RBL - worst possible reputation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "compromised_hosts",
+    "rules": [
+      {
+        "symbol": "URI_HIDDEN_PATH",
+        "weight": 1.0,
+        "description": "Message contains URI with a hidden path",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "XAW_SERVICE_ACCT",
+        "weight": 1.0,
+        "description": "Message originally from a service account",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HIDDEN_SOURCE_OBJ",
+        "weight": 2.0,
+        "description": "UNIX hidden file/directory in path",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_PHPMAILER_SIG",
+        "weight": 0.0,
+        "description": "PHPMailer signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WWW_DOT_DOMAIN",
+        "weight": 0.500000,
+        "description": "From/Sender/Reply-To or Envelope is @www.domain.com",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_SOURCE",
+        "weight": 0.0,
+        "description": "Has X-Source headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HACKED_WP_PHISHING",
+        "weight": 4.500000,
+        "description": "Phish message sent by hacked Wordpress instance",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_XAW",
+        "weight": 0.0,
+        "description": "Has X-Authentication-Warning header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_PHP_SCRIPT",
+        "weight": 0.0,
+        "description": "Has X-PHP-Script header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHP_SCRIPT_ROOT",
+        "weight": 1.0,
+        "description": "PHP Script executed by root UID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PHP_XPS_PATTERN",
+        "weight": 0.0,
+        "description": "Message contains X-PHP-Script pattern",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_AS",
+        "weight": 0.0,
+        "description": "Has X-Authenticated-Sender header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "COMPROMISED_ACCT_BULK",
+        "weight": 3.0,
+        "description": "Likely to be from a compromised account",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "X_PHP_EVAL",
+        "weight": 4.0,
+        "description": "Message sent using eval'd PHP",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_POS",
+        "weight": 0.0,
+        "description": "Has X-PHP-Originating-Script header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_WP_URI",
+        "weight": 0.0,
+        "description": "Contains WordPress URIs",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ABUSE_FROM_INJECTOR",
+        "weight": 2.0,
+        "description": "Message is sent from a suspicios origin and showing signs of abuse, likely spam injected in compromised account",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_GMSV",
+        "weight": 0.0,
+        "description": "Has X-Get-Message-Sender-Via: header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FROM_SERVICE_ACCT",
+        "weight": 1.0,
+        "description": "Sender/From/Reply-To is a service account",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ENVFROM_SERVICE_ACCT",
+        "weight": 1.0,
+        "description": "Envelope from is a service account",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_X_ANTIABUSE",
+        "weight": 0.0,
+        "description": "Has X-AntiAbuse headers",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WP_COMPROMISED",
+        "weight": 0.0,
+        "description": "URL that is pointing to a compromised WordPress installation",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_WWW",
+        "weight": 0.500000,
+        "description": "Message-ID from www host",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "html",
+    "rules": [
+      {
+        "symbol": "ZERO_FONT",
+        "weight": 1.0,
+        "description": "Zero sized font used",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTML_SHORT_LINK_IMG_1",
+        "weight": 2.0,
+        "description": "Short HTML part (0..1K) with a link to an image",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_WHITE_ON_WHITE",
+        "weight": 4.0,
+        "description": "Message contains low contrast text",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTML_SHORT_LINK_IMG_2",
+        "weight": 1.0,
+        "description": "Short HTML part (1K..1.5K) with a link to an image",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTML_VISIBLE_CHECKS",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTML_SHORT_LINK_IMG_3",
+        "weight": 0.500000,
+        "description": "Short HTML part (1.5K..2K) with a link to an image",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HAS_DATA_URI",
+        "weight": 0.0,
+        "description": "Has Data URI encoding",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTTP_TO_IP",
+        "weight": 1.0,
+        "description": "HTML anchor points to an IP address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_EMPTY_IMAGE",
+        "weight": 2.0,
+        "description": "Message contains empty parts and image",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MANY_INVISIBLE_PARTS",
+        "weight": 1.0,
+        "description": "Many parts are visually hidden",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_SUSPICIOUS_IMAGES",
+        "weight": 5.0,
+        "description": "Message has high image to text ratio",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTTP_TO_HTTPS",
+        "weight": 0.500000,
+        "description": "The anchor text contains a distinct scheme compared to the target URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "EXT_CSS",
+        "weight": 1.0,
+        "description": "Message contains external CSS reference",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DATA_URI_OBFU",
+        "weight": 2.0,
+        "description": "Uses Data URI encoding to obfuscate plain or HTML in base64",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "HTML_META_REFRESH_URL",
+        "weight": 5.0,
+        "description": "Has HTML Meta refresh URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "subject",
+    "rules": [
+      {
+        "symbol": "SUBJ_ALL_CAPS",
+        "weight": 3.0,
+        "description": "Subject contains mostly capital letters",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "LONG_SUBJ",
+        "weight": 3.0,
+        "description": "Subject is very long",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URL_IN_SUBJECT",
+        "weight": 4.0,
+        "description": "Subject contains URL",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "ungrouped",
+    "rules": [
+      {
+        "symbol": "ARC_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ASN",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DKIM_SIGNED",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLOCKLISTDE_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DWL_DNSWL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MSBL_EBL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MAILSPIKE_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPAMHAUS_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_FRESH15_UNKNOWN_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SPF_CHECK",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_HASHBL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RCVD_IN_DNSWL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SINGLE_SHORT_PART",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SURBL_MULTI_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "UDF_COMPRESSION_500PLUS",
+        "weight": 9.0,
+        "description": "very well compressed img file in archive",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "ASN_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_VIRUSFREE_UNKNOWN_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SENDERSCORE_REPUT_UNKNOWN_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_EMAILBL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "URIBL_MULTI_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "DBL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RSPAMD_URIBL_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "RBL_SEM_IPV6_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SEM_URIBL_UNKNOWN_FAIL",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "mua",
+    "rules": [
+      {
+        "symbol": "FORGED_MUA_THEBAT_MSGID_UNKNOWN",
+        "weight": 3.0,
+        "description": "Message pretends to be send from The Bat! but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_KMAIL_MSGID_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Message pretends to be send from KMail but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_OPERA_MSGID",
+        "weight": 4.0,
+        "description": "Message pretends to be send from Opera Mail but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_SEAMONKEY_MSGID",
+        "weight": 4.0,
+        "description": "Forged mail pretending to be from Mozilla Seamonkey but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_SEAMONKEY_MSGID_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Forged mail pretending to be from Mozilla Seamonkey but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_OUTLOOK",
+        "weight": 3.0,
+        "description": "Forged Outlook MUA",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_BOUNDARY2",
+        "weight": 4.0,
+        "description": "Suspicious boundary in Content-Type header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_THEBAT_MSGID",
+        "weight": 4.0,
+        "description": "Message pretends to be send from The Bat! but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_BOUNDARY3",
+        "weight": 3.0,
+        "description": "Suspicious boundary in Content-Type header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_BOUNDARY4",
+        "weight": 4.0,
+        "description": "Suspicious boundary in Content-Type header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_BOUNDARY",
+        "weight": 5.0,
+        "description": "Suspicious boundary in Content-Type header",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_POSTBOX_MSGID_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Forged mail pretending to be from Postbox but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_MOZILLA_MAIL_MSGID",
+        "weight": 4.0,
+        "description": "Message pretends to be send from Mozilla Mail but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_THUNDERBIRD_MSGID_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Forged mail pretending to be from Mozilla Thunderbird but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_MAILLIST",
+        "weight": 0.0,
+        "description": "Avoid false positives for FORGED_MUA_* in maillist",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_THUNDERBIRD_MSGID",
+        "weight": 4.0,
+        "description": "Forged mail pretending to be from Mozilla Thunderbird but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_MOZILLA_MAIL_MSGID_UNKNOWN",
+        "weight": 2.500000,
+        "description": "Message pretends to be send from Mozilla Mail but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FORGED_MUA_POSTBOX_MSGID",
+        "weight": 4.0,
+        "description": "Forged mail pretending to be from Postbox but has forged Message-ID",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "whitelist",
+    "rules": [
+      {
+        "symbol": "WHITELIST_DKIM",
+        "weight": -1.0,
+        "description": "Mail comes from the whitelisted domain and has a valid DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_SPF_DKIM",
+        "weight": -3.0,
+        "description": "Mail comes from the whitelisted domain and has valid SPF and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DMARC",
+        "weight": 6.0,
+        "description": "Mail comes from the whitelisted domain and has failed DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_DMARC",
+        "weight": -7.0,
+        "description": "Mail comes from the whitelisted domain and has valid DMARC and DKIM policies",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_SPF_DKIM",
+        "weight": 3.0,
+        "description": "Mail comes from the whitelisted domain and has no valid SPF policy or a bad DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_DKIM",
+        "weight": 2.0,
+        "description": "Mail comes from the whitelisted domain and has non-valid DKIM signature",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "WHITELIST_SPF",
+        "weight": -1.0,
+        "description": "Mail comes from the whitelisted domain and has a valid SPF policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BLACKLIST_SPF",
+        "weight": 1.0,
+        "description": "Mail comes from the whitelisted domain and has no valid SPF policy",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "blankspam",
+    "rules": [
+      {
+        "symbol": "COMPLETELY_EMPTY",
+        "weight": 15.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SHORT_PART_BAD_HEADERS",
+        "weight": 7.0,
+        "description": "MISSING_ESSENTIAL_HEADERS & SINGLE_SHORT_PART",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MISSING_ESSENTIAL_HEADERS",
+        "weight": 7.0,
+        "description": "Common headers were entirely absent",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "content",
+    "rules": [
+      {
+        "symbol": "PDF_TIMEOUT",
+        "weight": 0.0,
+        "description": "There is a PDF in the message that caused timeout in processing",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PDF_LONG_TRAILER",
+        "weight": 0.200000,
+        "description": "There is an PDF with a long trailer in the message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PDF_JAVASCRIPT",
+        "weight": 0.100000,
+        "description": "There is an PDF with JavaScript in the message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PDF_MANY_OBJECTS",
+        "weight": 0.0,
+        "description": "There is a PDF with too many objects in the message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PDF_ENCRYPTED",
+        "weight": 0.300000,
+        "description": "There is an encrypted PDF in the message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "PDF_SUSPICIOUS",
+        "weight": 4.500000,
+        "description": "There is an PDF with suspicious properties in the message",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "Message ID",
+    "rules": [
+      {
+        "symbol": "MID_CONTAINS_TO",
+        "weight": 1.0,
+        "description": "Message-ID contains To address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_MISSING_BRACKETS",
+        "weight": 0.500000,
+        "description": "Message-ID is missing <>'s",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_MATCH_TO",
+        "weight": 1.0,
+        "description": "Message-ID RHS matches To domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_NOT_FQDN",
+        "weight": 0.500000,
+        "description": "Message-ID RHS is not a fully-qualified domain name",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_MATCH_FROM",
+        "weight": 0.0,
+        "description": "Message-ID RHS matches From domain",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_CONTAINS_FROM",
+        "weight": 1.0,
+        "description": "Message-ID contains From address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_BARE_IP",
+        "weight": 2.0,
+        "description": "Message-ID RHS is a bare IP address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_IP_LITERAL",
+        "weight": 0.500000,
+        "description": "Message-ID RHS is an IP-literal",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "MID_RHS_MATCH_FROMTLD",
+        "weight": 0.0,
+        "description": "Message-ID RHS matches From domain tld",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "headers,mime",
+    "rules": [
+      {
+        "symbol": "CHECK_TO_CC",
+        "weight": 0.0,
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "scams",
+    "rules": [
+      {
+        "symbol": "LEAKED_PASSWORD_SCAM_RE",
+        "weight": 0.0,
+        "description": "Contains BTC wallet address and malicious regexps",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "FREEMAIL_AFF",
+        "weight": 4.0,
+        "description": "Message exhibits strong characteristics of advance fee fraud (AFF a/k/a '419' spam) involving freemail addresses",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "INTRODUCTION",
+        "weight": 2.0,
+        "description": "Sender introduces themselves",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "SUSPICIOUS_MDN",
+        "weight": 2.0,
+        "description": "Message delivery notification should go to freemail or disposable e-mail, but message was not sent from a freemail address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "BITCOIN_ADDR",
+        "weight": 0.0,
+        "description": "Message has a valid bitcoin wallet address",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "LEAKED_PASSWORD_SCAM",
+        "weight": 7.0,
+        "description": "Contains BTC wallet address and scam patterns",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  },
+  {
+    "group": "body",
+    "rules": [
+      {
+        "symbol": "HAS_ATTACHMENT",
+        "weight": 0.0,
+        "description": "Message contains attachments",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      },
+      {
+        "symbol": "R_PARTS_DIFFER",
+        "weight": 1.0,
+        "description": "Text and HTML parts differ",
+        "frequency": 0.0,
+        "frequency_stddev": 0.0,
+        "time": 0.0
+      }
+    ]
+  }
+]

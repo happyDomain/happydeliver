@@ -37,11 +37,13 @@ const (
 )
 
 // RspamdAnalyzer analyzes rspamd results from email headers
-type RspamdAnalyzer struct{}
+type RspamdAnalyzer struct {
+	symbols map[string]string
+}
 
-// NewRspamdAnalyzer creates a new rspamd analyzer
-func NewRspamdAnalyzer() *RspamdAnalyzer {
-	return &RspamdAnalyzer{}
+// NewRspamdAnalyzer creates a new rspamd analyzer with optional symbol descriptions
+func NewRspamdAnalyzer(symbols map[string]string) *RspamdAnalyzer {
+	return &RspamdAnalyzer{symbols: symbols}
 }
 
 // AnalyzeRspamd extracts and analyzes rspamd results from email headers
@@ -81,6 +83,16 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 	if serverHeader, ok := headers["X-Rspamd-Server"]; ok {
 		server := strings.TrimSpace(serverHeader)
 		result.Server = &server
+	}
+
+	// Populate symbol descriptions from the lookup map
+	if a.symbols != nil {
+		for name, sym := range result.Symbols {
+			if desc, ok := a.symbols[name]; ok {
+				sym.Description = &desc
+				result.Symbols[name] = sym
+			}
+		}
 	}
 
 	// Derive IsSpam from score vs reject threshold.

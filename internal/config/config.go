@@ -72,7 +72,8 @@ type AnalysisConfig struct {
 	HTTPTimeout  time.Duration
 	RBLs         []string
 	DNSWLs       []string
-	CheckAllIPs  bool // Check all IPs found in headers, not just the first one
+	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
+	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
 }
 
 // DefaultConfig returns a configuration with sensible defaults

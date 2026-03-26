@@ -49,11 +49,12 @@ func NewReportGenerator(
 	rbls []string,
 	dnswls []string,
 	checkAllIPs bool,
+	rspamdAPIURL string,
 ) *ReportGenerator {
 	return &ReportGenerator{
 		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
-		rspamdAnalyzer:  NewRspamdAnalyzer(),
+		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
 		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),

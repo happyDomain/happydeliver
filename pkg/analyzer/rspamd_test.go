@@ -30,7 +30,7 @@ import (
 )
 
 func TestAnalyzeRspamdNoHeaders(t *testing.T) {
-	analyzer := NewRspamdAnalyzer()
+	analyzer := NewRspamdAnalyzer(nil)
 	email := &EmailMessage{Header: make(mail.Header)}
 
 	result := analyzer.AnalyzeRspamd(email)
@@ -126,7 +126,7 @@ func TestParseSpamdResult(t *testing.T) {
 		},
 	}
 
-	analyzer := NewRspamdAnalyzer()
+	analyzer := NewRspamdAnalyzer(nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestAnalyzeRspamd(t *testing.T) {
 		},
 	}
 
-	analyzer := NewRspamdAnalyzer()
+	analyzer := NewRspamdAnalyzer(nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -340,7 +340,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 	}
 
-	analyzer := NewRspamdAnalyzer()
+	analyzer := NewRspamdAnalyzer(nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -380,7 +380,7 @@ func TestAnalyzeRspamdRealEmail(t *testing.T) {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
 
-	analyzer := NewRspamdAnalyzer()
+	analyzer := NewRspamdAnalyzer(nil)
 	result := analyzer.AnalyzeRspamd(email)
 
 	if result == nil {

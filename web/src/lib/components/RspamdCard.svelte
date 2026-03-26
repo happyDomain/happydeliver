@@ -75,7 +75,7 @@
                             <tr>
                                 <th>Symbol</th>
                                 <th class="text-end">Score</th>
-                                <th>Parameters</th>
+                                <th>Description</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -87,7 +87,14 @@
                                           ? "table-success"
                                           : ""}
                                 >
-                                    <td class="font-monospace">{symbolName}</td>
+                                    <td>
+                                        <span class="font-monospace">{symbolName}</span>
+                                        {#if symbol.params}
+                                            <small class="d-block text-muted">
+                                                {symbol.params}
+                                            </small>
+                                        {/if}
+                                    </td>
                                     <td class="text-end">
                                         <span
                                             class={symbol.score > 0
@@ -99,7 +106,7 @@
                                             {symbol.score > 0 ? "+" : ""}{symbol.score.toFixed(2)}
                                         </span>
                                     </td>
-                                    <td class="small text-muted">{symbol.params ?? ""}</td>
+                                    <td class="small text-muted">{symbol.description ?? ""}</td>
                                 </tr>
                             {/each}
                         </tbody>
