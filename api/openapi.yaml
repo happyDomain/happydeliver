@@ -926,6 +926,10 @@ components:
           format: float
           description: Score contribution of this test
           example: -1.9
+        params:
+          type: string
+          description: Symbol parameters or options
+          example: "0.02"
         description:
           type: string
           description: Human-readable description of what this test checks
@@ -975,7 +979,7 @@ components:
         symbols:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/RspamdSymbol'
+            $ref: '#/components/schemas/SpamTestDetail'
           description: Map of triggered rspamd symbols to their details
           example:
             BAYES_HAM:
@@ -986,25 +990,6 @@ components:
           type: string
           description: Full rspamd report (raw X-Spamd-Result header)
 
-    RspamdSymbol:
-      type: object
-      required:
-        - name
-        - score
-      properties:
-        name:
-          type: string
-          description: Symbol name
-          example: "BAYES_HAM"
-        score:
-          type: number
-          format: float
-          description: Score contribution of this symbol
-          example: -1.9
-        params:
-          type: string
-          description: Symbol parameters or options
-          example: "0.02"
 
     DNSResults:
       type: object

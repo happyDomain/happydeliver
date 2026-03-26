@@ -59,7 +59,7 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 	}
 
 	result := &api.RspamdResult{
-		Symbols: make(map[string]api.RspamdSymbol),
+		Symbols: make(map[string]api.SpamTestDetail),
 	}
 
 	// Parse X-Spamd-Result header (primary source for score, threshold, and symbols)
@@ -129,7 +129,7 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *api.RspamdResul
 		if len(matches) > 2 {
 			name := matches[1]
 			score, _ := strconv.ParseFloat(matches[2], 64)
-			sym := api.RspamdSymbol{
+			sym := api.SpamTestDetail{
 				Name:  name,
 				Score: float32(score),
 			}

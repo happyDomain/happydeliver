@@ -131,7 +131,7 @@ func TestParseSpamdResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := &api.RspamdResult{
-				Symbols: make(map[string]api.RspamdSymbol),
+				Symbols: make(map[string]api.SpamTestDetail),
 			}
 			analyzer.parseSpamdResult(tt.header, result)
 
