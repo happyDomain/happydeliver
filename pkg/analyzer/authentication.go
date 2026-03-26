@@ -152,26 +152,31 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.Authe
 
 	score := 0
 
-	// IPRev (15 points)
-	score += 15 * a.calculateIPRevScore(results) / 100
+	// Core authentication (90 points total)
+	// SPF (30 points)
+	score += 30 * a.calculateSPFScore(results) / 100
 
-	// SPF (25 points)
-	score += 25 * a.calculateSPFScore(results) / 100
+	// DKIM (30 points)
+	score += 30 * a.calculateDKIMScore(results) / 100
 
-	// DKIM (23 points)
-	score += 23 * a.calculateDKIMScore(results) / 100
-
-	// X-Google-DKIM (optional) - penalty if failed
-	score += 12 * a.calculateXGoogleDKIMScore(results) / 100
-
-	// X-Aligned-From
-	score += 2 * a.calculateXAlignedFromScore(results) / 100
-
-	// DMARC (25 points)
-	score += 25 * a.calculateDMARCScore(results) / 100
+	// DMARC (30 points)
+	score += 30 * a.calculateDMARCScore(results) / 100
 
 	// BIMI (10 points)
 	score += 10 * a.calculateBIMIScore(results) / 100
+
+	// Penalty-only: IPRev (up to -7 points on failure)
+	if iprevScore := a.calculateIPRevScore(results); iprevScore < 100 {
+		score += 7 * (iprevScore - 100) / 100
+	}
+
+	// Penalty-only: X-Google-DKIM (up to -12 points on failure)
+	score += 12 * a.calculateXGoogleDKIMScore(results) / 100
+
+	// Penalty-only: X-Aligned-From (up to -5 points on failure)
+	if xAlignedScore := a.calculateXAlignedFromScore(results); xAlignedScore < 100 {
+		score += 5 * (xAlignedScore - 100) / 100
+	}
 
 	// Ensure score doesn't exceed 100
 	if score > 100 {
