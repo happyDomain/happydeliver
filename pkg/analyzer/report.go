@@ -141,8 +141,10 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	blacklistScore := 0
 	var blacklistGrade string
+	var whitelistGrade string
 	if results.RBL != nil {
-		blacklistScore, blacklistGrade = r.rblChecker.CalculateScore(results.RBL)
+		blacklistScore, blacklistGrade = r.rblChecker.CalculateScore(results.RBL, false)
+		_, whitelistGrade = r.dnswlChecker.CalculateScore(results.DNSWL, true)
 	}
 
 	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
@@ -173,7 +175,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		AuthenticationScore: authScore,
 		AuthenticationGrade: api.ScoreSummaryAuthenticationGrade(authGrade),
 		BlacklistScore:      blacklistScore,
-		BlacklistGrade:      api.ScoreSummaryBlacklistGrade(blacklistGrade),
+		BlacklistGrade:      api.ScoreSummaryBlacklistGrade(MinGrade(blacklistGrade, whitelistGrade)),
 		ContentScore:        contentScore,
 		ContentGrade:        api.ScoreSummaryContentGrade(contentGrade),
 		HeaderScore:         headerScore,

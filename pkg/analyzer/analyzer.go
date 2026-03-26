@@ -138,7 +138,7 @@ func (a *APIAdapter) CheckBlacklistIP(ip string) ([]api.BlacklistCheck, []api.Bl
 		IPsChecked:  []string{ip},
 		ListedCount: listedCount,
 	}
-	score, grade := a.analyzer.generator.rblChecker.CalculateScore(results)
+	score, grade := a.analyzer.generator.rblChecker.CalculateScore(results, false)
 
 	// Check the IP against all configured DNSWLs (informational only)
 	whitelists, _, err := a.analyzer.generator.dnswlChecker.CheckIP(ip)

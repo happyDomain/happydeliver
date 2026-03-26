@@ -73,6 +73,8 @@ func ScoreToReportGrade(score int) api.ReportGrade {
 // gradeRank returns a numeric rank for a grade (lower = worse)
 func gradeRank(grade string) int {
 	switch grade {
+	case "A++":
+		return 7
 	case "A+":
 		return 6
 	case "A":

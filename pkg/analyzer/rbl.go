@@ -300,7 +300,19 @@ func (r *DNSListChecker) reverseIP(ipStr string) string {
 
 // CalculateScore calculates the list contribution to deliverability.
 // Informational lists are not counted in the score.
-func (r *DNSListChecker) CalculateScore(results *DNSListResults) (int, string) {
+func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bool) (int, string) {
+	scoringListCount := len(r.Lists) - len(r.informationalSet)
+
+	if forWhitelist {
+		if results.ListedCount >= scoringListCount {
+			return 100, "A++"
+		} else if results.ListedCount > 0 {
+			return 100, "A+"
+		} else {
+			return 95, "A"
+		}
+	}
+
 	if results == nil || len(results.IPsChecked) == 0 {
 		return 100, ""
 	}
@@ -309,7 +321,6 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults) (int, string) {
 		return 100, "A+"
 	}
 
-	scoringListCount := len(r.Lists) - len(r.informationalSet)
 	percentage := 100 - results.RelevantListedCount*100/scoringListCount
 	return percentage, ScoreToGrade(percentage)
 }
