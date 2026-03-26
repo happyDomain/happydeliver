@@ -63,6 +63,16 @@ func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *api.AuthRe
 		return nil
 	}
 
+	// Verify receiver matches our hostname
+	if a.receiverHostname != "" {
+		receiverRe := regexp.MustCompile(`receiver=([^\s;]+)`)
+		if matches := receiverRe.FindStringSubmatch(receivedSPF); len(matches) > 1 {
+			if matches[1] != a.receiverHostname {
+				return nil
+			}
+		}
+	}
+
 	result := &api.AuthResult{}
 
 	// Extract result (first word)
