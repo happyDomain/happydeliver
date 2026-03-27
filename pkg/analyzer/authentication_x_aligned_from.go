@@ -61,5 +61,5 @@ func (a *AuthenticationAnalyzer) calculateXAlignedFromScore(results *api.Authent
 		}
 	}
 
-	return 0
+	return 100
 }

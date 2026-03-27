@@ -69,5 +69,5 @@ func (a *AuthenticationAnalyzer) calculateIPRevScore(results *api.Authentication
 		}
 	}
 
-	return 0
+	return 100
 }
