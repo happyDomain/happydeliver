@@ -30,7 +30,8 @@ import (
 	"sync"
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // DNSListChecker checks IP addresses against DNS-based block/allow lists.
@@ -117,7 +118,7 @@ func NewDNSWLChecker(timeout time.Duration, dnswls []string, checkAllIPs bool) *
 
 // DNSListResults represents the results of DNS list checks
 type DNSListResults struct {
-	Checks              map[string][]api.BlacklistCheck // Map of IP -> list of checks for that IP
+	Checks              map[string][]model.BlacklistCheck // Map of IP -> list of checks for that IP
 	IPsChecked          []string
 	ListedCount         int // Total listings including informational entries
 	RelevantListedCount int // Listings on scoring (non-informational) lists only
@@ -126,7 +127,7 @@ type DNSListResults struct {
 // CheckEmail checks all IPs found in the email headers against the configured lists
 func (r *DNSListChecker) CheckEmail(email *EmailMessage) *DNSListResults {
 	results := &DNSListResults{
-		Checks: make(map[string][]api.BlacklistCheck),
+		Checks: make(map[string][]model.BlacklistCheck),
 	}
 
 	ips := r.extractIPs(email)
@@ -157,12 +158,12 @@ func (r *DNSListChecker) CheckEmail(email *EmailMessage) *DNSListResults {
 }
 
 // CheckIP checks a single IP address against all configured lists in parallel
-func (r *DNSListChecker) CheckIP(ip string) ([]api.BlacklistCheck, int, error) {
+func (r *DNSListChecker) CheckIP(ip string) ([]model.BlacklistCheck, int, error) {
 	if !r.isPublicIP(ip) {
 		return nil, 0, fmt.Errorf("invalid or non-public IP address: %s", ip)
 	}
 
-	checks := make([]api.BlacklistCheck, len(r.Lists))
+	checks := make([]model.BlacklistCheck, len(r.Lists))
 	var wg sync.WaitGroup
 
 	for i, list := range r.Lists {
@@ -239,14 +240,14 @@ func (r *DNSListChecker) isPublicIP(ipStr string) bool {
 }
 
 // checkIP checks a single IP against a single DNS list
-func (r *DNSListChecker) checkIP(ip, list string) api.BlacklistCheck {
-	check := api.BlacklistCheck{
+func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
+	check := model.BlacklistCheck{
 		Rbl: list,
 	}
 
 	reversedIP := r.reverseIP(ip)
 	if reversedIP == "" {
-		check.Error = api.PtrTo("Failed to reverse IP address")
+		check.Error = utils.PtrTo("Failed to reverse IP address")
 		return check
 	}
 
@@ -263,17 +264,17 @@ func (r *DNSListChecker) checkIP(ip, list string) api.BlacklistCheck {
 				return check
 			}
 		}
-		check.Error = api.PtrTo(fmt.Sprintf("DNS lookup failed: %v", err))
+		check.Error = utils.PtrTo(fmt.Sprintf("DNS lookup failed: %v", err))
 		return check
 	}
 
 	if len(addrs) > 0 {
-		check.Response = api.PtrTo(addrs[0])
+		check.Response = utils.PtrTo(addrs[0])
 
 		// In RBL mode, 127.255.255.253/254/255 indicate operational errors, not real listings.
 		if r.filterErrorCodes && (addrs[0] == "127.255.255.253" || addrs[0] == "127.255.255.254" || addrs[0] == "127.255.255.255") {
 			check.Listed = false
-			check.Error = api.PtrTo(fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", list, addrs[0]))
+			check.Error = utils.PtrTo(fmt.Sprintf("RBL %s returned error code %s (RBL operational issue)", list, addrs[0]))
 		} else {
 			check.Listed = true
 		}

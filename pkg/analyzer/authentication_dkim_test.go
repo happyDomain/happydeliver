@@ -24,35 +24,35 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseDKIMResult(t *testing.T) {
 	tests := []struct {
 		name             string
 		part             string
-		expectedResult   api.AuthResultResult
+		expectedResult   model.AuthResultResult
 		expectedDomain   string
 		expectedSelector string
 	}{
 		{
 			name:             "DKIM pass with domain and selector",
 			part:             "dkim=pass header.d=example.com header.s=default",
-			expectedResult:   api.AuthResultResultPass,
+			expectedResult:   model.AuthResultResultPass,
 			expectedDomain:   "example.com",
 			expectedSelector: "default",
 		},
 		{
 			name:             "DKIM fail",
 			part:             "dkim=fail header.d=example.com header.s=selector1",
-			expectedResult:   api.AuthResultResultFail,
+			expectedResult:   model.AuthResultResultFail,
 			expectedDomain:   "example.com",
 			expectedSelector: "selector1",
 		},
 		{
 			name:             "DKIM with short form (d= and s=)",
 			part:             "dkim=pass d=example.com s=default",
-			expectedResult:   api.AuthResultResultPass,
+			expectedResult:   model.AuthResultResultPass,
 			expectedDomain:   "example.com",
 			expectedSelector: "default",
 		},

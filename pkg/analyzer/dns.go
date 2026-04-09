@@ -24,7 +24,7 @@ package analyzer
 import (
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // DNSAnalyzer analyzes DNS records for email domains
@@ -54,16 +54,16 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 }
 
 // AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *api.HeaderAnalysis) *api.DNSResults {
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis) *model.DNSResults {
 	// Extract domain from From address
 	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
-		return &api.DNSResults{
+		return &model.DNSResults{
 			Errors: &[]string{"Unable to extract domain from email"},
 		}
 	}
 	fromDomain := *headersResults.DomainAlignment.FromDomain
 
-	results := &api.DNSResults{
+	results := &model.DNSResults{
 		FromDomain: fromDomain,
 		RpDomain:   headersResults.DomainAlignment.ReturnPathDomain,
 	}
@@ -109,7 +109,7 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *api.Header
 		dkimRecord := d.checkDKIMRecord(sig.Domain, sig.Selector)
 		if dkimRecord != nil {
 			if results.DkimRecords == nil {
-				results.DkimRecords = new([]api.DKIMRecord)
+				results.DkimRecords = new([]model.DKIMRecord)
 			}
 			*results.DkimRecords = append(*results.DkimRecords, *dkimRecord)
 		}
@@ -127,8 +127,8 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *api.Header
 
 // AnalyzeDomainOnly performs DNS validation for a domain without email context
 // This is useful for checking domain configuration without sending an actual email
-func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *api.DNSResults {
-	results := &api.DNSResults{
+func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
+	results := &model.DNSResults{
 		FromDomain: domain,
 	}
 
@@ -150,7 +150,7 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *api.DNSResults {
 // CalculateDomainOnlyScore calculates the DNS score for domain-only tests
 // Returns a score from 0-100 where higher is better
 // This version excludes PTR and DKIM checks since they require email context
-func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *api.DNSResults) (int, string) {
+func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
@@ -192,7 +192,7 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *api.DNSResults) (int, st
 // CalculateDNSScore calculates the DNS score from records results
 // Returns a score from 0-100 where higher is better
 // senderIP is the original sender IP address used for FCrDNS verification
-func (d *DNSAnalyzer) CalculateDNSScore(results *api.DNSResults, senderIP string) (int, string) {
+func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP string) (int, string) {
 	if results == nil {
 		return 0, ""
 	}

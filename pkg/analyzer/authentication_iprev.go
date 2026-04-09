@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseIPRevResult parses IP reverse lookup result from Authentication-Results
 // Example: iprev=pass smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)
-func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *api.IPRevResult {
-	result := &api.IPRevResult{}
+func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *model.IPRevResult {
+	result := &model.IPRevResult{}
 
 	// Extract result (pass, fail, temperror, permerror, none)
 	re := regexp.MustCompile(`iprev=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.IPRevResultResult(resultStr)
+		result.Result = model.IPRevResultResult(resultStr)
 	}
 
 	// Extract IP address (smtp.remote-ip or remote-ip)
@@ -54,15 +55,15 @@ func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *api.IPRevResult 
 		result.Hostname = &hostname
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "iprev="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "iprev="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateIPRevScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateIPRevScore(results *model.AuthenticationResults) (score int) {
 	if results.Iprev != nil {
 		switch results.Iprev.Result {
-		case api.Pass:
+		case model.Pass:
 			return 100
 		default: // fail, temperror, permerror
 			return 0

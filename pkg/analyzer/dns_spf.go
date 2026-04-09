@@ -27,33 +27,34 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
-func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]api.SPFRecord {
+func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]model.SPFRecord {
 	visited := make(map[string]bool)
 	return d.resolveSPFRecords(domain, visited, 0, true)
 }
 
 // resolveSPFRecords recursively resolves SPF records including include: directives
 // isMainRecord indicates if this is the primary domain's record (not an included one)
-func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int, isMainRecord bool) *[]api.SPFRecord {
+func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int, isMainRecord bool) *[]model.SPFRecord {
 	const maxDepth = 10 // Prevent infinite recursion
 
 	if depth > maxDepth {
-		return &[]api.SPFRecord{
+		return &[]model.SPFRecord{
 			{
 				Domain: &domain,
 				Valid:  false,
-				Error:  api.PtrTo("Maximum SPF include depth exceeded"),
+				Error:  utils.PtrTo("Maximum SPF include depth exceeded"),
 			},
 		}
 	}
 
 	// Prevent circular references
 	if visited[domain] {
-		return &[]api.SPFRecord{}
+		return &[]model.SPFRecord{}
 	}
 	visited[domain] = true
 
@@ -62,11 +63,11 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, domain)
 	if err != nil {
-		return &[]api.SPFRecord{
+		return &[]model.SPFRecord{
 			{
 				Domain: &domain,
 				Valid:  false,
-				Error:  api.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
+				Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
 			},
 		}
 	}
@@ -82,23 +83,23 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	if spfCount == 0 {
-		return &[]api.SPFRecord{
+		return &[]model.SPFRecord{
 			{
 				Domain: &domain,
 				Valid:  false,
-				Error:  api.PtrTo("No SPF record found"),
+				Error:  utils.PtrTo("No SPF record found"),
 			},
 		}
 	}
 
-	var results []api.SPFRecord
+	var results []model.SPFRecord
 
 	if spfCount > 1 {
-		results = append(results, api.SPFRecord{
+		results = append(results, model.SPFRecord{
 			Domain: &domain,
 			Record: &spfRecord,
 			Valid:  false,
-			Error:  api.PtrTo("Multiple SPF records found (RFC violation)"),
+			Error:  utils.PtrTo("Multiple SPF records found (RFC violation)"),
 		})
 		return &results
 	}
@@ -107,28 +108,28 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	validationErr := d.validateSPF(spfRecord, isMainRecord)
 
 	// Extract the "all" mechanism qualifier
-	var allQualifier *api.SPFRecordAllQualifier
+	var allQualifier *model.SPFRecordAllQualifier
 	var errMsg *string
 
 	if validationErr != nil {
-		errMsg = api.PtrTo(validationErr.Error())
+		errMsg = utils.PtrTo(validationErr.Error())
 	} else {
 		// Extract qualifier from the "all" mechanism
 		if strings.HasSuffix(spfRecord, " -all") {
-			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("-"))
+			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("-"))
 		} else if strings.HasSuffix(spfRecord, " ~all") {
-			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("~"))
+			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("~"))
 		} else if strings.HasSuffix(spfRecord, " +all") {
-			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("+"))
+			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("+"))
 		} else if strings.HasSuffix(spfRecord, " ?all") {
-			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("?"))
+			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("?"))
 		} else if strings.HasSuffix(spfRecord, " all") {
 			// Implicit + qualifier (default)
-			allQualifier = api.PtrTo(api.SPFRecordAllQualifier("+"))
+			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("+"))
 		}
 	}
 
-	results = append(results, api.SPFRecord{
+	results = append(results, model.SPFRecord{
 		Domain:       &domain,
 		Record:       &spfRecord,
 		Valid:        validationErr == nil,
@@ -301,7 +302,7 @@ func (d *DNSAnalyzer) hasSPFStrictFail(record string) bool {
 	return strings.HasSuffix(record, " -all")
 }
 
-func (d *DNSAnalyzer) calculateSPFScore(results *api.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (score int) {
 	// SPF is essential for email authentication
 	if results.SpfRecords != nil && len(*results.SpfRecords) > 0 {
 		// Find the main SPF record by skipping redirects

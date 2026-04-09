@@ -31,7 +31,8 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // HeaderAnalyzer analyzes email header quality and structure
@@ -43,7 +44,7 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 }
 
 // CalculateHeaderScore evaluates email structural quality from header analysis
-func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *api.HeaderAnalysis) (int, rune) {
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (int, rune) {
 	if analysis == nil || analysis.Headers == nil {
 		return 0, ' '
 	}
@@ -187,7 +188,7 @@ func (h *HeaderAnalyzer) parseEmailDate(dateStr string) (time.Time, error) {
 }
 
 // isNoReplyAddress checks if a header check represents a no-reply email address
-func (h *HeaderAnalyzer) isNoReplyAddress(headerCheck api.HeaderCheck) bool {
+func (h *HeaderAnalyzer) isNoReplyAddress(headerCheck model.HeaderCheck) bool {
 	if !headerCheck.Present || headerCheck.Value == nil {
 		return false
 	}
@@ -243,18 +244,18 @@ func (h *HeaderAnalyzer) formatAddress(addr *mail.Address) string {
 }
 
 // GenerateHeaderAnalysis creates structured header analysis from email
-func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults *api.AuthenticationResults) *api.HeaderAnalysis {
+func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults *model.AuthenticationResults) *model.HeaderAnalysis {
 	if email == nil {
 		return nil
 	}
 
-	analysis := &api.HeaderAnalysis{}
+	analysis := &model.HeaderAnalysis{}
 
 	// Check for proper MIME structure
-	analysis.HasMimeStructure = api.PtrTo(len(email.Parts) > 0)
+	analysis.HasMimeStructure = utils.PtrTo(len(email.Parts) > 0)
 
 	// Initialize headers map
-	headers := make(map[string]api.HeaderCheck)
+	headers := make(map[string]model.HeaderCheck)
 
 	// Check required headers
 	requiredHeaders := []string{"From", "To", "Date", "Message-ID", "Subject"}
@@ -308,12 +309,12 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults
 }
 
 // checkHeader checks if a header is present and valid
-func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, importance string) *api.HeaderCheck {
+func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, importance string) *model.HeaderCheck {
 	value := email.GetHeaderValue(headerName)
 	present := email.HasHeader(headerName) && value != ""
 
-	importanceEnum := api.HeaderCheckImportance(importance)
-	check := &api.HeaderCheck{
+	importanceEnum := model.HeaderCheckImportance(importance)
+	check := &model.HeaderCheck{
 		Present:    present,
 		Importance: &importanceEnum,
 	}
@@ -374,10 +375,10 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 }
 
 // analyzeDomainAlignment checks domain alignment between headers and DKIM signatures
-func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults *api.AuthenticationResults) *api.DomainAlignment {
-	alignment := &api.DomainAlignment{
-		Aligned:        api.PtrTo(true),
-		RelaxedAligned: api.PtrTo(true),
+func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults *model.AuthenticationResults) *model.DomainAlignment {
+	alignment := &model.DomainAlignment{
+		Aligned:        utils.PtrTo(true),
+		RelaxedAligned: utils.PtrTo(true),
 	}
 
 	// Extract From domain
@@ -405,13 +406,13 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 	}
 
 	// Extract DKIM domains from authentication results
-	var dkimDomains []api.DKIMDomainInfo
+	var dkimDomains []model.DKIMDomainInfo
 	if authResults != nil && authResults.Dkim != nil {
 		for _, dkim := range *authResults.Dkim {
 			if dkim.Domain != nil && *dkim.Domain != "" {
 				domain := *dkim.Domain
 				orgDomain := h.getOrganizationalDomain(domain)
-				dkimDomains = append(dkimDomains, api.DKIMDomainInfo{
+				dkimDomains = append(dkimDomains, model.DKIMDomainInfo{
 					Domain:    domain,
 					OrgDomain: orgDomain,
 				})
@@ -560,18 +561,18 @@ func (h *HeaderAnalyzer) getOrganizationalDomain(domain string) string {
 }
 
 // findHeaderIssues identifies issues with headers
-func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []api.HeaderIssue {
-	var issues []api.HeaderIssue
+func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []model.HeaderIssue {
+	var issues []model.HeaderIssue
 
 	// Check for missing required headers
 	requiredHeaders := []string{"From", "Date", "Message-ID"}
 	for _, header := range requiredHeaders {
 		if !email.HasHeader(header) || email.GetHeaderValue(header) == "" {
-			issues = append(issues, api.HeaderIssue{
+			issues = append(issues, model.HeaderIssue{
 				Header:   header,
-				Severity: api.HeaderIssueSeverityCritical,
+				Severity: model.HeaderIssueSeverityCritical,
 				Message:  fmt.Sprintf("Required header '%s' is missing", header),
-				Advice:   api.PtrTo(fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)),
+				Advice:   utils.PtrTo(fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)),
 			})
 		}
 	}
@@ -579,11 +580,11 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []api.HeaderIssue
 	// Check Message-ID format
 	messageID := email.GetHeaderValue("Message-ID")
 	if messageID != "" && !h.isValidMessageID(messageID) {
-		issues = append(issues, api.HeaderIssue{
+		issues = append(issues, model.HeaderIssue{
 			Header:   "Message-ID",
-			Severity: api.HeaderIssueSeverityMedium,
+			Severity: model.HeaderIssueSeverityMedium,
 			Message:  "Message-ID format is invalid",
-			Advice:   api.PtrTo("Use proper Message-ID format: <unique-id@domain.com>"),
+			Advice:   utils.PtrTo("Use proper Message-ID format: <unique-id@domain.com>"),
 		})
 	}
 
@@ -591,7 +592,7 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []api.HeaderIssue
 }
 
 // parseReceivedChain extracts the chain of Received headers from an email
-func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []api.ReceivedHop {
+func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []model.ReceivedHop {
 	if email == nil || email.Header == nil {
 		return nil
 	}
@@ -601,7 +602,7 @@ func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []api.ReceivedH
 		return nil
 	}
 
-	var chain []api.ReceivedHop
+	var chain []model.ReceivedHop
 
 	for _, receivedValue := range receivedHeaders {
 		hop := h.parseReceivedHeader(receivedValue)
@@ -614,8 +615,8 @@ func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []api.ReceivedH
 }
 
 // parseReceivedHeader parses a single Received header value
-func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *api.ReceivedHop {
-	hop := &api.ReceivedHop{}
+func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *model.ReceivedHop {
+	hop := &model.ReceivedHop{}
 
 	// Normalize whitespace - Received headers can span multiple lines
 	normalized := strings.Join(strings.Fields(receivedValue), " ")

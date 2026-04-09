@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestCalculateHeaderScore(t *testing.T) {
@@ -404,7 +404,7 @@ func TestParseReceivedChain(t *testing.T) {
 		name            string
 		receivedHeaders []string
 		expectedHops    int
-		validateFirst   func(*testing.T, *EmailMessage, []api.ReceivedHop)
+		validateFirst   func(*testing.T, *EmailMessage, []model.ReceivedHop)
 	}{
 		{
 			name:            "No Received headers",
@@ -417,7 +417,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail.example.com (mail.example.com [192.0.2.1]) by mx.receiver.com (Postfix) with ESMTPS id ABC123 for <user@receiver.com>; Mon, 01 Jan 2024 12:00:00 +0000",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []api.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -450,7 +450,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail2.example.com (mail2.example.com [192.0.2.2]) by mx2.receiver.com with SMTP id 222; Mon, 01 Jan 2024 11:59:00 +0000",
 			},
 			expectedHops: 2,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []api.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
 				if len(hops) != 2 {
 					t.Fatalf("Expected 2 hops, got %d", len(hops))
 				}
@@ -472,7 +472,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail.example.com (unknown [IPv6:2607:5300:203:2818::1]) by mx.receiver.com with ESMTPS; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []api.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -499,7 +499,7 @@ func TestParseReceivedChain(t *testing.T) {
 	for <test-9a9ce364-c394-4fa9-acef-d46ff2f482bf@deliver.happydomain.org>; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)`,
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []api.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -527,7 +527,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from unknown by localhost",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []api.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -1012,16 +1012,16 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			}
 
 			// Create authentication results with DKIM signatures
-			var authResults *api.AuthenticationResults
+			var authResults *model.AuthenticationResults
 			if len(tt.dkimDomains) > 0 {
-				dkimResults := make([]api.AuthResult, 0, len(tt.dkimDomains))
+				dkimResults := make([]model.AuthResult, 0, len(tt.dkimDomains))
 				for _, domain := range tt.dkimDomains {
-					dkimResults = append(dkimResults, api.AuthResult{
-						Result: api.AuthResultResultPass,
+					dkimResults = append(dkimResults, model.AuthResult{
+						Result: model.AuthResultResultPass,
 						Domain: &domain,
 					})
 				}
-				authResults = &api.AuthenticationResults{
+				authResults = &model.AuthenticationResults{
 					Dkim: &dkimResults,
 				}
 			}

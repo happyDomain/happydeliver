@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // Default rspamd action thresholds (rspamd built-in defaults)
@@ -47,7 +47,7 @@ func NewRspamdAnalyzer(symbols map[string]string) *RspamdAnalyzer {
 }
 
 // AnalyzeRspamd extracts and analyzes rspamd results from email headers
-func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
+func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *model.RspamdResult {
 	headers := email.GetRspamdHeaders()
 	if len(headers) == 0 {
 		return nil
@@ -60,8 +60,8 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 		return nil
 	}
 
-	result := &api.RspamdResult{
-		Symbols: make(map[string]api.SpamTestDetail),
+	result := &model.RspamdResult{
+		Symbols: make(map[string]model.SpamTestDetail),
 	}
 
 	// Parse X-Spamd-Result header (primary source for score, threshold, and symbols)
@@ -107,7 +107,7 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *api.RspamdResult {
 
 // parseSpamdResult parses the X-Spamd-Result header
 // Format: "default: False [-3.91 / 15.00];\n\tSYMBOL(score)[params]; ..."
-func (a *RspamdAnalyzer) parseSpamdResult(header string, result *api.RspamdResult) {
+func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdResult) {
 	// Extract score and threshold from the first line
 	// e.g. "default: False [-3.91 / 15.00]"
 	scoreRe := regexp.MustCompile(`\[\s*(-?\d+\.?\d*)\s*/\s*(-?\d+\.?\d*)\s*\]`)
@@ -141,7 +141,7 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *api.RspamdResul
 		if len(matches) > 2 {
 			name := matches[1]
 			score, _ := strconv.ParseFloat(matches[2], 64)
-			sym := api.SpamTestDetail{
+			sym := model.SpamTestDetail{
 				Name:  name,
 				Score: float32(score),
 			}
@@ -155,7 +155,7 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *api.RspamdResul
 }
 
 // CalculateRspamdScore calculates the rspamd contribution to deliverability (0-100 scale)
-func (a *RspamdAnalyzer) CalculateRspamdScore(result *api.RspamdResult) (int, string) {
+func (a *RspamdAnalyzer) CalculateRspamdScore(result *model.RspamdResult) (int, string) {
 	if result == nil {
 		return 100, "" // rspamd not installed
 	}

@@ -26,7 +26,7 @@ import (
 	"net/mail"
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestAnalyzeRspamdNoHeaders(t *testing.T) {
@@ -130,8 +130,8 @@ func TestParseSpamdResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &api.RspamdResult{
-				Symbols: make(map[string]api.SpamTestDetail),
+			result := &model.RspamdResult{
+				Symbols: make(map[string]model.SpamTestDetail),
 			}
 			analyzer.parseSpamdResult(tt.header, result)
 
@@ -281,7 +281,7 @@ func TestAnalyzeRspamd(t *testing.T) {
 func TestCalculateRspamdScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        *api.RspamdResult
+		result        *model.RspamdResult
 		expectedScore int
 		expectedGrade string
 	}{
@@ -293,7 +293,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 		{
 			name: "Score well below threshold",
-			result: &api.RspamdResult{
+			result: &model.RspamdResult{
 				Score:     -3.91,
 				Threshold: 15.00,
 			},
@@ -302,7 +302,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 		{
 			name: "Score at zero",
-			result: &api.RspamdResult{
+			result: &model.RspamdResult{
 				Score:     0,
 				Threshold: 15.00,
 			},
@@ -312,7 +312,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 		{
 			name: "Score at threshold (half of 2*threshold)",
-			result: &api.RspamdResult{
+			result: &model.RspamdResult{
 				Score:     15.00,
 				Threshold: 15.00,
 			},
@@ -321,7 +321,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 		{
 			name: "Score above 2*threshold",
-			result: &api.RspamdResult{
+			result: &model.RspamdResult{
 				Score:     31.00,
 				Threshold: 15.00,
 			},
@@ -330,7 +330,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 		},
 		{
 			name: "Score exactly at 2*threshold",
-			result: &api.RspamdResult{
+			result: &model.RspamdResult{
 				Score:     30.00,
 				Threshold: 15.00,
 			},

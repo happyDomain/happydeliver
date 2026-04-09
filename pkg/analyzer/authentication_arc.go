@@ -27,7 +27,8 @@ import (
 	"slices"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // textprotoCanonical converts a header name to canonical form
@@ -52,24 +53,24 @@ func pluralize(count int) string {
 
 // parseARCResult parses ARC result from Authentication-Results
 // Example: arc=pass
-func (a *AuthenticationAnalyzer) parseARCResult(part string) *api.ARCResult {
-	result := &api.ARCResult{}
+func (a *AuthenticationAnalyzer) parseARCResult(part string) *model.ARCResult {
+	result := &model.ARCResult{}
 
 	// Extract result (pass, fail, none)
 	re := regexp.MustCompile(`arc=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.ARCResultResult(resultStr)
+		result.Result = model.ARCResultResult(resultStr)
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "arc="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "arc="))
 
 	return result
 }
 
 // parseARCHeaders parses ARC headers from email message
 // ARC consists of three headers per hop: ARC-Authentication-Results, ARC-Message-Signature, ARC-Seal
-func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *api.ARCResult {
+func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *model.ARCResult {
 	// Get all ARC-related headers
 	arcAuthResults := email.Header[textprotoCanonical("ARC-Authentication-Results")]
 	arcMessageSig := email.Header[textprotoCanonical("ARC-Message-Signature")]
@@ -80,8 +81,8 @@ func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *api.ARCRe
 		return nil
 	}
 
-	result := &api.ARCResult{
-		Result: api.ARCResultResultNone,
+	result := &model.ARCResult{
+		Result: model.ARCResultResultNone,
 	}
 
 	// Count the ARC chain length (number of sets)
@@ -94,15 +95,15 @@ func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *api.ARCRe
 
 	// Determine overall result
 	if chainLength == 0 {
-		result.Result = api.ARCResultResultNone
+		result.Result = model.ARCResultResultNone
 		details := "No ARC chain present"
 		result.Details = &details
 	} else if !chainValid {
-		result.Result = api.ARCResultResultFail
+		result.Result = model.ARCResultResultFail
 		details := fmt.Sprintf("ARC chain validation failed (chain length: %d)", chainLength)
 		result.Details = &details
 	} else {
-		result.Result = api.ARCResultResultPass
+		result.Result = model.ARCResultResultPass
 		details := fmt.Sprintf("ARC chain valid with %d intermediar%s", chainLength, pluralize(chainLength))
 		result.Details = &details
 	}
@@ -111,7 +112,7 @@ func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *api.ARCRe
 }
 
 // enhanceARCResult enhances an existing ARC result with chain information
-func (a *AuthenticationAnalyzer) enhanceARCResult(email *EmailMessage, arcResult *api.ARCResult) {
+func (a *AuthenticationAnalyzer) enhanceARCResult(email *EmailMessage, arcResult *model.ARCResult) {
 	if arcResult == nil {
 		return
 	}

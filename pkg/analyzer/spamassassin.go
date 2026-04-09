@@ -27,7 +27,8 @@ import (
 	"strconv"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // SpamAssassinAnalyzer analyzes SpamAssassin results from email headers
@@ -39,7 +40,7 @@ func NewSpamAssassinAnalyzer() *SpamAssassinAnalyzer {
 }
 
 // AnalyzeSpamAssassin extracts and analyzes SpamAssassin results from email headers
-func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.SpamAssassinResult {
+func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *model.SpamAssassinResult {
 	headers := email.GetSpamAssassinHeaders()
 	if len(headers) == 0 {
 		return nil
@@ -53,8 +54,8 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.Spa
 		return nil
 	}
 
-	result := &api.SpamAssassinResult{
-		TestDetails: make(map[string]api.SpamTestDetail),
+	result := &model.SpamAssassinResult{
+		TestDetails: make(map[string]model.SpamTestDetail),
 	}
 
 	// Parse X-Spam-Status header
@@ -76,13 +77,13 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.Spa
 
 	// Parse X-Spam-Report header for detailed test results
 	if reportHeader, ok := headers["X-Spam-Report"]; ok {
-		result.Report = api.PtrTo(strings.Replace(reportHeader, " * ", "\n* ", -1))
+		result.Report = utils.PtrTo(strings.Replace(reportHeader, " * ", "\n* ", -1))
 		a.parseSpamReport(reportHeader, result)
 	}
 
 	// Parse X-Spam-Checker-Version
 	if versionHeader, ok := headers["X-Spam-Checker-Version"]; ok {
-		result.Version = api.PtrTo(strings.TrimSpace(versionHeader))
+		result.Version = utils.PtrTo(strings.TrimSpace(versionHeader))
 	}
 
 	return result
@@ -90,7 +91,7 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *api.Spa
 
 // parseSpamStatus parses the X-Spam-Status header
 // Format: Yes/No, score=5.5 required=5.0 tests=TEST1,TEST2,TEST3 autolearn=no
-func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *api.SpamAssassinResult) {
+func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *model.SpamAssassinResult) {
 	// Check if spam (first word)
 	parts := strings.SplitN(header, ",", 2)
 	if len(parts) > 0 {
@@ -134,7 +135,7 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *api.SpamAs
 // *  0.0 TEST_NAME Description line 1
 // *      continuation line 2
 // *      continuation line 3
-func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAssassinResult) {
+func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *model.SpamAssassinResult) {
 	segments := strings.Split(report, "*")
 
 	// Regex to match test lines: score TEST_NAME Description
@@ -156,7 +157,7 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAs
 			// Save previous test if exists
 			if currentTestName != "" {
 				description := strings.TrimSpace(currentDescription.String())
-				detail := api.SpamTestDetail{
+				detail := model.SpamTestDetail{
 					Name:        currentTestName,
 					Score:       result.TestDetails[currentTestName].Score,
 					Description: &description,
@@ -174,7 +175,7 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAs
 			currentDescription.WriteString(description)
 
 			// Initialize with score
-			result.TestDetails[testName] = api.SpamTestDetail{
+			result.TestDetails[testName] = model.SpamTestDetail{
 				Name:  testName,
 				Score: float32(score),
 			}
@@ -191,7 +192,7 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAs
 	// Save the last test if exists
 	if currentTestName != "" {
 		description := strings.TrimSpace(currentDescription.String())
-		detail := api.SpamTestDetail{
+		detail := model.SpamTestDetail{
 			Name:        currentTestName,
 			Score:       result.TestDetails[currentTestName].Score,
 			Description: &description,
@@ -201,7 +202,7 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *api.SpamAs
 }
 
 // CalculateSpamAssassinScore calculates the SpamAssassin contribution to deliverability
-func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *api.SpamAssassinResult) (int, string) {
+func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *model.SpamAssassinResult) (int, string) {
 	if result == nil {
 		return 100, "" // No spam scan results, assume good
 	}

@@ -24,38 +24,39 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestParseSPFResult(t *testing.T) {
 	tests := []struct {
 		name           string
 		part           string
-		expectedResult api.AuthResultResult
+		expectedResult model.AuthResultResult
 		expectedDomain string
 	}{
 		{
 			name:           "SPF pass with domain",
 			part:           "spf=pass smtp.mailfrom=sender@example.com",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDomain: "example.com",
 		},
 		{
 			name:           "SPF fail",
 			part:           "spf=fail smtp.mailfrom=sender@example.com",
-			expectedResult: api.AuthResultResultFail,
+			expectedResult: model.AuthResultResultFail,
 			expectedDomain: "example.com",
 		},
 		{
 			name:           "SPF neutral",
 			part:           "spf=neutral smtp.mailfrom=sender@example.com",
-			expectedResult: api.AuthResultResultNeutral,
+			expectedResult: model.AuthResultResultNeutral,
 			expectedDomain: "example.com",
 		},
 		{
 			name:           "SPF softfail",
 			part:           "spf=softfail smtp.mailfrom=sender@example.com",
-			expectedResult: api.AuthResultResultSoftfail,
+			expectedResult: model.AuthResultResultSoftfail,
 			expectedDomain: "example.com",
 		},
 	}
@@ -84,7 +85,7 @@ func TestParseLegacySPF(t *testing.T) {
 	tests := []struct {
 		name           string
 		receivedSPF    string
-		expectedResult api.AuthResultResult
+		expectedResult model.AuthResultResult
 		expectedDomain *string
 		expectNil      bool
 	}{
@@ -97,8 +98,8 @@ func TestParseLegacySPF(t *testing.T) {
     envelope-from="user@example.com";
     helo=smtp.example.com;
     client-ip=192.0.2.10`,
-			expectedResult: api.AuthResultResultPass,
-			expectedDomain: api.PtrTo("example.com"),
+			expectedResult: model.AuthResultResultPass,
+			expectedDomain: utils.PtrTo("example.com"),
 		},
 		{
 			name: "SPF fail with sender",
@@ -109,43 +110,43 @@ func TestParseLegacySPF(t *testing.T) {
     sender="sender@test.com";
     helo=smtp.test.com;
     client-ip=192.0.2.20`,
-			expectedResult: api.AuthResultResultFail,
-			expectedDomain: api.PtrTo("test.com"),
+			expectedResult: model.AuthResultResultFail,
+			expectedDomain: utils.PtrTo("test.com"),
 		},
 		{
 			name:           "SPF softfail",
 			receivedSPF:    "softfail (example.com: transitioning domain of admin@example.org does not designate 192.0.2.30 as permitted sender) envelope-from=\"admin@example.org\"",
-			expectedResult: api.AuthResultResultSoftfail,
-			expectedDomain: api.PtrTo("example.org"),
+			expectedResult: model.AuthResultResultSoftfail,
+			expectedDomain: utils.PtrTo("example.org"),
 		},
 		{
 			name:           "SPF neutral",
 			receivedSPF:    "neutral (example.com: 192.0.2.40 is neither permitted nor denied by domain of info@domain.net) envelope-from=\"info@domain.net\"",
-			expectedResult: api.AuthResultResultNeutral,
-			expectedDomain: api.PtrTo("domain.net"),
+			expectedResult: model.AuthResultResultNeutral,
+			expectedDomain: utils.PtrTo("domain.net"),
 		},
 		{
 			name:           "SPF none",
 			receivedSPF:    "none (example.com: domain of noreply@company.io has no SPF record) envelope-from=\"noreply@company.io\"",
-			expectedResult: api.AuthResultResultNone,
-			expectedDomain: api.PtrTo("company.io"),
+			expectedResult: model.AuthResultResultNone,
+			expectedDomain: utils.PtrTo("company.io"),
 		},
 		{
 			name:           "SPF temperror",
 			receivedSPF:    "temperror (example.com: error in processing SPF record) envelope-from=\"support@shop.example\"",
-			expectedResult: api.AuthResultResultTemperror,
-			expectedDomain: api.PtrTo("shop.example"),
+			expectedResult: model.AuthResultResultTemperror,
+			expectedDomain: utils.PtrTo("shop.example"),
 		},
 		{
 			name:           "SPF permerror",
 			receivedSPF:    "permerror (example.com: domain of contact@invalid.test has invalid SPF record) envelope-from=\"contact@invalid.test\"",
-			expectedResult: api.AuthResultResultPermerror,
-			expectedDomain: api.PtrTo("invalid.test"),
+			expectedResult: model.AuthResultResultPermerror,
+			expectedDomain: utils.PtrTo("invalid.test"),
 		},
 		{
 			name:           "SPF pass without domain extraction",
 			receivedSPF:    "pass (example.com: 192.0.2.50 is authorized)",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDomain: nil,
 		},
 		{
@@ -156,8 +157,8 @@ func TestParseLegacySPF(t *testing.T) {
 		{
 			name:           "SPF with unquoted envelope-from",
 			receivedSPF:    "pass (example.com: sender SPF authorized) envelope-from=postmaster@mail.example.net",
-			expectedResult: api.AuthResultResultPass,
-			expectedDomain: api.PtrTo("mail.example.net"),
+			expectedResult: model.AuthResultResultPass,
+			expectedDomain: utils.PtrTo("mail.example.net"),
 		},
 	}
 

@@ -24,44 +24,44 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseXAlignedFromResult(t *testing.T) {
 	tests := []struct {
 		name           string
 		part           string
-		expectedResult api.AuthResultResult
+		expectedResult model.AuthResultResult
 		expectedDetail string
 	}{
 		{
 			name:           "x-aligned-from pass with details",
 			part:           "x-aligned-from=pass (Address match)",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDetail: "pass (Address match)",
 		},
 		{
 			name:           "x-aligned-from fail with reason",
 			part:           "x-aligned-from=fail (Address mismatch)",
-			expectedResult: api.AuthResultResultFail,
+			expectedResult: model.AuthResultResultFail,
 			expectedDetail: "fail (Address mismatch)",
 		},
 		{
 			name:           "x-aligned-from pass minimal",
 			part:           "x-aligned-from=pass",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDetail: "pass",
 		},
 		{
 			name:           "x-aligned-from neutral",
 			part:           "x-aligned-from=neutral (No alignment check performed)",
-			expectedResult: api.AuthResultResultNeutral,
+			expectedResult: model.AuthResultResultNeutral,
 			expectedDetail: "neutral (No alignment check performed)",
 		},
 		{
 			name:           "x-aligned-from none",
 			part:           "x-aligned-from=none",
-			expectedResult: api.AuthResultResultNone,
+			expectedResult: model.AuthResultResultNone,
 			expectedDetail: "none",
 		},
 	}
@@ -88,34 +88,34 @@ func TestParseXAlignedFromResult(t *testing.T) {
 func TestCalculateXAlignedFromScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        *api.AuthResult
+		result        *model.AuthResult
 		expectedScore int
 	}{
 		{
 			name: "pass result gives positive score",
-			result: &api.AuthResult{
-				Result: api.AuthResultResultPass,
+			result: &model.AuthResult{
+				Result: model.AuthResultResultPass,
 			},
 			expectedScore: 100,
 		},
 		{
 			name: "fail result gives zero score",
-			result: &api.AuthResult{
-				Result: api.AuthResultResultFail,
+			result: &model.AuthResult{
+				Result: model.AuthResultResultFail,
 			},
 			expectedScore: 0,
 		},
 		{
 			name: "neutral result gives zero score",
-			result: &api.AuthResult{
-				Result: api.AuthResultResultNeutral,
+			result: &model.AuthResult{
+				Result: model.AuthResultResultNeutral,
 			},
 			expectedScore: 0,
 		},
 		{
 			name: "none result gives zero score",
-			result: &api.AuthResult{
-				Result: api.AuthResultResultNone,
+			result: &model.AuthResult{
+				Result: model.AuthResultResultNone,
 			},
 			expectedScore: 0,
 		},
@@ -130,7 +130,7 @@ func TestCalculateXAlignedFromScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := &api.AuthenticationResults{
+			results := &model.AuthenticationResults{
 				XAlignedFrom: tt.result,
 			}
 

@@ -24,42 +24,42 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseBIMIResult(t *testing.T) {
 	tests := []struct {
 		name             string
 		part             string
-		expectedResult   api.AuthResultResult
+		expectedResult   model.AuthResultResult
 		expectedDomain   string
 		expectedSelector string
 	}{
 		{
 			name:             "BIMI pass with domain and selector",
 			part:             "bimi=pass header.d=example.com header.selector=default",
-			expectedResult:   api.AuthResultResultPass,
+			expectedResult:   model.AuthResultResultPass,
 			expectedDomain:   "example.com",
 			expectedSelector: "default",
 		},
 		{
 			name:             "BIMI fail",
 			part:             "bimi=fail header.d=example.com header.selector=default",
-			expectedResult:   api.AuthResultResultFail,
+			expectedResult:   model.AuthResultResultFail,
 			expectedDomain:   "example.com",
 			expectedSelector: "default",
 		},
 		{
 			name:             "BIMI with short form (d= and selector=)",
 			part:             "bimi=pass d=example.com selector=v1",
-			expectedResult:   api.AuthResultResultPass,
+			expectedResult:   model.AuthResultResultPass,
 			expectedDomain:   "example.com",
 			expectedSelector: "v1",
 		},
 		{
 			name:           "BIMI none",
 			part:           "bimi=none header.d=example.com",
-			expectedResult: api.AuthResultResultNone,
+			expectedResult: model.AuthResultResultNone,
 			expectedDomain: "example.com",
 		},
 	}

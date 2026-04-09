@@ -32,7 +32,8 @@ import (
 	"time"
 	"unicode"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 	"golang.org/x/net/html"
 )
 
@@ -728,16 +729,16 @@ func (c *ContentAnalyzer) normalizeText(text string) string {
 }
 
 // GenerateContentAnalysis creates structured content analysis from results
-func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.ContentAnalysis {
+func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *model.ContentAnalysis {
 	if results == nil {
 		return nil
 	}
 
-	analysis := &api.ContentAnalysis{
-		HasHtml:            api.PtrTo(results.HTMLContent != ""),
-		HasPlaintext:       api.PtrTo(results.TextContent != ""),
-		HasUnsubscribeLink: api.PtrTo(results.HasUnsubscribe),
-		UnsubscribeMethods: &[]api.ContentAnalysisUnsubscribeMethods{},
+	analysis := &model.ContentAnalysis{
+		HasHtml:            utils.PtrTo(results.HTMLContent != ""),
+		HasPlaintext:       utils.PtrTo(results.TextContent != ""),
+		HasUnsubscribeLink: utils.PtrTo(results.HasUnsubscribe),
+		UnsubscribeMethods: &[]model.ContentAnalysisUnsubscribeMethods{},
 	}
 
 	// Calculate text-to-image ratio (inverse of image-to-text)
@@ -750,16 +751,16 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 	}
 
 	// Build HTML issues
-	htmlIssues := []api.ContentIssue{}
+	htmlIssues := []model.ContentIssue{}
 
 	// Add HTML parsing errors
 	if !results.HTMLValid && len(results.HTMLErrors) > 0 {
 		for _, errMsg := range results.HTMLErrors {
-			htmlIssues = append(htmlIssues, api.ContentIssue{
-				Type:     api.BrokenHtml,
-				Severity: api.ContentIssueSeverityHigh,
+			htmlIssues = append(htmlIssues, model.ContentIssue{
+				Type:     model.BrokenHtml,
+				Severity: model.ContentIssueSeverityHigh,
 				Message:  errMsg,
-				Advice:   api.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
+				Advice:   utils.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
 			})
 		}
 	}
@@ -773,53 +774,53 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 			}
 		}
 		if missingAltCount > 0 {
-			htmlIssues = append(htmlIssues, api.ContentIssue{
-				Type:     api.MissingAlt,
-				Severity: api.ContentIssueSeverityMedium,
+			htmlIssues = append(htmlIssues, model.ContentIssue{
+				Type:     model.MissingAlt,
+				Severity: model.ContentIssueSeverityMedium,
 				Message:  fmt.Sprintf("%d image(s) missing alt attributes", missingAltCount),
-				Advice:   api.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
+				Advice:   utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
 			})
 		}
 	}
 
 	// Add excessive images issue
 	if results.ImageTextRatio > 10.0 {
-		htmlIssues = append(htmlIssues, api.ContentIssue{
-			Type:     api.ExcessiveImages,
-			Severity: api.ContentIssueSeverityMedium,
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.ExcessiveImages,
+			Severity: model.ContentIssueSeverityMedium,
 			Message:  "Email is excessively image-heavy",
-			Advice:   api.PtrTo("Reduce the number of images relative to text content"),
+			Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
 		})
 	}
 
 	// Add suspicious URL issues
 	for _, suspURL := range results.SuspiciousURLs {
-		htmlIssues = append(htmlIssues, api.ContentIssue{
-			Type:     api.SuspiciousLink,
-			Severity: api.ContentIssueSeverityHigh,
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.SuspiciousLink,
+			Severity: model.ContentIssueSeverityHigh,
 			Message:  "Suspicious URL detected",
 			Location: &suspURL,
-			Advice:   api.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"),
+			Advice:   utils.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"),
 		})
 	}
 
 	// Add harmful HTML tag issues
 	for _, harmfulIssue := range results.HarmfullIssues {
-		htmlIssues = append(htmlIssues, api.ContentIssue{
-			Type:     api.DangerousHtml,
-			Severity: api.ContentIssueSeverityCritical,
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.DangerousHtml,
+			Severity: model.ContentIssueSeverityCritical,
 			Message:  harmfulIssue,
-			Advice:   api.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
+			Advice:   utils.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
 		})
 	}
 
 	// Add general content issues (like external stylesheets)
 	for _, contentIssue := range results.ContentIssues {
-		htmlIssues = append(htmlIssues, api.ContentIssue{
-			Type:     api.BrokenHtml,
-			Severity: api.ContentIssueSeverityLow,
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.BrokenHtml,
+			Severity: model.ContentIssueSeverityLow,
 			Message:  contentIssue,
-			Advice:   api.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
+			Advice:   utils.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
 		})
 	}
 
@@ -829,31 +830,31 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 
 	// Convert links
 	if len(results.Links) > 0 {
-		links := make([]api.LinkCheck, 0, len(results.Links))
+		links := make([]model.LinkCheck, 0, len(results.Links))
 		for _, link := range results.Links {
-			status := api.Valid
+			status := model.Valid
 			if link.Status >= 400 {
-				status = api.Broken
+				status = model.Broken
 			} else if !link.IsSafe {
-				status = api.Suspicious
+				status = model.Suspicious
 			} else if link.Warning != "" {
-				status = api.Timeout
+				status = model.Timeout
 			}
 
-			apiLink := api.LinkCheck{
+			apiLink := model.LinkCheck{
 				Url:    link.URL,
 				Status: status,
 			}
 
 			if link.Status > 0 {
-				apiLink.HttpCode = api.PtrTo(link.Status)
+				apiLink.HttpCode = utils.PtrTo(link.Status)
 			}
 
 			// Check if it's a URL shortener
 			parsedURL, err := url.Parse(link.URL)
 			if err == nil {
 				isShortened := c.isSuspiciousURL(link.URL, parsedURL)
-				apiLink.IsShortened = api.PtrTo(isShortened)
+				apiLink.IsShortened = utils.PtrTo(isShortened)
 			}
 
 			links = append(links, apiLink)
@@ -863,9 +864,9 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 
 	// Convert images
 	if len(results.Images) > 0 {
-		images := make([]api.ImageCheck, 0, len(results.Images))
+		images := make([]model.ImageCheck, 0, len(results.Images))
 		for _, img := range results.Images {
-			apiImg := api.ImageCheck{
+			apiImg := model.ImageCheck{
 				HasAlt: img.HasAlt,
 			}
 			if img.Src != "" {
@@ -875,7 +876,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 				apiImg.AltText = &img.AltText
 			}
 			// Simple heuristic: tracking pixels are typically 1x1
-			apiImg.IsTrackingPixel = api.PtrTo(false)
+			apiImg.IsTrackingPixel = utils.PtrTo(false)
 
 			images = append(images, apiImg)
 		}
@@ -884,19 +885,19 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *api.
 
 	// Unsubscribe methods
 	if results.HasUnsubscribe {
-		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.Link)
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.Link)
 	}
 
 	for _, url := range c.listUnsubscribeURLs {
 		if strings.HasPrefix(url, "mailto:") {
-			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.Mailto)
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.Mailto)
 		} else if strings.HasPrefix(url, "http:") || strings.HasPrefix(url, "https:") {
-			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.ListUnsubscribeHeader)
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ListUnsubscribeHeader)
 		}
 	}
 
-	if slices.Contains(*analysis.UnsubscribeMethods, api.ListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
-		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, api.OneClick)
+	if slices.Contains(*analysis.UnsubscribeMethods, model.ListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.OneClick)
 	}
 
 	return analysis

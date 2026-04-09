@@ -1,5 +1,9 @@
-package: api
+package: model
 generate:
   models: true
-  embedded-spec: false
-output: internal/api/models.gen.go
+  embedded-spec: true
+output: internal/model/types.gen.go
+output-options:
+  skip-prune: true
+import-mapping:
+  ./schemas.yaml: "-"

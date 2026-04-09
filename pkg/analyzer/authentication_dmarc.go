@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseDMARCResult parses DMARC result from Authentication-Results
 // Example: dmarc=pass action=none header.from=example.com
-func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`dmarc=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract domain (header.from)
@@ -47,17 +48,17 @@ func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *api.AuthResult {
 		result.Domain = &domain
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "dmarc="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "dmarc="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateDMARCScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateDMARCScore(results *model.AuthenticationResults) (score int) {
 	if results.Dmarc != nil {
 		switch results.Dmarc.Result {
-		case api.AuthResultResultPass:
+		case model.AuthResultResultPass:
 			return 100
-		case api.AuthResultResultNone:
+		case model.AuthResultResultNone:
 			return 33
 		default: // fail
 			return 0

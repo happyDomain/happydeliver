@@ -28,7 +28,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/config"
 )
 
@@ -59,7 +59,7 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 type AnalysisResult struct {
 	Email   *EmailMessage
 	Results *AnalysisResults
-	Report  *api.Report
+	Report  *model.Report
 }
 
 // AnalyzeEmailBytes performs complete email analysis from raw bytes
@@ -113,7 +113,7 @@ func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) ([]byt
 }
 
 // AnalyzeDomain performs DNS analysis for a domain and returns the results
-func (a *APIAdapter) AnalyzeDomain(domain string) (*api.DNSResults, int, string) {
+func (a *APIAdapter) AnalyzeDomain(domain string) (*model.DNSResults, int, string) {
 	// Perform DNS analysis
 	dnsResults := a.analyzer.generator.dnsAnalyzer.AnalyzeDomainOnly(domain)
 
@@ -124,7 +124,7 @@ func (a *APIAdapter) AnalyzeDomain(domain string) (*api.DNSResults, int, string)
 }
 
 // CheckBlacklistIP checks a single IP address against DNS blacklists and whitelists
-func (a *APIAdapter) CheckBlacklistIP(ip string) ([]api.BlacklistCheck, []api.BlacklistCheck, int, int, string, error) {
+func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, int, int, string, error) {
 	// Check the IP against all configured RBLs
 	checks, listedCount, err := a.analyzer.generator.rblChecker.CheckIP(ip)
 	if err != nil {
@@ -134,7 +134,7 @@ func (a *APIAdapter) CheckBlacklistIP(ip string) ([]api.BlacklistCheck, []api.Bl
 	// Calculate score using the existing function
 	// Create a minimal RBLResults structure for scoring
 	results := &DNSListResults{
-		Checks:      map[string][]api.BlacklistCheck{ip: checks},
+		Checks:      map[string][]model.BlacklistCheck{ip: checks},
 		IPsChecked:  []string{ip},
 		ListedCount: listedCount,
 	}

@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseDKIMResult parses DKIM result from Authentication-Results
 // Example: dkim=pass header.d=example.com header.s=selector1
-func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`dkim=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract domain (header.d or d)
@@ -54,18 +55,18 @@ func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "dkim="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "dkim="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateDKIMScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateDKIMScore(results *model.AuthenticationResults) (score int) {
 	// Expect at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		hasPass := false
 		hasNonPass := false
 		for _, dkim := range *results.Dkim {
-			if dkim.Result == api.AuthResultResultPass {
+			if dkim.Result == model.AuthResultResultPass {
 				hasPass = true
 			} else {
 				hasNonPass = true

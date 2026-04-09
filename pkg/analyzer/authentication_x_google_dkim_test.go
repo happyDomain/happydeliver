@@ -24,39 +24,39 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseXGoogleDKIMResult(t *testing.T) {
 	tests := []struct {
 		name             string
 		part             string
-		expectedResult   api.AuthResultResult
+		expectedResult   model.AuthResultResult
 		expectedDomain   string
 		expectedSelector string
 	}{
 		{
 			name:           "x-google-dkim pass with domain",
 			part:           "x-google-dkim=pass (2048-bit rsa key) header.d=1e100.net header.i=@1e100.net header.b=fauiPVZ6",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDomain: "1e100.net",
 		},
 		{
 			name:           "x-google-dkim pass with short form",
 			part:           "x-google-dkim=pass d=gmail.com",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDomain: "gmail.com",
 		},
 		{
 			name:           "x-google-dkim fail",
 			part:           "x-google-dkim=fail header.d=example.com",
-			expectedResult: api.AuthResultResultFail,
+			expectedResult: model.AuthResultResultFail,
 			expectedDomain: "example.com",
 		},
 		{
 			name:           "x-google-dkim with minimal info",
 			part:           "x-google-dkim=pass",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 		},
 	}
 

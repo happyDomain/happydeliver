@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestNewRBLChecker(t *testing.T) {
@@ -336,7 +336,7 @@ func TestGetBlacklistScore(t *testing.T) {
 
 func TestGetUniqueListedIPs(t *testing.T) {
 	results := &DNSListResults{
-		Checks: map[string][]api.BlacklistCheck{
+		Checks: map[string][]model.BlacklistCheck{
 			"198.51.100.1": {
 				{Rbl: "zen.spamhaus.org", Listed: true},
 				{Rbl: "bl.spamcop.net", Listed: true},
@@ -364,7 +364,7 @@ func TestGetUniqueListedIPs(t *testing.T) {
 
 func TestGetRBLsForIP(t *testing.T) {
 	results := &DNSListResults{
-		Checks: map[string][]api.BlacklistCheck{
+		Checks: map[string][]model.BlacklistCheck{
 			"198.51.100.1": {
 				{Rbl: "zen.spamhaus.org", Listed: true},
 				{Rbl: "bl.spamcop.net", Listed: true},

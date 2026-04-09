@@ -24,7 +24,7 @@ package analyzer
 import (
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 )
@@ -66,14 +66,14 @@ func NewReportGenerator(
 // AnalysisResults contains all intermediate analysis results
 type AnalysisResults struct {
 	Email          *EmailMessage
-	Authentication *api.AuthenticationResults
+	Authentication *model.AuthenticationResults
 	Content        *ContentResults
-	DNS            *api.DNSResults
-	Headers        *api.HeaderAnalysis
+	DNS            *model.DNSResults
+	Headers        *model.HeaderAnalysis
 	RBL            *DNSListResults
 	DNSWL          *DNSListResults
-	SpamAssassin   *api.SpamAssassinResult
-	Rspamd         *api.RspamdResult
+	SpamAssassin   *model.SpamAssassinResult
+	Rspamd         *model.RspamdResult
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -96,11 +96,11 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 }
 
 // GenerateReport creates a complete API report from analysis results
-func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResults) *api.Report {
+func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResults) *model.Report {
 	reportID := uuid.New()
 	now := time.Now()
 
-	report := &api.Report{
+	report := &model.Report{
 		Id:        utils.UUIDToBase32(reportID),
 		TestId:    utils.UUIDToBase32(testID),
 		CreatedAt: now,
@@ -169,19 +169,19 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		spamGrade = MinGrade(saGrade, rspamdGrade)
 	}
 
-	report.Summary = &api.ScoreSummary{
+	report.Summary = &model.ScoreSummary{
 		DnsScore:            dnsScore,
-		DnsGrade:            api.ScoreSummaryDnsGrade(dnsGrade),
+		DnsGrade:            model.ScoreSummaryDnsGrade(dnsGrade),
 		AuthenticationScore: authScore,
-		AuthenticationGrade: api.ScoreSummaryAuthenticationGrade(authGrade),
+		AuthenticationGrade: model.ScoreSummaryAuthenticationGrade(authGrade),
 		BlacklistScore:      blacklistScore,
-		BlacklistGrade:      api.ScoreSummaryBlacklistGrade(MinGrade(blacklistGrade, whitelistGrade)),
+		BlacklistGrade:      model.ScoreSummaryBlacklistGrade(MinGrade(blacklistGrade, whitelistGrade)),
 		ContentScore:        contentScore,
-		ContentGrade:        api.ScoreSummaryContentGrade(contentGrade),
+		ContentGrade:        model.ScoreSummaryContentGrade(contentGrade),
 		HeaderScore:         headerScore,
-		HeaderGrade:         api.ScoreSummaryHeaderGrade(headerGrade),
+		HeaderGrade:         model.ScoreSummaryHeaderGrade(headerGrade),
 		SpamScore:           spamScore,
-		SpamGrade:           api.ScoreSummarySpamGrade(spamGrade),
+		SpamGrade:           model.ScoreSummarySpamGrade(spamGrade),
 	}
 
 	// Add authentication results
@@ -213,16 +213,16 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Add SpamAssassin result with individual deliverability score
 	if results.SpamAssassin != nil {
-		saGradeTyped := api.SpamAssassinResultDeliverabilityGrade(saGrade)
-		results.SpamAssassin.DeliverabilityScore = api.PtrTo(saScore)
+		saGradeTyped := model.SpamAssassinResultDeliverabilityGrade(saGrade)
+		results.SpamAssassin.DeliverabilityScore = utils.PtrTo(saScore)
 		results.SpamAssassin.DeliverabilityGrade = &saGradeTyped
 	}
 	report.Spamassassin = results.SpamAssassin
 
 	// Add rspamd result with individual deliverability score
 	if results.Rspamd != nil {
-		rspamdGradeTyped := api.RspamdResultDeliverabilityGrade(rspamdGrade)
-		results.Rspamd.DeliverabilityScore = api.PtrTo(rspamdScore)
+		rspamdGradeTyped := model.RspamdResultDeliverabilityGrade(rspamdGrade)
+		results.Rspamd.DeliverabilityScore = utils.PtrTo(rspamdScore)
 		results.Rspamd.DeliverabilityGrade = &rspamdGradeTyped
 	}
 	report.Rspamd = results.Rspamd
@@ -288,7 +288,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		}
 
 		if minusGrade < 255 {
-			report.Grade = api.ReportGrade(string([]byte{'A' + minusGrade}))
+			report.Grade = model.ReportGrade(string([]byte{'A' + minusGrade}))
 		}
 	}
 

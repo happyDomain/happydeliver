@@ -25,34 +25,35 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseXAlignedFromResult parses X-Aligned-From result from Authentication-Results
 // Example: x-aligned-from=pass (Address match)
-func (a *AuthenticationAnalyzer) parseXAlignedFromResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseXAlignedFromResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`x-aligned-from=([\w]+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract details (everything after the result)
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "x-aligned-from="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "x-aligned-from="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateXAlignedFromScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateXAlignedFromScore(results *model.AuthenticationResults) (score int) {
 	if results.XAlignedFrom != nil {
 		switch results.XAlignedFrom.Result {
-		case api.AuthResultResultPass:
+		case model.AuthResultResultPass:
 			// pass: positive contribution
 			return 100
-		case api.AuthResultResultFail:
+		case model.AuthResultResultFail:
 			// fail: negative contribution
 			return 0
 		default:

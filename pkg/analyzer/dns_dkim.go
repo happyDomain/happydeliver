@@ -26,7 +26,8 @@ import (
 	"fmt"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // DKIMHeader holds the domain and selector extracted from a DKIM-Signature header.
@@ -61,8 +62,8 @@ func parseDKIMSignatures(signatures []string) []DKIMHeader {
 	return results
 }
 
-// checkapi.DKIMRecord looks up and validates DKIM record for a domain and selector
-func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *api.DKIMRecord {
+// checkmodel.DKIMRecord looks up and validates DKIM record for a domain and selector
+func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *model.DKIMRecord {
 	// DKIM records are at: selector._domainkey.domain
 	dkimDomain := fmt.Sprintf("%s._domainkey.%s", selector, domain)
 
@@ -71,20 +72,20 @@ func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *api.DKIMRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, dkimDomain)
 	if err != nil {
-		return &api.DKIMRecord{
+		return &model.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    api.PtrTo(fmt.Sprintf("Failed to lookup DKIM record: %v", err)),
+			Error:    utils.PtrTo(fmt.Sprintf("Failed to lookup DKIM record: %v", err)),
 		}
 	}
 
 	if len(txtRecords) == 0 {
-		return &api.DKIMRecord{
+		return &model.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    api.PtrTo("No DKIM record found"),
+			Error:    utils.PtrTo("No DKIM record found"),
 		}
 	}
 
@@ -93,16 +94,16 @@ func (d *DNSAnalyzer) checkDKIMRecord(domain, selector string) *api.DKIMRecord {
 
 	// Basic validation - should contain "v=DKIM1" and "p=" (public key)
 	if !d.validateDKIM(dkimRecord) {
-		return &api.DKIMRecord{
+		return &model.DKIMRecord{
 			Selector: selector,
 			Domain:   domain,
-			Record:   api.PtrTo(dkimRecord),
+			Record:   utils.PtrTo(dkimRecord),
 			Valid:    false,
-			Error:    api.PtrTo("DKIM record appears malformed"),
+			Error:    utils.PtrTo("DKIM record appears malformed"),
 		}
 	}
 
-	return &api.DKIMRecord{
+	return &model.DKIMRecord{
 		Selector: selector,
 		Domain:   domain,
 		Record:   &dkimRecord,
@@ -126,7 +127,7 @@ func (d *DNSAnalyzer) validateDKIM(record string) bool {
 	return true
 }
 
-func (d *DNSAnalyzer) calculateDKIMScore(results *api.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (score int) {
 	// DKIM provides strong email authentication
 	if results.DkimRecords != nil && len(*results.DkimRecords) > 0 {
 		hasValidDKIM := false

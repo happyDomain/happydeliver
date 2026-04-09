@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseBIMIResult parses BIMI result from Authentication-Results
 // Example: bimi=pass header.d=example.com header.selector=default
-func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`bimi=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract domain (header.d or d)
@@ -54,17 +55,17 @@ func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *api.AuthResult {
 		result.Selector = &selector
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "bimi="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "bimi="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateBIMIScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateBIMIScore(results *model.AuthenticationResults) (score int) {
 	if results.Bimi != nil {
 		switch results.Bimi.Result {
-		case api.AuthResultResultPass:
+		case model.AuthResultResultPass:
 			return 100
-		case api.AuthResultResultDeclined:
+		case model.AuthResultResultDeclined:
 			return 59
 		default: // fail
 			return 0

@@ -27,7 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestParseSpamStatus(t *testing.T) {
@@ -77,8 +78,8 @@ func TestParseSpamStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &api.SpamAssassinResult{
-				TestDetails: make(map[string]api.SpamTestDetail),
+			result := &model.SpamAssassinResult{
+				TestDetails: make(map[string]model.SpamTestDetail),
 			}
 			analyzer.parseSpamStatus(tt.header, result)
 
@@ -115,27 +116,27 @@ func TestParseSpamReport(t *testing.T) {
 `
 
 	analyzer := NewSpamAssassinAnalyzer()
-	result := &api.SpamAssassinResult{
-		TestDetails: make(map[string]api.SpamTestDetail),
+	result := &model.SpamAssassinResult{
+		TestDetails: make(map[string]model.SpamTestDetail),
 	}
 
 	analyzer.parseSpamReport(report, result)
 
-	expectedTests := map[string]api.SpamTestDetail{
+	expectedTests := map[string]model.SpamTestDetail{
 		"BAYES_99": {
 			Name:        "BAYES_99",
 			Score:       5.0,
-			Description: api.PtrTo("Bayes spam probability is 99 to 100%"),
+			Description: utils.PtrTo("Bayes spam probability is 99 to 100%"),
 		},
 		"SPOOFED_SENDER": {
 			Name:        "SPOOFED_SENDER",
 			Score:       3.5,
-			Description: api.PtrTo("From address doesn't match envelope sender"),
+			Description: utils.PtrTo("From address doesn't match envelope sender"),
 		},
 		"ALL_TRUSTED": {
 			Name:        "ALL_TRUSTED",
 			Score:       -1.0,
-			Description: api.PtrTo("All mail servers are trusted"),
+			Description: utils.PtrTo("All mail servers are trusted"),
 		},
 	}
 
@@ -157,7 +158,7 @@ func TestParseSpamReport(t *testing.T) {
 func TestGetSpamAssassinScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		result        *api.SpamAssassinResult
+		result        *model.SpamAssassinResult
 		expectedScore int
 		minScore      int
 		maxScore      int
@@ -169,7 +170,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Excellent score (negative)",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         -2.5,
 				RequiredScore: 5.0,
 			},
@@ -177,7 +178,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Good score (below threshold)",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
@@ -185,7 +186,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Score at threshold",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         5.0,
 				RequiredScore: 5.0,
 			},
@@ -193,7 +194,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Above threshold (spam)",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         6.0,
 				RequiredScore: 5.0,
 			},
@@ -201,7 +202,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "High spam score",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         12.0,
 				RequiredScore: 5.0,
 			},
@@ -209,7 +210,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		},
 		{
 			name: "Very high spam score",
-			result: &api.SpamAssassinResult{
+			result: &model.SpamAssassinResult{
 				Score:         20.0,
 				RequiredScore: 5.0,
 			},

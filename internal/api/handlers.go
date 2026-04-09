@@ -31,6 +31,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/internal/version"
@@ -40,8 +41,8 @@ import (
 // This interface breaks the circular dependency with pkg/analyzer
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
-	AnalyzeDomain(domain string) (dnsResults *DNSResults, score int, grade string)
-	CheckBlacklistIP(ip string) (checks []BlacklistCheck, whitelists []BlacklistCheck, listedCount int, score int, grade string, err error)
+	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
+	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, listedCount int, score int, grade string, err error)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -79,11 +80,11 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 	)
 
 	// Return response
-	c.JSON(http.StatusCreated, TestResponse{
+	c.JSON(http.StatusCreated, model.TestResponse{
 		Id:      base32ID,
 		Email:   openapi_types.Email(email),
-		Status:  TestResponseStatusPending,
-		Message: stringPtr("Send your test email to the given address"),
+		Status:  model.TestResponseStatusPending,
+		Message: utils.PtrTo("Send your test email to the given address"),
 	})
 }
 
@@ -93,10 +94,10 @@ func (h *APIHandler) GetTest(c *gin.Context, id string) {
 	// Convert base32 ID to UUID
 	testUUID, err := utils.Base32ToUUID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_id",
 			Message: "Invalid test ID format",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -104,20 +105,20 @@ func (h *APIHandler) GetTest(c *gin.Context, id string) {
 	// Check if a report exists for this test ID
 	reportExists, err := h.storage.ReportExists(testUUID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to check test status",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
 
 	// Determine status based on report existence
-	var apiStatus TestStatus
+	var apiStatus model.TestStatus
 	if reportExists {
-		apiStatus = TestStatusAnalyzed
+		apiStatus = model.TestStatusAnalyzed
 	} else {
-		apiStatus = TestStatusPending
+		apiStatus = model.TestStatusPending
 	}
 
 	// Generate test email address using Base32-encoded UUID
@@ -127,7 +128,7 @@ func (h *APIHandler) GetTest(c *gin.Context, id string) {
 		h.config.Email.Domain,
 	)
 
-	c.JSON(http.StatusOK, Test{
+	c.JSON(http.StatusOK, model.Test{
 		Id:     id,
 		Email:  openapi_types.Email(email),
 		Status: apiStatus,
@@ -140,10 +141,10 @@ func (h *APIHandler) GetReport(c *gin.Context, id string) {
 	// Convert base32 ID to UUID
 	testUUID, err := utils.Base32ToUUID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_id",
 			Message: "Invalid test ID format",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -151,16 +152,16 @@ func (h *APIHandler) GetReport(c *gin.Context, id string) {
 	reportJSON, _, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			c.JSON(http.StatusNotFound, Error{
+			c.JSON(http.StatusNotFound, model.Error{
 				Error:   "not_found",
 				Message: "Report not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to retrieve report",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -175,10 +176,10 @@ func (h *APIHandler) GetRawEmail(c *gin.Context, id string) {
 	// Convert base32 ID to UUID
 	testUUID, err := utils.Base32ToUUID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_id",
 			Message: "Invalid test ID format",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -186,16 +187,16 @@ func (h *APIHandler) GetRawEmail(c *gin.Context, id string) {
 	_, rawEmail, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			c.JSON(http.StatusNotFound, Error{
+			c.JSON(http.StatusNotFound, model.Error{
 				Error:   "not_found",
 				Message: "Email not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to retrieve raw email",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -209,10 +210,10 @@ func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
 	// Convert base32 ID to UUID
 	testUUID, err := utils.Base32ToUUID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_id",
 			Message: "Invalid test ID format",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -221,16 +222,16 @@ func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
 	_, rawEmail, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			c.JSON(http.StatusNotFound, Error{
+			c.JSON(http.StatusNotFound, model.Error{
 				Error:   "not_found",
 				Message: "Email not found",
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to retrieve email",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -238,20 +239,20 @@ func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
 	// Re-analyze the email using the current analyzer
 	reportJSON, err := h.analyzer.AnalyzeEmailBytes(rawEmail, testUUID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "analysis_error",
 			Message: "Failed to re-analyze email",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
 
 	// Update the report in storage
 	if err := h.storage.UpdateReport(testUUID, reportJSON); err != nil {
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to update report",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -267,24 +268,24 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 	uptime := int(time.Since(h.startTime).Seconds())
 
 	// Check database connectivity by trying to check if a report exists
-	dbStatus := StatusComponentsDatabaseUp
+	dbStatus := model.StatusComponentsDatabaseUp
 	if _, err := h.storage.ReportExists(uuid.New()); err != nil {
-		dbStatus = StatusComponentsDatabaseDown
+		dbStatus = model.StatusComponentsDatabaseDown
 	}
 
 	// Determine overall status
-	overallStatus := Healthy
-	if dbStatus == StatusComponentsDatabaseDown {
-		overallStatus = Unhealthy
+	overallStatus := model.Healthy
+	if dbStatus == model.StatusComponentsDatabaseDown {
+		overallStatus = model.Unhealthy
 	}
 
-	mtaStatus := StatusComponentsMtaUp
-	c.JSON(http.StatusOK, Status{
+	mtaStatus := model.StatusComponentsMtaUp
+	c.JSON(http.StatusOK, model.Status{
 		Status:  overallStatus,
 		Version: version.Version,
 		Components: &struct {
-			Database *StatusComponentsDatabase `json:"database,omitempty"`
-			Mta      *StatusComponentsMta      `json:"mta,omitempty"`
+			Database *model.StatusComponentsDatabase `json:"database,omitempty"`
+			Mta      *model.StatusComponentsMta      `json:"mta,omitempty"`
 		}{
 			Database: &dbStatus,
 			Mta:      &mtaStatus,
@@ -296,14 +297,14 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 // TestDomain performs synchronous domain analysis
 // (POST /domain)
 func (h *APIHandler) TestDomain(c *gin.Context) {
-	var request DomainTestRequest
+	var request model.DomainTestRequest
 
 	// Bind and validate request
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_request",
 			Message: "Invalid request body",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -312,28 +313,28 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 	dnsResults, score, grade := h.analyzer.AnalyzeDomain(request.Domain)
 
 	// Convert grade string to DomainTestResponseGrade enum
-	var responseGrade DomainTestResponseGrade
+	var responseGrade model.DomainTestResponseGrade
 	switch grade {
 	case "A+":
-		responseGrade = DomainTestResponseGradeA
+		responseGrade = model.DomainTestResponseGradeA
 	case "A":
-		responseGrade = DomainTestResponseGradeA1
+		responseGrade = model.DomainTestResponseGradeA1
 	case "B":
-		responseGrade = DomainTestResponseGradeB
+		responseGrade = model.DomainTestResponseGradeB
 	case "C":
-		responseGrade = DomainTestResponseGradeC
+		responseGrade = model.DomainTestResponseGradeC
 	case "D":
-		responseGrade = DomainTestResponseGradeD
+		responseGrade = model.DomainTestResponseGradeD
 	case "E":
-		responseGrade = DomainTestResponseGradeE
+		responseGrade = model.DomainTestResponseGradeE
 	case "F":
-		responseGrade = DomainTestResponseGradeF
+		responseGrade = model.DomainTestResponseGradeF
 	default:
-		responseGrade = DomainTestResponseGradeF
+		responseGrade = model.DomainTestResponseGradeF
 	}
 
 	// Build response
-	response := DomainTestResponse{
+	response := model.DomainTestResponse{
 		Domain:     request.Domain,
 		Score:      score,
 		Grade:      responseGrade,
@@ -346,14 +347,14 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 // CheckBlacklist checks an IP address against DNS blacklists
 // (POST /blacklist)
 func (h *APIHandler) CheckBlacklist(c *gin.Context) {
-	var request BlacklistCheckRequest
+	var request model.BlacklistCheckRequest
 
 	// Bind and validate request
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_request",
 			Message: "Invalid request body",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
@@ -361,22 +362,22 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 	// Perform blacklist check using analyzer
 	checks, whitelists, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, Error{
+		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_ip",
 			Message: "Invalid IP address",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
 
 	// Build response
-	response := BlacklistCheckResponse{
+	response := model.BlacklistCheckResponse{
 		Ip:          request.Ip,
 		Blacklists:  checks,
 		Whitelists:  &whitelists,
 		ListedCount: listedCount,
 		Score:       score,
-		Grade:       BlacklistCheckResponseGrade(grade),
+		Grade:       model.BlacklistCheckResponseGrade(grade),
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -386,7 +387,7 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 // (GET /tests)
 func (h *APIHandler) ListTests(c *gin.Context, params ListTestsParams) {
 	if h.config.DisableTestList {
-		c.JSON(http.StatusForbidden, Error{
+		c.JSON(http.StatusForbidden, model.Error{
 			Error:   "feature_disabled",
 			Message: "Test listing is disabled on this instance",
 		})
@@ -405,51 +406,17 @@ func (h *APIHandler) ListTests(c *gin.Context, params ListTestsParams) {
 		}
 	}
 
-	summaries, total, err := h.storage.ListReportSummaries(offset, limit)
+	tests, total, err := h.storage.ListReportSummaries(offset, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, Error{
+		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "internal_error",
 			Message: "Failed to list tests",
-			Details: stringPtr(err.Error()),
+			Details: utils.PtrTo(err.Error()),
 		})
 		return
 	}
 
-	tests := make([]TestSummary, 0, len(summaries))
-	for _, s := range summaries {
-		base32ID := utils.UUIDToBase32(s.TestID)
-
-		var grade TestSummaryGrade
-		switch s.Grade {
-		case "A+":
-			grade = TestSummaryGradeA
-		case "A":
-			grade = TestSummaryGradeA1
-		case "B":
-			grade = TestSummaryGradeB
-		case "C":
-			grade = TestSummaryGradeC
-		case "D":
-			grade = TestSummaryGradeD
-		case "E":
-			grade = TestSummaryGradeE
-		default:
-			grade = TestSummaryGradeF
-		}
-
-		summary := TestSummary{
-			TestId:    base32ID,
-			Score:     s.Score,
-			Grade:     grade,
-			CreatedAt: s.CreatedAt,
-		}
-		if s.FromDomain != "" {
-			summary.FromDomain = stringPtr(s.FromDomain)
-		}
-		tests = append(tests, summary)
-	}
-
-	c.JSON(http.StatusOK, TestListResponse{
+	c.JSON(http.StatusOK, model.TestListResponse{
 		Tests:  tests,
 		Total:  int(total),
 		Offset: offset,

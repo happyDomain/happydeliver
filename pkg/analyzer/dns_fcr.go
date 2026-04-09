@@ -24,7 +24,7 @@ package analyzer
 import (
 	"context"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // checkPTRAndForward performs reverse DNS lookup (PTR) and forward confirmation (A/AAAA)
@@ -63,7 +63,7 @@ func (d *DNSAnalyzer) checkPTRAndForward(ip string) ([]string, []string) {
 }
 
 // Proper reverse DNS (PTR) and forward-confirmed reverse DNS (FCrDNS) is important for deliverability
-func (d *DNSAnalyzer) calculatePTRScore(results *api.DNSResults, senderIP string) (score int) {
+func (d *DNSAnalyzer) calculatePTRScore(results *model.DNSResults, senderIP string) (score int) {
 	if results.PtrRecords != nil && len(*results.PtrRecords) > 0 {
 		// 50 points for having PTR records
 		score += 50

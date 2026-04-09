@@ -22,7 +22,7 @@
 package analyzer
 
 import (
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // ScoreToGrade converts a percentage score (0-100) to a letter grade
@@ -65,9 +65,9 @@ func ScoreToGradeKind(score int) string {
 	}
 }
 
-// ScoreToReportGrade converts a percentage score to an api.ReportGrade
-func ScoreToReportGrade(score int) api.ReportGrade {
-	return api.ReportGrade(ScoreToGrade(score))
+// ScoreToReportGrade converts a percentage score to an model.ReportGrade
+func ScoreToReportGrade(score int) model.ReportGrade {
+	return model.ReportGrade(ScoreToGrade(score))
 }
 
 // gradeRank returns a numeric rank for a grade (lower = worse)

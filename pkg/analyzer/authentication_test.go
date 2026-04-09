@@ -24,76 +24,77 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestGetAuthenticationScore(t *testing.T) {
 	tests := []struct {
 		name          string
-		results       *api.AuthenticationResults
+		results       *model.AuthenticationResults
 		expectedScore int
 	}{
 		{
 			name: "Perfect authentication (SPF + DKIM + DMARC)",
-			results: &api.AuthenticationResults{
-				Spf: &api.AuthResult{
-					Result: api.AuthResultResultPass,
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultPass,
 				},
-				Dkim: &[]api.AuthResult{
-					{Result: api.AuthResultResultPass},
+				Dkim: &[]model.AuthResult{
+					{Result: model.AuthResultResultPass},
 				},
-				Dmarc: &api.AuthResult{
-					Result: api.AuthResultResultPass,
+				Dmarc: &model.AuthResult{
+					Result: model.AuthResultResultPass,
 				},
 			},
 			expectedScore: 73, // SPF=25 + DKIM=23 + DMARC=25
 		},
 		{
 			name: "SPF and DKIM only",
-			results: &api.AuthenticationResults{
-				Spf: &api.AuthResult{
-					Result: api.AuthResultResultPass,
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultPass,
 				},
-				Dkim: &[]api.AuthResult{
-					{Result: api.AuthResultResultPass},
+				Dkim: &[]model.AuthResult{
+					{Result: model.AuthResultResultPass},
 				},
 			},
 			expectedScore: 48, // SPF=25 + DKIM=23
 		},
 		{
 			name: "SPF fail, DKIM pass",
-			results: &api.AuthenticationResults{
-				Spf: &api.AuthResult{
-					Result: api.AuthResultResultFail,
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultFail,
 				},
-				Dkim: &[]api.AuthResult{
-					{Result: api.AuthResultResultPass},
+				Dkim: &[]model.AuthResult{
+					{Result: model.AuthResultResultPass},
 				},
 			},
 			expectedScore: 23, // SPF=0 + DKIM=23
 		},
 		{
 			name: "SPF softfail",
-			results: &api.AuthenticationResults{
-				Spf: &api.AuthResult{
-					Result: api.AuthResultResultSoftfail,
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultSoftfail,
 				},
 			},
 			expectedScore: 4,
 		},
 		{
 			name:          "No authentication",
-			results:       &api.AuthenticationResults{},
+			results:       &model.AuthenticationResults{},
 			expectedScore: 0,
 		},
 		{
 			name: "BIMI adds to score",
-			results: &api.AuthenticationResults{
-				Spf: &api.AuthResult{
-					Result: api.AuthResultResultPass,
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultPass,
 				},
-				Bimi: &api.AuthResult{
-					Result: api.AuthResultResultPass,
+				Bimi: &model.AuthResult{
+					Result: model.AuthResultResultPass,
 				},
 			},
 			expectedScore: 35, // SPF (25) + BIMI (10)
@@ -117,30 +118,30 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 	tests := []struct {
 		name                string
 		header              string
-		expectedSPFResult   *api.AuthResultResult
+		expectedSPFResult   *model.AuthResultResult
 		expectedSPFDomain   *string
 		expectedDKIMCount   int
-		expectedDKIMResult  *api.AuthResultResult
-		expectedDMARCResult *api.AuthResultResult
+		expectedDKIMResult  *model.AuthResultResult
+		expectedDMARCResult *model.AuthResultResult
 		expectedDMARCDomain *string
-		expectedBIMIResult  *api.AuthResultResult
-		expectedARCResult   *api.ARCResultResult
+		expectedBIMIResult  *model.AuthResultResult
+		expectedARCResult   *model.ARCResultResult
 	}{
 		{
 			name:                "Complete authentication results",
 			header:              "mx.google.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=pass action=none header.from=example.com",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultPass),
+			expectedSPFDomain:   utils.PtrTo("example.com"),
 			expectedDKIMCount:   1,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedDMARCResult: api.PtrTo(api.AuthResultResultPass),
-			expectedDMARCDomain: api.PtrTo("example.com"),
+			expectedDKIMResult:  utils.PtrTo(model.AuthResultResultPass),
+			expectedDMARCResult: utils.PtrTo(model.AuthResultResultPass),
+			expectedDMARCDomain: utils.PtrTo("example.com"),
 		},
 		{
 			name:                "SPF only",
 			header:              "mail.example.com; spf=pass smtp.mailfrom=user@domain.com",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:   api.PtrTo("domain.com"),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultPass),
+			expectedSPFDomain:   utils.PtrTo("domain.com"),
 			expectedDKIMCount:   0,
 			expectedDMARCResult: nil,
 		},
@@ -149,68 +150,68 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 			header:             "mail.example.com; dkim=pass header.d=example.com header.s=selector1",
 			expectedSPFResult:  nil,
 			expectedDKIMCount:  1,
-			expectedDKIMResult: api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMResult: utils.PtrTo(model.AuthResultResultPass),
 		},
 		{
 			name:                "Multiple DKIM signatures",
 			header:              "mail.example.com; dkim=pass header.d=example.com header.s=s1; dkim=pass header.d=example.com header.s=s2",
 			expectedSPFResult:   nil,
 			expectedDKIMCount:   2,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMResult:  utils.PtrTo(model.AuthResultResultPass),
 			expectedDMARCResult: nil,
 		},
 		{
 			name:                "SPF fail with DKIM pass",
 			header:              "mail.example.com; spf=fail smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultFail),
-			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultFail),
+			expectedSPFDomain:   utils.PtrTo("example.com"),
 			expectedDKIMCount:   1,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMResult:  utils.PtrTo(model.AuthResultResultPass),
 			expectedDMARCResult: nil,
 		},
 		{
 			name:                "SPF softfail",
 			header:              "mail.example.com; spf=softfail smtp.mailfrom=sender@example.com",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultSoftfail),
-			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultSoftfail),
+			expectedSPFDomain:   utils.PtrTo("example.com"),
 			expectedDKIMCount:   0,
 			expectedDMARCResult: nil,
 		},
 		{
 			name:                "DMARC fail",
 			header:              "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=fail action=quarantine header.from=example.com",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultPass),
 			expectedDKIMCount:   1,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedDMARCResult: api.PtrTo(api.AuthResultResultFail),
-			expectedDMARCDomain: api.PtrTo("example.com"),
+			expectedDKIMResult:  utils.PtrTo(model.AuthResultResultPass),
+			expectedDMARCResult: utils.PtrTo(model.AuthResultResultFail),
+			expectedDMARCDomain: utils.PtrTo("example.com"),
 		},
 		{
 			name:               "BIMI pass",
 			header:             "mail.example.com; spf=pass smtp.mailfrom=sender@example.com; bimi=pass header.d=example.com header.selector=default",
-			expectedSPFResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:  api.PtrTo("example.com"),
+			expectedSPFResult:  utils.PtrTo(model.AuthResultResultPass),
+			expectedSPFDomain:  utils.PtrTo("example.com"),
 			expectedDKIMCount:  0,
-			expectedBIMIResult: api.PtrTo(api.AuthResultResultPass),
+			expectedBIMIResult: utils.PtrTo(model.AuthResultResultPass),
 		},
 		{
 			name:              "ARC pass",
 			header:            "mail.example.com; arc=pass",
 			expectedSPFResult: nil,
 			expectedDKIMCount: 0,
-			expectedARCResult: api.PtrTo(api.ARCResultResultPass),
+			expectedARCResult: utils.PtrTo(model.ARCResultResultPass),
 		},
 		{
 			name:                "All authentication methods",
 			header:              "mx.google.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com header.s=default; dmarc=pass action=none header.from=example.com; bimi=pass header.d=example.com header.selector=v1; arc=pass",
-			expectedSPFResult:   api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain:   api.PtrTo("example.com"),
+			expectedSPFResult:   utils.PtrTo(model.AuthResultResultPass),
+			expectedSPFDomain:   utils.PtrTo("example.com"),
 			expectedDKIMCount:   1,
-			expectedDKIMResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedDMARCResult: api.PtrTo(api.AuthResultResultPass),
-			expectedDMARCDomain: api.PtrTo("example.com"),
-			expectedBIMIResult:  api.PtrTo(api.AuthResultResultPass),
-			expectedARCResult:   api.PtrTo(api.ARCResultResultPass),
+			expectedDKIMResult:  utils.PtrTo(model.AuthResultResultPass),
+			expectedDMARCResult: utils.PtrTo(model.AuthResultResultPass),
+			expectedDMARCDomain: utils.PtrTo("example.com"),
+			expectedBIMIResult:  utils.PtrTo(model.AuthResultResultPass),
+			expectedARCResult:   utils.PtrTo(model.ARCResultResultPass),
 		},
 		{
 			name:              "Empty header (authserv-id only)",
@@ -221,8 +222,8 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 		{
 			name:              "Empty parts with semicolons",
 			header:            "mx.google.com; ; ; spf=pass smtp.mailfrom=sender@example.com; ;",
-			expectedSPFResult: api.PtrTo(api.AuthResultResultPass),
-			expectedSPFDomain: api.PtrTo("example.com"),
+			expectedSPFResult: utils.PtrTo(model.AuthResultResultPass),
+			expectedSPFDomain: utils.PtrTo("example.com"),
 			expectedDKIMCount: 0,
 		},
 		{
@@ -230,19 +231,19 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 			header:             "mail.example.com; dkim=pass d=example.com s=selector1",
 			expectedSPFResult:  nil,
 			expectedDKIMCount:  1,
-			expectedDKIMResult: api.PtrTo(api.AuthResultResultPass),
+			expectedDKIMResult: utils.PtrTo(model.AuthResultResultPass),
 		},
 		{
 			name:              "SPF neutral",
 			header:            "mail.example.com; spf=neutral smtp.mailfrom=sender@example.com",
-			expectedSPFResult: api.PtrTo(api.AuthResultResultNeutral),
-			expectedSPFDomain: api.PtrTo("example.com"),
+			expectedSPFResult: utils.PtrTo(model.AuthResultResultNeutral),
+			expectedSPFDomain: utils.PtrTo("example.com"),
 			expectedDKIMCount: 0,
 		},
 		{
 			name:              "SPF none",
 			header:            "mail.example.com; spf=none",
-			expectedSPFResult: api.PtrTo(api.AuthResultResultNone),
+			expectedSPFResult: utils.PtrTo(model.AuthResultResultNone),
 			expectedDKIMCount: 0,
 		},
 	}
@@ -251,7 +252,7 @@ func TestParseAuthenticationResultsHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := &api.AuthenticationResults{}
+			results := &model.AuthenticationResults{}
 			analyzer.parseAuthenticationResultsHeader(tt.header, results)
 
 			// Check SPF
@@ -357,13 +358,13 @@ func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 
 	t.Run("Multiple SPF results - only first is parsed", func(t *testing.T) {
 		header := "mail.example.com; spf=pass smtp.mailfrom=first@example.com; spf=fail smtp.mailfrom=second@example.com"
-		results := &api.AuthenticationResults{}
+		results := &model.AuthenticationResults{}
 		analyzer.parseAuthenticationResultsHeader(header, results)
 
 		if results.Spf == nil {
 			t.Fatal("Expected SPF result, got nil")
 		}
-		if results.Spf.Result != api.AuthResultResultPass {
+		if results.Spf.Result != model.AuthResultResultPass {
 			t.Errorf("Expected first SPF result (pass), got %v", results.Spf.Result)
 		}
 		if results.Spf.Domain == nil || *results.Spf.Domain != "example.com" {
@@ -373,13 +374,13 @@ func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 
 	t.Run("Multiple DMARC results - only first is parsed", func(t *testing.T) {
 		header := "mail.example.com; dmarc=pass header.from=first.com; dmarc=fail header.from=second.com"
-		results := &api.AuthenticationResults{}
+		results := &model.AuthenticationResults{}
 		analyzer.parseAuthenticationResultsHeader(header, results)
 
 		if results.Dmarc == nil {
 			t.Fatal("Expected DMARC result, got nil")
 		}
-		if results.Dmarc.Result != api.AuthResultResultPass {
+		if results.Dmarc.Result != model.AuthResultResultPass {
 			t.Errorf("Expected first DMARC result (pass), got %v", results.Dmarc.Result)
 		}
 		if results.Dmarc.Domain == nil || *results.Dmarc.Domain != "first.com" {
@@ -389,26 +390,26 @@ func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 
 	t.Run("Multiple ARC results - only first is parsed", func(t *testing.T) {
 		header := "mail.example.com; arc=pass; arc=fail"
-		results := &api.AuthenticationResults{}
+		results := &model.AuthenticationResults{}
 		analyzer.parseAuthenticationResultsHeader(header, results)
 
 		if results.Arc == nil {
 			t.Fatal("Expected ARC result, got nil")
 		}
-		if results.Arc.Result != api.ARCResultResultPass {
+		if results.Arc.Result != model.ARCResultResultPass {
 			t.Errorf("Expected first ARC result (pass), got %v", results.Arc.Result)
 		}
 	})
 
 	t.Run("Multiple BIMI results - only first is parsed", func(t *testing.T) {
 		header := "mail.example.com; bimi=pass header.d=first.com; bimi=fail header.d=second.com"
-		results := &api.AuthenticationResults{}
+		results := &model.AuthenticationResults{}
 		analyzer.parseAuthenticationResultsHeader(header, results)
 
 		if results.Bimi == nil {
 			t.Fatal("Expected BIMI result, got nil")
 		}
-		if results.Bimi.Result != api.AuthResultResultPass {
+		if results.Bimi.Result != model.AuthResultResultPass {
 			t.Errorf("Expected first BIMI result (pass), got %v", results.Bimi.Result)
 		}
 		if results.Bimi.Domain == nil || *results.Bimi.Domain != "first.com" {
@@ -419,7 +420,7 @@ func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 	t.Run("Multiple DKIM results - all are parsed", func(t *testing.T) {
 		// DKIM is special - multiple signatures should all be collected
 		header := "mail.example.com; dkim=pass header.d=first.com header.s=s1; dkim=fail header.d=second.com header.s=s2"
-		results := &api.AuthenticationResults{}
+		results := &model.AuthenticationResults{}
 		analyzer.parseAuthenticationResultsHeader(header, results)
 
 		if results.Dkim == nil {
@@ -428,10 +429,10 @@ func TestParseAuthenticationResultsHeader_OnlyFirstResultParsed(t *testing.T) {
 		if len(*results.Dkim) != 2 {
 			t.Errorf("Expected 2 DKIM results, got %d", len(*results.Dkim))
 		}
-		if (*results.Dkim)[0].Result != api.AuthResultResultPass {
+		if (*results.Dkim)[0].Result != model.AuthResultResultPass {
 			t.Errorf("Expected first DKIM result to be pass, got %v", (*results.Dkim)[0].Result)
 		}
-		if (*results.Dkim)[1].Result != api.AuthResultResultFail {
+		if (*results.Dkim)[1].Result != model.AuthResultResultFail {
 			t.Errorf("Expected second DKIM result to be fail, got %v", (*results.Dkim)[1].Result)
 		}
 	})

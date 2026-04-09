@@ -24,26 +24,26 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseDMARCResult(t *testing.T) {
 	tests := []struct {
 		name           string
 		part           string
-		expectedResult api.AuthResultResult
+		expectedResult model.AuthResultResult
 		expectedDomain string
 	}{
 		{
 			name:           "DMARC pass",
 			part:           "dmarc=pass action=none header.from=example.com",
-			expectedResult: api.AuthResultResultPass,
+			expectedResult: model.AuthResultResultPass,
 			expectedDomain: "example.com",
 		},
 		{
 			name:           "DMARC fail",
 			part:           "dmarc=fail action=quarantine header.from=example.com",
-			expectedResult: api.AuthResultResultFail,
+			expectedResult: model.AuthResultResultFail,
 			expectedDomain: "example.com",
 		},
 	}

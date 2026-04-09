@@ -24,7 +24,7 @@ package analyzer
 import (
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // AuthenticationAnalyzer analyzes email authentication results
@@ -38,8 +38,8 @@ func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer 
 }
 
 // AnalyzeAuthentication extracts and analyzes authentication results from email headers
-func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *api.AuthenticationResults {
-	results := &api.AuthenticationResults{}
+func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *model.AuthenticationResults {
+	results := &model.AuthenticationResults{}
 
 	// Parse Authentication-Results headers
 	authHeaders := email.GetAuthenticationResults(a.receiverHostname)
@@ -65,7 +65,7 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *api
 
 // parseAuthenticationResultsHeader parses an Authentication-Results header
 // Format: example.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com
-func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string, results *api.AuthenticationResults) {
+func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string, results *model.AuthenticationResults) {
 	// Split by semicolon to get individual results
 	parts := strings.Split(header, ";")
 	if len(parts) < 2 {
@@ -91,7 +91,7 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 			dkimResult := a.parseDKIMResult(part)
 			if dkimResult != nil {
 				if results.Dkim == nil {
-					dkimList := []api.AuthResult{*dkimResult}
+					dkimList := []model.AuthResult{*dkimResult}
 					results.Dkim = &dkimList
 				} else {
 					*results.Dkim = append(*results.Dkim, *dkimResult)
@@ -145,7 +145,7 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 
 // CalculateAuthenticationScore calculates the authentication score from auth results
 // Returns a score from 0-100 where higher is better
-func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *api.AuthenticationResults) (int, string) {
+func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.AuthenticationResults) (int, string) {
 	if results == nil {
 		return 0, ""
 	}

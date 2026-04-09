@@ -1,5 +1,5 @@
 // This file is part of the happyDeliver (R) project.
-// Copyright (c) 2025 happyDomain
+// Copyright (c) 2026 happyDomain
 // Authors: Pierre-Olivier Mercier, et al.
 //
 // This program is offered under a commercial and under the AGPL license.
@@ -19,11 +19,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package api
-
-func stringPtr(s string) *string {
-	return &s
-}
+package utils
 
 // PtrTo returns a pointer to the provided value
 func PtrTo[T any](v T) *T {

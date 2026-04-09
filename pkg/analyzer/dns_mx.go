@@ -25,36 +25,37 @@ import (
 	"context"
 	"fmt"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // checkMXRecords looks up MX records for a domain
-func (d *DNSAnalyzer) checkMXRecords(domain string) *[]api.MXRecord {
+func (d *DNSAnalyzer) checkMXRecords(domain string) *[]model.MXRecord {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	mxRecords, err := d.resolver.LookupMX(ctx, domain)
 	if err != nil {
-		return &[]api.MXRecord{
+		return &[]model.MXRecord{
 			{
 				Valid: false,
-				Error: api.PtrTo(fmt.Sprintf("Failed to lookup MX records: %v", err)),
+				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup MX records: %v", err)),
 			},
 		}
 	}
 
 	if len(mxRecords) == 0 {
-		return &[]api.MXRecord{
+		return &[]model.MXRecord{
 			{
 				Valid: false,
-				Error: api.PtrTo("No MX records found"),
+				Error: utils.PtrTo("No MX records found"),
 			},
 		}
 	}
 
-	var results []api.MXRecord
+	var results []model.MXRecord
 	for _, mx := range mxRecords {
-		results = append(results, api.MXRecord{
+		results = append(results, model.MXRecord{
 			Host:     mx.Host,
 			Priority: mx.Pref,
 			Valid:    true,
@@ -64,7 +65,7 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) *[]api.MXRecord {
 	return &results
 }
 
-func (d *DNSAnalyzer) calculateMXScore(results *api.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateMXScore(results *model.DNSResults) (score int) {
 	// Having valid MX records is critical for email deliverability
 	// From domain MX records (half points) - needed for replies
 	if results.FromMxRecords != nil && len(*results.FromMxRecords) > 0 {

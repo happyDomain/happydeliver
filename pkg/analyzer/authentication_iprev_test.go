@@ -24,71 +24,72 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestParseIPRevResult(t *testing.T) {
 	tests := []struct {
 		name             string
 		part             string
-		expectedResult   api.IPRevResultResult
+		expectedResult   model.IPRevResultResult
 		expectedIP       *string
 		expectedHostname *string
 	}{
 		{
 			name:             "IPRev pass with IP and hostname",
 			part:             "iprev=pass smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)",
-			expectedResult:   api.Pass,
-			expectedIP:       api.PtrTo("195.110.101.58"),
-			expectedHostname: api.PtrTo("authsmtp74.register.it"),
+			expectedResult:   model.Pass,
+			expectedIP:       utils.PtrTo("195.110.101.58"),
+			expectedHostname: utils.PtrTo("authsmtp74.register.it"),
 		},
 		{
 			name:             "IPRev pass without smtp prefix",
 			part:             "iprev=pass remote-ip=192.0.2.1 (mail.example.com)",
-			expectedResult:   api.Pass,
-			expectedIP:       api.PtrTo("192.0.2.1"),
-			expectedHostname: api.PtrTo("mail.example.com"),
+			expectedResult:   model.Pass,
+			expectedIP:       utils.PtrTo("192.0.2.1"),
+			expectedHostname: utils.PtrTo("mail.example.com"),
 		},
 		{
 			name:             "IPRev fail",
 			part:             "iprev=fail smtp.remote-ip=198.51.100.42 (unknown.host.com)",
-			expectedResult:   api.Fail,
-			expectedIP:       api.PtrTo("198.51.100.42"),
-			expectedHostname: api.PtrTo("unknown.host.com"),
+			expectedResult:   model.Fail,
+			expectedIP:       utils.PtrTo("198.51.100.42"),
+			expectedHostname: utils.PtrTo("unknown.host.com"),
 		},
 		{
 			name:             "IPRev temperror",
 			part:             "iprev=temperror smtp.remote-ip=203.0.113.1",
-			expectedResult:   api.Temperror,
-			expectedIP:       api.PtrTo("203.0.113.1"),
+			expectedResult:   model.Temperror,
+			expectedIP:       utils.PtrTo("203.0.113.1"),
 			expectedHostname: nil,
 		},
 		{
 			name:             "IPRev permerror",
 			part:             "iprev=permerror smtp.remote-ip=192.0.2.100",
-			expectedResult:   api.Permerror,
-			expectedIP:       api.PtrTo("192.0.2.100"),
+			expectedResult:   model.Permerror,
+			expectedIP:       utils.PtrTo("192.0.2.100"),
 			expectedHostname: nil,
 		},
 		{
 			name:             "IPRev with IPv6",
 			part:             "iprev=pass smtp.remote-ip=2001:db8::1 (ipv6.example.com)",
-			expectedResult:   api.Pass,
-			expectedIP:       api.PtrTo("2001:db8::1"),
-			expectedHostname: api.PtrTo("ipv6.example.com"),
+			expectedResult:   model.Pass,
+			expectedIP:       utils.PtrTo("2001:db8::1"),
+			expectedHostname: utils.PtrTo("ipv6.example.com"),
 		},
 		{
 			name:             "IPRev with subdomain hostname",
 			part:             "iprev=pass smtp.remote-ip=192.0.2.50 (mail.subdomain.example.com)",
-			expectedResult:   api.Pass,
-			expectedIP:       api.PtrTo("192.0.2.50"),
-			expectedHostname: api.PtrTo("mail.subdomain.example.com"),
+			expectedResult:   model.Pass,
+			expectedIP:       utils.PtrTo("192.0.2.50"),
+			expectedHostname: utils.PtrTo("mail.subdomain.example.com"),
 		},
 		{
 			name:             "IPRev pass without parentheses",
 			part:             "iprev=pass smtp.remote-ip=192.0.2.200",
-			expectedResult:   api.Pass,
-			expectedIP:       api.PtrTo("192.0.2.200"),
+			expectedResult:   model.Pass,
+			expectedIP:       utils.PtrTo("192.0.2.200"),
 			expectedHostname: nil,
 		},
 	}
@@ -142,29 +143,29 @@ func TestParseAuthenticationResultsHeader_IPRev(t *testing.T) {
 	tests := []struct {
 		name                string
 		header              string
-		expectedIPRevResult *api.IPRevResultResult
+		expectedIPRevResult *model.IPRevResultResult
 		expectedIP          *string
 		expectedHostname    *string
 	}{
 		{
 			name:                "IPRev pass in Authentication-Results",
 			header:              "mx.google.com; iprev=pass smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)",
-			expectedIPRevResult: api.PtrTo(api.Pass),
-			expectedIP:          api.PtrTo("195.110.101.58"),
-			expectedHostname:    api.PtrTo("authsmtp74.register.it"),
+			expectedIPRevResult: utils.PtrTo(model.Pass),
+			expectedIP:          utils.PtrTo("195.110.101.58"),
+			expectedHostname:    utils.PtrTo("authsmtp74.register.it"),
 		},
 		{
 			name:                "IPRev with other authentication methods",
 			header:              "mx.google.com; spf=pass smtp.mailfrom=sender@example.com; iprev=pass smtp.remote-ip=192.0.2.1 (mail.example.com); dkim=pass header.d=example.com",
-			expectedIPRevResult: api.PtrTo(api.Pass),
-			expectedIP:          api.PtrTo("192.0.2.1"),
-			expectedHostname:    api.PtrTo("mail.example.com"),
+			expectedIPRevResult: utils.PtrTo(model.Pass),
+			expectedIP:          utils.PtrTo("192.0.2.1"),
+			expectedHostname:    utils.PtrTo("mail.example.com"),
 		},
 		{
 			name:                "IPRev fail",
 			header:              "mx.google.com; iprev=fail smtp.remote-ip=198.51.100.42",
-			expectedIPRevResult: api.PtrTo(api.Fail),
-			expectedIP:          api.PtrTo("198.51.100.42"),
+			expectedIPRevResult: utils.PtrTo(model.Fail),
+			expectedIP:          utils.PtrTo("198.51.100.42"),
 			expectedHostname:    nil,
 		},
 		{
@@ -175,9 +176,9 @@ func TestParseAuthenticationResultsHeader_IPRev(t *testing.T) {
 		{
 			name:                "Multiple IPRev results - only first is parsed",
 			header:              "mx.google.com; iprev=pass smtp.remote-ip=192.0.2.1 (first.com); iprev=fail smtp.remote-ip=192.0.2.2 (second.com)",
-			expectedIPRevResult: api.PtrTo(api.Pass),
-			expectedIP:          api.PtrTo("192.0.2.1"),
-			expectedHostname:    api.PtrTo("first.com"),
+			expectedIPRevResult: utils.PtrTo(model.Pass),
+			expectedIP:          utils.PtrTo("192.0.2.1"),
+			expectedHostname:    utils.PtrTo("first.com"),
 		},
 	}
 
@@ -185,7 +186,7 @@ func TestParseAuthenticationResultsHeader_IPRev(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := &api.AuthenticationResults{}
+			results := &model.AuthenticationResults{}
 			analyzer.parseAuthenticationResultsHeader(tt.header, results)
 
 			// Check IPRev

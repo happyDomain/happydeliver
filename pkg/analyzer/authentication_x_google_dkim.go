@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseXGoogleDKIMResult parses Google DKIM result from Authentication-Results
 // Example: x-google-dkim=pass (2048-bit rsa key) header.d=1e100.net header.i=@1e100.net header.b=fauiPVZ6
-func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`x-google-dkim=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract domain (header.d or d)
@@ -54,15 +55,15 @@ func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(part string) *api.AuthRe
 		result.Selector = &selector
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "x-google-dkim="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "x-google-dkim="))
 
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateXGoogleDKIMScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateXGoogleDKIMScore(results *model.AuthenticationResults) (score int) {
 	if results.XGoogleDkim != nil {
 		switch results.XGoogleDkim.Result {
-		case api.AuthResultResultPass:
+		case model.AuthResultResultPass:
 			// pass: don't alter the score
 		default: // fail
 			return -100

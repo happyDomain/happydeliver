@@ -27,11 +27,12 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // checkBIMIRecord looks up and validates BIMI record for a domain and selector
-func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *api.BIMIRecord {
+func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord {
 	// BIMI records are at: selector._bimi.domain
 	bimiDomain := fmt.Sprintf("%s._bimi.%s", selector, domain)
 
@@ -40,20 +41,20 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *api.BIMIRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, bimiDomain)
 	if err != nil {
-		return &api.BIMIRecord{
+		return &model.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    api.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %v", err)),
+			Error:    utils.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %v", err)),
 		}
 	}
 
 	if len(txtRecords) == 0 {
-		return &api.BIMIRecord{
+		return &model.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    api.PtrTo("No BIMI record found"),
+			Error:    utils.PtrTo("No BIMI record found"),
 		}
 	}
 
@@ -66,18 +67,18 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *api.BIMIRecord {
 
 	// Basic validation - should contain "v=BIMI1" and "l=" (logo URL)
 	if !d.validateBIMI(bimiRecord) {
-		return &api.BIMIRecord{
+		return &model.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Record:   &bimiRecord,
 			LogoUrl:  &logoURL,
 			VmcUrl:   &vmcURL,
 			Valid:    false,
-			Error:    api.PtrTo("BIMI record appears malformed"),
+			Error:    utils.PtrTo("BIMI record appears malformed"),
 		}
 	}
 
-	return &api.BIMIRecord{
+	return &model.BIMIRecord{
 		Selector: selector,
 		Domain:   domain,
 		Record:   &bimiRecord,

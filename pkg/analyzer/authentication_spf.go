@@ -25,19 +25,20 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // parseSPFResult parses SPF result from Authentication-Results
 // Example: spf=pass smtp.mailfrom=sender@example.com
-func (a *AuthenticationAnalyzer) parseSPFResult(part string) *api.AuthResult {
-	result := &api.AuthResult{}
+func (a *AuthenticationAnalyzer) parseSPFResult(part string) *model.AuthResult {
+	result := &model.AuthResult{}
 
 	// Extract result (pass, fail, etc.)
 	re := regexp.MustCompile(`spf=(\w+)`)
 	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
 		resultStr := strings.ToLower(matches[1])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	// Extract domain
@@ -51,13 +52,13 @@ func (a *AuthenticationAnalyzer) parseSPFResult(part string) *api.AuthResult {
 		}
 	}
 
-	result.Details = api.PtrTo(strings.TrimPrefix(part, "spf="))
+	result.Details = utils.PtrTo(strings.TrimPrefix(part, "spf="))
 
 	return result
 }
 
 // parseLegacySPF attempts to parse SPF from Received-SPF header
-func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *api.AuthResult {
+func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *model.AuthResult {
 	receivedSPF := email.Header.Get("Received-SPF")
 	if receivedSPF == "" {
 		return nil
@@ -73,13 +74,13 @@ func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *api.AuthRe
 		}
 	}
 
-	result := &api.AuthResult{}
+	result := &model.AuthResult{}
 
 	// Extract result (first word)
 	parts := strings.Fields(receivedSPF)
 	if len(parts) > 0 {
 		resultStr := strings.ToLower(parts[0])
-		result.Result = api.AuthResultResult(resultStr)
+		result.Result = model.AuthResultResult(resultStr)
 	}
 
 	result.Details = &receivedSPF
@@ -97,14 +98,14 @@ func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *api.AuthRe
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateSPFScore(results *api.AuthenticationResults) (score int) {
+func (a *AuthenticationAnalyzer) calculateSPFScore(results *model.AuthenticationResults) (score int) {
 	if results.Spf != nil {
 		switch results.Spf.Result {
-		case api.AuthResultResultPass:
+		case model.AuthResultResultPass:
 			return 100
-		case api.AuthResultResultNeutral, api.AuthResultResultNone:
+		case model.AuthResultResultNeutral, model.AuthResultResultNone:
 			return 50
-		case api.AuthResultResultSoftfail:
+		case model.AuthResultResultSoftfail:
 			return 17
 		default: // fail, temperror, permerror
 			return 0

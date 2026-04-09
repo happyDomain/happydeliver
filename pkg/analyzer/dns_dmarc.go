@@ -27,11 +27,12 @@ import (
 	"regexp"
 	"strings"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
-// checkapi.DMARCRecord looks up and validates DMARC record for a domain
-func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
+// checkmodel.DMARCRecord looks up and validates DMARC record for a domain
+func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	// DMARC records are at: _dmarc.domain
 	dmarcDomain := fmt.Sprintf("_dmarc.%s", domain)
 
@@ -40,9 +41,9 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, dmarcDomain)
 	if err != nil {
-		return &api.DMARCRecord{
+		return &model.DMARCRecord{
 			Valid: false,
-			Error: api.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
 		}
 	}
 
@@ -56,9 +57,9 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
 	}
 
 	if dmarcRecord == "" {
-		return &api.DMARCRecord{
+		return &model.DMARCRecord{
 			Valid: false,
-			Error: api.PtrTo("No DMARC record found"),
+			Error: utils.PtrTo("No DMARC record found"),
 		}
 	}
 
@@ -77,21 +78,21 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *api.DMARCRecord {
 
 	// Basic validation
 	if !d.validateDMARC(dmarcRecord) {
-		return &api.DMARCRecord{
+		return &model.DMARCRecord{
 			Record:          &dmarcRecord,
-			Policy:          api.PtrTo(api.DMARCRecordPolicy(policy)),
+			Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
 			SubdomainPolicy: subdomainPolicy,
 			Percentage:      percentage,
 			SpfAlignment:    spfAlignment,
 			DkimAlignment:   dkimAlignment,
 			Valid:           false,
-			Error:           api.PtrTo("DMARC record appears malformed"),
+			Error:           utils.PtrTo("DMARC record appears malformed"),
 		}
 	}
 
-	return &api.DMARCRecord{
+	return &model.DMARCRecord{
 		Record:          &dmarcRecord,
-		Policy:          api.PtrTo(api.DMARCRecordPolicy(policy)),
+		Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
 		SubdomainPolicy: subdomainPolicy,
 		Percentage:      percentage,
 		SpfAlignment:    spfAlignment,
@@ -113,44 +114,44 @@ func (d *DNSAnalyzer) extractDMARCPolicy(record string) string {
 
 // extractDMARCSPFAlignment extracts SPF alignment mode from a DMARC record
 // Returns "relaxed" (default) or "strict"
-func (d *DNSAnalyzer) extractDMARCSPFAlignment(record string) *api.DMARCRecordSpfAlignment {
+func (d *DNSAnalyzer) extractDMARCSPFAlignment(record string) *model.DMARCRecordSpfAlignment {
 	// Look for aspf=s (strict) or aspf=r (relaxed)
 	re := regexp.MustCompile(`aspf=(r|s)`)
 	matches := re.FindStringSubmatch(record)
 	if len(matches) > 1 {
 		if matches[1] == "s" {
-			return api.PtrTo(api.DMARCRecordSpfAlignmentStrict)
+			return utils.PtrTo(model.DMARCRecordSpfAlignmentStrict)
 		}
-		return api.PtrTo(api.DMARCRecordSpfAlignmentRelaxed)
+		return utils.PtrTo(model.DMARCRecordSpfAlignmentRelaxed)
 	}
 	// Default is relaxed if not specified
-	return api.PtrTo(api.DMARCRecordSpfAlignmentRelaxed)
+	return utils.PtrTo(model.DMARCRecordSpfAlignmentRelaxed)
 }
 
 // extractDMARCDKIMAlignment extracts DKIM alignment mode from a DMARC record
 // Returns "relaxed" (default) or "strict"
-func (d *DNSAnalyzer) extractDMARCDKIMAlignment(record string) *api.DMARCRecordDkimAlignment {
+func (d *DNSAnalyzer) extractDMARCDKIMAlignment(record string) *model.DMARCRecordDkimAlignment {
 	// Look for adkim=s (strict) or adkim=r (relaxed)
 	re := regexp.MustCompile(`adkim=(r|s)`)
 	matches := re.FindStringSubmatch(record)
 	if len(matches) > 1 {
 		if matches[1] == "s" {
-			return api.PtrTo(api.DMARCRecordDkimAlignmentStrict)
+			return utils.PtrTo(model.DMARCRecordDkimAlignmentStrict)
 		}
-		return api.PtrTo(api.DMARCRecordDkimAlignmentRelaxed)
+		return utils.PtrTo(model.DMARCRecordDkimAlignmentRelaxed)
 	}
 	// Default is relaxed if not specified
-	return api.PtrTo(api.DMARCRecordDkimAlignmentRelaxed)
+	return utils.PtrTo(model.DMARCRecordDkimAlignmentRelaxed)
 }
 
 // extractDMARCSubdomainPolicy extracts subdomain policy from a DMARC record
 // Returns the sp tag value or nil if not specified (defaults to main policy)
-func (d *DNSAnalyzer) extractDMARCSubdomainPolicy(record string) *api.DMARCRecordSubdomainPolicy {
+func (d *DNSAnalyzer) extractDMARCSubdomainPolicy(record string) *model.DMARCRecordSubdomainPolicy {
 	// Look for sp=none, sp=quarantine, or sp=reject
 	re := regexp.MustCompile(`sp=(none|quarantine|reject)`)
 	matches := re.FindStringSubmatch(record)
 	if len(matches) > 1 {
-		return api.PtrTo(api.DMARCRecordSubdomainPolicy(matches[1]))
+		return utils.PtrTo(model.DMARCRecordSubdomainPolicy(matches[1]))
 	}
 	// If sp is not specified, it defaults to the main policy (p tag)
 	// Return nil to indicate it's using the default
@@ -191,7 +192,7 @@ func (d *DNSAnalyzer) validateDMARC(record string) bool {
 	return true
 }
 
-func (d *DNSAnalyzer) calculateDMARCScore(results *api.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int) {
 	// DMARC ties SPF and DKIM together and provides policy
 	if results.DmarcRecord != nil {
 		if results.DmarcRecord.Valid {
@@ -210,10 +211,10 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *api.DNSResults) (score int) {
 				}
 			}
 			// Bonus points for strict alignment modes (2 points each)
-			if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == api.DMARCRecordSpfAlignmentStrict {
+			if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
 				score += 5
 			}
-			if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == api.DMARCRecordDkimAlignmentStrict {
+			if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
 				score += 5
 			}
 			// Subdomain policy scoring (sp tag)

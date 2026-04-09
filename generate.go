@@ -21,5 +21,5 @@
 
 package main
 
-//go:generate go tool oapi-codegen -config api/config-models.yaml api/openapi.yaml
+//go:generate go tool oapi-codegen -config api/config-models.yaml api/schemas.yaml
 //go:generate go tool oapi-codegen -config api/config-server.yaml api/openapi.yaml

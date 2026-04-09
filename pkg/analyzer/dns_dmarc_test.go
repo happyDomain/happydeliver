@@ -25,7 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestExtractDMARCPolicy(t *testing.T) {
@@ -228,17 +229,17 @@ func TestExtractDMARCSubdomainPolicy(t *testing.T) {
 		{
 			name:           "Subdomain policy - none",
 			record:         "v=DMARC1; p=quarantine; sp=none",
-			expectedPolicy: api.PtrTo("none"),
+			expectedPolicy: utils.PtrTo("none"),
 		},
 		{
 			name:           "Subdomain policy - quarantine",
 			record:         "v=DMARC1; p=reject; sp=quarantine",
-			expectedPolicy: api.PtrTo("quarantine"),
+			expectedPolicy: utils.PtrTo("quarantine"),
 		},
 		{
 			name:           "Subdomain policy - reject",
 			record:         "v=DMARC1; p=quarantine; sp=reject",
-			expectedPolicy: api.PtrTo("reject"),
+			expectedPolicy: utils.PtrTo("reject"),
 		},
 		{
 			name:           "No subdomain policy specified (defaults to main policy)",
@@ -248,7 +249,7 @@ func TestExtractDMARCSubdomainPolicy(t *testing.T) {
 		{
 			name:           "Complex record with subdomain policy",
 			record:         "v=DMARC1; p=reject; sp=quarantine; rua=mailto:dmarc@example.com; pct=100",
-			expectedPolicy: api.PtrTo("quarantine"),
+			expectedPolicy: utils.PtrTo("quarantine"),
 		},
 	}
 
@@ -282,22 +283,22 @@ func TestExtractDMARCPercentage(t *testing.T) {
 		{
 			name:               "Percentage - 100",
 			record:             "v=DMARC1; p=quarantine; pct=100",
-			expectedPercentage: api.PtrTo(100),
+			expectedPercentage: utils.PtrTo(100),
 		},
 		{
 			name:               "Percentage - 50",
 			record:             "v=DMARC1; p=quarantine; pct=50",
-			expectedPercentage: api.PtrTo(50),
+			expectedPercentage: utils.PtrTo(50),
 		},
 		{
 			name:               "Percentage - 25",
 			record:             "v=DMARC1; p=reject; pct=25",
-			expectedPercentage: api.PtrTo(25),
+			expectedPercentage: utils.PtrTo(25),
 		},
 		{
 			name:               "Percentage - 0",
 			record:             "v=DMARC1; p=none; pct=0",
-			expectedPercentage: api.PtrTo(0),
+			expectedPercentage: utils.PtrTo(0),
 		},
 		{
 			name:               "No percentage specified (defaults to 100)",
@@ -307,7 +308,7 @@ func TestExtractDMARCPercentage(t *testing.T) {
 		{
 			name:               "Complex record with percentage",
 			record:             "v=DMARC1; p=reject; sp=quarantine; rua=mailto:dmarc@example.com; pct=75",
-			expectedPercentage: api.PtrTo(75),
+			expectedPercentage: utils.PtrTo(75),
 		},
 		{
 			name:               "Invalid percentage > 100 (ignored)",

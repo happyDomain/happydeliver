@@ -30,6 +30,9 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 var (
@@ -45,19 +48,10 @@ type Storage interface {
 	ReportExists(testID uuid.UUID) (bool, error)
 	UpdateReport(testID uuid.UUID, reportJSON []byte) error
 	DeleteOldReports(olderThan time.Time) (int64, error)
-	ListReportSummaries(offset, limit int) ([]ReportSummary, int64, error)
+	ListReportSummaries(offset, limit int) ([]model.TestSummary, int64, error)
 
 	// Close closes the database connection
 	Close() error
-}
-
-// ReportSummary is a lightweight projection of Report for listing
-type ReportSummary struct {
-	TestID     uuid.UUID
-	Score      int
-	Grade      string
-	FromDomain string
-	CreatedAt  time.Time
 }
 
 // DBStorage implements Storage using GORM
@@ -149,15 +143,24 @@ func (s *DBStorage) DeleteOldReports(olderThan time.Time) (int64, error) {
 	return result.RowsAffected, nil
 }
 
+// reportSummaryRow is used internally to scan SQL results before converting to model.TestSummary
+type reportSummaryRow struct {
+	TestID     uuid.UUID
+	Score      int
+	Grade      string
+	FromDomain string
+	CreatedAt  time.Time
+}
+
 // ListReportSummaries returns a paginated list of lightweight report summaries
-func (s *DBStorage) ListReportSummaries(offset, limit int) ([]ReportSummary, int64, error) {
+func (s *DBStorage) ListReportSummaries(offset, limit int) ([]model.TestSummary, int64, error) {
 	var total int64
 	if err := s.db.Model(&Report{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count reports: %w", err)
 	}
 
 	if total == 0 {
-		return []ReportSummary{}, 0, nil
+		return []model.TestSummary{}, 0, nil
 	}
 
 	var selectExpr string
@@ -168,23 +171,39 @@ func (s *DBStorage) ListReportSummaries(offset, limit int) ([]ReportSummary, int
 			`convert_from(report_json, 'UTF8')::jsonb->>'grade' as grade, ` +
 			`convert_from(report_json, 'UTF8')::jsonb->'dns_results'->>'from_domain' as from_domain, ` +
 			`created_at`
-	default: // sqlite
+	case "sqlite":
 		selectExpr = `test_id, ` +
 			`json_extract(report_json, '$.score') as score, ` +
 			`json_extract(report_json, '$.grade') as grade, ` +
 			`json_extract(report_json, '$.dns_results.from_domain') as from_domain, ` +
 			`created_at`
+	default:
+		return nil, 0, fmt.Errorf("history tests list not implemented in this database dialect")
 	}
 
-	var summaries []ReportSummary
+	var rows []reportSummaryRow
 	err := s.db.Model(&Report{}).
 		Select(selectExpr).
 		Order("created_at DESC").
 		Offset(offset).
 		Limit(limit).
-		Scan(&summaries).Error
+		Scan(&rows).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list report summaries: %w", err)
+	}
+
+	summaries := make([]model.TestSummary, 0, len(rows))
+	for _, r := range rows {
+		s := model.TestSummary{
+			TestId:    utils.UUIDToBase32(r.TestID),
+			Score:     r.Score,
+			Grade:     model.TestSummaryGrade(r.Grade),
+			CreatedAt: r.CreatedAt,
+		}
+		if r.FromDomain != "" {
+			s.FromDomain = utils.PtrTo(r.FromDomain)
+		}
+		summaries = append(summaries, s)
 	}
 
 	return summaries, total, nil

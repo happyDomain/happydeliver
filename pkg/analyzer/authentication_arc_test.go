@@ -24,29 +24,29 @@ package analyzer
 import (
 	"testing"
 
-	"git.happydns.org/happyDeliver/internal/api"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 func TestParseARCResult(t *testing.T) {
 	tests := []struct {
 		name           string
 		part           string
-		expectedResult api.ARCResultResult
+		expectedResult model.ARCResultResult
 	}{
 		{
 			name:           "ARC pass",
 			part:           "arc=pass",
-			expectedResult: api.ARCResultResultPass,
+			expectedResult: model.ARCResultResultPass,
 		},
 		{
 			name:           "ARC fail",
 			part:           "arc=fail",
-			expectedResult: api.ARCResultResultFail,
+			expectedResult: model.ARCResultResultFail,
 		},
 		{
 			name:           "ARC none",
 			part:           "arc=none",
-			expectedResult: api.ARCResultResultNone,
+			expectedResult: model.ARCResultResultNone,
 		},
 	}
 
