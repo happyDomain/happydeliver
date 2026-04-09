@@ -70,6 +70,10 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 		appConfig["custom_logo_url"] = cfg.CustomLogoURL
 	}
 
+	if !cfg.DisableTestList {
+		appConfig["test_list_enabled"] = true
+	}
+
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {
 		log.Println("Unable to generate JSON config to inject in web application")
 	} else {
@@ -95,6 +99,7 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	router.GET("/domain/:domain", serveOrReverse("/", cfg))
 	router.GET("/test/", serveOrReverse("/", cfg))
 	router.GET("/test/:testid", serveOrReverse("/", cfg))
+	router.GET("/history/", serveOrReverse("/", cfg))
 	router.GET("/favicon.png", func(c *gin.Context) { c.Writer.Header().Set("Cache-Control", "public, max-age=604800, immutable") }, serveOrReverse("", cfg))
 	router.GET("/img/*path", serveOrReverse("", cfg))
 

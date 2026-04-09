@@ -381,3 +381,78 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// ListTests returns a paginated list of test summaries
+// (GET /tests)
+func (h *APIHandler) ListTests(c *gin.Context, params ListTestsParams) {
+	if h.config.DisableTestList {
+		c.JSON(http.StatusForbidden, Error{
+			Error:   "feature_disabled",
+			Message: "Test listing is disabled on this instance",
+		})
+		return
+	}
+
+	offset := 0
+	limit := 20
+	if params.Offset != nil {
+		offset = *params.Offset
+	}
+	if params.Limit != nil {
+		limit = *params.Limit
+		if limit > 100 {
+			limit = 100
+		}
+	}
+
+	summaries, total, err := h.storage.ListReportSummaries(offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Error{
+			Error:   "internal_error",
+			Message: "Failed to list tests",
+			Details: stringPtr(err.Error()),
+		})
+		return
+	}
+
+	tests := make([]TestSummary, 0, len(summaries))
+	for _, s := range summaries {
+		base32ID := utils.UUIDToBase32(s.TestID)
+
+		var grade TestSummaryGrade
+		switch s.Grade {
+		case "A+":
+			grade = TestSummaryGradeA
+		case "A":
+			grade = TestSummaryGradeA1
+		case "B":
+			grade = TestSummaryGradeB
+		case "C":
+			grade = TestSummaryGradeC
+		case "D":
+			grade = TestSummaryGradeD
+		case "E":
+			grade = TestSummaryGradeE
+		default:
+			grade = TestSummaryGradeF
+		}
+
+		summary := TestSummary{
+			TestId:    base32ID,
+			Score:     s.Score,
+			Grade:     grade,
+			CreatedAt: s.CreatedAt,
+		}
+		if s.FromDomain != "" {
+			summary.FromDomain = stringPtr(s.FromDomain)
+		}
+		tests = append(tests, summary)
+	}
+
+	c.JSON(http.StatusOK, TestListResponse{
+		Tests:  tests,
+		Total:  int(total),
+		Offset: offset,
+		Limit:  limit,
+	})
+}

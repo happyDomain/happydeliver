@@ -45,9 +45,19 @@ type Storage interface {
 	ReportExists(testID uuid.UUID) (bool, error)
 	UpdateReport(testID uuid.UUID, reportJSON []byte) error
 	DeleteOldReports(olderThan time.Time) (int64, error)
+	ListReportSummaries(offset, limit int) ([]ReportSummary, int64, error)
 
 	// Close closes the database connection
 	Close() error
+}
+
+// ReportSummary is a lightweight projection of Report for listing
+type ReportSummary struct {
+	TestID     uuid.UUID
+	Score      int
+	Grade      string
+	FromDomain string
+	CreatedAt  time.Time
 }
 
 // DBStorage implements Storage using GORM
@@ -137,6 +147,47 @@ func (s *DBStorage) DeleteOldReports(olderThan time.Time) (int64, error) {
 		return 0, fmt.Errorf("failed to delete old reports: %w", result.Error)
 	}
 	return result.RowsAffected, nil
+}
+
+// ListReportSummaries returns a paginated list of lightweight report summaries
+func (s *DBStorage) ListReportSummaries(offset, limit int) ([]ReportSummary, int64, error) {
+	var total int64
+	if err := s.db.Model(&Report{}).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count reports: %w", err)
+	}
+
+	if total == 0 {
+		return []ReportSummary{}, 0, nil
+	}
+
+	var selectExpr string
+	switch s.db.Dialector.Name() {
+	case "postgres":
+		selectExpr = `test_id, ` +
+			`(convert_from(report_json, 'UTF8')::jsonb->>'score')::int as score, ` +
+			`convert_from(report_json, 'UTF8')::jsonb->>'grade' as grade, ` +
+			`convert_from(report_json, 'UTF8')::jsonb->'dns_results'->>'from_domain' as from_domain, ` +
+			`created_at`
+	default: // sqlite
+		selectExpr = `test_id, ` +
+			`json_extract(report_json, '$.score') as score, ` +
+			`json_extract(report_json, '$.grade') as grade, ` +
+			`json_extract(report_json, '$.dns_results.from_domain') as from_domain, ` +
+			`created_at`
+	}
+
+	var summaries []ReportSummary
+	err := s.db.Model(&Report{}).
+		Select(selectExpr).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Scan(&summaries).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list report summaries: %w", err)
+	}
+
+	return summaries, total, nil
 }
 
 // Close closes the database connection

@@ -40,7 +40,17 @@
                     <Logo color={$theme === "light" ? "black" : "white"} />
                 {/if}
             </a>
-            <div>
+            {#if $appConfig.test_list_enabled}
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history/">
+                            <i class="bi bi-clock-history me-1"></i>
+                            History
+                        </a>
+                    </li>
+                </ul>
+            {/if}
+            <div class="d-flex align-items-center">
                 <span class="d-none d-md-inline navbar-text text-primary small">
                     Open-Source Email Deliverability Tester
                 </span>

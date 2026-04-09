@@ -1,12 +1,30 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
 
-    import { createTest as apiCreateTest } from "$lib/api";
-    import { FeatureCard, HowItWorksStep } from "$lib/components";
+    import { createTest as apiCreateTest, listTests } from "$lib/api";
+    import type { TestSummary } from "$lib/api/types.gen";
+    import { FeatureCard, HowItWorksStep, HistoryTable } from "$lib/components";
     import { appConfig } from "$lib/stores/config";
 
     let loading = $state(false);
     let error = $state<string | null>(null);
+    let recentTests = $state<TestSummary[]>([]);
+
+    async function loadRecentTests() {
+        if (!$appConfig.test_list_enabled) return;
+        try {
+            const response = await listTests({ query: { offset: 0, limit: 5 } });
+            if (response.data) {
+                recentTests = response.data.tests;
+            }
+        } catch {
+            // Silently ignore — this is a non-critical section
+        }
+    }
+
+    $effect(() => {
+        loadRecentTests();
+    });
 
     async function createTest() {
         loading = true;
@@ -175,6 +193,32 @@
         </div>
     </div>
 </section>
+
+<!-- Recently Tested -->
+{#if $appConfig.test_list_enabled && recentTests.length > 0}
+    <section class="py-5 border-bottom border-3" id="recent">
+        <div class="container py-4">
+            <div class="row text-center mb-5">
+                <div class="col-lg-8 mx-auto">
+                    <h2 class="display-5 fw-bold mb-3">Recently Tested</h2>
+                    <p class="text-muted">Latest deliverability reports from this instance</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-10 mx-auto">
+                    <HistoryTable tests={recentTests} />
+                    <div class="text-center mt-4">
+                        <a href="/history/" class="btn btn-outline-primary">
+                            <i class="bi bi-clock-history me-2"></i>
+                            View All Tests
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+{/if}
 
 <!-- Features Section -->
 <section class="py-5" id="features">

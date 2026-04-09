@@ -50,6 +50,7 @@ type Config struct {
 	RateLimit       uint          // API rate limit (requests per second per IP)
 	SurveyURL       url.URL       // URL for user feedback survey
 	CustomLogoURL   string        // URL for custom logo image in the web UI
+	DisableTestList bool          // Disable the public test listing endpoint
 }
 
 // DatabaseConfig contains database connection settings

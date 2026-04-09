@@ -26,6 +26,7 @@ interface AppConfig {
     survey_url?: string;
     custom_logo_url?: string;
     rbls?: string[];
+    test_list_enabled?: boolean;
 }
 
 const defaultConfig: AppConfig = {

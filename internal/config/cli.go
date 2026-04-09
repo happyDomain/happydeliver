@@ -44,6 +44,7 @@ func declareFlags(o *Config) {
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
 	flag.StringVar(&o.CustomLogoURL, "custom-logo-url", o.CustomLogoURL, "URL for custom logo image in the web UI")
+	flag.BoolVar(&o.DisableTestList, "disable-test-list", o.DisableTestList, "Disable the public test listing endpoint")
 
 	// Others flags are declared in some other files likes sources, storages, ... when they need specials configurations
 }
