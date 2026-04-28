@@ -279,6 +279,33 @@ cat email.eml | ./happyDeliver analyze -recipient test-uuid@yourdomain.com
 
 **Note:** In production, emails are delivered via LMTP (see integration instructions above).
 
+## Use with happyDomain
+
+happyDeliver can be driven by [happyDomain](https://happydomain.org) through
+the [`checker-happydeliver`](https://git.nemunai.re/happyDomain/checker-happydeliver)
+plugin, so the deliverability of a domain you manage is monitored alongside
+its DNS and inbound SMTP posture.
+
+How it works:
+
+1. Attach the **Outbound deliverability** checker to the mail service of a zone
+   in happyDomain. Point it at a happyDeliver instance via `happydeliver_url`;
+   operators can configure a default instance globally.
+2. On each run, the checker calls `POST /api/test` to allocate a fresh
+   recipient address, prompts the user (or an automated sender) to mail it from
+   the tested domain, then polls `GET /api/test/{id}` until the report is
+   ready.
+3. The structured report from `GET /api/report/{id}` is translated into
+   happyDomain rule states: CRIT/WARN/INFO on SPF, DKIM, DMARC, alignment, spam
+   score, blacklists and headers, plus an overall score threshold
+   (`min_score`/`warn_score`).
+4. Runs repeat on a configurable interval so a regression in deliverability (a
+   new RBL listing, a DKIM key rotation gone wrong, a broken SPF include, ...)
+   surfaces as a domain-level alert in happyDomain.
+
+See the [`checker-happydeliver` repository](https://git.nemunai.re/happyDomain/checker-happydeliver)
+for build instructions and the full list of run options.
+
 ## Scoring System
 
 The deliverability score is calculated from A to F based on:
