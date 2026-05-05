@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/JGLTechnologies/gin-rate-limit v1.5.8
 	github.com/emersion/go-smtp v0.24.0
-	github.com/getkin/kin-openapi v0.135.0
+	github.com/getkin/kin-openapi v0.137.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.3.0
