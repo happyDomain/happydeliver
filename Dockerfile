@@ -75,6 +75,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     ln -s /usr/bin/ld /bin/ld
 
 RUN cpanm --notest Mail::SPF && \
+    cpanm --notest Mail::DKIM && \
     cpanm --notest Mail::Milter::Authentication
 
 RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milter-0.4.0.tar.gz && \
