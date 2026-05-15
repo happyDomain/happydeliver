@@ -1,4 +1,18 @@
 services:
+  unbound:
+    image: alpinelinux/unbound
+    restart: unless-stopped
+
+    configs:
+      - source: unbound_conf
+        target: /etc/unbound/unbound.conf
+        uid: "100"
+        gid: "101"
+
+    networks:
+      default:
+        ipv4_address: 172.28.0.53
+
   happydeliver:
     build:
       context: .
@@ -24,8 +38,41 @@ services:
       # Log files
       - ./logs:/var/log/happydeliver
 
+    dns:
+      - 172.28.0.53
     restart: unless-stopped
+
+configs:
+  unbound_conf:
+    content: |
+      server:
+          verbosity: 1
+          interface: 0.0.0.0
+          port: 53
+          do-ip4: yes
+          do-ip6: no
+          do-udp: yes
+          do-tcp: yes
+
+          access-control: 127.0.0.0/8 allow
+          access-control: 172.28.0.0/24 allow
+
+          # Short cache for a testing resolver
+          cache-max-ttl: 60
+
+          # Buffers: let the system decide
+          so-sndbuf: 0
+          so-rcvbuf: 0
+
+          # Trust anchor (static, ships with the image)
+          trust-anchor-file: "/etc/unbound/root.key"
 
 volumes:
   data:
   logs:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
