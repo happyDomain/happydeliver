@@ -49,6 +49,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     perl-crypt-openssl-random \
     perl-crypt-openssl-verify \
     perl-crypt-openssl-x509 \
+    perl-cryptx \
     perl-dbd-sqlite \
     perl-dbi \
     perl-email-address-xs \
@@ -101,6 +102,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     perl-crypt-openssl-random \
     perl-crypt-openssl-verify \
     perl-crypt-openssl-x509 \
+    perl-cryptx \
     perl-dbd-sqlite \
     perl-dbi \
     perl-email-address-xs \
