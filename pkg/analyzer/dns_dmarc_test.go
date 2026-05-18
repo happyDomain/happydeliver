@@ -439,6 +439,60 @@ func TestExtractDMARCSubdomainPolicy(t *testing.T) {
 	}
 }
 
+func TestExtractDMARCNonexistentSubdomainPolicy(t *testing.T) {
+	tests := []struct {
+		name           string
+		record         string
+		expectedPolicy *string
+	}{
+		{
+			name:           "Non-existent subdomain policy - none",
+			record:         "v=DMARC1; p=quarantine; np=none",
+			expectedPolicy: utils.PtrTo("none"),
+		},
+		{
+			name:           "Non-existent subdomain policy - quarantine",
+			record:         "v=DMARC1; p=reject; np=quarantine",
+			expectedPolicy: utils.PtrTo("quarantine"),
+		},
+		{
+			name:           "Non-existent subdomain policy - reject",
+			record:         "v=DMARC1; p=quarantine; np=reject",
+			expectedPolicy: utils.PtrTo("reject"),
+		},
+		{
+			name:           "No np tag (defaults to effective sp/p policy)",
+			record:         "v=DMARC1; p=quarantine",
+			expectedPolicy: nil,
+		},
+		{
+			name:           "Complex record with np and sp tags",
+			record:         "v=DMARC1; p=reject; sp=quarantine; np=reject; rua=mailto:dmarc@example.com; pct=100",
+			expectedPolicy: utils.PtrTo("reject"),
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractDMARCNonexistentSubdomainPolicy(tt.record)
+			if tt.expectedPolicy == nil {
+				if result != nil {
+					t.Errorf("extractDMARCNonexistentSubdomainPolicy(%q) = %v, want nil", tt.record, result)
+				}
+			} else {
+				if result == nil {
+					t.Fatalf("extractDMARCNonexistentSubdomainPolicy(%q) returned nil, expected %q", tt.record, *tt.expectedPolicy)
+				}
+				if string(*result) != *tt.expectedPolicy {
+					t.Errorf("extractDMARCNonexistentSubdomainPolicy(%q) = %q, want %q", tt.record, string(*result), *tt.expectedPolicy)
+				}
+			}
+		})
+	}
+}
+
 func TestExtractDMARCPercentage(t *testing.T) {
 	tests := []struct {
 		name               string

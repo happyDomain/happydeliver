@@ -60,33 +60,36 @@ func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool
 func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMARCRecord {
 	policy := d.extractDMARCPolicy(rawRecord)
 	subdomainPolicy := d.extractDMARCSubdomainPolicy(rawRecord)
+	nonexistentSubdomainPolicy := d.extractDMARCNonexistentSubdomainPolicy(rawRecord)
 	percentage := d.extractDMARCPercentage(rawRecord)
 	spfAlignment := d.extractDMARCSPFAlignment(rawRecord)
 	dkimAlignment := d.extractDMARCDKIMAlignment(rawRecord)
 
 	if !d.validateDMARC(rawRecord) {
 		return &model.DMARCRecord{
-			Domain:          &foundDomain,
-			Record:          &rawRecord,
-			Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
-			SubdomainPolicy: subdomainPolicy,
-			Percentage:      percentage,
-			SpfAlignment:    spfAlignment,
-			DkimAlignment:   dkimAlignment,
-			Valid:           false,
-			Error:           utils.PtrTo("DMARC record appears malformed"),
+			Domain:                     &foundDomain,
+			Record:                     &rawRecord,
+			Policy:                     utils.PtrTo(model.DMARCRecordPolicy(policy)),
+			SubdomainPolicy:            subdomainPolicy,
+			NonexistentSubdomainPolicy: nonexistentSubdomainPolicy,
+			Percentage:                 percentage,
+			SpfAlignment:               spfAlignment,
+			DkimAlignment:              dkimAlignment,
+			Valid:                      false,
+			Error:                      utils.PtrTo("DMARC record appears malformed"),
 		}
 	}
 
 	return &model.DMARCRecord{
-		Domain:          &foundDomain,
-		Record:          &rawRecord,
-		Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
-		SubdomainPolicy: subdomainPolicy,
-		Percentage:      percentage,
-		SpfAlignment:    spfAlignment,
-		DkimAlignment:   dkimAlignment,
-		Valid:           true,
+		Domain:                     &foundDomain,
+		Record:                     &rawRecord,
+		Policy:                     utils.PtrTo(model.DMARCRecordPolicy(policy)),
+		SubdomainPolicy:            subdomainPolicy,
+		NonexistentSubdomainPolicy: nonexistentSubdomainPolicy,
+		Percentage:                 percentage,
+		SpfAlignment:               spfAlignment,
+		DkimAlignment:              dkimAlignment,
+		Valid:                      true,
 	}
 }
 
@@ -98,8 +101,8 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	raw, notFound, err := d.lookupDMARCAt(domain)
 	if err != nil {
 		return &model.DMARCRecord{
-			Valid:  false,
-			Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+			Valid: false,
+			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
 		}
 	}
 	if !notFound {
@@ -112,8 +115,8 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 		raw, notFound, err = d.lookupDMARCAt(orgDomain)
 		if err != nil {
 			return &model.DMARCRecord{
-				Valid:  false,
-				Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+				Valid: false,
+				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
 			}
 		}
 		if !notFound {
@@ -134,8 +137,8 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	}
 
 	return &model.DMARCRecord{
-		Valid:  false,
-		Error:  utils.PtrTo("No DMARC record found"),
+		Valid: false,
+		Error: utils.PtrTo("No DMARC record found"),
 	}
 }
 
@@ -196,6 +199,18 @@ func (d *DNSAnalyzer) extractDMARCSubdomainPolicy(record string) *model.DMARCRec
 	return nil
 }
 
+// extractDMARCNonexistentSubdomainPolicy extracts non-existent subdomain policy from a DMARC record.
+// Returns the np tag value or nil if not specified (defaults to effective sp/p policy).
+// The np= tag is introduced by DMARCbis (draft-ietf-dmarc-dmarcbis).
+func (d *DNSAnalyzer) extractDMARCNonexistentSubdomainPolicy(record string) *model.DMARCRecordNonexistentSubdomainPolicy {
+	re := regexp.MustCompile(`np=(none|quarantine|reject)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		return utils.PtrTo(model.DMARCRecordNonexistentSubdomainPolicy(matches[1]))
+	}
+	return nil
+}
+
 // extractDMARCPercentage extracts the percentage from a DMARC record
 // Returns the pct tag value or nil if not specified (defaults to 100)
 func (d *DNSAnalyzer) extractDMARCPercentage(record string) *int {
@@ -244,26 +259,25 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int)
 				case "quarantine":
 					// Good policy - no deduction
 				case "none":
-					// Weakest policy - deduct 5 points
+					// Weakest policy - deduct 25 points
 					score -= 25
 				}
 			}
-			// Bonus points for strict alignment modes (2 points each)
+			// Bonus points for strict alignment modes (5 points each)
 			if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
 				score += 5
 			}
 			if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
 				score += 5
 			}
+			// Policy strength: none < quarantine < reject
+			policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
+			mainPolicy := string(*results.DmarcRecord.Policy)
+
 			// Subdomain policy scoring (sp tag)
-			// +3 for stricter or equal subdomain policy, -3 for weaker
+			// +15 for stricter or equal subdomain policy, -15 for weaker
 			if results.DmarcRecord.SubdomainPolicy != nil {
-				mainPolicy := string(*results.DmarcRecord.Policy)
 				subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
-
-				// Policy strength: none < quarantine < reject
-				policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
-
 				mainStrength := policyStrength[mainPolicy]
 				subStrength := policyStrength[subPolicy]
 
@@ -277,6 +291,22 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int)
 			} else {
 				// No sp tag means subdomains inherit main policy (good default)
 				score += 15
+			}
+			// Non-existent subdomain policy scoring (np tag, DMARCbis)
+			// -15 from base; +15 back if absent (good default) or >= effective sp/p strength
+			score -= 15
+			effectiveSubPolicy := mainPolicy
+			if results.DmarcRecord.SubdomainPolicy != nil {
+				effectiveSubPolicy = string(*results.DmarcRecord.SubdomainPolicy)
+			}
+			if results.DmarcRecord.NonexistentSubdomainPolicy == nil {
+				score += 15
+			} else {
+				npStrength := policyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)]
+				effectiveStrength := policyStrength[effectiveSubPolicy]
+				if npStrength >= effectiveStrength {
+					score += 15
+				}
 			}
 			// Percentage scoring (pct tag)
 			// Apply the percentage on the current score

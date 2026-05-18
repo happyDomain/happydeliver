@@ -905,6 +905,11 @@ components:
           enum: [none, quarantine, reject, unknown]
           description: DMARC subdomain policy (sp tag) - policy for subdomains if different from main policy
           example: "quarantine"
+        nonexistent_subdomain_policy:
+          type: string
+          enum: [none, quarantine, reject, unknown]
+          description: DMARC non-existent subdomain policy (np tag) - policy for non-existent subdomains (NXDOMAIN); defaults to sp= or p= if absent
+          example: "reject"
         percentage:
           type: integer
           minimum: 0

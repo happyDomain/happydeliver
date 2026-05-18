@@ -202,6 +202,9 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			if dns.DmarcRecord.SubdomainPolicy != nil {
 				fmt.Fprintf(writer, ", Subdomain Policy: %s", *dns.DmarcRecord.SubdomainPolicy)
 			}
+			if dns.DmarcRecord.NonexistentSubdomainPolicy != nil {
+				fmt.Fprintf(writer, ", Non-Existent Subdomain Policy: %s", *dns.DmarcRecord.NonexistentSubdomainPolicy)
+			}
 			fmt.Fprintln(writer)
 			if dns.DmarcRecord.Record != nil {
 				fmt.Fprintf(writer, "      %s\n", *dns.DmarcRecord.Record)

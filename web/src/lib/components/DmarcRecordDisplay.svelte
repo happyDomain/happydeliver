@@ -166,6 +166,42 @@
                 </div>
             {/if}
 
+            <!-- Non-Existent Subdomain Policy (np tag, DMARCbis) -->
+            {#if dmarcRecord.nonexistent_subdomain_policy}
+                {@const effectiveSubStrength = policyStrength(dmarcRecord.subdomain_policy ?? dmarcRecord.policy)}
+                {@const npStrength = policyStrength(dmarcRecord.nonexistent_subdomain_policy)}
+                <div class="mb-3">
+                    <strong>Non-Existent Subdomain Policy:</strong>
+                    <span
+                        class="badge {dmarcRecord.nonexistent_subdomain_policy === 'reject'
+                            ? 'bg-success'
+                            : dmarcRecord.nonexistent_subdomain_policy === 'quarantine'
+                              ? 'bg-warning'
+                              : 'bg-secondary'}"
+                    >
+                        {dmarcRecord.nonexistent_subdomain_policy}
+                    </span>
+                    {#if npStrength >= effectiveSubStrength}
+                        <div class="alert alert-success mt-2 mb-0 small">
+                            <i class="bi bi-check-circle me-1"></i>
+                            <strong>Good configuration</strong> — non-existent subdomain policy is equal to or stricter
+                            than the effective subdomain policy.
+                        </div>
+                    {:else}
+                        <div class="alert alert-warning mt-2 mb-0 small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Weaker protection for non-existent subdomains</strong> — consider setting
+                            <code>np={dmarcRecord.subdomain_policy ?? dmarcRecord.policy}</code> to match your subdomain policy.
+                        </div>
+                    {/if}
+                    <div class="alert alert-info mt-2 mb-0 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        The <code>np=</code> tag is introduced by <strong>DMARCbis</strong> (draft-ietf-dmarc-dmarcbis),
+                        a draft RFC updating RFC 7489. Support may vary across mail receivers.
+                    </div>
+                </div>
+            {/if}
+
             <!-- Percentage -->
             {#if dmarcRecord.percentage !== undefined}
                 <div class="mb-3">
