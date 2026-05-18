@@ -106,7 +106,7 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 
 	// Check DKIM records by parsing DKIM-Signature headers directly
 	for _, sig := range parseDKIMSignatures(email.Header["Dkim-Signature"]) {
-		dkimRecord := d.checkDKIMRecord(sig.Domain, sig.Selector)
+		dkimRecord := d.checkDKIMRecord(sig)
 		if dkimRecord != nil {
 			if results.DkimRecords == nil {
 				results.DkimRecords = new([]model.DKIMRecord)

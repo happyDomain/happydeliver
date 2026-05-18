@@ -873,6 +873,24 @@ components:
           type: string
           description: DKIM record content
           example: "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA..."
+        key_type:
+          type: string
+          description: "Key type from k= tag (e.g. rsa, ed25519); defaults to rsa if absent"
+          example: "rsa"
+        hash_algorithms:
+          type: array
+          items:
+            type: string
+          description: "Acceptable hash algorithms from h= tag; empty means all accepted (RFC 6376 default: sha256)"
+          example: ["sha256"]
+        signing_algorithm:
+          type: string
+          description: "Algorithm used in DKIM-Signature a= tag (e.g. rsa-sha256, ed25519-sha256)"
+          example: "rsa-sha256"
+        key_size:
+          type: integer
+          description: "Public key size in bits (RSA: 1024/2048/4096; Ed25519: always 256)"
+          example: 2048
         valid:
           type: boolean
           description: Whether the DKIM record is valid
