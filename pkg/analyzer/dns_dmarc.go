@@ -25,12 +25,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"regexp"
+	"strconv"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
+
+var dmarcPolicyStrength = map[string]int{"none": 0, "quarantine": 1, "reject": 2}
 
 // lookupDMARCAt queries _dmarc.<domain> and returns the raw DMARC1 TXT record.
 // notFound=true means no record exists (NXDOMAIN or empty); false means a real DNS error occurred.
@@ -56,17 +58,62 @@ func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool
 
 // parseDMARCRecord parses a raw DMARC TXT record into a DMARCRecord model.
 func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMARCRecord {
-	policy := d.extractDMARCPolicy(rawRecord)
-	subdomainPolicy := d.extractDMARCSubdomainPolicy(rawRecord)
-	nonexistentSubdomainPolicy := d.extractDMARCNonexistentSubdomainPolicy(rawRecord)
-	percentage := d.extractDMARCPercentage(rawRecord)
-	testMode := d.extractDMARCTestMode(rawRecord)
-	psd := d.extractDMARCPSD(rawRecord)
-	spfAlignment := d.extractDMARCSPFAlignment(rawRecord)
-	dkimAlignment := d.extractDMARCDKIMAlignment(rawRecord)
-	deprecatedPct := percentage != nil
-	deprecatedRf := d.hasDMARCTag(rawRecord, "rf")
-	deprecatedRi := d.hasDMARCTag(rawRecord, "ri")
+	tags := parseDKIMTags(rawRecord)
+
+	// Policy
+	policy := "unknown"
+	switch tags["p"] {
+	case "none", "quarantine", "reject":
+		policy = tags["p"]
+	}
+
+	// SPF alignment (default: relaxed)
+	spfAlignment := utils.PtrTo(model.DMARCRecordSpfAlignmentRelaxed)
+	if tags["aspf"] == "s" {
+		spfAlignment = utils.PtrTo(model.DMARCRecordSpfAlignmentStrict)
+	}
+
+	// DKIM alignment (default: relaxed)
+	dkimAlignment := utils.PtrTo(model.DMARCRecordDkimAlignmentRelaxed)
+	if tags["adkim"] == "s" {
+		dkimAlignment = utils.PtrTo(model.DMARCRecordDkimAlignmentStrict)
+	}
+
+	// Subdomain policy
+	var subdomainPolicy *model.DMARCRecordSubdomainPolicy
+	switch tags["sp"] {
+	case "none", "quarantine", "reject":
+		subdomainPolicy = utils.PtrTo(model.DMARCRecordSubdomainPolicy(tags["sp"]))
+	}
+
+	// Non-existent subdomain policy (DMARCbis np=)
+	var nonexistentSubdomainPolicy *model.DMARCRecordNonexistentSubdomainPolicy
+	switch tags["np"] {
+	case "none", "quarantine", "reject":
+		nonexistentSubdomainPolicy = utils.PtrTo(model.DMARCRecordNonexistentSubdomainPolicy(tags["np"]))
+	}
+
+	// Percentage (pct=, deprecated in DMARCbis)
+	var percentage *int
+	if pctStr, ok := tags["pct"]; ok {
+		if pct, err := strconv.Atoi(pctStr); err == nil && pct >= 0 && pct <= 100 {
+			percentage = &pct
+		}
+	}
+
+	// Test mode (DMARCbis t=)
+	var testMode *bool
+	if t, ok := tags["t"]; ok {
+		v := t == "y"
+		testMode = &v
+	}
+
+	// PSD (DMARCbis psd=)
+	var psd *model.DMARCRecordPsd
+	switch tags["psd"] {
+	case "y", "n", "u":
+		psd = utils.PtrTo(model.DMARCRecordPsd(tags["psd"]))
+	}
 
 	rec := &model.DMARCRecord{
 		Domain:                     &foundDomain,
@@ -80,13 +127,13 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 		SpfAlignment:               spfAlignment,
 		DkimAlignment:              dkimAlignment,
 	}
-	if deprecatedPct {
+	if percentage != nil {
 		rec.DeprecatedPct = utils.PtrTo(true)
 	}
-	if deprecatedRf {
+	if _, ok := tags["rf"]; ok {
 		rec.DeprecatedRf = utils.PtrTo(true)
 	}
-	if deprecatedRi {
+	if _, ok := tags["ri"]; ok {
 		rec.DeprecatedRi = utils.PtrTo(true)
 	}
 
@@ -158,127 +205,15 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	return d.parseDMARCRecord(foundDomain, raw)
 }
 
-// extractDMARCPolicy extracts the policy from a DMARC record
-func (d *DNSAnalyzer) extractDMARCPolicy(record string) string {
-	// Look for p=none, p=quarantine, or p=reject
-	re := regexp.MustCompile(`p=(none|quarantine|reject)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		return matches[1]
-	}
-	return "unknown"
-}
-
-// extractDMARCSPFAlignment extracts SPF alignment mode from a DMARC record
-// Returns "relaxed" (default) or "strict"
-func (d *DNSAnalyzer) extractDMARCSPFAlignment(record string) *model.DMARCRecordSpfAlignment {
-	// Look for aspf=s (strict) or aspf=r (relaxed)
-	re := regexp.MustCompile(`aspf=(r|s)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		if matches[1] == "s" {
-			return utils.PtrTo(model.DMARCRecordSpfAlignmentStrict)
-		}
-		return utils.PtrTo(model.DMARCRecordSpfAlignmentRelaxed)
-	}
-	// Default is relaxed if not specified
-	return utils.PtrTo(model.DMARCRecordSpfAlignmentRelaxed)
-}
-
-// extractDMARCDKIMAlignment extracts DKIM alignment mode from a DMARC record
-// Returns "relaxed" (default) or "strict"
-func (d *DNSAnalyzer) extractDMARCDKIMAlignment(record string) *model.DMARCRecordDkimAlignment {
-	// Look for adkim=s (strict) or adkim=r (relaxed)
-	re := regexp.MustCompile(`adkim=(r|s)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		if matches[1] == "s" {
-			return utils.PtrTo(model.DMARCRecordDkimAlignmentStrict)
-		}
-		return utils.PtrTo(model.DMARCRecordDkimAlignmentRelaxed)
-	}
-	// Default is relaxed if not specified
-	return utils.PtrTo(model.DMARCRecordDkimAlignmentRelaxed)
-}
-
-// extractDMARCSubdomainPolicy extracts subdomain policy from a DMARC record
-// Returns the sp tag value or nil if not specified (defaults to main policy)
-func (d *DNSAnalyzer) extractDMARCSubdomainPolicy(record string) *model.DMARCRecordSubdomainPolicy {
-	// Look for sp=none, sp=quarantine, or sp=reject
-	re := regexp.MustCompile(`sp=(none|quarantine|reject)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		return utils.PtrTo(model.DMARCRecordSubdomainPolicy(matches[1]))
-	}
-	// If sp is not specified, it defaults to the main policy (p tag)
-	// Return nil to indicate it's using the default
-	return nil
-}
-
-// extractDMARCNonexistentSubdomainPolicy extracts non-existent subdomain policy from a DMARC record.
-// Returns the np tag value or nil if not specified (defaults to effective sp/p policy).
-// The np= tag is introduced by DMARCbis (draft-ietf-dmarc-dmarcbis).
-func (d *DNSAnalyzer) extractDMARCNonexistentSubdomainPolicy(record string) *model.DMARCRecordNonexistentSubdomainPolicy {
-	re := regexp.MustCompile(`np=(none|quarantine|reject)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		return utils.PtrTo(model.DMARCRecordNonexistentSubdomainPolicy(matches[1]))
-	}
-	return nil
-}
-
-// extractDMARCPercentage extracts the percentage from a DMARC record.
-// Returns the pct tag value or nil if not specified (defaults to 100).
-// Note: pct= is deprecated in DMARCbis; use t= (test_mode) instead.
-func (d *DNSAnalyzer) extractDMARCPercentage(record string) *int {
-	re := regexp.MustCompile(`pct=(\d+)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		var pct int
-		fmt.Sscanf(matches[1], "%d", &pct)
-		if pct >= 0 && pct <= 100 {
-			return &pct
-		}
-	}
-	return nil
-}
-
-// extractDMARCTestMode extracts the DMARCbis t= tag (test mode).
-// Returns true for t=y, false for t=n, nil if absent (defaults to false / full enforcement).
-func (d *DNSAnalyzer) extractDMARCTestMode(record string) *bool {
-	re := regexp.MustCompile(`(?:^|;)\s*t=(y|n)(?:;|$|\s)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		v := matches[1] == "y"
-		return &v
-	}
-	return nil
-}
-
-// extractDMARCPSD extracts the DMARCbis psd= tag value as a typed enum.
-// Returns nil if the tag is absent (defaults to "u" / unknown).
-func (d *DNSAnalyzer) extractDMARCPSD(record string) *model.DMARCRecordPsd {
-	v := d.extractDMARCPSDValue(record)
-	if v == "" {
-		return nil
-	}
-	return utils.PtrTo(model.DMARCRecordPsd(v))
-}
-
-// extractDMARCPSDValue returns the raw string value of psd= ("y", "n", "u") or "".
+// extractDMARCPSDValue returns the raw psd= value ("y", "n", "u") or "" if absent.
+// Used during DNS Tree Walk before full record parsing.
 func (d *DNSAnalyzer) extractDMARCPSDValue(record string) string {
-	re := regexp.MustCompile(`(?:^|;)\s*psd=(y|n|u)(?:;|$|\s)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		return matches[1]
+	v := parseDKIMTags(record)["psd"]
+	switch v {
+	case "y", "n", "u":
+		return v
 	}
 	return ""
-}
-
-// hasDMARCTag reports whether the given tag name appears in the record.
-func (d *DNSAnalyzer) hasDMARCTag(record, tag string) bool {
-	re := regexp.MustCompile(`(?:^|;)\s*` + regexp.QuoteMeta(tag) + `=`)
-	return re.MatchString(record)
 }
 
 // validateDMARC performs basic DMARC record validation.
@@ -343,12 +278,10 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int)
 		score += 5
 	}
 
-	policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
-
 	// Subdomain policy scoring (sp tag): +15 for equal-or-stricter, -15 for weaker
 	if results.DmarcRecord.SubdomainPolicy != nil {
 		subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
-		if policyStrength[subPolicy] >= policyStrength[effectivePolicy] {
+		if dmarcPolicyStrength[subPolicy] >= dmarcPolicyStrength[effectivePolicy] {
 			score += 15
 		} else {
 			score -= 15
@@ -357,19 +290,17 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int)
 		score += 15 // inherits main policy — good default
 	}
 
-	// Non-existent subdomain policy scoring (np tag, DMARCbis)
-	score -= 15
+	// Non-existent subdomain policy scoring (np tag, DMARCbis): +15 for equal-or-stricter, -15 for weaker
 	effectiveSubPolicy := effectivePolicy
 	if results.DmarcRecord.SubdomainPolicy != nil {
 		effectiveSubPolicy = string(*results.DmarcRecord.SubdomainPolicy)
 	}
 	if results.DmarcRecord.NonexistentSubdomainPolicy == nil {
 		score += 15 // inherits subdomain/main policy — good default
+	} else if dmarcPolicyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)] >= dmarcPolicyStrength[effectiveSubPolicy] {
+		score += 15
 	} else {
-		npStrength := policyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)]
-		if npStrength >= policyStrength[effectiveSubPolicy] {
-			score += 15
-		}
+		score -= 15
 	}
 
 	// pct= scaling (deprecated in DMARCbis, kept for backward compatibility).

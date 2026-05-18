@@ -221,7 +221,7 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-func TestExtractDMARCPolicy(t *testing.T) {
+func TestParseDMARCRecordPolicy(t *testing.T) {
 	tests := []struct {
 		name           string
 		record         string
@@ -253,15 +253,18 @@ func TestExtractDMARCPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCPolicy(tt.record)
-			if result != tt.expectedPolicy {
-				t.Errorf("extractDMARCPolicy(%q) = %q, want %q", tt.record, result, tt.expectedPolicy)
+			rec := analyzer.parseDMARCRecord("example.com", tt.record)
+			if rec.Policy == nil {
+				t.Fatalf("parseDMARCRecord(%q).Policy = nil", tt.record)
+			}
+			if string(*rec.Policy) != tt.expectedPolicy {
+				t.Errorf("parseDMARCRecord(%q).Policy = %q, want %q", tt.record, string(*rec.Policy), tt.expectedPolicy)
 			}
 		})
 	}
 }
 
-func TestExtractDMARCTestMode(t *testing.T) {
+func TestParseDMARCRecordTestMode(t *testing.T) {
 	tests := []struct {
 		name     string
 		record   string
@@ -288,24 +291,24 @@ func TestExtractDMARCTestMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCTestMode(tt.record)
+			result := analyzer.parseDMARCRecord("example.com", tt.record).TestMode
 			if tt.wantMode == nil {
 				if result != nil {
-					t.Errorf("extractDMARCTestMode(%q) = %v, want nil", tt.record, *result)
+					t.Errorf("parseDMARCRecord(%q).TestMode = %v, want nil", tt.record, *result)
 				}
 			} else {
 				if result == nil {
-					t.Fatalf("extractDMARCTestMode(%q) = nil, want %v", tt.record, *tt.wantMode)
+					t.Fatalf("parseDMARCRecord(%q).TestMode = nil, want %v", tt.record, *tt.wantMode)
 				}
 				if *result != *tt.wantMode {
-					t.Errorf("extractDMARCTestMode(%q) = %v, want %v", tt.record, *result, *tt.wantMode)
+					t.Errorf("parseDMARCRecord(%q).TestMode = %v, want %v", tt.record, *result, *tt.wantMode)
 				}
 			}
 		})
 	}
 }
 
-func TestExtractDMARCPSD(t *testing.T) {
+func TestParseDMARCRecordPSD(t *testing.T) {
 	tests := []struct {
 		name    string
 		record  string
@@ -337,43 +340,48 @@ func TestExtractDMARCPSD(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCPSD(tt.record)
+			result := analyzer.parseDMARCRecord("example.com", tt.record).Psd
 			if tt.wantPSD == nil {
 				if result != nil {
-					t.Errorf("extractDMARCPSD(%q) = %v, want nil", tt.record, *result)
+					t.Errorf("parseDMARCRecord(%q).Psd = %v, want nil", tt.record, *result)
 				}
 			} else {
 				if result == nil {
-					t.Fatalf("extractDMARCPSD(%q) = nil, want %q", tt.record, *tt.wantPSD)
+					t.Fatalf("parseDMARCRecord(%q).Psd = nil, want %q", tt.record, *tt.wantPSD)
 				}
 				if string(*result) != *tt.wantPSD {
-					t.Errorf("extractDMARCPSD(%q) = %q, want %q", tt.record, string(*result), *tt.wantPSD)
+					t.Errorf("parseDMARCRecord(%q).Psd = %q, want %q", tt.record, string(*result), *tt.wantPSD)
 				}
 			}
 		})
 	}
 }
 
-func TestHasDMARCTag(t *testing.T) {
+func TestParseDMARCRecordDeprecatedTags(t *testing.T) {
 	tests := []struct {
-		name   string
-		record string
-		tag    string
-		want   bool
+		name      string
+		record    string
+		wantRf    bool
+		wantRi    bool
 	}{
-		{name: "rf tag present", record: "v=DMARC1; p=none; rf=afrf", tag: "rf", want: true},
-		{name: "ri tag present", record: "v=DMARC1; p=none; ri=86400", tag: "ri", want: true},
-		{name: "rf tag absent", record: "v=DMARC1; p=quarantine; rua=mailto:x@example.com", tag: "rf", want: false},
-		{name: "ri tag absent", record: "v=DMARC1; p=quarantine", tag: "ri", want: false},
+		{name: "rf tag present", record: "v=DMARC1; p=none; rf=afrf", wantRf: true, wantRi: false},
+		{name: "ri tag present", record: "v=DMARC1; p=none; ri=86400", wantRf: false, wantRi: true},
+		{name: "rf tag absent", record: "v=DMARC1; p=quarantine; rua=mailto:x@example.com", wantRf: false, wantRi: false},
+		{name: "ri tag absent", record: "v=DMARC1; p=quarantine", wantRf: false, wantRi: false},
 	}
 
 	analyzer := NewDNSAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.hasDMARCTag(tt.record, tt.tag)
-			if result != tt.want {
-				t.Errorf("hasDMARCTag(%q, %q) = %v, want %v", tt.record, tt.tag, result, tt.want)
+			rec := analyzer.parseDMARCRecord("example.com", tt.record)
+			gotRf := rec.DeprecatedRf != nil && *rec.DeprecatedRf
+			gotRi := rec.DeprecatedRi != nil && *rec.DeprecatedRi
+			if gotRf != tt.wantRf {
+				t.Errorf("parseDMARCRecord(%q).DeprecatedRf = %v, want %v", tt.record, gotRf, tt.wantRf)
+			}
+			if gotRi != tt.wantRi {
+				t.Errorf("parseDMARCRecord(%q).DeprecatedRi = %v, want %v", tt.record, gotRi, tt.wantRi)
 			}
 		})
 	}
@@ -429,142 +437,36 @@ func TestValidateDMARC(t *testing.T) {
 	}
 }
 
-func TestExtractDMARCSPFAlignment(t *testing.T) {
-	tests := []struct {
-		name              string
-		record            string
-		expectedAlignment string
-	}{
-		{
-			name:              "SPF alignment - strict",
-			record:            "v=DMARC1; p=quarantine; aspf=s",
-			expectedAlignment: "strict",
-		},
-		{
-			name:              "SPF alignment - relaxed (explicit)",
-			record:            "v=DMARC1; p=quarantine; aspf=r",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "SPF alignment - relaxed (default, not specified)",
-			record:            "v=DMARC1; p=quarantine",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "Both alignments specified - check SPF strict",
-			record:            "v=DMARC1; p=quarantine; aspf=s; adkim=r",
-			expectedAlignment: "strict",
-		},
-		{
-			name:              "Both alignments specified - check SPF relaxed",
-			record:            "v=DMARC1; p=quarantine; aspf=r; adkim=s",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "Complex record with SPF strict",
-			record:            "v=DMARC1; p=reject; rua=mailto:dmarc@example.com; aspf=s; adkim=s; pct=100",
-			expectedAlignment: "strict",
-		},
-	}
-
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCSPFAlignment(tt.record)
-			if result == nil {
-				t.Fatalf("extractDMARCSPFAlignment(%q) returned nil, expected non-nil", tt.record)
-			}
-			if string(*result) != tt.expectedAlignment {
-				t.Errorf("extractDMARCSPFAlignment(%q) = %q, want %q", tt.record, string(*result), tt.expectedAlignment)
-			}
-		})
-	}
-}
-
-func TestExtractDMARCDKIMAlignment(t *testing.T) {
-	tests := []struct {
-		name              string
-		record            string
-		expectedAlignment string
-	}{
-		{
-			name:              "DKIM alignment - strict",
-			record:            "v=DMARC1; p=reject; adkim=s",
-			expectedAlignment: "strict",
-		},
-		{
-			name:              "DKIM alignment - relaxed (explicit)",
-			record:            "v=DMARC1; p=reject; adkim=r",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "DKIM alignment - relaxed (default, not specified)",
-			record:            "v=DMARC1; p=none",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "Both alignments specified - check DKIM strict",
-			record:            "v=DMARC1; p=quarantine; aspf=r; adkim=s",
-			expectedAlignment: "strict",
-		},
-		{
-			name:              "Both alignments specified - check DKIM relaxed",
-			record:            "v=DMARC1; p=quarantine; aspf=s; adkim=r",
-			expectedAlignment: "relaxed",
-		},
-		{
-			name:              "Complex record with DKIM strict",
-			record:            "v=DMARC1; p=reject; rua=mailto:dmarc@example.com; aspf=r; adkim=s; pct=100",
-			expectedAlignment: "strict",
-		},
-	}
-
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCDKIMAlignment(tt.record)
-			if result == nil {
-				t.Fatalf("extractDMARCDKIMAlignment(%q) returned nil, expected non-nil", tt.record)
-			}
-			if string(*result) != tt.expectedAlignment {
-				t.Errorf("extractDMARCDKIMAlignment(%q) = %q, want %q", tt.record, string(*result), tt.expectedAlignment)
-			}
-		})
-	}
-}
-
-func TestExtractDMARCSubdomainPolicy(t *testing.T) {
+func TestParseDMARCRecordAlignment(t *testing.T) {
 	tests := []struct {
 		name           string
 		record         string
-		expectedPolicy *string
+		expectedSPF    string
+		expectedDKIM   string
 	}{
 		{
-			name:           "Subdomain policy - none",
-			record:         "v=DMARC1; p=quarantine; sp=none",
-			expectedPolicy: utils.PtrTo("none"),
+			name:         "SPF strict, DKIM relaxed",
+			record:       "v=DMARC1; p=quarantine; aspf=s; adkim=r",
+			expectedSPF:  "strict",
+			expectedDKIM: "relaxed",
 		},
 		{
-			name:           "Subdomain policy - quarantine",
-			record:         "v=DMARC1; p=reject; sp=quarantine",
-			expectedPolicy: utils.PtrTo("quarantine"),
+			name:         "SPF relaxed explicit, DKIM strict",
+			record:       "v=DMARC1; p=quarantine; aspf=r; adkim=s",
+			expectedSPF:  "relaxed",
+			expectedDKIM: "strict",
 		},
 		{
-			name:           "Subdomain policy - reject",
-			record:         "v=DMARC1; p=quarantine; sp=reject",
-			expectedPolicy: utils.PtrTo("reject"),
+			name:         "Defaults when neither specified",
+			record:       "v=DMARC1; p=quarantine",
+			expectedSPF:  "relaxed",
+			expectedDKIM: "relaxed",
 		},
 		{
-			name:           "No subdomain policy specified (defaults to main policy)",
-			record:         "v=DMARC1; p=quarantine",
-			expectedPolicy: nil,
-		},
-		{
-			name:           "Complex record with subdomain policy",
-			record:         "v=DMARC1; p=reject; sp=quarantine; rua=mailto:dmarc@example.com; pct=100",
-			expectedPolicy: utils.PtrTo("quarantine"),
+			name:         "Both strict in complex record",
+			record:       "v=DMARC1; p=reject; rua=mailto:dmarc@example.com; aspf=s; adkim=s; pct=100",
+			expectedSPF:  "strict",
+			expectedDKIM: "strict",
 		},
 	}
 
@@ -572,53 +474,53 @@ func TestExtractDMARCSubdomainPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCSubdomainPolicy(tt.record)
-			if tt.expectedPolicy == nil {
-				if result != nil {
-					t.Errorf("extractDMARCSubdomainPolicy(%q) = %v, want nil", tt.record, result)
-				}
-			} else {
-				if result == nil {
-					t.Fatalf("extractDMARCSubdomainPolicy(%q) returned nil, expected %q", tt.record, *tt.expectedPolicy)
-				}
-				if string(*result) != *tt.expectedPolicy {
-					t.Errorf("extractDMARCSubdomainPolicy(%q) = %q, want %q", tt.record, string(*result), *tt.expectedPolicy)
-				}
+			rec := analyzer.parseDMARCRecord("example.com", tt.record)
+			if rec.SpfAlignment == nil {
+				t.Fatalf("parseDMARCRecord(%q).SpfAlignment = nil", tt.record)
+			}
+			if string(*rec.SpfAlignment) != tt.expectedSPF {
+				t.Errorf("SpfAlignment = %q, want %q", string(*rec.SpfAlignment), tt.expectedSPF)
+			}
+			if rec.DkimAlignment == nil {
+				t.Fatalf("parseDMARCRecord(%q).DkimAlignment = nil", tt.record)
+			}
+			if string(*rec.DkimAlignment) != tt.expectedDKIM {
+				t.Errorf("DkimAlignment = %q, want %q", string(*rec.DkimAlignment), tt.expectedDKIM)
 			}
 		})
 	}
 }
 
-func TestExtractDMARCNonexistentSubdomainPolicy(t *testing.T) {
+func TestParseDMARCRecordSubdomainPolicy(t *testing.T) {
 	tests := []struct {
 		name           string
 		record         string
-		expectedPolicy *string
+		expectedSP     *string
+		expectedNP     *string
 	}{
 		{
-			name:           "Non-existent subdomain policy - none",
-			record:         "v=DMARC1; p=quarantine; np=none",
-			expectedPolicy: utils.PtrTo("none"),
+			name:       "sp=none, no np",
+			record:     "v=DMARC1; p=quarantine; sp=none",
+			expectedSP: utils.PtrTo("none"),
+			expectedNP: nil,
 		},
 		{
-			name:           "Non-existent subdomain policy - quarantine",
-			record:         "v=DMARC1; p=reject; np=quarantine",
-			expectedPolicy: utils.PtrTo("quarantine"),
+			name:       "sp=reject, np=reject",
+			record:     "v=DMARC1; p=reject; sp=quarantine; np=reject; rua=mailto:dmarc@example.com; pct=100",
+			expectedSP: utils.PtrTo("quarantine"),
+			expectedNP: utils.PtrTo("reject"),
 		},
 		{
-			name:           "Non-existent subdomain policy - reject",
-			record:         "v=DMARC1; p=quarantine; np=reject",
-			expectedPolicy: utils.PtrTo("reject"),
+			name:       "No sp or np (both default)",
+			record:     "v=DMARC1; p=quarantine",
+			expectedSP: nil,
+			expectedNP: nil,
 		},
 		{
-			name:           "No np tag (defaults to effective sp/p policy)",
-			record:         "v=DMARC1; p=quarantine",
-			expectedPolicy: nil,
-		},
-		{
-			name:           "Complex record with np and sp tags",
-			record:         "v=DMARC1; p=reject; sp=quarantine; np=reject; rua=mailto:dmarc@example.com; pct=100",
-			expectedPolicy: utils.PtrTo("reject"),
+			name:       "np=quarantine, no sp",
+			record:     "v=DMARC1; p=reject; np=quarantine",
+			expectedSP: nil,
+			expectedNP: utils.PtrTo("quarantine"),
 		},
 	}
 
@@ -626,86 +528,63 @@ func TestExtractDMARCNonexistentSubdomainPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCNonexistentSubdomainPolicy(tt.record)
-			if tt.expectedPolicy == nil {
-				if result != nil {
-					t.Errorf("extractDMARCNonexistentSubdomainPolicy(%q) = %v, want nil", tt.record, result)
+			rec := analyzer.parseDMARCRecord("example.com", tt.record)
+			if tt.expectedSP == nil {
+				if rec.SubdomainPolicy != nil {
+					t.Errorf("parseDMARCRecord(%q).SubdomainPolicy = %v, want nil", tt.record, *rec.SubdomainPolicy)
 				}
 			} else {
-				if result == nil {
-					t.Fatalf("extractDMARCNonexistentSubdomainPolicy(%q) returned nil, expected %q", tt.record, *tt.expectedPolicy)
+				if rec.SubdomainPolicy == nil {
+					t.Fatalf("parseDMARCRecord(%q).SubdomainPolicy = nil, want %q", tt.record, *tt.expectedSP)
 				}
-				if string(*result) != *tt.expectedPolicy {
-					t.Errorf("extractDMARCNonexistentSubdomainPolicy(%q) = %q, want %q", tt.record, string(*result), *tt.expectedPolicy)
+				if string(*rec.SubdomainPolicy) != *tt.expectedSP {
+					t.Errorf("SubdomainPolicy = %q, want %q", string(*rec.SubdomainPolicy), *tt.expectedSP)
+				}
+			}
+			if tt.expectedNP == nil {
+				if rec.NonexistentSubdomainPolicy != nil {
+					t.Errorf("parseDMARCRecord(%q).NonexistentSubdomainPolicy = %v, want nil", tt.record, *rec.NonexistentSubdomainPolicy)
+				}
+			} else {
+				if rec.NonexistentSubdomainPolicy == nil {
+					t.Fatalf("parseDMARCRecord(%q).NonexistentSubdomainPolicy = nil, want %q", tt.record, *tt.expectedNP)
+				}
+				if string(*rec.NonexistentSubdomainPolicy) != *tt.expectedNP {
+					t.Errorf("NonexistentSubdomainPolicy = %q, want %q", string(*rec.NonexistentSubdomainPolicy), *tt.expectedNP)
 				}
 			}
 		})
 	}
 }
 
-func TestExtractDMARCPercentage(t *testing.T) {
+func TestParseDMARCRecordPercentage(t *testing.T) {
 	tests := []struct {
 		name               string
 		record             string
 		expectedPercentage *int
 	}{
-		{
-			name:               "Percentage - 100",
-			record:             "v=DMARC1; p=quarantine; pct=100",
-			expectedPercentage: utils.PtrTo(100),
-		},
-		{
-			name:               "Percentage - 50",
-			record:             "v=DMARC1; p=quarantine; pct=50",
-			expectedPercentage: utils.PtrTo(50),
-		},
-		{
-			name:               "Percentage - 25",
-			record:             "v=DMARC1; p=reject; pct=25",
-			expectedPercentage: utils.PtrTo(25),
-		},
-		{
-			name:               "Percentage - 0",
-			record:             "v=DMARC1; p=none; pct=0",
-			expectedPercentage: utils.PtrTo(0),
-		},
-		{
-			name:               "No percentage specified (defaults to 100)",
-			record:             "v=DMARC1; p=quarantine",
-			expectedPercentage: nil,
-		},
-		{
-			name:               "Complex record with percentage",
-			record:             "v=DMARC1; p=reject; sp=quarantine; rua=mailto:dmarc@example.com; pct=75",
-			expectedPercentage: utils.PtrTo(75),
-		},
-		{
-			name:               "Invalid percentage > 100 (ignored)",
-			record:             "v=DMARC1; p=quarantine; pct=150",
-			expectedPercentage: nil,
-		},
-		{
-			name:               "Invalid percentage < 0 (ignored)",
-			record:             "v=DMARC1; p=quarantine; pct=-10",
-			expectedPercentage: nil,
-		},
+		{name: "pct=100", record: "v=DMARC1; p=quarantine; pct=100", expectedPercentage: utils.PtrTo(100)},
+		{name: "pct=50", record: "v=DMARC1; p=quarantine; pct=50", expectedPercentage: utils.PtrTo(50)},
+		{name: "pct=0", record: "v=DMARC1; p=none; pct=0", expectedPercentage: utils.PtrTo(0)},
+		{name: "no pct", record: "v=DMARC1; p=quarantine", expectedPercentage: nil},
+		{name: "pct=150 ignored", record: "v=DMARC1; p=quarantine; pct=150", expectedPercentage: nil},
 	}
 
 	analyzer := NewDNSAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDMARCPercentage(tt.record)
+			result := analyzer.parseDMARCRecord("example.com", tt.record).Percentage
 			if tt.expectedPercentage == nil {
 				if result != nil {
-					t.Errorf("extractDMARCPercentage(%q) = %v, want nil", tt.record, *result)
+					t.Errorf("parseDMARCRecord(%q).Percentage = %d, want nil", tt.record, *result)
 				}
 			} else {
 				if result == nil {
-					t.Fatalf("extractDMARCPercentage(%q) returned nil, expected %d", tt.record, *tt.expectedPercentage)
+					t.Fatalf("parseDMARCRecord(%q).Percentage = nil, want %d", tt.record, *tt.expectedPercentage)
 				}
 				if *result != *tt.expectedPercentage {
-					t.Errorf("extractDMARCPercentage(%q) = %d, want %d", tt.record, *result, *tt.expectedPercentage)
+					t.Errorf("parseDMARCRecord(%q).Percentage = %d, want %d", tt.record, *result, *tt.expectedPercentage)
 				}
 			}
 		})
