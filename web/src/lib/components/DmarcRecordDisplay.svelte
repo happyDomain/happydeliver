@@ -11,6 +11,7 @@
     const isFallback = $derived(
         !!dmarcRecord?.domain && !!fromDomain && dmarcRecord.domain !== fromDomain,
     );
+    // A single-label domain (no dot) is a TLD/PSD level fallback
     const isPsdFallback = $derived(isFallback && !dmarcRecord?.domain?.includes("."));
 
     // Helper function to determine policy strength
@@ -18,6 +19,15 @@
         const strength: Record<string, number> = { none: 0, quarantine: 1, reject: 2 };
         return strength[policy || "none"] || 0;
     };
+
+    // Effective policy after applying DMARCbis t=y downgrade
+    const effectivePolicy = $derived((): string => {
+        const p = dmarcRecord?.policy ?? "none";
+        if (!dmarcRecord?.test_mode) return p;
+        if (p === "reject") return "quarantine";
+        if (p === "quarantine") return "none";
+        return p;
+    });
 </script>
 
 {#if dmarcRecord}
@@ -68,9 +78,12 @@
                         No DMARC record exists for <code>{fromDomain}</code>. The record above was
                         inherited from
                         {#if isPsdFallback}
-                            the Public Suffix Domain <code>{dmarcRecord.domain}</code> per RFC 9091.
+                            the Public Suffix Domain <code>{dmarcRecord.domain}</code> via the DMARCbis
+                            DNS Tree Walk (which obsoletes the RFC 9091 PSD DMARC experiment).
                         {:else}
-                            the organizational domain <code>{dmarcRecord.domain}</code> per RFC 7489.
+                            the organizational domain <code>{dmarcRecord.domain}</code> via the
+                            DMARCbis DNS Tree Walk (compatible with RFC 7489 organizational domain
+                            fallback).
                         {/if}
                     </div>
                 </div>
@@ -120,6 +133,53 @@
                             options are: none, quarantine, or reject.
                         </div>
                     {/if}
+                </div>
+            {/if}
+
+            <!-- Test Mode (DMARCbis t= tag) -->
+            {#if dmarcRecord.test_mode}
+                <div class="mb-3">
+                    <strong>Test Mode:</strong>
+                    <span class="badge bg-warning">t=y (active)</span>
+                    <div class="alert alert-warning mt-2 mb-0 small">
+                        <i class="bi bi-flask me-1"></i>
+                        <strong>Test mode active</strong> — DMARCbis-compliant receivers will
+                        downgrade the effective policy one level:
+                        {#if dmarcRecord.policy === "reject"}
+                            <code>p=reject</code> is applied as <code>p=quarantine</code>.
+                        {:else if dmarcRecord.policy === "quarantine"}
+                            <code>p=quarantine</code> is applied as <code>p=none</code> (no action taken).
+                        {:else}
+                            <code>p=none</code> is unaffected by test mode.
+                        {/if}
+                        Aggregate reports are still generated normally.
+                        This tag replaces the deprecated <code>pct=</code> for gradual rollout.
+                    </div>
+                </div>
+            {/if}
+
+            <!-- PSD tag (DMARCbis psd=) -->
+            {#if dmarcRecord.psd === "y"}
+                <div class="mb-3">
+                    <strong>Public Suffix Domain:</strong>
+                    <span class="badge bg-info">psd=y</span>
+                    <div class="alert alert-info mt-2 mb-0 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>PSD declared</strong> — this domain is declared as a Public Suffix
+                        Domain. DMARCbis-compliant receivers will apply this policy to subdomains
+                        that have no DMARC record of their own when using the DNS Tree Walk algorithm.
+                    </div>
+                </div>
+            {:else if dmarcRecord.psd === "n"}
+                <div class="mb-3">
+                    <strong>Organizational Domain Boundary:</strong>
+                    <span class="badge bg-info">psd=n</span>
+                    <div class="alert alert-info mt-2 mb-0 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Org Domain declared</strong> — <code>psd=n</code> explicitly declares
+                        this as an Organizational Domain boundary. Subdomains with separate DNS
+                        delegation will use their own independent DMARCbis Tree Walk.
+                    </div>
                 </div>
             {/if}
 
@@ -202,7 +262,7 @@
                 </div>
             {/if}
 
-            <!-- Percentage -->
+            <!-- Percentage (pct=, deprecated in DMARCbis) -->
             {#if dmarcRecord.percentage !== undefined}
                 <div class="mb-3">
                     <strong>Enforcement Percentage:</strong>
@@ -215,25 +275,35 @@
                     >
                         {dmarcRecord.percentage}%
                     </span>
+                    <div class="alert alert-warning mt-2 mb-0 small">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Deprecated tag</strong> — the <code>pct=</code> tag is removed in
+                        DMARCbis. Many receivers already ignore it. For gradual rollout, replace it
+                        with <code>t=y</code> (test mode); for full enforcement, simply remove
+                        <code>pct=</code> from your record.
+                        {#if dmarcRecord.percentage === 0}
+                            <br /><strong>pct=0 is an anti-pattern</strong> — it was widely misused
+                            as a signal to bypass DMARC entirely, which is one reason the tag was
+                            removed. Use <code>t=y</code> instead.
+                        {/if}
+                    </div>
                     {#if dmarcRecord.percentage === 100}
                         <div class="alert alert-success mt-2 mb-0 small">
                             <i class="bi bi-check-circle me-1"></i>
                             <strong>Full enforcement</strong> — all messages are subject to DMARC policy.
-                            This provides maximum protection.
                         </div>
-                    {:else if dmarcRecord.percentage >= 50}
+                    {:else if dmarcRecord.percentage > 0 && dmarcRecord.percentage >= 50}
                         <div class="alert alert-warning mt-2 mb-0 small">
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             <strong>Partial enforcement</strong> — only {dmarcRecord.percentage}% of
-                            messages are subject to DMARC policy. Consider increasing to
-                            <code>pct=100</code> once you've validated your configuration.
+                            messages are subject to DMARC policy. Receivers ignoring pct= will apply
+                            the full policy regardless.
                         </div>
-                    {:else}
+                    {:else if dmarcRecord.percentage > 0}
                         <div class="alert alert-danger mt-2 mb-0 small">
                             <i class="bi bi-x-circle me-1"></i>
                             <strong>Low enforcement</strong> — only {dmarcRecord.percentage}% of
-                            messages are protected. Gradually increase to <code>pct=100</code> for full
-                            protection.
+                            messages are protected. Receivers ignoring pct= will apply full policy.
                         </div>
                     {/if}
                 </div>
@@ -316,6 +386,30 @@
                 <div class="mb-2">
                     <strong>Record:</strong><br />
                     <code class="d-block mt-1 text-break">{dmarcRecord.record}</code>
+                </div>
+            {/if}
+
+            <!-- Deprecated rf=/ri= tags -->
+            {#if dmarcRecord.deprecated_rf || dmarcRecord.deprecated_ri}
+                <div class="alert alert-warning mt-2 mb-3 small">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Deprecated tags detected</strong> — your record contains
+                    {#if dmarcRecord.deprecated_rf && dmarcRecord.deprecated_ri}
+                        <code>rf=</code> and <code>ri=</code> tags that are
+                    {:else if dmarcRecord.deprecated_rf}
+                        the <code>rf=</code> tag that is
+                    {:else}
+                        the <code>ri=</code> tag that is
+                    {/if}
+                    removed in DMARCbis. Modern receivers will ignore
+                    {dmarcRecord.deprecated_rf && dmarcRecord.deprecated_ri ? "them" : "it"}.
+                    {#if dmarcRecord.deprecated_ri}
+                        Aggregate reporting interval is now fixed at ≥ 24 hours regardless of
+                        <code>ri=</code>.
+                    {/if}
+                    You can safely remove
+                    {dmarcRecord.deprecated_rf && dmarcRecord.deprecated_ri ? "these tags" : "this tag"}
+                    from your DMARC record.
                 </div>
             {/if}
 

@@ -90,7 +90,7 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantDomain: utils.PtrTo("mail.example.com"),
 		},
 		{
-			name:   "exact domain NXDOMAIN — falls back to org domain",
+			name:   "exact domain NXDOMAIN — tree walk reaches org domain",
 			domain: "mail.example.com",
 			txt: map[string][]string{
 				"_dmarc.example.com": {orgRecord},
@@ -99,7 +99,7 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantDomain: utils.PtrTo("example.com"),
 		},
 		{
-			name:   "exact domain has no v=DMARC1 TXT — falls back to org domain",
+			name:   "exact domain has no v=DMARC1 TXT — tree walk reaches org domain",
 			domain: "mail.example.com",
 			txt: map[string][]string{
 				"_dmarc.mail.example.com": {"some-other-txt"},
@@ -109,7 +109,7 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantDomain: utils.PtrTo("example.com"),
 		},
 		{
-			name:   "both exact and org NXDOMAIN but PSD has psd=y — RFC 9091 fallback",
+			name:   "both exact and org NXDOMAIN but PSD (TLD) has psd=y — DMARCbis Tree Walk",
 			domain: "mail.example.com",
 			txt: map[string][]string{
 				"_dmarc.com": {psdRecord},
@@ -118,7 +118,7 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantDomain: utils.PtrTo("com"),
 		},
 		{
-			name:   "PSD record exists but no psd=y — no record returned",
+			name:   "PSD record exists but no psd=y — TLD record ignored by Tree Walk",
 			domain: "mail.example.com",
 			txt: map[string][]string{
 				"_dmarc.com": {"v=DMARC1; p=none"},
@@ -127,14 +127,14 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantErrSubst: "No DMARC record found",
 		},
 		{
-			name:   "no record at any level",
-			domain: "mail.example.com",
-			txt:    map[string][]string{},
+			name:         "no record at any level",
+			domain:       "mail.example.com",
+			txt:          map[string][]string{},
 			wantValid:    false,
 			wantErrSubst: "No DMARC record found",
 		},
 		{
-			name:   "DNS error on exact domain — no fallback, error returned",
+			name:   "DNS error on exact domain — error returned",
 			domain: "mail.example.com",
 			errMap: map[string]error{
 				"_dmarc.mail.example.com": fmt.Errorf("SERVFAIL"),
@@ -143,13 +143,40 @@ func TestCheckDMARCRecordFallback(t *testing.T) {
 			wantErrSubst: "SERVFAIL",
 		},
 		{
-			name:   "domain already at org level — no redundant fallback",
+			name:   "domain already at org level — found immediately",
 			domain: "example.com",
 			txt: map[string][]string{
 				"_dmarc.example.com": {orgRecord},
 			},
 			wantValid:  true,
 			wantDomain: utils.PtrTo("example.com"),
+		},
+		{
+			name:   "deep subdomain — tree walk finds record two levels up",
+			domain: "a.b.example.com",
+			txt: map[string][]string{
+				"_dmarc.example.com": {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("example.com"),
+		},
+		{
+			name:   "8-label domain — shortcut to 7-label suffix on miss",
+			domain: "a.b.c.d.e.f.example.com",
+			txt: map[string][]string{
+				"_dmarc.b.c.d.e.f.example.com": {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("b.c.d.e.f.example.com"),
+		},
+		{
+			name:   "psd=n record stops tree walk at that level",
+			domain: "mail.sub.example.com",
+			txt: map[string][]string{
+				"_dmarc.sub.example.com": {"v=DMARC1; p=reject; psd=n"},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("sub.example.com"),
 		},
 	}
 
@@ -234,6 +261,124 @@ func TestExtractDMARCPolicy(t *testing.T) {
 	}
 }
 
+func TestExtractDMARCTestMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		record   string
+		wantMode *bool
+	}{
+		{
+			name:     "t=y sets test mode",
+			record:   "v=DMARC1; p=reject; t=y",
+			wantMode: utils.PtrTo(true),
+		},
+		{
+			name:     "t=n explicitly disables test mode",
+			record:   "v=DMARC1; p=reject; t=n",
+			wantMode: utils.PtrTo(false),
+		},
+		{
+			name:     "absent t tag returns nil",
+			record:   "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com",
+			wantMode: nil,
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractDMARCTestMode(tt.record)
+			if tt.wantMode == nil {
+				if result != nil {
+					t.Errorf("extractDMARCTestMode(%q) = %v, want nil", tt.record, *result)
+				}
+			} else {
+				if result == nil {
+					t.Fatalf("extractDMARCTestMode(%q) = nil, want %v", tt.record, *tt.wantMode)
+				}
+				if *result != *tt.wantMode {
+					t.Errorf("extractDMARCTestMode(%q) = %v, want %v", tt.record, *result, *tt.wantMode)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractDMARCPSD(t *testing.T) {
+	tests := []struct {
+		name    string
+		record  string
+		wantPSD *string
+	}{
+		{
+			name:    "psd=y marks Public Suffix Domain",
+			record:  "v=DMARC1; p=none; psd=y",
+			wantPSD: utils.PtrTo("y"),
+		},
+		{
+			name:    "psd=n marks Org Domain boundary",
+			record:  "v=DMARC1; p=reject; psd=n",
+			wantPSD: utils.PtrTo("n"),
+		},
+		{
+			name:    "psd=u is explicit unknown",
+			record:  "v=DMARC1; p=quarantine; psd=u",
+			wantPSD: utils.PtrTo("u"),
+		},
+		{
+			name:    "absent psd tag returns nil",
+			record:  "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com",
+			wantPSD: nil,
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.extractDMARCPSD(tt.record)
+			if tt.wantPSD == nil {
+				if result != nil {
+					t.Errorf("extractDMARCPSD(%q) = %v, want nil", tt.record, *result)
+				}
+			} else {
+				if result == nil {
+					t.Fatalf("extractDMARCPSD(%q) = nil, want %q", tt.record, *tt.wantPSD)
+				}
+				if string(*result) != *tt.wantPSD {
+					t.Errorf("extractDMARCPSD(%q) = %q, want %q", tt.record, string(*result), *tt.wantPSD)
+				}
+			}
+		})
+	}
+}
+
+func TestHasDMARCTag(t *testing.T) {
+	tests := []struct {
+		name   string
+		record string
+		tag    string
+		want   bool
+	}{
+		{name: "rf tag present", record: "v=DMARC1; p=none; rf=afrf", tag: "rf", want: true},
+		{name: "ri tag present", record: "v=DMARC1; p=none; ri=86400", tag: "ri", want: true},
+		{name: "rf tag absent", record: "v=DMARC1; p=quarantine; rua=mailto:x@example.com", tag: "rf", want: false},
+		{name: "ri tag absent", record: "v=DMARC1; p=quarantine", tag: "ri", want: false},
+	}
+
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.hasDMARCTag(tt.record, tt.tag)
+			if result != tt.want {
+				t.Errorf("hasDMARCTag(%q, %q) = %v, want %v", tt.record, tt.tag, result, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateDMARC(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -251,12 +396,17 @@ func TestValidateDMARC(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "DMARCbis: p= absent but rua= present is valid (treated as p=none)",
+			record:   "v=DMARC1; rua=mailto:dmarc@example.com",
+			expected: true,
+		},
+		{
 			name:     "Invalid DMARC - no version",
 			record:   "p=quarantine",
 			expected: false,
 		},
 		{
-			name:     "Invalid DMARC - no policy",
+			name:     "Invalid DMARC - no policy and no rua",
 			record:   "v=DMARC1",
 			expected: false,
 		},

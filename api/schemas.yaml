@@ -926,14 +926,35 @@ components:
         nonexistent_subdomain_policy:
           type: string
           enum: [none, quarantine, reject, unknown]
-          description: DMARC non-existent subdomain policy (np tag) - policy for non-existent subdomains (NXDOMAIN); defaults to sp= or p= if absent
+          description: DMARC non-existent subdomain policy (np tag) - policy for non-existent subdomains (NXDOMAIN); defaults to sp= or p= if absent (DMARCbis)
           example: "reject"
         percentage:
           type: integer
           minimum: 0
           maximum: 100
-          description: Percentage of messages subjected to filtering (pct tag, default 100)
+          description: "Percentage of messages subjected to filtering (pct tag, default 100). DEPRECATED in DMARCbis: use test_mode (t=y) instead."
           example: 100
+        test_mode:
+          type: boolean
+          description: "DMARCbis t= tag: when true (t=y), receivers downgrade effective policy one level (reject→quarantine, quarantine→none). Replaces the deprecated pct= tag for testing."
+          example: false
+        psd:
+          type: string
+          enum: [y, n, u]
+          description: "DMARCbis psd= tag: y=this is a Public Suffix Domain, n=this is an Organizational Domain boundary, u=unknown (default, use DNS Tree Walk to determine)"
+          example: "u"
+        deprecated_pct:
+          type: boolean
+          description: "Whether the deprecated pct= tag was found in the record (pct is removed in DMARCbis; migrate to t=y for testing mode)"
+          example: false
+        deprecated_rf:
+          type: boolean
+          description: "Whether the deprecated rf= tag was found in the record (rf is removed in DMARCbis; failure report formats are now defined separately)"
+          example: false
+        deprecated_ri:
+          type: boolean
+          description: "Whether the deprecated ri= tag was found in the record (ri is removed in DMARCbis; aggregate reporting interval is now fixed at ≥24 hours)"
+          example: false
         spf_alignment:
           type: string
           enum: [relaxed, strict]

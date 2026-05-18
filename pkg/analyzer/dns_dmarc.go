@@ -28,8 +28,6 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/net/publicsuffix"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
@@ -62,84 +60,102 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 	subdomainPolicy := d.extractDMARCSubdomainPolicy(rawRecord)
 	nonexistentSubdomainPolicy := d.extractDMARCNonexistentSubdomainPolicy(rawRecord)
 	percentage := d.extractDMARCPercentage(rawRecord)
+	testMode := d.extractDMARCTestMode(rawRecord)
+	psd := d.extractDMARCPSD(rawRecord)
 	spfAlignment := d.extractDMARCSPFAlignment(rawRecord)
 	dkimAlignment := d.extractDMARCDKIMAlignment(rawRecord)
+	deprecatedPct := percentage != nil
+	deprecatedRf := d.hasDMARCTag(rawRecord, "rf")
+	deprecatedRi := d.hasDMARCTag(rawRecord, "ri")
 
-	if !d.validateDMARC(rawRecord) {
-		return &model.DMARCRecord{
-			Domain:                     &foundDomain,
-			Record:                     &rawRecord,
-			Policy:                     utils.PtrTo(model.DMARCRecordPolicy(policy)),
-			SubdomainPolicy:            subdomainPolicy,
-			NonexistentSubdomainPolicy: nonexistentSubdomainPolicy,
-			Percentage:                 percentage,
-			SpfAlignment:               spfAlignment,
-			DkimAlignment:              dkimAlignment,
-			Valid:                      false,
-			Error:                      utils.PtrTo("DMARC record appears malformed"),
-		}
-	}
-
-	return &model.DMARCRecord{
+	rec := &model.DMARCRecord{
 		Domain:                     &foundDomain,
 		Record:                     &rawRecord,
 		Policy:                     utils.PtrTo(model.DMARCRecordPolicy(policy)),
 		SubdomainPolicy:            subdomainPolicy,
 		NonexistentSubdomainPolicy: nonexistentSubdomainPolicy,
 		Percentage:                 percentage,
+		TestMode:                   testMode,
+		Psd:                        psd,
 		SpfAlignment:               spfAlignment,
 		DkimAlignment:              dkimAlignment,
-		Valid:                      true,
 	}
+	if deprecatedPct {
+		rec.DeprecatedPct = utils.PtrTo(true)
+	}
+	if deprecatedRf {
+		rec.DeprecatedRf = utils.PtrTo(true)
+	}
+	if deprecatedRi {
+		rec.DeprecatedRi = utils.PtrTo(true)
+	}
+
+	if !d.validateDMARC(rawRecord) {
+		rec.Valid = false
+		rec.Error = utils.PtrTo("DMARC record appears malformed")
+		return rec
+	}
+
+	rec.Valid = true
+	return rec
 }
 
-// checkDMARCRecord looks up and validates the DMARC record for a domain.
-// It follows RFC 7489 §6.6.3 fallback to the Organizational Domain and
-// RFC 9091 optional fallback to the Public Suffix Domain (only when psd=y).
+// walkDNSForDMARC implements the DMARCbis DNS Tree Walk algorithm (Section 4.10).
+// It queries _dmarc.<domain> and walks up the label hierarchy until a valid DMARC
+// record is found or all labels are exhausted. Maximum 8 DNS queries per message.
+// For domains with ≥8 labels, after the initial miss the walk jumps to the 7-label
+// suffix before resuming normally (to stay within the 8-query budget).
+// Single-label (TLD) records are only accepted when they carry psd=y.
+func (d *DNSAnalyzer) walkDNSForDMARC(domain string) (record, foundDomain string, err error) {
+	labels := strings.Split(strings.ToLower(strings.TrimSuffix(domain, ".")), ".")
+	n := len(labels)
+
+	for i, queries := 0, 0; i < n && queries < 8; i, queries = i+1, queries+1 {
+		current := strings.Join(labels[i:], ".")
+
+		raw, notFound, lookupErr := d.lookupDMARCAt(current)
+		if lookupErr != nil {
+			return "", "", lookupErr
+		}
+		if !notFound {
+			// Single-label (TLD) records are only used when the record explicitly opts in.
+			if !strings.Contains(current, ".") {
+				if d.extractDMARCPSDValue(raw) != "y" {
+					break
+				}
+			}
+			return raw, current, nil
+		}
+
+		// DMARCbis §4.10: after missing on a ≥8-label domain, shortcut to the
+		// 7-label suffix for the next query rather than stepping one label at a time.
+		if i == 0 && n >= 8 {
+			i = n - 8 // the outer i++ will land at n-7 (7 labels from the right)
+		}
+	}
+
+	return "", "", nil
+}
+
+// checkDMARCRecord looks up and validates the DMARC record for a domain using
+// the DMARCbis DNS Tree Walk algorithm (Section 4.10), which supersedes the
+// RFC 7489 PSL-based organizational domain lookup and the RFC 9091 PSD DMARC
+// experimental fallback.
 func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
-	// Step 1: try exact domain (_dmarc.<domain>)
-	raw, notFound, err := d.lookupDMARCAt(domain)
+	raw, foundDomain, err := d.walkDNSForDMARC(domain)
 	if err != nil {
 		return &model.DMARCRecord{
 			Valid: false,
 			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
 		}
 	}
-	if !notFound {
-		return d.parseDMARCRecord(domain, raw)
-	}
-
-	// Step 2: RFC 7489 — fall back to Organizational Domain (eTLD+1)
-	orgDomain := getOrganizationalDomain(domain)
-	if orgDomain != domain {
-		raw, notFound, err = d.lookupDMARCAt(orgDomain)
-		if err != nil {
-			return &model.DMARCRecord{
-				Valid: false,
-				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
-			}
-		}
-		if !notFound {
-			return d.parseDMARCRecord(orgDomain, raw)
+	if foundDomain == "" {
+		return &model.DMARCRecord{
+			Valid: false,
+			Error: utils.PtrTo("No DMARC record found"),
 		}
 	}
-
-	// Step 3: RFC 9091 — fall back to Public Suffix Domain when psd=y
-	psd, _ := publicsuffix.PublicSuffix(domain)
-	if psd != "" && psd != orgDomain {
-		raw, notFound, err = d.lookupDMARCAt(psd)
-		if err == nil && !notFound {
-			// Only apply PSD DMARC when the record explicitly opts in with psd=y
-			if strings.Contains(raw, "psd=y") {
-				return d.parseDMARCRecord(psd, raw)
-			}
-		}
-	}
-
-	return &model.DMARCRecord{
-		Valid: false,
-		Error: utils.PtrTo("No DMARC record found"),
-	}
+	return d.parseDMARCRecord(foundDomain, raw)
 }
 
 // extractDMARCPolicy extracts the policy from a DMARC record
@@ -211,114 +227,156 @@ func (d *DNSAnalyzer) extractDMARCNonexistentSubdomainPolicy(record string) *mod
 	return nil
 }
 
-// extractDMARCPercentage extracts the percentage from a DMARC record
-// Returns the pct tag value or nil if not specified (defaults to 100)
+// extractDMARCPercentage extracts the percentage from a DMARC record.
+// Returns the pct tag value or nil if not specified (defaults to 100).
+// Note: pct= is deprecated in DMARCbis; use t= (test_mode) instead.
 func (d *DNSAnalyzer) extractDMARCPercentage(record string) *int {
-	// Look for pct=<number>
 	re := regexp.MustCompile(`pct=(\d+)`)
 	matches := re.FindStringSubmatch(record)
 	if len(matches) > 1 {
-		// Convert string to int
 		var pct int
 		fmt.Sscanf(matches[1], "%d", &pct)
-		// Validate range (0-100)
 		if pct >= 0 && pct <= 100 {
 			return &pct
 		}
 	}
-	// Default is 100 if not specified
 	return nil
 }
 
-// validateDMARC performs basic DMARC record validation
+// extractDMARCTestMode extracts the DMARCbis t= tag (test mode).
+// Returns true for t=y, false for t=n, nil if absent (defaults to false / full enforcement).
+func (d *DNSAnalyzer) extractDMARCTestMode(record string) *bool {
+	re := regexp.MustCompile(`(?:^|;)\s*t=(y|n)(?:;|$|\s)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		v := matches[1] == "y"
+		return &v
+	}
+	return nil
+}
+
+// extractDMARCPSD extracts the DMARCbis psd= tag value as a typed enum.
+// Returns nil if the tag is absent (defaults to "u" / unknown).
+func (d *DNSAnalyzer) extractDMARCPSD(record string) *model.DMARCRecordPsd {
+	v := d.extractDMARCPSDValue(record)
+	if v == "" {
+		return nil
+	}
+	return utils.PtrTo(model.DMARCRecordPsd(v))
+}
+
+// extractDMARCPSDValue returns the raw string value of psd= ("y", "n", "u") or "".
+func (d *DNSAnalyzer) extractDMARCPSDValue(record string) string {
+	re := regexp.MustCompile(`(?:^|;)\s*psd=(y|n|u)(?:;|$|\s)`)
+	matches := re.FindStringSubmatch(record)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+// hasDMARCTag reports whether the given tag name appears in the record.
+func (d *DNSAnalyzer) hasDMARCTag(record, tag string) bool {
+	re := regexp.MustCompile(`(?:^|;)\s*` + regexp.QuoteMeta(tag) + `=`)
+	return re.MatchString(record)
+}
+
+// validateDMARC performs basic DMARC record validation.
+// Per DMARCbis, p= is now RECOMMENDED (not required): a record with a valid
+// rua= but no p= is treated as p=none and considered valid.
 func (d *DNSAnalyzer) validateDMARC(record string) bool {
-	// Must start with v=DMARC1
 	if !strings.HasPrefix(record, "v=DMARC1") {
 		return false
 	}
 
-	// Must have a policy tag
+	// p= absent is allowed in DMARCbis when rua= is present (treated as p=none).
 	if !strings.Contains(record, "p=") {
-		return false
+		return strings.Contains(record, "rua=")
 	}
 
 	return true
 }
 
 func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int) {
-	// DMARC ties SPF and DKIM together and provides policy
-	if results.DmarcRecord != nil {
-		if results.DmarcRecord.Valid {
-			score += 50
-			// Bonus points for stricter policies
-			if results.DmarcRecord.Policy != nil {
-				switch *results.DmarcRecord.Policy {
-				case "reject":
-					// Strictest policy - full points already awarded
-					score += 25
-				case "quarantine":
-					// Good policy - no deduction
-				case "none":
-					// Weakest policy - deduct 25 points
-					score -= 25
-				}
-			}
-			// Bonus points for strict alignment modes (5 points each)
-			if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
-				score += 5
-			}
-			if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
-				score += 5
-			}
-			// Policy strength: none < quarantine < reject
-			policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
-			mainPolicy := string(*results.DmarcRecord.Policy)
+	if results.DmarcRecord == nil {
+		return
+	}
 
-			// Subdomain policy scoring (sp tag)
-			// +15 for stricter or equal subdomain policy, -15 for weaker
-			if results.DmarcRecord.SubdomainPolicy != nil {
-				subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
-				mainStrength := policyStrength[mainPolicy]
-				subStrength := policyStrength[subPolicy]
-
-				if subStrength >= mainStrength {
-					// Subdomain policy is equal or stricter
-					score += 15
-				} else {
-					// Subdomain policy is weaker
-					score -= 15
-				}
-			} else {
-				// No sp tag means subdomains inherit main policy (good default)
-				score += 15
-			}
-			// Non-existent subdomain policy scoring (np tag, DMARCbis)
-			// -15 from base; +15 back if absent (good default) or >= effective sp/p strength
-			score -= 15
-			effectiveSubPolicy := mainPolicy
-			if results.DmarcRecord.SubdomainPolicy != nil {
-				effectiveSubPolicy = string(*results.DmarcRecord.SubdomainPolicy)
-			}
-			if results.DmarcRecord.NonexistentSubdomainPolicy == nil {
-				score += 15
-			} else {
-				npStrength := policyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)]
-				effectiveStrength := policyStrength[effectiveSubPolicy]
-				if npStrength >= effectiveStrength {
-					score += 15
-				}
-			}
-			// Percentage scoring (pct tag)
-			// Apply the percentage on the current score
-			if results.DmarcRecord.Percentage != nil {
-				pct := *results.DmarcRecord.Percentage
-
-				score = score * pct / 100
-			}
-		} else if results.DmarcRecord.Record != nil {
-			// Partial credit if DMARC record exists but has issues
+	if !results.DmarcRecord.Valid {
+		if results.DmarcRecord.Record != nil {
+			// Partial credit if a DMARC record exists but has issues
 			score += 20
 		}
+		return
+	}
+
+	score += 50
+
+	// Determine effective policy: DMARCbis t=y downgrades policy one level.
+	effectivePolicy := "none"
+	if results.DmarcRecord.Policy != nil {
+		effectivePolicy = string(*results.DmarcRecord.Policy)
+	}
+	testMode := results.DmarcRecord.TestMode != nil && *results.DmarcRecord.TestMode
+	if testMode {
+		switch effectivePolicy {
+		case "reject":
+			effectivePolicy = "quarantine"
+		case "quarantine":
+			effectivePolicy = "none"
+		}
+	}
+
+	// Bonus/penalty for policy strength
+	switch effectivePolicy {
+	case "reject":
+		score += 25
+	case "none":
+		score -= 25
+	}
+
+	// Bonus points for strict alignment modes
+	if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
+		score += 5
+	}
+	if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
+		score += 5
+	}
+
+	policyStrength := map[string]int{"none": 0, "quarantine": 1, "reject": 2}
+
+	// Subdomain policy scoring (sp tag): +15 for equal-or-stricter, -15 for weaker
+	if results.DmarcRecord.SubdomainPolicy != nil {
+		subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
+		if policyStrength[subPolicy] >= policyStrength[effectivePolicy] {
+			score += 15
+		} else {
+			score -= 15
+		}
+	} else {
+		score += 15 // inherits main policy — good default
+	}
+
+	// Non-existent subdomain policy scoring (np tag, DMARCbis)
+	score -= 15
+	effectiveSubPolicy := effectivePolicy
+	if results.DmarcRecord.SubdomainPolicy != nil {
+		effectiveSubPolicy = string(*results.DmarcRecord.SubdomainPolicy)
+	}
+	if results.DmarcRecord.NonexistentSubdomainPolicy == nil {
+		score += 15 // inherits subdomain/main policy — good default
+	} else {
+		npStrength := policyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)]
+		if npStrength >= policyStrength[effectiveSubPolicy] {
+			score += 15
+		}
+	}
+
+	// pct= scaling (deprecated in DMARCbis, kept for backward compatibility).
+	// pct=0 is an anti-pattern: score it as zero enforcement.
+	if results.DmarcRecord.Percentage != nil {
+		pct := *results.DmarcRecord.Percentage
+		score = score * pct / 100
 	}
 
 	return
