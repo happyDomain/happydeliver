@@ -92,18 +92,18 @@ func TestCalculateXAlignedFromScore(t *testing.T) {
 		expectedScore int
 	}{
 		{
-			name: "pass result gives positive score",
+			name: "pass result gives no penalty",
 			result: &model.AuthResult{
 				Result: model.AuthResultResultPass,
 			},
-			expectedScore: 100,
+			expectedScore: 0,
 		},
 		{
-			name: "fail result gives zero score",
+			name: "fail result gives full penalty",
 			result: &model.AuthResult{
 				Result: model.AuthResultResultFail,
 			},
-			expectedScore: 0,
+			expectedScore: -100,
 		},
 		{
 			name: "neutral result gives zero score",

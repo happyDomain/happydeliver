@@ -318,7 +318,7 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bo
 		return 100, ""
 	}
 
-	if results.ListedCount <= 0 {
+	if results.ListedCount <= 0 || scoringListCount <= 0 {
 		return 100, "A+"
 	}
 

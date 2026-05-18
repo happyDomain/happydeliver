@@ -51,16 +51,16 @@ func (a *AuthenticationAnalyzer) calculateXAlignedFromScore(results *model.Authe
 	if results.XAlignedFrom != nil {
 		switch results.XAlignedFrom.Result {
 		case model.AuthResultResultPass:
-			// pass: positive contribution
-			return 100
+			// pass: no impact
+			return 0
 		case model.AuthResultResultFail:
 			// fail: negative contribution
-			return 0
+			return -100
 		default:
 			// neutral, none, etc.: no impact
 			return 0
 		}
 	}
 
-	return 100
+	return 0
 }

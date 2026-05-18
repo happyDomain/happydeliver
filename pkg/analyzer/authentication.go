@@ -174,9 +174,7 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 	score += 12 * a.calculateXGoogleDKIMScore(results) / 100
 
 	// Penalty-only: X-Aligned-From (up to -5 points on failure)
-	if xAlignedScore := a.calculateXAlignedFromScore(results); xAlignedScore < 100 {
-		score += 5 * (xAlignedScore - 100) / 100
-	}
+	score += 5 * a.calculateXAlignedFromScore(results) / 100
 
 	// Ensure score doesn't exceed 100
 	if score > 100 {
