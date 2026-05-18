@@ -891,6 +891,10 @@ components:
           type: string
           description: DMARC record content
           example: "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+        domain:
+          type: string
+          description: Domain at which the DMARC record was found (may differ from From domain when organizational domain fallback was used)
+          example: "example.com"
         policy:
           type: string
           enum: [none, quarantine, reject, unknown]

@@ -165,7 +165,10 @@
             {/if}
 
             <!-- DMARC Record -->
-            <DmarcRecordDisplay dmarcRecord={dnsResults.dmarc_record} />
+            <DmarcRecordDisplay
+                dmarcRecord={dnsResults.dmarc_record}
+                fromDomain={dnsResults.from_domain}
+            />
 
             <!-- BIMI Record -->
             <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} />

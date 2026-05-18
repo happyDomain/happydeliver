@@ -388,7 +388,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		if domain != "" {
 			alignment.FromDomain = &domain
 			// Extract organizational domain
-			orgDomain := h.getOrganizationalDomain(domain)
+			orgDomain := getOrganizationalDomain(domain)
 			alignment.FromOrgDomain = &orgDomain
 		}
 	}
@@ -400,7 +400,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		if domain != "" {
 			alignment.ReturnPathDomain = &domain
 			// Extract organizational domain
-			orgDomain := h.getOrganizationalDomain(domain)
+			orgDomain := getOrganizationalDomain(domain)
 			alignment.ReturnPathOrgDomain = &orgDomain
 		}
 	}
@@ -411,7 +411,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		for _, dkim := range *authResults.Dkim {
 			if dkim.Domain != nil && *dkim.Domain != "" {
 				domain := *dkim.Domain
-				orgDomain := h.getOrganizationalDomain(domain)
+				orgDomain := getOrganizationalDomain(domain)
 				dkimDomains = append(dkimDomains, model.DKIMDomainInfo{
 					Domain:    domain,
 					OrgDomain: orgDomain,
@@ -542,7 +542,7 @@ func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
 // getOrganizationalDomain extracts the organizational domain from a fully qualified domain name
 // using the Public Suffix List (PSL) to correctly handle multi-level TLDs.
 // For example: mail.example.com -> example.com, mail.example.co.uk -> example.co.uk
-func (h *HeaderAnalyzer) getOrganizationalDomain(domain string) string {
+func getOrganizationalDomain(domain string) string {
 	domain = strings.ToLower(strings.TrimSpace(domain))
 
 	// Use golang.org/x/net/publicsuffix to get the eTLD+1 (organizational domain)

@@ -291,34 +291,38 @@ func TestGetBlacklistScore(t *testing.T) {
 		{
 			name: "Listed on 1 RBL",
 			results: &DNSListResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 1,
+				IPsChecked:          []string{"198.51.100.1"},
+				ListedCount:         1,
+				RelevantListedCount: 1,
 			},
-			expectedScore: 84, // 100 - 1*100/6 = 84 (integer division: 100/6=16)
+			expectedScore: 92, // 100 - 1*100/12 = 92 (12 scoring lists = 14 default - 2 informational)
 		},
 		{
 			name: "Listed on 2 RBLs",
 			results: &DNSListResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 2,
+				IPsChecked:          []string{"198.51.100.1"},
+				ListedCount:         2,
+				RelevantListedCount: 2,
 			},
-			expectedScore: 67, // 100 - 2*100/6 = 67 (integer division: 200/6=33)
+			expectedScore: 84, // 100 - 2*100/12 = 84
 		},
 		{
 			name: "Listed on 3 RBLs",
 			results: &DNSListResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 3,
+				IPsChecked:          []string{"198.51.100.1"},
+				ListedCount:         3,
+				RelevantListedCount: 3,
 			},
-			expectedScore: 50, // 100 - 3*100/6 = 50 (integer division: 300/6=50)
+			expectedScore: 75, // 100 - 3*100/12 = 75
 		},
 		{
 			name: "Listed on 4+ RBLs",
 			results: &DNSListResults{
-				IPsChecked:  []string{"198.51.100.1"},
-				ListedCount: 4,
+				IPsChecked:          []string{"198.51.100.1"},
+				ListedCount:         4,
+				RelevantListedCount: 4,
 			},
-			expectedScore: 34, // 100 - 4*100/6 = 34 (integer division: 400/6=66)
+			expectedScore: 67, // 100 - 4*100/12 = 67
 		},
 	}
 
@@ -326,7 +330,7 @@ func TestGetBlacklistScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, _ := checker.CalculateScore(tt.results)
+			score, _ := checker.CalculateScore(tt.results, false)
 			if score != tt.expectedScore {
 				t.Errorf("GetBlacklistScore() = %v, want %v", score, tt.expectedScore)
 			}

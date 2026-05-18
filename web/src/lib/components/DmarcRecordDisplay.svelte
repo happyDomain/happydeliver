@@ -3,9 +3,15 @@
 
     interface Props {
         dmarcRecord?: DmarcRecord;
+        fromDomain?: string;
     }
 
-    let { dmarcRecord }: Props = $props();
+    let { dmarcRecord, fromDomain }: Props = $props();
+
+    const isFallback = $derived(
+        !!dmarcRecord?.domain && !!fromDomain && dmarcRecord.domain !== fromDomain,
+    );
+    const isPsdFallback = $derived(isFallback && !dmarcRecord?.domain?.includes("."));
 
     // Helper function to determine policy strength
     const policyStrength = (policy: string | undefined): number => {
@@ -51,6 +57,24 @@
                     <span class="badge bg-danger">Invalid</span>
                 {/if}
             </div>
+
+            <!-- Fallback domain notice -->
+            {#if isFallback}
+                <div class="mb-3">
+                    <strong>Record found at:</strong>
+                    <code>{dmarcRecord.domain}</code>
+                    <div class="alert alert-info mt-2 mb-0 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        No DMARC record exists for <code>{fromDomain}</code>. The record above was
+                        inherited from
+                        {#if isPsdFallback}
+                            the Public Suffix Domain <code>{dmarcRecord.domain}</code> per RFC 9091.
+                        {:else}
+                            the organizational domain <code>{dmarcRecord.domain}</code> per RFC 7489.
+                        {/if}
+                    </div>
+                </div>
+            {/if}
 
             <!-- Policy -->
             {#if dmarcRecord.policy}

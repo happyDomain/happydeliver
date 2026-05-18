@@ -22,12 +22,177 @@
 package analyzer
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
-	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
+
+// mockDNSResolver maps domain names to TXT records for testing.
+// An entry with value nil means NXDOMAIN; an error value triggers a DNS error.
+type mockDNSResolver struct {
+	txt map[string][]string
+	err map[string]error
+}
+
+func (m *mockDNSResolver) LookupTXT(_ context.Context, name string) ([]string, error) {
+	if err, ok := m.err[name]; ok {
+		return nil, err
+	}
+	if records, ok := m.txt[name]; ok {
+		return records, nil
+	}
+	return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+}
+
+func (m *mockDNSResolver) LookupMX(_ context.Context, _ string) ([]*net.MX, error) {
+	return nil, nil
+}
+func (m *mockDNSResolver) LookupAddr(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+func (m *mockDNSResolver) LookupHost(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
+func newMockAnalyzer(txt map[string][]string, errMap map[string]error) *DNSAnalyzer {
+	if errMap == nil {
+		errMap = map[string]error{}
+	}
+	return NewDNSAnalyzerWithResolver(5*time.Second, &mockDNSResolver{txt: txt, err: errMap})
+}
+
+func TestCheckDMARCRecordFallback(t *testing.T) {
+	const orgRecord = "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+	const subRecord = "v=DMARC1; p=reject"
+	const psdRecord = "v=DMARC1; p=none; psd=y"
+
+	tests := []struct {
+		name         string
+		domain       string
+		txt          map[string][]string
+		errMap       map[string]error
+		wantValid    bool
+		wantDomain   *string
+		wantErrSubst string
+	}{
+		{
+			name:   "exact domain has DMARC record — no fallback",
+			domain: "mail.example.com",
+			txt: map[string][]string{
+				"_dmarc.mail.example.com": {subRecord},
+				"_dmarc.example.com":      {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("mail.example.com"),
+		},
+		{
+			name:   "exact domain NXDOMAIN — falls back to org domain",
+			domain: "mail.example.com",
+			txt: map[string][]string{
+				"_dmarc.example.com": {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("example.com"),
+		},
+		{
+			name:   "exact domain has no v=DMARC1 TXT — falls back to org domain",
+			domain: "mail.example.com",
+			txt: map[string][]string{
+				"_dmarc.mail.example.com": {"some-other-txt"},
+				"_dmarc.example.com":      {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("example.com"),
+		},
+		{
+			name:   "both exact and org NXDOMAIN but PSD has psd=y — RFC 9091 fallback",
+			domain: "mail.example.com",
+			txt: map[string][]string{
+				"_dmarc.com": {psdRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("com"),
+		},
+		{
+			name:   "PSD record exists but no psd=y — no record returned",
+			domain: "mail.example.com",
+			txt: map[string][]string{
+				"_dmarc.com": {"v=DMARC1; p=none"},
+			},
+			wantValid:    false,
+			wantErrSubst: "No DMARC record found",
+		},
+		{
+			name:   "no record at any level",
+			domain: "mail.example.com",
+			txt:    map[string][]string{},
+			wantValid:    false,
+			wantErrSubst: "No DMARC record found",
+		},
+		{
+			name:   "DNS error on exact domain — no fallback, error returned",
+			domain: "mail.example.com",
+			errMap: map[string]error{
+				"_dmarc.mail.example.com": fmt.Errorf("SERVFAIL"),
+			},
+			wantValid:    false,
+			wantErrSubst: "SERVFAIL",
+		},
+		{
+			name:   "domain already at org level — no redundant fallback",
+			domain: "example.com",
+			txt: map[string][]string{
+				"_dmarc.example.com": {orgRecord},
+			},
+			wantValid:  true,
+			wantDomain: utils.PtrTo("example.com"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := newMockAnalyzer(tt.txt, tt.errMap)
+			result := analyzer.checkDMARCRecord(tt.domain)
+
+			if result.Valid != tt.wantValid {
+				t.Errorf("Valid = %v, want %v", result.Valid, tt.wantValid)
+			}
+			if tt.wantDomain != nil {
+				if result.Domain == nil {
+					t.Fatalf("Domain = nil, want %q", *tt.wantDomain)
+				}
+				if *result.Domain != *tt.wantDomain {
+					t.Errorf("Domain = %q, want %q", *result.Domain, *tt.wantDomain)
+				}
+			}
+			if tt.wantErrSubst != "" {
+				if result.Error == nil {
+					t.Fatalf("Error = nil, want substring %q", tt.wantErrSubst)
+				}
+				if !contains(*result.Error, tt.wantErrSubst) {
+					t.Errorf("Error = %q, want substring %q", *result.Error, tt.wantErrSubst)
+				}
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
+}
+
+func containsStr(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
 
 func TestExtractDMARCPolicy(t *testing.T) {
 	tests := []struct {

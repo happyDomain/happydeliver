@@ -24,62 +24,50 @@ package analyzer
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
-// checkmodel.DMARCRecord looks up and validates DMARC record for a domain
-func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
-	// DMARC records are at: _dmarc.domain
-	dmarcDomain := fmt.Sprintf("_dmarc.%s", domain)
-
+// lookupDMARCAt queries _dmarc.<domain> and returns the raw DMARC1 TXT record.
+// notFound=true means no record exists (NXDOMAIN or empty); false means a real DNS error occurred.
+func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
-	txtRecords, err := d.resolver.LookupTXT(ctx, dmarcDomain)
-	if err != nil {
-		return &model.DMARCRecord{
-			Valid: false,
-			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+	txtRecords, lookupErr := d.resolver.LookupTXT(ctx, fmt.Sprintf("_dmarc.%s", domain))
+	if lookupErr != nil {
+		if dnsErr, ok := lookupErr.(*net.DNSError); ok && dnsErr.IsNotFound {
+			return "", true, nil
 		}
+		return "", false, lookupErr
 	}
 
-	// Find DMARC record (starts with "v=DMARC1")
-	var dmarcRecord string
 	for _, txt := range txtRecords {
 		if strings.HasPrefix(txt, "v=DMARC1") {
-			dmarcRecord = txt
-			break
+			return txt, false, nil
 		}
 	}
+	return "", true, nil
+}
 
-	if dmarcRecord == "" {
+// parseDMARCRecord parses a raw DMARC TXT record into a DMARCRecord model.
+func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMARCRecord {
+	policy := d.extractDMARCPolicy(rawRecord)
+	subdomainPolicy := d.extractDMARCSubdomainPolicy(rawRecord)
+	percentage := d.extractDMARCPercentage(rawRecord)
+	spfAlignment := d.extractDMARCSPFAlignment(rawRecord)
+	dkimAlignment := d.extractDMARCDKIMAlignment(rawRecord)
+
+	if !d.validateDMARC(rawRecord) {
 		return &model.DMARCRecord{
-			Valid: false,
-			Error: utils.PtrTo("No DMARC record found"),
-		}
-	}
-
-	// Extract policy
-	policy := d.extractDMARCPolicy(dmarcRecord)
-
-	// Extract subdomain policy
-	subdomainPolicy := d.extractDMARCSubdomainPolicy(dmarcRecord)
-
-	// Extract percentage
-	percentage := d.extractDMARCPercentage(dmarcRecord)
-
-	// Extract alignment modes
-	spfAlignment := d.extractDMARCSPFAlignment(dmarcRecord)
-	dkimAlignment := d.extractDMARCDKIMAlignment(dmarcRecord)
-
-	// Basic validation
-	if !d.validateDMARC(dmarcRecord) {
-		return &model.DMARCRecord{
-			Record:          &dmarcRecord,
+			Domain:          &foundDomain,
+			Record:          &rawRecord,
 			Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
 			SubdomainPolicy: subdomainPolicy,
 			Percentage:      percentage,
@@ -91,13 +79,63 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	}
 
 	return &model.DMARCRecord{
-		Record:          &dmarcRecord,
+		Domain:          &foundDomain,
+		Record:          &rawRecord,
 		Policy:          utils.PtrTo(model.DMARCRecordPolicy(policy)),
 		SubdomainPolicy: subdomainPolicy,
 		Percentage:      percentage,
 		SpfAlignment:    spfAlignment,
 		DkimAlignment:   dkimAlignment,
 		Valid:           true,
+	}
+}
+
+// checkDMARCRecord looks up and validates the DMARC record for a domain.
+// It follows RFC 7489 §6.6.3 fallback to the Organizational Domain and
+// RFC 9091 optional fallback to the Public Suffix Domain (only when psd=y).
+func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
+	// Step 1: try exact domain (_dmarc.<domain>)
+	raw, notFound, err := d.lookupDMARCAt(domain)
+	if err != nil {
+		return &model.DMARCRecord{
+			Valid:  false,
+			Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+		}
+	}
+	if !notFound {
+		return d.parseDMARCRecord(domain, raw)
+	}
+
+	// Step 2: RFC 7489 — fall back to Organizational Domain (eTLD+1)
+	orgDomain := getOrganizationalDomain(domain)
+	if orgDomain != domain {
+		raw, notFound, err = d.lookupDMARCAt(orgDomain)
+		if err != nil {
+			return &model.DMARCRecord{
+				Valid:  false,
+				Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+			}
+		}
+		if !notFound {
+			return d.parseDMARCRecord(orgDomain, raw)
+		}
+	}
+
+	// Step 3: RFC 9091 — fall back to Public Suffix Domain when psd=y
+	psd, _ := publicsuffix.PublicSuffix(domain)
+	if psd != "" && psd != orgDomain {
+		raw, notFound, err = d.lookupDMARCAt(psd)
+		if err == nil && !notFound {
+			// Only apply PSD DMARC when the record explicitly opts in with psd=y
+			if strings.Contains(raw, "psd=y") {
+				return d.parseDMARCRecord(psd, raw)
+			}
+		}
+	}
+
+	return &model.DMARCRecord{
+		Valid:  false,
+		Error:  utils.PtrTo("No DMARC record found"),
 	}
 }
 
