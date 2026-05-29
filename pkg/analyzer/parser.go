@@ -22,13 +22,18 @@
 package analyzer
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net/mail"
 	"net/textproto"
 	"strings"
+
+	"golang.org/x/text/encoding/htmlindex"
 )
 
 // EmailMessage represents a parsed email message
@@ -99,16 +104,18 @@ func ParseEmail(r io.Reader) (*EmailMessage, error) {
 			return nil, fmt.Errorf("failed to read email body: %w", err)
 		}
 		email.RawBody = string(body)
+		encoding := msg.Header.Get("Content-Transfer-Encoding")
 		email.Parts = []MessagePart{
 			{
 				ContentType: "text/plain",
-				Content:     string(body),
+				Encoding:    encoding,
+				Content:     decodeBody(body, encoding, ""),
 				IsText:      true,
 			},
 		}
 	} else {
 		// Parse MIME message
-		parts, err := parseMIMEParts(msg.Body, contentType)
+		parts, err := parseMIMEParts(msg.Body, contentType, msg.Header.Get("Content-Transfer-Encoding"))
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse MIME parts: %w", err)
 		}
@@ -118,8 +125,11 @@ func ParseEmail(r io.Reader) (*EmailMessage, error) {
 	return email, nil
 }
 
-// parseMIMEParts recursively parses MIME parts
-func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
+// parseMIMEParts recursively parses MIME parts. encoding is the
+// Content-Transfer-Encoding from the enclosing header, used only for
+// single-part (non-multipart) bodies whose encoding lives in the message
+// header rather than a part header.
+func parseMIMEParts(body io.Reader, contentType, encoding string) ([]MessagePart, error) {
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse media type: %w", err)
@@ -150,53 +160,113 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 			}
 
 			// Check if this part is also multipart
-			partMediaType, _, _ := mime.ParseMediaType(partContentType)
+			partMediaType, partParams, _ := mime.ParseMediaType(partContentType)
+			partEncoding := part.Header.Get("Content-Transfer-Encoding")
 			if strings.HasPrefix(partMediaType, "multipart/") {
 				// Recursively parse nested multipart
-				nestedParts, err := parseMIMEParts(part, partContentType)
+				nestedParts, err := parseMIMEParts(part, partContentType, partEncoding)
 				if err != nil {
 					return nil, err
 				}
 				parts = append(parts, MessagePart{
 					ContentType: partContentType,
-					Encoding:    part.Header.Get("Content-Transfer-Encoding"),
+					Encoding:    partEncoding,
 					Parts:       nestedParts,
 				})
 			} else {
-				// Read the part content
-				content, err := io.ReadAll(part)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read part content: %w", err)
-				}
-
 				messagePart := MessagePart{
 					ContentType: partContentType,
-					Encoding:    part.Header.Get("Content-Transfer-Encoding"),
-					Content:     string(content),
+					Encoding:    partEncoding,
 					IsHTML:      strings.Contains(strings.ToLower(partMediaType), "html"),
 					IsText:      strings.Contains(strings.ToLower(partMediaType), "text"),
 				}
+
+				// Only text parts are ever read back, by GetTextParts and
+				// GetHTMLParts: decoding an attachment would allocate and
+				// then throw away its whole payload. NextPart() skips over
+				// whatever we leave unconsumed.
+				if messagePart.IsText || messagePart.IsHTML {
+					content, err := io.ReadAll(part)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read part content: %w", err)
+					}
+					messagePart.Content = decodeBody(content, partEncoding, partParams["charset"])
+				}
+
 				parts = append(parts, messagePart)
 			}
 		}
 	} else {
 		// Single part message
-		content, err := io.ReadAll(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read body content: %w", err)
+		part := MessagePart{
+			ContentType: contentType,
+			Encoding:    encoding,
+			IsHTML:      strings.Contains(strings.ToLower(mediaType), "html"),
+			IsText:      strings.Contains(strings.ToLower(mediaType), "text"),
 		}
 
-		parts = []MessagePart{
-			{
-				ContentType: contentType,
-				Content:     string(content),
-				IsHTML:      strings.Contains(strings.ToLower(mediaType), "html"),
-				IsText:      strings.Contains(strings.ToLower(mediaType), "text"),
-			},
+		// Same reasoning as above: a non-text body is never consulted, so
+		// reading and decoding it would be wasted work.
+		if part.IsText || part.IsHTML {
+			content, err := io.ReadAll(body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read body content: %w", err)
+			}
+			part.Content = decodeBody(content, encoding, params["charset"])
 		}
+
+		parts = []MessagePart{part}
 	}
 
 	return parts, nil
+}
+
+// decodeBody applies the Content-Transfer-Encoding then converts the charset to
+// UTF-8. It is best-effort: on a decode error it keeps whatever prefix was
+// successfully decoded before the error, so a malformed part never breaks the
+// whole report.
+func decodeBody(content []byte, encoding, charset string) string {
+	switch strings.ToLower(strings.TrimSpace(encoding)) {
+	case "quoted-printable":
+		// ReadAll returns the bytes decoded so far alongside any error, so
+		// a malformed byte partway through the part must not discard the
+		// valid prefix that decoded fine.
+		if decoded, err := io.ReadAll(quotedprintable.NewReader(bytes.NewReader(content))); err == nil || len(decoded) > 0 {
+			content = decoded
+		}
+	case "base64":
+		// Decode already ignores the \r\n line breaks MIME inserts, but not
+		// the spaces/tabs a few encoders use to indent continuation lines:
+		// pay for a copy only when one is actually present.
+		cleaned := content
+		if bytes.ContainsAny(cleaned, " \t") {
+			cleaned = bytes.Map(func(r rune) rune {
+				if r == ' ' || r == '\t' {
+					return -1
+				}
+				return r
+			}, cleaned)
+		}
+		// AppendDecode returns the bytes decoded so far alongside any error,
+		// so a malformed byte partway through the part must not discard the
+		// valid prefix that decoded fine.
+		if decoded, err := base64.StdEncoding.AppendDecode(nil, cleaned); err == nil || len(decoded) > 0 {
+			content = decoded
+		}
+	}
+
+	switch strings.ToLower(strings.TrimSpace(charset)) {
+	case "", "utf-8", "utf8", "us-ascii", "ascii":
+		// already UTF-8 compatible
+	default:
+		if enc, err := htmlindex.Get(charset); err == nil {
+			if decoded, err := enc.NewDecoder().Bytes(content); err == nil {
+				content = decoded
+			}
+		}
+	}
+
+	return string(content)
 }
 
 // buildRawHeaders reconstructs the raw header string
