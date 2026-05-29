@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -172,5 +173,91 @@ Body content.
 
 	if email.HasHeader("List-Unsubscribe") {
 		t.Error("Expected List-Unsubscribe header to not exist")
+	}
+}
+
+func TestParseEmail_QuotedPrintableBody(t *testing.T) {
+	// A quoted-printable HTML part: =3D is `=`, =22 is `"`, and the trailing
+	// `=` is a soft line break that splits the long URL.
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: QP Test\r\n" +
+		"Content-Type: text/html; charset=\"utf-8\"\r\n" +
+		"Content-Transfer-Encoding: quoted-printable\r\n" +
+		"\r\n" +
+		"<a href=3D=22https://example.com/subscription/4bdad7fe-ef=\r\n" +
+		"36-4abc=22>Unsub</a>\r\n"
+
+	email, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+
+	content := email.Parts[0].Content
+	want := `<a href="https://example.com/subscription/4bdad7fe-ef36-4abc">Unsub</a>`
+	if !strings.Contains(content, want) {
+		t.Errorf("Expected decoded content to contain %q, got: %q", want, content)
+	}
+	if strings.Contains(content, "3D") || strings.Contains(content, "=\r\n") {
+		t.Errorf("Quoted-printable artifacts leaked into content: %q", content)
+	}
+}
+
+func TestParseEmail_Base64Body(t *testing.T) {
+	htmlSnippet := `<p>Hello <a href="https://example.com/x">link</a></p>`
+	encoded := base64.StdEncoding.EncodeToString([]byte(htmlSnippet))
+
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: B64 Test\r\n" +
+		"Content-Type: text/html; charset=\"utf-8\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"\r\n" + encoded + "\r\n"
+
+	email, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+	if got := email.Parts[0].Content; got != htmlSnippet {
+		t.Errorf("Expected base64 round-trip %q, got: %q", htmlSnippet, got)
+	}
+}
+
+func TestParseEmail_CharsetISO88591(t *testing.T) {
+	// 0xE9 is 'é' in ISO-8859-1; it must become the UTF-8 form.
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: Charset Test\r\n" +
+		"Content-Type: text/plain; charset=\"ISO-8859-1\"\r\n" +
+		"\r\n" +
+		"Caf\xe9 cr\xe8me\r\n"
+
+	email, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+	if got := email.Parts[0].Content; !strings.Contains(got, "Café crème") {
+		t.Errorf("Expected charset-decoded UTF-8 'Café crème', got: %q", got)
+	}
+}
+
+func TestDecodeBody_Passthrough(t *testing.T) {
+	body := []byte("plain <a href=3D\"x\"> stays literal only if not QP")
+	for _, enc := range []string{"7bit", "8bit", "binary", ""} {
+		if got := decodeBody(body, enc, ""); got != string(body) {
+			t.Errorf("encoding %q: expected passthrough, got: %q", enc, got)
+		}
 	}
 }
