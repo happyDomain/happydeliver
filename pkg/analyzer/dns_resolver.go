@@ -23,8 +23,21 @@ package analyzer
 
 import (
 	"context"
+	"errors"
 	"net"
 )
+
+// formatDNSError renders a resolution error without exposing the upstream
+// resolver address that net.DNSError.Error() normally appends as " on <addr>".
+func formatDNSError(err error) string {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		sanitized := *dnsErr
+		sanitized.Server = ""
+		return sanitized.Error()
+	}
+	return err.Error()
+}
 
 // DNSResolver defines the interface for DNS resolution operations.
 // This interface abstracts DNS lookups to allow for custom implementations,

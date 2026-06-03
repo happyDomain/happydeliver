@@ -122,7 +122,7 @@ func (d *DNSAnalyzer) checkDKIMRecord(h DKIMHeader) *model.DKIMRecord {
 			Domain:           h.Domain,
 			SigningAlgorithm: signingAlgorithmPtr(h.Algorithm),
 			Valid:            false,
-			Error:            utils.PtrTo(fmt.Sprintf("Failed to lookup DKIM record: %v", err)),
+			Error:            utils.PtrTo(fmt.Sprintf("Failed to lookup DKIM record: %s", formatDNSError(err))),
 		}
 	}
 

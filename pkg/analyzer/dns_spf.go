@@ -67,7 +67,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 			{
 				Domain: &domain,
 				Valid:  false,
-				Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %v", err)),
+				Error:  utils.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %s", formatDNSError(err))),
 			},
 		}
 	}

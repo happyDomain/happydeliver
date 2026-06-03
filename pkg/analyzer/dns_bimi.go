@@ -45,7 +45,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    utils.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %v", err)),
+			Error:    utils.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %s", formatDNSError(err))),
 		}
 	}
 

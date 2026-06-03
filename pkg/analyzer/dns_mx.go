@@ -39,7 +39,7 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) *[]model.MXRecord {
 		return &[]model.MXRecord{
 			{
 				Valid: false,
-				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup MX records: %v", err)),
+				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup MX records: %s", formatDNSError(err))),
 			},
 		}
 	}

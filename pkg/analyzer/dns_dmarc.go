@@ -193,7 +193,7 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	if err != nil {
 		return &model.DMARCRecord{
 			Valid: false,
-			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %v", err)),
+			Error: utils.PtrTo(fmt.Sprintf("Failed to lookup DMARC record: %s", formatDNSError(err))),
 		}
 	}
 	if foundDomain == "" {
