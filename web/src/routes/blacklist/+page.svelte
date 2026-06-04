@@ -161,6 +161,10 @@
                     <i class="bi bi-envelope-plus me-1"></i>
                     Send Test Email
                 </a>
+                <a href="/domain" class="btn btn-sm btn-outline-primary ms-1">
+                    <i class="bi bi-shield-shaded me-1"></i>
+                    Check a Domain
+                </a>
             </div>
         </div>
     </div>

@@ -1217,6 +1217,9 @@ components:
           example: "A"
         dns_results:
           $ref: '#/components/schemas/DNSResults'
+        blacklist:
+          $ref: '#/components/schemas/DomainBlacklistResult'
+          description: Domain reputation/blacklist aggregation (omitted when the check could not be run)
 
     BlacklistCheckRequest:
       type: object
@@ -1267,6 +1270,103 @@ components:
           items:
             $ref: '#/components/schemas/BlacklistCheck'
           description: List of DNS whitelist check results (informational only)
+
+    DomainBlacklistResult:
+      type: object
+      required:
+        - registered_domain
+        - collected_at
+        - results
+      properties:
+        registered_domain:
+          type: string
+          description: eTLD+1 of the input domain
+          example: "example.com"
+        collected_at:
+          type: string
+          format: date-time
+          description: When the aggregation finished
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Reputation score (0-100, higher is better). Omitted when the verdict is inconclusive (no usable source).
+          example: 100
+        grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade derived from the score. Omitted when the verdict is inconclusive.
+          example: "A+"
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DomainBlacklistSourceResult'
+          description: One entry per registered source (disabled sources included with enabled=false)
+
+    DomainBlacklistSourceResult:
+      type: object
+      required:
+        - source_id
+        - source_name
+        - enabled
+        - listed
+      properties:
+        source_id:
+          type: string
+          example: "quad9"
+        source_name:
+          type: string
+          example: "Quad9"
+        subject:
+          type: string
+          description: Per-zone identifier (DNSBL zones only)
+        enabled:
+          type: boolean
+          description: False when the source is disabled or missing credentials
+        listed:
+          type: boolean
+          description: Verdict from the source's Evaluate (false when disabled or errored)
+        blocked_query:
+          type: boolean
+          description: Resolver returned a block response (not a real listing)
+        severity:
+          type: string
+          description: Severity attached to the verdict (crit, warn, info, ok, or empty)
+        reasons:
+          type: array
+          items: { type: string }
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/DomainBlacklistEvidence'
+        lookup_url:
+          type: string
+        removal_url:
+          type: string
+        reference:
+          type: string
+        error:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+          description: Source-specific structured data (free-form)
+
+    DomainBlacklistEvidence:
+      type: object
+      required:
+        - label
+        - value
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        status:
+          type: string
+        extra:
+          type: object
+          additionalProperties: { type: string }
 
     TestSummary:
       type: object

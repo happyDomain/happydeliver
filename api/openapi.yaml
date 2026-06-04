@@ -363,6 +363,12 @@ components:
       $ref: './schemas.yaml#/components/schemas/BlacklistCheckRequest'
     BlacklistCheckResponse:
       $ref: './schemas.yaml#/components/schemas/BlacklistCheckResponse'
+    DomainBlacklistResult:
+      $ref: './schemas.yaml#/components/schemas/DomainBlacklistResult'
+    DomainBlacklistSourceResult:
+      $ref: './schemas.yaml#/components/schemas/DomainBlacklistSourceResult'
+    DomainBlacklistEvidence:
+      $ref: './schemas.yaml#/components/schemas/DomainBlacklistEvidence'
     TestSummary:
       $ref: './schemas.yaml#/components/schemas/TestSummary'
     TestListResponse:

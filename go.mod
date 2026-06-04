@@ -3,6 +3,8 @@ module git.happydns.org/happyDeliver
 go 1.25.0
 
 require (
+	git.happydns.org/checker-blacklist v0.4.0
+	git.happydns.org/checker-sdk-go v1.9.0
 	github.com/JGLTechnologies/gin-rate-limit v1.5.8
 	github.com/emersion/go-smtp v0.24.0
 	github.com/getkin/kin-openapi v0.140.0

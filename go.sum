@@ -1,3 +1,7 @@
+git.happydns.org/checker-blacklist v0.4.0 h1:mTOWz2tcMXGU2WFVM9VLxnSJ7mFXL2Lhq5NBq+lUU7g=
+git.happydns.org/checker-blacklist v0.4.0/go.mod h1:huOwQWfAA+Wo+WbUbtyRIS/Y0eA+C3YrguGuJL+3qEE=
+git.happydns.org/checker-sdk-go v1.9.0 h1:orBRymir+p6PMHVa4focryPKhTVWT7JAv6u9Ido5KF0=
+git.happydns.org/checker-sdk-go v1.9.0/go.mod h1:aNAcfYFfbhvH9kJhE0Njp5GX0dQbxdRB0rJ0KvSC5nI=
 github.com/JGLTechnologies/gin-rate-limit v1.5.8 h1:KiaHIEbpYxHpDvjhpjIif8fnVmjdw/afCMdGoN1AsB0=
 github.com/JGLTechnologies/gin-rate-limit v1.5.8/go.mod h1:t9eLOUxikPI0TzKy0VYRbZJr7hBP2Qg9E3JigoxF70g=
 github.com/RaveNoX/go-jsoncommentstrip v1.0.0/go.mod h1:78ihd09MekBnJnxpICcwzCMzGrKSKYe4AqU6PDYYpjk=

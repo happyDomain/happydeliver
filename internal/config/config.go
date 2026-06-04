@@ -75,6 +75,18 @@ type AnalysisConfig struct {
 	DNSWLs       []string
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
+	Blacklist    BlacklistConfig
+}
+
+// BlacklistConfig holds per-source credentials/options for the
+// domain-oriented checker-blacklist provider. Keys must match the
+// option IDs declared by each source in the checker-blacklist module
+// (see checker/virustotal.go, checker/safebrowsing.go, …). Free sources
+// (Quad9, OISD, URLhaus, OpenPhish, Disconnect, Botvrij, …) need no
+// configuration.
+type BlacklistConfig struct {
+	VirusTotalAPIKey   string
+	SafeBrowsingAPIKey string
 }
 
 // DefaultConfig returns a configuration with sensible defaults
