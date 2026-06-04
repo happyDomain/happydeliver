@@ -86,7 +86,19 @@ type AnalysisConfig struct {
 	// VMCRoots is the pool built from VMCRootsFile by Validate. It is not
 	// configurable directly: the file is read once at startup so a broken
 	// trust policy is reported there rather than on every analysis.
-	VMCRoots *x509.CertPool `json:"-"`
+	VMCRoots  *x509.CertPool `json:"-"`
+	Blacklist BlacklistConfig
+}
+
+// BlacklistConfig holds per-source credentials/options for the
+// domain-oriented checker-blacklist provider. Keys must match the
+// option IDs declared by each source in the checker-blacklist module
+// (see checker/virustotal.go, checker/safebrowsing.go, …). Free sources
+// (Quad9, OISD, URLhaus, OpenPhish, Disconnect, Botvrij, …) need no
+// configuration.
+type BlacklistConfig struct {
+	VirusTotalAPIKey   string
+	SafeBrowsingAPIKey string
 }
 
 // DefaultConfig returns a configuration with sensible defaults

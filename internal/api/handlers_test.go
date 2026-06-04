@@ -154,7 +154,7 @@ func newTestHandler(t *testing.T, cfg *config.Config) (*APIHandler, *fakeStorage
 	store := newFakeStorage()
 	analyzer := &fakeAnalyzer{}
 
-	return NewAPIHandler(store, cfg, analyzer), store, analyzer
+	return NewAPIHandler(store, cfg, analyzer, nil), store, analyzer
 }
 
 // uploadRequest builds a multipart request carrying body under the given field name.
