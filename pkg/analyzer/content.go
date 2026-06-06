@@ -501,6 +501,11 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 		return false
 	}
 
+	// Replace email addresses with just their domain part to avoid false positives
+	// e.g. "john.doe@example.com" → "example.com" so local-part dots don't look like domains
+	emailAddrRegex := regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@([a-z0-9.\-]+\.[a-z]{2,})`)
+	linkText = emailAddrRegex.ReplaceAllString(linkText, "$1")
+
 	// Common generic link texts that shouldn't trigger warnings
 	genericTexts := []string{
 		"click here", "read more", "learn more", "download", "subscribe",
