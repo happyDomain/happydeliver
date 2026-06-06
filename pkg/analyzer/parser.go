@@ -34,6 +34,8 @@ import (
 	"strings"
 
 	"golang.org/x/text/encoding/htmlindex"
+
+	"git.happydns.org/happyDeliver/pkg/uuencode"
 )
 
 // EmailMessage represents a parsed email message
@@ -253,6 +255,8 @@ func decodeBody(content []byte, encoding, charset string) string {
 		if decoded, err := base64.StdEncoding.AppendDecode(nil, cleaned); err == nil || len(decoded) > 0 {
 			content = decoded
 		}
+	case "uuencode", "x-uuencode", "uue":
+		content = uuencode.Decode(content)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(charset)) {
