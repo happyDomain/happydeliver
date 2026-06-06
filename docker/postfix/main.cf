@@ -7,7 +7,7 @@ myhostname = __HOSTNAME__
 mydomain = __DOMAIN__
 myorigin = $mydomain
 inet_interfaces = all
-inet_protocols = ipv4
+inet_protocols = all
 
 # Recipient settings
 mydestination = localhost.$mydomain, localhost
