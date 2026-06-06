@@ -72,6 +72,26 @@
                     {bimiRecord.error}
                 </div>
             {/if}
+            {#if !bimiRecord.valid}
+                <div class="alert alert-info mt-3 mb-0">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-lightbulb me-1"></i>
+                        Explicitly decline BIMI participation
+                    </h6>
+                    <p class="mb-2 small">
+                        If you do not intend to publish a brand logo, you can add a declination
+                        record to signal that this domain deliberately opts out of BIMI. This
+                        prevents mail clients from falling back to a parent-domain record:
+                    </p>
+                    <code class="d-block bg-white rounded p-2 text-break border"
+                        >{bimiRecord.selector}._bimi.{bimiRecord.domain}. IN TXT "v=BIMI1; l=; a="</code
+                    >
+                    <p class="mt-1 mb-0 small text-muted">
+                        Declination record format as defined in §&thinsp;4.3.1 of
+                        <em>draft-brand-indicators-for-message-identification</em>.
+                    </p>
+                </div>
+            {/if}
         </div>
     </div>
 {/if}
