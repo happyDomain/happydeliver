@@ -161,7 +161,7 @@ func (a *RspamdAnalyzer) CalculateRspamdScore(result *model.RspamdResult) (int, 
 	}
 
 	threshold := result.Threshold
-	percentage := 100 - int(math.Round(float64(result.Score*100/(2*threshold))))
+	percentage := 100 - int(math.Round(float64(result.Score*100/threshold)))
 
 	if percentage > 100 {
 		return 100, "A+"

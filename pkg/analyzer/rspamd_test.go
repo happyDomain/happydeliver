@@ -311,13 +311,14 @@ func TestCalculateRspamdScore(t *testing.T) {
 			expectedGrade: "A",
 		},
 		{
-			name: "Score at threshold (half of 2*threshold)",
+			name: "Score at threshold",
 			result: &model.RspamdResult{
 				Score:     15.00,
 				Threshold: 15.00,
 			},
-			// 100 - round(15*100/(2*15)) = 100 - 50 = 50
-			expectedScore: 50,
+			// 100 - round(15*100/15) = 100 - 100 = 0
+			expectedScore: 0,
+			expectedGrade: "F",
 		},
 		{
 			name: "Score above 2*threshold",
@@ -334,7 +335,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 				Score:     30.00,
 				Threshold: 15.00,
 			},
-			// 100 - round(30*100/30) = 100 - 100 = 0
+			// 100 - round(30*100/15) = 100 - 200 = -100 → clamped to 0
 			expectedScore: 0,
 			expectedGrade: "F",
 		},
