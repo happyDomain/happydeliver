@@ -589,7 +589,51 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []model.HeaderIss
 		})
 	}
 
+	// Check for fake reply/forward: Subject has Re:/Fwd: prefix but no thread headers
+	subject := email.GetHeaderValue("Subject")
+	if h.hasReplyPrefix(subject) && !email.HasHeader("References") && !email.HasHeader("In-Reply-To") {
+		issues = append(issues, model.HeaderIssue{
+			Header:   "Subject",
+			Severity: model.HeaderIssueSeverityHigh,
+			Message:  "Subject indicates a reply or forward but no References or In-Reply-To header is present",
+			Advice:   utils.PtrTo("Remove the Re:/Fwd: prefix from the subject, or add References/In-Reply-To headers if this is a genuine reply"),
+		})
+	}
+
 	return issues
+}
+
+// hasReplyPrefix reports whether a subject line starts with a reply or forward prefix.
+func (h *HeaderAnalyzer) hasReplyPrefix(subject string) bool {
+	// Normalize: collapse leading whitespace and make comparison case-insensitive
+	s := strings.ToLower(strings.TrimSpace(subject))
+
+	prefixes := []string{
+		"re:",           // English / universal
+		"fwd:",          // English forward
+		"fw:",           // English forward (short)
+		"aw:",           // German Antwort
+		"wg:",           // German Weitergeleitet
+		"sv:",           // Scandinavian Svar
+		"vs:",           // Finnish Vastaus / Norwegian
+		"ref:",          // Some clients
+		"rép:",          // French Réponse
+		"tr:",           // French Transfert
+		"odp:",          // Polish Odpowiedź
+		"ynt:",          // Turkish Yanıt
+		"res:",          // Portuguese/Spanish Resposta/Respuesta
+		"enc:",          // Spanish Enviado/Reenviado
+		"vl:",           // Dutch Verwijzing
+		"antw:",         // Dutch Antwoord
+		"rv:",           // Norwegian/Swedish
+	}
+
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseReceivedChain extracts the chain of Received headers from an email

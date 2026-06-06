@@ -974,6 +974,146 @@ func TestCheckHeader_DateValidation(t *testing.T) {
 	}
 }
 
+func TestHasReplyPrefix(t *testing.T) {
+	tests := []struct {
+		subject  string
+		expected bool
+	}{
+		// Positive cases
+		{"Re: Hello", true},
+		{"RE: Hello", true},
+		{"re: Hello", true},
+		{"Fwd: Hello", true},
+		{"FWD: Hello", true},
+		{"fw: Hello", true},
+		{"FW: Hello", true},
+		{"Aw: Hallo", true},
+		{"WG: Weitergeleitet", true},
+		{"Sv: Hej", true},
+		{"Vs: Vastaus", true},
+		{"Ref: something", true},
+		{"Rép: Bonjour", true},
+		{"TR: Transféré", true},
+		{"Odp: Odpowiedź", true},
+		{"Ynt: Yanıt", true},
+		{"Res: Resposta", true},
+		{"Enc: Reenviado", true},
+		{"Vl: Verwijzing", true},
+		{"Antw: Antwoord", true},
+		{"Rv: Svar", true},
+		// Negative cases
+		{"Hello", false},
+		{"", false},
+		{"react: something", false},
+		{"reference: check this", false},
+		{"Resources available", false},
+		{"Friendly reminder", false},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.subject, func(t *testing.T) {
+			result := analyzer.hasReplyPrefix(tt.subject)
+			if result != tt.expected {
+				t.Errorf("hasReplyPrefix(%q) = %v, want %v", tt.subject, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFindHeaderIssues_FakeReply(t *testing.T) {
+	tests := []struct {
+		name            string
+		headers         map[string]string
+		expectIssueType string // non-empty means we expect an issue containing this substring
+	}{
+		{
+			name: "Re: subject without thread headers",
+			headers: map[string]string{
+				"From":       "sender@example.com",
+				"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
+				"Message-ID": "<abc@example.com>",
+				"Subject":    "Re: Your invoice",
+			},
+			expectIssueType: "References or In-Reply-To",
+		},
+		{
+			name: "Fwd: subject without thread headers",
+			headers: map[string]string{
+				"From":       "sender@example.com",
+				"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
+				"Message-ID": "<abc@example.com>",
+				"Subject":    "Fwd: Important update",
+			},
+			expectIssueType: "References or In-Reply-To",
+		},
+		{
+			name: "Re: subject with References header - no issue",
+			headers: map[string]string{
+				"From":       "sender@example.com",
+				"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
+				"Message-ID": "<abc@example.com>",
+				"Subject":    "Re: Your invoice",
+				"References": "<original@example.com>",
+			},
+			expectIssueType: "",
+		},
+		{
+			name: "Re: subject with In-Reply-To only - no issue",
+			headers: map[string]string{
+				"From":        "sender@example.com",
+				"Date":        "Mon, 01 Jan 2024 12:00:00 +0000",
+				"Message-ID":  "<abc@example.com>",
+				"Subject":     "Re: Your invoice",
+				"In-Reply-To": "<original@example.com>",
+			},
+			expectIssueType: "",
+		},
+		{
+			name: "Normal subject without thread headers - no issue",
+			headers: map[string]string{
+				"From":       "sender@example.com",
+				"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
+				"Message-ID": "<abc@example.com>",
+				"Subject":    "Your invoice",
+			},
+			expectIssueType: "",
+		},
+	}
+
+	analyzer := NewHeaderAnalyzer()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := &EmailMessage{
+				Header: createHeaderWithFields(tt.headers),
+			}
+
+			issues := analyzer.findHeaderIssues(email)
+
+			found := false
+			for _, issue := range issues {
+				if strings.Contains(issue.Message, tt.expectIssueType) {
+					found = true
+					break
+				}
+			}
+
+			if tt.expectIssueType != "" && !found {
+				t.Errorf("expected issue containing %q, but none found (issues: %v)", tt.expectIssueType, issues)
+			}
+			if tt.expectIssueType == "" {
+				for _, issue := range issues {
+					if strings.Contains(issue.Message, "References or In-Reply-To") {
+						t.Errorf("unexpected fake-reply issue found: %s", issue.Message)
+					}
+				}
+			}
+		})
+	}
+}
+
 // Helper functions for testing
 func strPtr(s string) *string {
 	return &s
