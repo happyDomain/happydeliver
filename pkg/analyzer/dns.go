@@ -110,6 +110,15 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 		results.RpMxRecords = d.checkMXRecords(*results.RpDomain)
 	}
 
+	// Verify the sender domains can actually receive replies/bounces (MX, with
+	// A/AAAA fallback), mirroring the ReturnOK milter check.
+	results.ReturnOk = &model.ReturnOK{
+		From: d.checkReturnOKDomain(fromDomain, orgDomainOrEmpty(headersResults.DomainAlignment.FromOrgDomain)),
+	}
+	if results.RpDomain != nil && *results.RpDomain != "" {
+		results.ReturnOk.ReturnPath = d.checkReturnOKDomain(*results.RpDomain, orgDomainOrEmpty(headersResults.DomainAlignment.ReturnPathOrgDomain))
+	}
+
 	// Check SPF records (for Return-Path domain - this is the envelope sender)
 	// SPF validates the MAIL FROM command, which corresponds to Return-Path
 	results.SpfRecords = d.checkSPFRecords(spfDomain)
@@ -148,6 +157,11 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
 	// Check SPF records
 	results.SpfRecords = d.checkSPFRecords(domain)
 
+	// Verify the domain can receive replies/bounces (MX, with A/AAAA fallback)
+	results.ReturnOk = &model.ReturnOK{
+		From: d.checkReturnOKDomain(domain, ""),
+	}
+
 	// Check DMARC record
 	results.DmarcRecord = d.checkDMARCRecord(domain)
 
@@ -178,6 +192,9 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 
 	// DMARC Record: 40 points
 	score += 40 * d.calculateDMARCScore(results) / 100
+
+	// Penalty when a sender domain cannot receive replies/bounces at all
+	score += calculateReturnOKPenalty(results)
 
 	// BIMI Record: only bonus
 	if results.BimiRecord != nil && results.BimiRecord.Valid {
@@ -223,6 +240,9 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 
 	// DMARC Record: 20 points
 	score += 20 * d.calculateDMARCScore(results) / 100
+
+	// Penalty when a sender domain cannot receive replies/bounces at all
+	score += calculateReturnOKPenalty(results)
 
 	// BIMI Record
 	// BIMI is optional but indicates advanced email branding

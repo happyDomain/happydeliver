@@ -829,11 +829,48 @@ components:
         helo_ptr_match:
           type: boolean
           description: Whether the announced HELO hostname matches one of the sender's PTR records (case-insensitive)
+        return_ok:
+          $ref: '#/components/schemas/ReturnOK'
         errors:
           type: array
           items:
             type: string
           description: DNS lookup errors
+
+    ReturnOK:
+      type: object
+      description: Whether the sender domains can receive replies and bounces (MX, with A/AAAA fallback)
+      properties:
+        from:
+          $ref: '#/components/schemas/ReturnOKDomain'
+        return_path:
+          $ref: '#/components/schemas/ReturnOKDomain'
+
+    ReturnOKDomain:
+      type: object
+      required:
+        - domain
+        - status
+      properties:
+        domain:
+          type: string
+          description: Domain that was evaluated
+          example: "example.com"
+        status:
+          type: string
+          enum: [pass, warn, fail]
+          x-go-type: string
+          description: pass = MX present, warn = only A/AAAA records (implicit MX), fail = no records
+        has_mx:
+          type: boolean
+          description: Whether the domain has at least one MX record
+        has_address:
+          type: boolean
+          description: Whether the domain has an A or AAAA record (implicit MX fallback)
+        org_domain:
+          type: string
+          description: Organizational domain used as fallback when the domain itself had no records
+          example: "example.com"
 
     MXRecord:
       type: object

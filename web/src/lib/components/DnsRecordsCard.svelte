@@ -10,6 +10,7 @@
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
+    import ReturnOkDisplay from "./ReturnOkDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
 
     interface Props {
@@ -100,6 +101,9 @@
                     heloPtrMatch={dnsResults.helo_ptr_match}
                 />
 
+                <!-- Return Address Reachability (ReturnOK) -->
+                <ReturnOkDisplay returnOk={dnsResults.return_ok} />
+
                 <hr class="my-4" />
 
                 <!-- Return-Path Domain Section -->
@@ -150,8 +154,7 @@
                     </h4>
                     {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                         <span class="badge bg-danger ms-2">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path
-                            domain
+                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain
                         </span>
                     {/if}
                 </div>
