@@ -3,6 +3,9 @@
 # SMTP service
 smtp      inet  n       -       n       -       -       smtpd
 
+# TLS session cache and PRNG manager (required for STARTTLS)
+tlsmgr    unix  -       -       n       1000?   1       tlsmgr
+
 # Pickup service
 pickup    unix  n       -       n       60      1       pickup
 
