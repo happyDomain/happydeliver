@@ -36,5 +36,8 @@ smtpd_recipient_restrictions =
     permit_mynetworks,
     reject_unauth_destination
 
+# TLS - record the negotiated cipher/protocol in the Received: header
+smtpd_tls_received_header = yes
+
 # Logging
 debug_peer_level = 2

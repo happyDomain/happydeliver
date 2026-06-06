@@ -677,6 +677,77 @@ func TestParseReceivedHeader(t *testing.T) {
 	}
 }
 
+func TestParseReceivedTLS(t *testing.T) {
+	tests := []struct {
+		name           string
+		receivedValue  string
+		expectNil      bool
+		expectVersion  *string
+		expectCipher   *string
+		expectBits     *int
+		expectVerified *bool
+	}{
+		{
+			name: "TLS 1.3 no client certificate",
+			receivedValue: "from mail.example.com (unknown [IPv6:2001:db8::1]) " +
+				"(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits) " +
+				"key-exchange x25519 server-signature ECDSA (prime256v1) server-digest SHA256) " +
+				"(No client certificate requested) " +
+				"by mx.example.org (Postfix) with ESMTPSA id 1EFD11611EA; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)",
+			expectVersion:  strPtr("TLSv1.3"),
+			expectCipher:   strPtr("TLS_AES_256_GCM_SHA384"),
+			expectBits:     intPtr(256),
+			expectVerified: nil,
+		},
+		{
+			name: "TLS with verified client certificate",
+			receivedValue: "from mail.example.com (mail.example.com [192.0.2.1]) " +
+				"(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits)) " +
+				"(Client CN \"example\", Issuer \"CA\" (verified OK)) " +
+				"by mx.receiver.com (Postfix) with ESMTPS id ABC; Mon, 01 Jan 2024 12:00:00 +0000",
+			expectVersion:  strPtr("TLSv1.2"),
+			expectCipher:   strPtr("ECDHE-RSA-AES128-GCM-SHA256"),
+			expectBits:     intPtr(128),
+			expectVerified: boolPtr(true),
+		},
+		{
+			name:          "Plaintext (no TLS)",
+			receivedValue: "from mail.example.com (mail.example.com [192.0.2.1]) by mx.receiver.com (Postfix) with ESMTP id ABC; Mon, 01 Jan 2024 12:00:00 +0000",
+			expectNil:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalized := strings.Join(strings.Fields(tt.receivedValue), " ")
+			tls := parseReceivedTLS(normalized)
+
+			if tt.expectNil {
+				if tls != nil {
+					t.Fatalf("expected nil TLS info, got %+v", tls)
+				}
+				return
+			}
+
+			if tls == nil {
+				t.Fatal("parseReceivedTLS returned nil")
+			}
+			if !equalStrPtr(tls.Version, tt.expectVersion) {
+				t.Errorf("Version = %v, want %v", ptrToStr(tls.Version), ptrToStr(tt.expectVersion))
+			}
+			if !equalStrPtr(tls.Cipher, tt.expectCipher) {
+				t.Errorf("Cipher = %v, want %v", ptrToStr(tls.Cipher), ptrToStr(tt.expectCipher))
+			}
+			if (tls.Bits == nil) != (tt.expectBits == nil) || (tls.Bits != nil && *tls.Bits != *tt.expectBits) {
+				t.Errorf("Bits = %v, want %v", tls.Bits, tt.expectBits)
+			}
+			if (tls.Verified == nil) != (tt.expectVerified == nil) || (tls.Verified != nil && *tls.Verified != *tt.expectVerified) {
+				t.Errorf("Verified = %v, want %v", tls.Verified, tt.expectVerified)
+			}
+		})
+	}
+}
+
 func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 	analyzer := NewHeaderAnalyzer()
 
@@ -906,6 +977,10 @@ func TestCheckHeader_DateValidation(t *testing.T) {
 // Helper functions for testing
 func strPtr(s string) *string {
 	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func ptrToStr(p *string) string {

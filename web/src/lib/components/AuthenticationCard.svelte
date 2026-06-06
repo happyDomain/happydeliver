@@ -218,6 +218,40 @@
             </div>
         {/if}
 
+        <!-- X-TLS (Transport encryption) -->
+        {#if authentication.x_tls}
+            <div class="list-group-item" id="authentication-x-tls">
+                <div class="d-flex align-items-start">
+                    <i
+                        class="bi {getAuthResultIcon(
+                            authentication.x_tls.result,
+                            true,
+                        )} {getAuthResultClass(authentication.x_tls.result, true)} me-2 fs-5"
+                    ></i>
+                    <div>
+                        <strong>Transport TLS</strong>
+                        <i
+                            class="bi bi-info-circle text-muted ms-1"
+                            title="Whether the inbound connection that delivered this message used TLS encryption (x-tls). Falls back to the inbound Received hop when no x-tls header is present."
+                        ></i>
+                        <span
+                            class="text-uppercase ms-2 {getAuthResultClass(
+                                authentication.x_tls.result,
+                                true,
+                            )}"
+                        >
+                            {authentication.x_tls.result}
+                        </span>
+                        {#if authentication.x_tls.details}
+                            <div class="small text-muted mt-1">
+                                {authentication.x_tls.details}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+        {/if}
+
         <!-- SPF (Required) -->
         <div class="list-group-item">
             <div class="d-flex align-items-start" id="authentication-spf">

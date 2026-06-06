@@ -434,6 +434,29 @@ components:
           type: string
           description: Reverse DNS (PTR record) for the IP address
           example: "mail.example.com"
+        tls:
+          $ref: '#/components/schemas/TLSInfo'
+          description: TLS details of the connection for this hop, if encrypted
+
+    TLSInfo:
+      type: object
+      properties:
+        version:
+          type: string
+          description: TLS protocol version
+          example: "TLSv1.3"
+        cipher:
+          type: string
+          description: Cipher suite used
+          example: "TLS_AES_256_GCM_SHA384"
+        bits:
+          type: integer
+          description: Cipher strength in bits
+          example: 256
+        verified:
+          type: boolean
+          description: Whether the peer certificate was verified/trusted
+          example: true
 
     DKIMDomainInfo:
       type: object
@@ -540,6 +563,11 @@ components:
         x_ptr:
           $ref: '#/components/schemas/XPtrResult'
           description: X-Ptr result (HELO hostname vs reverse DNS consistency check)
+        x_tls:
+          $ref: '#/components/schemas/AuthResult'
+          description: >-
+            Transport TLS encryption of the inbound connection (x-tls).
+            Synthesized from the inbound Received hop when no x-tls header is present.
 
     AuthResult:
       type: object

@@ -147,6 +147,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.XPtr = a.parseXPtrResult(part)
 			}
 		}
+
+		// Parse x-tls
+		if strings.HasPrefix(part, "x-tls=") {
+			if results.XTls == nil {
+				results.XTls = a.parseXTLSResult(part)
+			}
+		}
 	}
 }
 
@@ -182,6 +189,9 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 
 	// Penalty-only: X-Aligned-From (up to -5 points on failure)
 	score += 5 * a.calculateXAlignedFromScore(results) / 100
+
+	// Penalty-only: X-TLS / transport encryption (-10 points when not encrypted)
+	score += 10 * a.calculateXTLSScore(results) / 100
 
 	// Ensure score doesn't exceed 100
 	if score > 100 {

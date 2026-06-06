@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -693,5 +694,50 @@ func (h *HeaderAnalyzer) parseReceivedHeader(receivedValue string) *model.Receiv
 		}
 	}
 
+	// Extract TLS details from the Received header parentheticals
+	// (e.g. "(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits) ...)")
+	hop.Tls = parseReceivedTLS(normalized)
+
 	return hop
+}
+
+// parseReceivedTLS extracts TLS connection details from a normalized Received header value.
+// Returns nil when the hop was not encrypted (no TLS version/cipher found).
+func parseReceivedTLS(normalized string) *model.TLSInfo {
+	tls := &model.TLSInfo{}
+	found := false
+
+	// TLS protocol version, e.g. "using TLSv1.3"
+	if matches := regexp.MustCompile(`(?i)using\s+(TLSv[0-9.]+|SSLv[0-9.]+)`).FindStringSubmatch(normalized); len(matches) > 1 {
+		tls.Version = &matches[1]
+		found = true
+	}
+
+	// Cipher suite, e.g. "with cipher TLS_AES_256_GCM_SHA384"
+	if matches := regexp.MustCompile(`(?i)with cipher\s+([A-Za-z0-9_-]+)`).FindStringSubmatch(normalized); len(matches) > 1 {
+		tls.Cipher = &matches[1]
+		found = true
+	}
+
+	// Cipher strength, e.g. "(256/256 bits)"
+	if matches := regexp.MustCompile(`\((\d+)/\d+ bits\)`).FindStringSubmatch(normalized); len(matches) > 1 {
+		if bits, err := strconv.Atoi(matches[1]); err == nil {
+			tls.Bits = &bits
+		}
+	}
+
+	if !found {
+		return nil
+	}
+
+	// Certificate verification status. Postfix emits "(verified OK)" when the peer
+	// certificate was trusted, "(not verified)" otherwise. "No client certificate
+	// requested" leaves the field unset (trust is simply not applicable).
+	if regexp.MustCompile(`(?i)verified OK`).MatchString(normalized) {
+		tls.Verified = utils.PtrTo(true)
+	} else if regexp.MustCompile(`(?i)not verified`).MatchString(normalized) {
+		tls.Verified = utils.PtrTo(false)
+	}
+
+	return tls
 }

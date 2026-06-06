@@ -85,6 +85,10 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
+	// Fall back to the received chain's inbound TLS when no x-tls header was present.
+	if results.Authentication != nil && results.Headers != nil {
+		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
+	}
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
