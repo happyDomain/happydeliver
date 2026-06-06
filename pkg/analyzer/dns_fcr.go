@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"context"
+	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 )
@@ -62,6 +63,21 @@ func (d *DNSAnalyzer) checkPTRAndForward(ip string) ([]string, []string) {
 	return ptrNames, forwardIPs
 }
 
+// checkHeloPtrMatch reports whether the announced HELO hostname matches one of
+// the sender's PTR records (case-insensitive, trailing dot ignored).
+func checkHeloPtrMatch(helo string, ptrRecords []string) bool {
+	helo = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(helo)), ".")
+	if helo == "" {
+		return false
+	}
+	for _, ptr := range ptrRecords {
+		if strings.TrimSuffix(strings.ToLower(ptr), ".") == helo {
+			return true
+		}
+	}
+	return false
+}
+
 // Proper reverse DNS (PTR) and forward-confirmed reverse DNS (FCrDNS) is important for deliverability
 func (d *DNSAnalyzer) calculatePTRScore(results *model.DNSResults, senderIP string) (score int) {
 	if results.PtrRecords != nil && len(*results.PtrRecords) > 0 {
@@ -70,6 +86,11 @@ func (d *DNSAnalyzer) calculatePTRScore(results *model.DNSResults, senderIP stri
 
 		if len(*results.PtrRecords) > 1 {
 			// Penalty has it's bad to have multiple PTR records
+			score -= 15
+		}
+
+		// Penalty when the announced HELO name doesn't match the PTR hostname
+		if results.HeloPtrMatch != nil && !*results.HeloPtrMatch {
 			score -= 15
 		}
 

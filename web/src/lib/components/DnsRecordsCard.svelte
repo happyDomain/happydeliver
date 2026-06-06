@@ -6,6 +6,7 @@
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
@@ -90,6 +91,13 @@
                     ptrRecords={dnsResults.ptr_records}
                     ptrForwardRecords={dnsResults.ptr_forward_records}
                     {senderIp}
+                />
+
+                <!-- HELO / PTR Consistency -->
+                <HeloPtrMatchDisplay
+                    heloHostname={dnsResults.helo_hostname ?? receivedChain?.[0]?.from}
+                    ptrRecords={dnsResults.ptr_records}
+                    heloPtrMatch={dnsResults.helo_ptr_match}
                 />
 
                 <hr class="my-4" />

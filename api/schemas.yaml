@@ -537,6 +537,9 @@ components:
         x_aligned_from:
           $ref: '#/components/schemas/AuthResult'
           description: X-Aligned-From authentication result (checks address alignment)
+        x_ptr:
+          $ref: '#/components/schemas/XPtrResult'
+          description: X-Ptr result (HELO hostname vs reverse DNS consistency check)
 
     AuthResult:
       type: object
@@ -605,6 +608,29 @@ components:
           type: string
           description: Additional details about the IP reverse lookup
           example: "smtp.remote-ip=195.110.101.58 (authsmtp74.register.it)"
+
+    XPtrResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [pass, fail, none, temperror, permerror]
+          description: HELO/PTR consistency check result
+          example: "fail"
+        helo:
+          type: string
+          description: HELO/EHLO hostname announced by the sending server (smtp.helo)
+          example: "relay.example.org"
+        ptr:
+          type: string
+          description: Reverse DNS (PTR) hostname of the sender IP (policy.ptr)
+          example: "mail.example.com"
+        details:
+          type: string
+          description: Additional details about the x-ptr check
+          example: "smtp.helo=relay.example.org policy.ptr=mail.example.com"
 
     SpamAssassinResult:
       type: object
@@ -796,6 +822,13 @@ components:
             type: string
           description: A or AAAA records resolved from the PTR hostnames (forward confirmation)
           example: ["192.0.2.1", "2001:db8::1"]
+        helo_hostname:
+          type: string
+          description: HELO/EHLO hostname announced by the sending server (from the first Received hop)
+          example: "mail.example.com"
+        helo_ptr_match:
+          type: boolean
+          description: Whether the announced HELO hostname matches one of the sender's PTR records (case-insensitive)
         errors:
           type: array
           items:

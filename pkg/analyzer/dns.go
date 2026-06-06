@@ -88,6 +88,16 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 			if len(forwardRecords) > 0 {
 				results.PtrForwardRecords = &forwardRecords
 			}
+
+			// Record the announced HELO name and whether it matches the PTR record
+			if firstHop.From != nil && *firstHop.From != "" {
+				helo := *firstHop.From
+				results.HeloHostname = &helo
+				if len(ptrRecords) > 0 {
+					match := checkHeloPtrMatch(helo, ptrRecords)
+					results.HeloPtrMatch = &match
+				}
+			}
 		}
 	}
 

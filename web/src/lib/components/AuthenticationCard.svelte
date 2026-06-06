@@ -170,6 +170,54 @@
             </div>
         {/if}
 
+        <!-- X-Ptr (HELO / reverse DNS consistency) -->
+        {#if authentication.x_ptr}
+            <div class="list-group-item" id="authentication-x-ptr">
+                <div class="d-flex align-items-start">
+                    <i
+                        class="bi {getAuthResultIcon(
+                            authentication.x_ptr.result,
+                            true,
+                        )} {getAuthResultClass(authentication.x_ptr.result, true)} me-2 fs-5"
+                    ></i>
+                    <div>
+                        <strong>HELO / PTR</strong>
+                        <i
+                            class="bi bi-info-circle text-muted ms-1"
+                            title="Checks that the HELO/EHLO hostname announced by the sending server matches the sender IP's reverse DNS (PTR) record."
+                        ></i>
+                        <span
+                            class="text-uppercase ms-2 {getAuthResultClass(
+                                authentication.x_ptr.result,
+                                true,
+                            )}"
+                        >
+                            {authentication.x_ptr.result}
+                        </span>
+                        {#if authentication.x_ptr.helo}
+                            <div class="small">
+                                <strong>Announced HELO:</strong>
+                                <span class="text-muted">{authentication.x_ptr.helo}</span>
+                            </div>
+                        {/if}
+                        {#if authentication.x_ptr.ptr}
+                            <div class="small">
+                                <strong>Reverse DNS (PTR):</strong>
+                                <span class="text-muted">{authentication.x_ptr.ptr}</span>
+                            </div>
+                        {/if}
+                        {#if authentication.x_ptr.details}
+                            <pre
+                                class="p-2 mb-0 {$theme === 'light'
+                                    ? 'bg-light'
+                                    : 'bg-secondary'} text-muted small"
+                                style="white-space: pre-wrap">{authentication.x_ptr.details}</pre>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+        {/if}
+
         <!-- SPF (Required) -->
         <div class="list-group-item">
             <div class="d-flex align-items-start" id="authentication-spf">

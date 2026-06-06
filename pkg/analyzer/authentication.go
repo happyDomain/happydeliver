@@ -140,6 +140,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.XAlignedFrom = a.parseXAlignedFromResult(part)
 			}
 		}
+
+		// Parse x-ptr
+		if strings.HasPrefix(part, "x-ptr=") {
+			if results.XPtr == nil {
+				results.XPtr = a.parseXPtrResult(part)
+			}
+		}
 	}
 }
 
