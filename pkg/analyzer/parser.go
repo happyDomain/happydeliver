@@ -34,6 +34,8 @@ import (
 	"strings"
 
 	"golang.org/x/text/encoding/htmlindex"
+
+	"git.happydns.org/happyDeliver/pkg/uuencode"
 )
 
 // EmailMessage represents a parsed email message
@@ -228,6 +230,10 @@ func decodeBody(content []byte, encoding, charset string) string {
 			return r
 		}, content)
 		if decoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(cleaned))); err == nil {
+			content = decoded
+		}
+	case "uuencode", "x-uuencode", "uue":
+		if decoded, err := io.ReadAll(uuencode.NewDecoder(bytes.NewReader(content))); err == nil {
 			content = decoded
 		}
 	}
