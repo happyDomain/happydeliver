@@ -24,10 +24,12 @@ package analyzer
 import (
 	"net/mail"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"golang.org/x/net/html"
 )
 
@@ -211,6 +213,25 @@ func TestIsUnsubscribeLink(t *testing.T) {
 			href:     "https://example.com/manage?id=42&lang=tr",
 			linkText: "Üyeliği sonlandır",
 			expected: true,
+		},
+		// Unreplaced template placeholders must NOT count as unsubscribe methods
+		{
+			name:     "Curly brace template placeholder",
+			href:     "{unsubscribe}",
+			linkText: "Unsubscribe",
+			expected: false,
+		},
+		{
+			name:     "Double curly brace template placeholder",
+			href:     "{{unsubscribe_url}}",
+			linkText: "Unsubscribe",
+			expected: false,
+		},
+		{
+			name:     "Mailchimp merge tag placeholder",
+			href:     "*|UNSUB|*",
+			linkText: "Unsubscribe here",
+			expected: false,
 		},
 	}
 
@@ -977,5 +998,92 @@ func TestHasDomainMisalignment(t *testing.T) {
 					tt.href, tt.linkText, result, tt.expected, tt.reason)
 			}
 		})
+	}
+}
+
+func TestIsTemplatePlaceholderURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected bool
+	}{
+		{name: "Single curly braces", url: "{unsubscribe}", expected: true},
+		{name: "Double curly braces", url: "{{unsubscribe_url}}", expected: true},
+		{name: "Dollar braces", url: "${unsubscribe}", expected: true},
+		{name: "Mailchimp merge tag", url: "*|UNSUB|*", expected: true},
+		{name: "Percent tag", url: "%unsubscribe%", expected: true},
+		{name: "Double percent tag", url: "%%unsubscribe%%", expected: true},
+		{name: "Square bracket tag", url: "[unsubscribe]", expected: true},
+		{name: "URL-encoded curly braces", url: "https://example.com/u/%7Btoken%7D", expected: true},
+		{name: "Placeholder embedded in URL", url: "https://example.com/unsub?id={{recipient_id}}", expected: true},
+		{name: "Normal https URL", url: "https://example.com/unsubscribe?id=123", expected: false},
+		{name: "Normal URL with percent-encoded space", url: "https://example.com/path%20name", expected: false},
+		{name: "Percent-encoded accented char (é)", url: "https://example.com/caf%C3%A9/unsubscribe", expected: false},
+		{name: "Percent-encoded UTF-8 ellipsis", url: "https://example.com/path?q=%E2%80%A6", expected: false},
+		{name: "Percent-encoded Cyrillic", url: "https://example.com/r?u=%D0%BF%D1%80%D0%B8%D0%B2", expected: false},
+		{name: "Adjacent percent-encoded octets (all hex)", url: "https://example.com/%aa%bb", expected: false},
+		{name: "Percent escape then literal hex letters", url: "https://example.com/x%def%20y", expected: false},
+		{name: "Short percent tag with non-hex letter", url: "%id%", expected: true},
+		{name: "Mailto URL", url: "mailto:unsubscribe@example.com", expected: false},
+		{name: "IPv6 URL (square brackets, not a tag)", url: "http://[::1]/unsubscribe", expected: false},
+		{name: "IPv6 URL with hex-letter host", url: "http://[fe80::1]/unsubscribe", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isTemplatePlaceholderURL(tt.url); got != tt.expected {
+				t.Errorf("isTemplatePlaceholderURL(%q) = %v, want %v", tt.url, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestValidateLink_TemplatePlaceholderIsInvalid(t *testing.T) {
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	check := analyzer.validateLink("{unsubscribe}")
+	if check.Valid {
+		t.Errorf("validateLink(%q).Valid = true, want false", "{unsubscribe}")
+	}
+	if check.Error == "" {
+		t.Errorf("validateLink(%q).Error is empty, want a template placeholder error", "{unsubscribe}")
+	}
+}
+
+func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	results := &ContentResults{
+		HTMLContent:    "<html><body><a href=\"{unsubscribe}\">Unsubscribe</a></body></html>",
+		Links:          []LinkCheck{{URL: "{unsubscribe}", Valid: false, IsTemplate: true, IsSafe: true, Error: "template"}},
+		HasUnsubscribe: false,
+	}
+
+	analysis := analyzer.GenerateContentAnalysis(results)
+
+	// The link must be reported as broken, not valid
+	if analysis.Links == nil || len(*analysis.Links) != 1 {
+		t.Fatalf("expected 1 link in analysis, got %v", analysis.Links)
+	}
+	if (*analysis.Links)[0].Status != model.Broken {
+		t.Errorf("template link status = %q, want %q", (*analysis.Links)[0].Status, model.Broken)
+	}
+
+	// It must not be counted as an unsubscribe method
+	if analysis.UnsubscribeMethods != nil && slices.Contains(*analysis.UnsubscribeMethods, model.Link) {
+		t.Errorf("template link wrongly counted as an unsubscribe method: %v", *analysis.UnsubscribeMethods)
+	}
+
+	// An unreplaced template issue must be reported
+	foundIssue := false
+	if analysis.HtmlIssues != nil {
+		for _, issue := range *analysis.HtmlIssues {
+			if issue.Type == model.UnreplacedTemplate {
+				foundIssue = true
+			}
+		}
+	}
+	if !foundIssue {
+		t.Errorf("expected an unreplaced_template content issue, got %v", analysis.HtmlIssues)
 	}
 }

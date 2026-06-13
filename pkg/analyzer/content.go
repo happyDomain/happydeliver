@@ -83,6 +83,27 @@ type ContentResults struct {
 	HarmfullIssues   []string
 }
 
+// templatePlaceholderRegex matches unreplaced templating tokens that remain when a
+// merge field was not substituted before sending. It covers the common syntaxes:
+//   - single/double curly braces: {unsubscribe}, {{unsubscribe_url}}
+//   - dollar braces: ${unsubscribe}
+//   - Mailchimp merge tags: *|UNSUB|*
+//   - percent tags: %unsubscribe%, %%unsubscribe%%
+//   - square bracket tags: [unsubscribe]
+//   - URL-encoded curly braces: %7Bunsubscribe%7D
+//
+// The percent-tag alternative requires the body to contain at least one non-hex
+// character ([g-z_.-]). Percent-encoded octets (e.g. "%C3%A9", "%E2%80%A6") only
+// ever place hex digits between "%" signs, so this distinguishes real merge tags
+// from ordinary percent-encoding and avoids flagging internationalized URLs.
+var templatePlaceholderRegex = regexp.MustCompile(`(?i)\{\{?[^{}]*\}?\}|\$\{[^}]*\}|\*\|[^|]*\|\*|%{1,2}[\w.\-]*[g-z_.\-][\w.\-]*%{1,2}|\[[a-z][\w.\-]*\]|%7b[^%]*%7d`)
+
+// isTemplatePlaceholderURL reports whether a URL still contains an unreplaced
+// templating placeholder, meaning the merge field was never substituted.
+func isTemplatePlaceholderURL(urlStr string) bool {
+	return templatePlaceholderRegex.MatchString(urlStr)
+}
+
 // HasPlaintext returns true if the email has plain text content
 func (r *ContentResults) HasPlaintext() bool {
 	return r.TextContent != ""
@@ -90,12 +111,13 @@ func (r *ContentResults) HasPlaintext() bool {
 
 // LinkCheck represents a link validation result
 type LinkCheck struct {
-	URL     string
-	Valid   bool
-	Status  int
-	Error   string
-	IsSafe  bool
-	Warning string
+	URL        string
+	Valid      bool
+	Status     int
+	Error      string
+	IsSafe     bool
+	Warning    string
+	IsTemplate bool // URL still contains an unreplaced templating placeholder (e.g. "{unsubscribe}")
 }
 
 // ImageCheck represents an image validation result
@@ -342,6 +364,13 @@ func (c *ContentAnalyzer) getAttr(n *html.Node, key string) string {
 
 // isUnsubscribeLink checks if a link is an unsubscribe link
 func (c *ContentAnalyzer) isUnsubscribeLink(href string, node *html.Node) bool {
+	// An href with an unreplaced template placeholder (e.g. "{unsubscribe}") is not a
+	// working link, so it must not count as a valid unsubscribe method even though it
+	// literally contains the word "unsubscribe".
+	if isTemplatePlaceholderURL(href) {
+		return false
+	}
+
 	// First check: does the href match a URL from the List-Unsubscribe header?
 	if slices.Contains(c.listUnsubscribeURLs, href) {
 		return true
@@ -385,6 +414,15 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 	check := LinkCheck{
 		URL:    urlStr,
 		IsSafe: true,
+	}
+
+	// Detect unreplaced templating placeholders (e.g. "{unsubscribe}"). Such a URL
+	// is not a real link: the merge field was never substituted before sending.
+	if isTemplatePlaceholderURL(urlStr) {
+		check.Valid = false
+		check.IsTemplate = true
+		check.Error = "URL contains an unreplaced template placeholder (merge field was not substituted before sending)"
+		return check
 	}
 
 	// Parse URL
@@ -798,6 +836,21 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 		})
 	}
 
+	// Add unreplaced template placeholder issues
+	for _, link := range results.Links {
+		if !link.IsTemplate {
+			continue
+		}
+		location := link.URL
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.UnreplacedTemplate,
+			Severity: model.ContentIssueSeverityHigh,
+			Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
+			Location: &location,
+			Advice:   utils.PtrTo("Ensure all merge fields and template placeholders are substituted before sending"),
+		})
+	}
+
 	// Add suspicious URL issues
 	for _, suspURL := range results.SuspiciousURLs {
 		htmlIssues = append(htmlIssues, model.ContentIssue{
@@ -838,7 +891,10 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 		links := make([]model.LinkCheck, 0, len(results.Links))
 		for _, link := range results.Links {
 			status := model.Valid
-			if link.Status >= 400 {
+			if !link.Valid {
+				// Link could not be parsed/validated (e.g. unreplaced template placeholder)
+				status = model.Broken
+			} else if link.Status >= 400 {
 				status = model.Broken
 			} else if !link.IsSafe {
 				status = model.Suspicious
