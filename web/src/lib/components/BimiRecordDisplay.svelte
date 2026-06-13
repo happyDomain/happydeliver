@@ -1,11 +1,16 @@
 <script lang="ts">
-    import type { BimiRecord } from "$lib/api/types.gen";
+    import type { BimiRecord, DmarcRecord } from "$lib/api/types.gen";
 
     interface Props {
         bimiRecord?: BimiRecord;
+        dmarcRecord?: DmarcRecord;
     }
 
-    let { bimiRecord }: Props = $props();
+    let { bimiRecord, dmarcRecord }: Props = $props();
+
+    const dmarcEnforced = $derived(
+        dmarcRecord?.policy === "quarantine" || dmarcRecord?.policy === "reject",
+    );
 </script>
 
 {#if bimiRecord}
@@ -72,7 +77,7 @@
                     {bimiRecord.error}
                 </div>
             {/if}
-            {#if !bimiRecord.valid}
+            {#if !bimiRecord.valid && dmarcEnforced}
                 <div class="alert alert-info mt-3 mb-0">
                     <h6 class="alert-heading">
                         <i class="bi bi-lightbulb me-1"></i>

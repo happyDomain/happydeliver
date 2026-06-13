@@ -182,7 +182,7 @@
             />
 
             <!-- BIMI Record -->
-            <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} />
+            <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} dmarcRecord={dnsResults.dmarc_record} />
         {/if}
     </div>
 </div>
