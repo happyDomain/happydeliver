@@ -74,6 +74,8 @@ var DefaultInformationalRBLs = []string{
 var DefaultDNSWLs = []string{
 	"list.dnswl.org",   // DNSWL.org — the main DNS whitelist
 	"swl.spamhaus.org", // Spamhaus Safe Whitelist
+	"wl.mailspike.net", // Mailspike Whitelist
+	"iadb.isipp.com",   // ISIPP Internet Accreditation Database
 }
 
 // NewRBLChecker creates a new RBL checker with configurable timeout and RBL list
