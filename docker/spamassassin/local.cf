@@ -59,3 +59,6 @@ score RCVD_IN_VALIDITY_SAFE_BLOCKED 0
 score RCVD_IN_VALIDITY_CERTIFIED 0
 score RCVD_IN_VALIDITY_RPBL 0
 score RCVD_IN_VALIDITY_SAFE 0
+
+# emails with no text are common for tests, don't penalize them
+score EMPTY_MESSAGE 0
