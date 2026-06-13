@@ -302,7 +302,9 @@ func (r *DNSListChecker) reverseIP(ipStr string) string {
 }
 
 // CalculateScore calculates the list contribution to deliverability.
-// Informational lists are not counted in the score.
+// Informational lists don't count proportionally; instead, if any
+// informational list triggers, a flat 10% penalty is applied regardless
+// of how many of them fire.
 func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bool) (int, string) {
 	scoringListCount := len(r.Lists) - len(r.informationalSet)
 
@@ -324,7 +326,13 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bo
 		return 100, "A+"
 	}
 
-	percentage := 100 - results.RelevantListedCount*100/scoringListCount
+	// A listing on any informational list applies a flat 10% penalty.
+	informationalPenalty := 0
+	if results.ListedCount > results.RelevantListedCount {
+		informationalPenalty = 10
+	}
+
+	percentage := max(0, 100-results.RelevantListedCount*100/scoringListCount-informationalPenalty)
 	return percentage, ScoreToGrade(percentage)
 }
 
