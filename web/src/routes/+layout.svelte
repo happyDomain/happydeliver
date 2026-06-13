@@ -72,75 +72,55 @@
 
     <footer
         id="footer-classic"
-        class="px-4 px-md-5 py-2 bg-tertiary d-flex justify-content-between"
+        class="px-4 px-md-5 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
     >
-        <a href="https://happydeliver.org/" target="_blank">Powered by happyDeliver</a>
+        <a class="footer-brand-link" href="https://happydeliver.org/" target="_blank" rel="noopener">
+            <i class="bi bi-envelope-check"></i>
+            Powered by happyDeliver
+        </a>
         <ul class="d-flex footer-nav">
             <li>
                 <a
                     href="https://git.happydomain.org/happydeliver/-/blob/master/api/openapi.yaml?ref_type=heads"
                     target="_blank"
+                    rel="noopener"
                 >
+                    <i class="bi bi-code-slash"></i>
                     API
                 </a>
             </li>
-            <li><a href="https://git.happydomain.org/happydeliver" target="_blank">Git</a></li>
-            <li><a href="https://feedback.happydeliver.org/" target="_blank">Feedback</a></li>
+            <li>
+                <a href="https://git.happydomain.org/happydeliver" target="_blank" rel="noopener">
+                    <i class="bi bi-git"></i>
+                    Git
+                </a>
+            </li>
+            <li>
+                <a href="https://feedback.happydeliver.org/" target="_blank" rel="noopener">
+                    <i class="bi bi-lightbulb"></i>
+                    Feedback
+                </a>
+            </li>
         </ul>
     </footer>
 
-    <footer id="footer-happydomain" class="d-none pt-3 pb-2 bg-dark text-light">
-        <div class="container mb-4">
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4">
-                <div class="col">
-                    <h3>
+    <footer id="footer-happydomain" class="d-none pt-5 pb-3">
+        <div class="container">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 mb-4">
+                <div class="col footer-brand-col">
+                    <div class="footer-logo mb-3">
                         <Logo color="white" />
-                    </h3>
-                    <ul class="footer-links">
-                        <li><a href="/#features">Features</a></li>
-                        <li>
-                            <a
-                                href="https://github.com/happyDomain/happydeliver/releases"
-                                target="_blank">Download</a
-                            >
-                        </li>
-                        <li>
-                            <a href="https://github.com/happyDomain/happydeliver/" target="_blank">
-                                GitHub
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="col">
-                    <h3>Our association</h3>
-                    <ul class="footer-links">
-                        <li>
-                            <a href="https://www.happydomain.org/en/who-we-are/" target="_blank">
-                                About us
-                            </a>
-                        </li>
-                        <li>
-                            <a href="https://www.happydomain.org/en/community/" target="_blank">
-                                Contact
-                            </a>
-                        </li>
-                        <li>
-                            <a href="https://www.happydomain.org/en/legal-notice/" target="_blank">
-                                Legal notice
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="col"></div>
-                <div class="col">
-                    <h3>Follow-us</h3>
-                    <div
-                        class="d-flex flex-wrap justify-content-between footer-links"
-                        style="gap: .5em; font-size: 2em"
-                    >
+                    </div>
+                    <p class="footer-tagline">
+                        Open-source email deliverability tester. Check your SPF, DKIM, DMARC and
+                        more before you hit send.
+                    </p>
+                    <div class="footer-social d-flex flex-wrap gap-2 mt-3">
                         <a
                             href="https://framagit.org/happyDomain/happydeliver"
                             target="_blank"
+                            rel="noopener"
+                            title="GitLab"
                             aria-label="Visit our GitLab repository"
                         >
                             <i class="bi bi-gitlab"></i>
@@ -148,38 +128,134 @@
                         <a
                             href="https://github.com/happyDomain/happydeliver"
                             target="_blank"
+                            rel="noopener"
+                            title="GitHub"
                             aria-label="Visit our GitHub repository"
                         >
                             <i class="bi bi-github"></i>
                         </a>
                         <a
-                            href="https://feedback.happydeliver.org/"
-                            target="_blank"
-                            aria-label="Share your feedback"
-                        >
-                            <i class="bi bi-lightbulb-fill"></i>
-                        </a>
-                        <a
                             href="https://floss.social/@happyDomain"
                             target="_blank"
+                            rel="noopener"
+                            title="Mastodon"
                             aria-label="Follow us on Mastodon"
                         >
                             <i class="bi bi-mastodon"></i>
                         </a>
+                        <a
+                            href="https://feedback.happydeliver.org/"
+                            target="_blank"
+                            rel="noopener"
+                            title="Feedback"
+                            aria-label="Share your feedback"
+                        >
+                            <i class="bi bi-lightbulb-fill"></i>
+                        </a>
                     </div>
                 </div>
+                <div class="col">
+                    <h4 class="footer-heading">Product</h4>
+                    <ul class="footer-links">
+                        <li><a href="/#features">Features</a></li>
+                        <li>
+                            <a
+                                href="https://github.com/happyDomain/happydeliver/releases"
+                                target="_blank"
+                                rel="noopener">Download</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://git.happydomain.org/happydeliver/-/blob/master/api/openapi.yaml?ref_type=heads"
+                                target="_blank"
+                                rel="noopener">API</a
+                            >
+                        </li>
+                    </ul>
+                </div>
+                <div class="col">
+                    <h4 class="footer-heading">Our association</h4>
+                    <ul class="footer-links">
+                        <li>
+                            <a href="https://www.happydomain.org/en/who-we-are/" target="_blank" rel="noopener">
+                                About us
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.happydomain.org/en/community/" target="_blank" rel="noopener">
+                                Contact
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.happydomain.org/en/legal-notice/" target="_blank" rel="noopener">
+                                Legal notice
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col">
+                    <h4 class="footer-heading">Resources</h4>
+                    <ul class="footer-links">
+                        <li>
+                            <a href="https://git.happydomain.org/happydeliver" target="_blank" rel="noopener">
+                                Source code
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/happyDomain/happydeliver/" target="_blank" rel="noopener">
+                                GitHub
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://feedback.happydeliver.org/" target="_blank" rel="noopener">
+                                Feedback
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom pt-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span class="footer-bottom-text">
+                    © {new Date().getFullYear()} happyDomain — Powered by happyDeliver
+                </span>
+                <a
+                    class="footer-git-link"
+                    href="https://git.happydomain.org/happydeliver"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    Free &amp; open-source software
+                </a>
             </div>
         </div>
     </footer>
 </div>
 
 <style>
-    footer {
-        border-top: 3px solid #9332bb;
-    }
-
     footer a {
         text-decoration: none;
+    }
+
+    #footer-classic {
+        font-size: 0.85rem;
+        /* Footer is always a dark band, so pin its colors instead of
+           using theme-reactive utilities. */
+        background-color: #212529;
+        color: #f8f9fa;
+    }
+
+    .footer-brand-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.7);
+        transition: color 0.2s;
+    }
+
+    .footer-brand-link:hover {
+        color: white;
     }
 
     .footer-nav {
@@ -195,25 +271,113 @@
     }
 
     .footer-nav li:not(:last-child)::after {
-        content: "|";
-        margin: 0 0.5rem;
+        content: "";
+        width: 1px;
+        height: 1rem;
+        margin: 0 0.75rem;
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .footer-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: rgba(255, 255, 255, 0.7);
+        transition: color 0.2s;
+    }
+
+    .footer-nav a:hover {
+        color: white;
+    }
+
+    .footer-nav a i {
+        opacity: 0.7;
+    }
+
+    #footer-happydomain {
+        /* Footer is always a dark band (all child text is hardcoded white),
+           so pin its colors instead of using theme-reactive utilities. */
+        background-color: #212529;
+        color: #f8f9fa;
+    }
+
+    .footer-tagline {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.55;
+        max-width: 260px;
+        margin-bottom: 0;
+    }
+
+    .footer-heading {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.45);
+        margin-bottom: 1rem;
     }
 
     .footer-links {
         list-style: none;
         padding: 0;
-    }
-
-    .footer-links li {
-        margin-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0;
     }
 
     .footer-links a {
         color: rgba(255, 255, 255, 0.7);
-        transition: color 0.3s;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: color 0.2s;
     }
 
     .footer-links a:hover {
         color: white;
+    }
+
+    .footer-social a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.6);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition:
+            color 0.2s,
+            border-color 0.2s,
+            background-color 0.2s;
+    }
+
+    .footer-social a:hover {
+        color: white;
+        border-color: rgba(255, 255, 255, 0.5);
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .footer-bottom {
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .footer-bottom-text {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .footer-git-link {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .footer-git-link:hover {
+        color: rgba(255, 255, 255, 0.8);
     }
 </style>
