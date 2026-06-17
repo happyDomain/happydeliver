@@ -45,6 +45,22 @@ type DNSListChecker struct {
 	informationalSet map[string]bool // Lists whose hits don't count toward the score
 }
 
+// ipAddrPatterns match IPv4 and IPv6 candidates in mail headers. Matches are
+// confirmed with net.ParseIP before use, so the patterns can be permissive.
+//
+// The IPv6 pattern (capture group 1 is the candidate):
+//   - requires a leading boundary (start-of-string or a non-hex, non-colon
+//     character) so it does not carve a spurious address out of the middle of a
+//     longer hex token such as "deadbeef:cafe:1::2";
+//   - allows the optional "IPv6:" label (any case) used in Received headers,
+//     e.g. [IPv6:2001:db8::1];
+//   - accepts an optional trailing dotted-quad so IPv4-mapped forms like
+//     ::ffff:8.8.8.8 match in full instead of being truncated at the first dot.
+var (
+	ipv4Pattern = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
+	ipv6Pattern = regexp.MustCompile(`(?i)(?:^|[^0-9a-f:])((?:ipv6:)?[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,}(?:(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3})?)`)
+)
+
 // DefaultRBLs is a list of commonly used RBL providers
 var DefaultRBLs = []string{
 	"zen.spamhaus.org",       // Spamhaus combined list
@@ -193,19 +209,39 @@ func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
 	seenIPs := make(map[string]bool)
 
 	receivedHeaders := email.Header["Received"]
-	ipv4Pattern := regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
+
+	addIP := func(candidate string) {
+		// Strip the "IPv6:" label Received headers use (any case), e.g.
+		// [IPv6:2001:db8::1].
+		if len(candidate) >= 5 && strings.EqualFold(candidate[:5], "ipv6:") {
+			candidate = candidate[5:]
+		}
+		ip := net.ParseIP(candidate)
+		if ip == nil || !r.isPublicIP(candidate) {
+			return
+		}
+		// Key on the canonical form so equivalent spellings (e.g. the
+		// IPv4-mapped ::ffff:8.8.8.8 and plain 8.8.8.8) dedup to one lookup.
+		canonical := ip.String()
+		if !seenIPs[canonical] {
+			ips = append(ips, canonical)
+			seenIPs[canonical] = true
+		}
+	}
+
+	// ipv6Pattern keeps the candidate in capture group 1 (match[0] also includes
+	// the leading boundary character).
+	addIPv6Matches := func(s string) {
+		for _, m := range ipv6Pattern.FindAllStringSubmatch(s, -1) {
+			addIP(m[1])
+		}
+	}
 
 	for _, received := range receivedHeaders {
-		matches := ipv4Pattern.FindAllString(received, -1)
-		for _, match := range matches {
-			if !r.isPublicIP(match) {
-				continue
-			}
-			if !seenIPs[match] {
-				ips = append(ips, match)
-				seenIPs[match] = true
-			}
+		for _, match := range ipv4Pattern.FindAllString(received, -1) {
+			addIP(match)
 		}
+		addIPv6Matches(received)
 	}
 
 	if len(ips) == 0 {
@@ -213,9 +249,10 @@ func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
 		if originatingIP != "" {
 			cleanIP := strings.TrimSuffix(strings.TrimPrefix(originatingIP, "["), "]")
 			cleanIP = strings.TrimSpace(cleanIP)
-			matches := ipv4Pattern.FindString(cleanIP)
-			if matches != "" && r.isPublicIP(matches) {
-				ips = append(ips, matches)
+			if match := ipv4Pattern.FindString(cleanIP); match != "" {
+				addIP(match)
+			} else if m := ipv6Pattern.FindStringSubmatch(cleanIP); m != nil {
+				addIP(m[1])
 			}
 		}
 	}
@@ -285,7 +322,7 @@ func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
 	return check
 }
 
-// reverseIP reverses an IPv4 address for DNSBL/DNSWL queries
+// reverseIP reverses an IPv4 or IPv6 address for DNSBL/DNSWL queries
 // Example: 192.0.2.1 -> 1.2.0.192
 func (r *DNSListChecker) reverseIP(ipStr string) string {
 	ip := net.ParseIP(ipStr)
@@ -293,12 +330,24 @@ func (r *DNSListChecker) reverseIP(ipStr string) string {
 		return ""
 	}
 
-	ipv4 := ip.To4()
-	if ipv4 == nil {
-		return "" // IPv6 not supported yet
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 	}
 
-	return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
+	// IPv6: reverse all 32 nibbles, least-significant first, dot-separated.
+	// Example: 2001:db8::1 -> 1.0.0.0...0.8.b.d.0.1.0.0.2
+	ipv6 := ip.To16()
+	if ipv6 == nil {
+		return ""
+	}
+
+	nibbles := make([]string, 0, 32)
+	for i := len(ipv6) - 1; i >= 0; i-- {
+		nibbles = append(nibbles, fmt.Sprintf("%x", ipv6[i]&0x0f))
+		nibbles = append(nibbles, fmt.Sprintf("%x", ipv6[i]>>4))
+	}
+
+	return strings.Join(nibbles, ".")
 }
 
 // CalculateScore calculates the list contribution to deliverability.

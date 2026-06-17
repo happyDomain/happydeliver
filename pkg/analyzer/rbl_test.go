@@ -86,6 +86,16 @@ func TestReverseIP(t *testing.T) {
 			expected: "42.100.51.198",
 		},
 		{
+			name:     "Valid IPv6",
+			ip:       "2001:db8::1",
+			expected: "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2",
+		},
+		{
+			name:     "Valid IPv6 (mixed groups)",
+			ip:       "2602:f964:2:8:1a00::a",
+			expected: "a.0.0.0.0.0.0.0.0.0.0.0.0.0.a.1.8.0.0.0.2.0.0.0.4.6.9.f.2.0.6.2",
+		},
+		{
 			name:     "Invalid IP",
 			ip:       "not-an-ip",
 			expected: "",
@@ -219,6 +229,51 @@ func TestExtractIPs(t *testing.T) {
 				"X-Originating-Ip": {"[8.8.8.8]"},
 			},
 			expectedIPs: []string{"8.8.8.8"},
+		},
+		{
+			name: "IPv6 Received header",
+			headers: map[string][]string{
+				"Received": {
+					"from zest.camelvega.com (zest.camelvega.com [IPv6:2602:f964:2:8:1a00::a]) by happydeliver.org",
+				},
+			},
+			expectedIPs: []string{"2602:f964:2:8:1a00::a"},
+		},
+		{
+			name: "IPv6 link-local (filtered out)",
+			headers: map[string][]string{
+				"Received": {
+					"from host (host [IPv6:fe80::1]) by mx.test.com",
+				},
+			},
+			expectedIPs: nil,
+		},
+		{
+			name: "IPv4-mapped IPv6 dedups with plain IPv4",
+			headers: map[string][]string{
+				"Received": {
+					"from host (host [IPv6:::ffff:8.8.8.8]) by mx.test.com",
+				},
+			},
+			expectedIPs: []string{"8.8.8.8"},
+		},
+		{
+			name: "IPv6 label is case-insensitive",
+			headers: map[string][]string{
+				"Received": {
+					"from host (host [IPV6:2602:f964:2:8:1a00::a]) by mx.test.com",
+				},
+			},
+			expectedIPs: []string{"2602:f964:2:8:1a00::a"},
+		},
+		{
+			name: "Hex token is not mistaken for an IPv6 address",
+			headers: map[string][]string{
+				"Received": {
+					"from mx (mx [203.0.113.7]) by host with id deadbeef:cafe:1::2",
+				},
+			},
+			expectedIPs: []string{"203.0.113.7"},
 		},
 		/*{
 			name: "Duplicate IPs (deduplicated)",
