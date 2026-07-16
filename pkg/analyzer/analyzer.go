@@ -49,8 +49,8 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		cfg.Analysis.CheckAllIPs,
 		cfg.Analysis.RspamdAPIURL,
 		cfg.Analysis.ClamAVAddress,
-		"",    // VirusTotal API key, wired in a later commit
-		false, // VirusTotal upload
+		cfg.Analysis.VirusTotalAPIKey,
+		cfg.Analysis.VirusTotalUpload,
 		cfg.Analysis.ScanTimeout,
 		cfg.Analysis.MaxAttachmentSize,
 	)

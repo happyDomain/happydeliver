@@ -77,7 +77,9 @@ type AnalysisConfig struct {
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
 
 	ClamAVAddress     string        // clamd address (tcp://host:port, unix:///path or host:port). Empty = disabled
-	ScanTimeout       time.Duration // Timeout for external attachment scans
+	VirusTotalAPIKey  string        // VirusTotal API key. Empty = disabled
+	VirusTotalUpload  bool          // Upload files unknown to VirusTotal for analysis
+	ScanTimeout       time.Duration // Timeout for external attachment scans (ClamAV, VirusTotal)
 	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }
 
