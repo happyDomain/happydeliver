@@ -94,7 +94,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 		}
 	}
 
-	return &model.BIMIRecord{
+	record := &model.BIMIRecord{
 		Selector: selector,
 		Domain:   domain,
 		Record:   &bimiRecord,
@@ -102,6 +102,15 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 		VmcUrl:   &vmcURL,
 		Valid:    true,
 	}
+
+	// Run evidence checks (logo retrieval, SVG P/S profile, VMC): a BIMI
+	// record only leads to a displayed logo if its assets are compliant.
+	if !d.runBIMIChecks(record) {
+		record.Valid = false
+		record.Error = utils.PtrTo("BIMI assets failed validation, see detailed checks below")
+	}
+
+	return record
 }
 
 // parseBIMITags parses a BIMI record into its tag=value pairs. Pairs are

@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"net/http"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -29,8 +30,9 @@ import (
 
 // DNSAnalyzer analyzes DNS records for email domains
 type DNSAnalyzer struct {
-	Timeout  time.Duration
-	resolver DNSResolver
+	Timeout    time.Duration
+	resolver   DNSResolver
+	httpClient *http.Client
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer with configurable timeout
@@ -50,6 +52,9 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 	return &DNSAnalyzer{
 		Timeout:  timeout,
 		resolver: resolver,
+		httpClient: &http.Client{
+			Timeout: timeout,
+		},
 	}
 }
 

@@ -1109,6 +1109,89 @@ components:
           type: string
           description: Error message if validation failed
           example: "No BIMI record found"
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/BIMICheck'
+          description: Detailed validation checks performed on the BIMI assets (logo and certificate)
+        vmc:
+          $ref: '#/components/schemas/VMCInfo'
+
+    BIMICheck:
+      type: object
+      required:
+        - name
+        - description
+        - status
+      properties:
+        name:
+          type: string
+          description: Machine-readable check identifier
+          example: "logo_fetch"
+        description:
+          type: string
+          description: Human-readable check title
+          example: "Logo file retrieval"
+        status:
+          type: string
+          enum: [pass, fail, warning, skipped]
+          description: Check outcome
+          example: "pass"
+        messages:
+          type: array
+          items:
+            type: string
+          description: Reasons explaining a failure or warning
+          example: ["Logo must be served over HTTPS"]
+
+    VMCInfo:
+      type: object
+      required:
+        - valid
+      properties:
+        issuer:
+          type: string
+          description: Issuer of the leaf certificate
+          example: "CN=DigiCert Verified Mark RSA4096 SHA256 2021 CA1,O=DigiCert\\, Inc.,C=US"
+        subject:
+          type: string
+          description: Subject of the leaf certificate
+          example: "CN=Example Corp,O=Example Corp,C=US"
+        serial_number:
+          type: string
+          description: Serial number of the leaf certificate
+        not_before:
+          type: string
+          format: date-time
+          description: Start of the certificate validity period
+        not_after:
+          type: string
+          format: date-time
+          description: End of the certificate validity period
+        san_domains:
+          type: array
+          items:
+            type: string
+          description: DNS names listed in the Subject Alternative Name extension
+          example: ["example.com"]
+        has_bimi_eku:
+          type: boolean
+          description: Whether the certificate carries the BIMI Extended Key Usage (1.3.6.1.5.5.7.3.31)
+        has_logotype:
+          type: boolean
+          description: Whether the certificate carries the logotype extension (1.3.6.1.5.5.7.1.12)
+        logo_matches:
+          type: boolean
+          description: Whether the SVG embedded in the certificate matches the logo published at the l= URL
+        chain_length:
+          type: integer
+          description: Number of certificates provided in the PEM chain
+        valid:
+          type: boolean
+          description: Whether the VMC passed all analysed criteria
+        error:
+          type: string
+          description: Error message if the VMC could not be analysed
 
     BlacklistCheck:
       type: object

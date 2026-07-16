@@ -32,6 +32,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
 
@@ -234,6 +235,37 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			}
 			if dns.BimiRecord.Error != nil {
 				fmt.Fprintf(writer, "      ERROR: %s\n", *dns.BimiRecord.Error)
+			}
+			if dns.BimiRecord.Checks != nil {
+				for _, check := range *dns.BimiRecord.Checks {
+					mark := "✓"
+					switch check.Status {
+					case model.BIMICheckStatusFail:
+						mark = "✗"
+					case model.BIMICheckStatusWarning:
+						mark = "!"
+					case model.BIMICheckStatusSkipped:
+						mark = "-"
+					}
+					fmt.Fprintf(writer, "      %s %s: %s\n", mark, check.Description, check.Status)
+					if check.Messages != nil {
+						for _, msg := range *check.Messages {
+							fmt.Fprintf(writer, "          %s\n", msg)
+						}
+					}
+				}
+			}
+			if dns.BimiRecord.Vmc != nil {
+				vmc := dns.BimiRecord.Vmc
+				if vmc.Subject != nil {
+					fmt.Fprintf(writer, "      VMC Subject: %s\n", *vmc.Subject)
+				}
+				if vmc.Issuer != nil {
+					fmt.Fprintf(writer, "      VMC Issuer: %s\n", *vmc.Issuer)
+				}
+				if vmc.NotAfter != nil {
+					fmt.Fprintf(writer, "      VMC Expires: %s\n", vmc.NotAfter.Format("2006-01-02"))
+				}
 			}
 		}
 
