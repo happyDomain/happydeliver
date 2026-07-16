@@ -115,6 +115,8 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			summary.SpamScore, summary.SpamGrade)
 		fmt.Fprintf(writer, "  Content Quality:                %3d%% (%s)\n",
 			summary.ContentScore, summary.ContentGrade)
+		fmt.Fprintf(writer, "  Attachments:                    %3d%% (%s)\n",
+			summary.AttachmentsScore, summary.AttachmentsGrade)
 	}
 
 	// DNS Results
@@ -623,6 +625,74 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 				}
 				if issue.Advice != nil {
 					fmt.Fprintf(writer, "      Advice: %s\n", *issue.Advice)
+				}
+			}
+		}
+	}
+
+	// Attachment Analysis
+	if report.AttachmentAnalysis != nil && report.AttachmentAnalysis.HasAttachments {
+		fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))
+		fmt.Fprintln(writer, "ATTACHMENT ANALYSIS")
+		fmt.Fprintln(writer, strings.Repeat("-", 70))
+
+		attachments := report.AttachmentAnalysis
+		if attachments.ClamavEnabled != nil && !*attachments.ClamavEnabled {
+			fmt.Fprintln(writer, "\n  ClamAV scanning: not configured")
+		}
+		if attachments.VirustotalEnabled != nil && !*attachments.VirustotalEnabled {
+			fmt.Fprintln(writer, "  VirusTotal lookups: not configured")
+		}
+
+		if attachments.Attachments != nil {
+			for i, att := range *attachments.Attachments {
+				name := "(unnamed)"
+				if att.Filename != nil {
+					name = *att.Filename
+				}
+				fmt.Fprintf(writer, "\n  [%d] %s (%d bytes)", i+1, name, att.Size)
+				if att.Inline != nil && *att.Inline {
+					fmt.Fprintf(writer, " [inline]")
+				}
+				fmt.Fprintln(writer)
+				if att.DeclaredContentType != nil {
+					fmt.Fprintf(writer, "      Declared type: %s\n", *att.DeclaredContentType)
+				}
+				if att.DetectedContentType != nil {
+					fmt.Fprintf(writer, "      Detected type: %s\n", *att.DetectedContentType)
+				}
+				fmt.Fprintf(writer, "      SHA-256: %s\n", att.Sha256)
+
+				if att.Clamav != nil {
+					fmt.Fprintf(writer, "      ClamAV: %s", att.Clamav.Status)
+					if att.Clamav.Signature != nil {
+						fmt.Fprintf(writer, " (%s)", *att.Clamav.Signature)
+					}
+					fmt.Fprintln(writer)
+				}
+				if att.Virustotal != nil {
+					fmt.Fprintf(writer, "      VirusTotal: %s", att.Virustotal.Status)
+					if att.Virustotal.Positives != nil && att.Virustotal.Total != nil {
+						fmt.Fprintf(writer, " (%d/%d engines)", *att.Virustotal.Positives, *att.Virustotal.Total)
+					}
+					if att.Virustotal.Permalink != nil {
+						fmt.Fprintf(writer, "\n        %s", *att.Virustotal.Permalink)
+					}
+					fmt.Fprintln(writer)
+				}
+
+				if att.Issues != nil && len(*att.Issues) > 0 {
+					fmt.Fprintln(writer, "      Issues:")
+					for _, issue := range *att.Issues {
+						fmt.Fprintf(writer, "        [%s] %s: %s\n",
+							strings.ToUpper(string(issue.Severity)), issue.Type, issue.Message)
+						if issue.Location != nil {
+							fmt.Fprintf(writer, "          Location: %s\n", *issue.Location)
+						}
+						if issue.Advice != nil {
+							fmt.Fprintf(writer, "          Advice: %s\n", *issue.Advice)
+						}
+					}
 				}
 			}
 		}

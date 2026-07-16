@@ -32,7 +32,7 @@ import (
 )
 
 func TestNewReportGenerator(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
 	if gen == nil {
 		t.Fatal("Expected report generator, got nil")
 	}
@@ -55,7 +55,7 @@ func TestNewReportGenerator(t *testing.T) {
 }
 
 func TestAnalyzeEmail(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
 
 	email := createTestEmail()
 
@@ -75,7 +75,7 @@ func TestAnalyzeEmail(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
 	testID := uuid.New()
 
 	email := createTestEmail()
@@ -126,11 +126,33 @@ func TestGenerateReport(t *testing.T) {
 		if report.Summary.DnsScore < 0 || report.Summary.DnsScore > 100 {
 			t.Errorf("DnsScore %v is out of bounds", report.Summary.DnsScore)
 		}
+		if report.Summary.AttachmentsScore < 0 || report.Summary.AttachmentsScore > 100 {
+			t.Errorf("AttachmentsScore %v is out of bounds", report.Summary.AttachmentsScore)
+		}
+	}
+}
+
+func TestGenerateReportAttachments(t *testing.T) {
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
+	testID := uuid.New()
+
+	// Email without attachments scores a perfect attachments category
+	email := createTestEmail()
+	report := gen.GenerateReport(testID, gen.AnalyzeEmail(email))
+
+	if report.Summary.AttachmentsScore != 100 {
+		t.Errorf("AttachmentsScore = %d without attachments, want 100", report.Summary.AttachmentsScore)
+	}
+	if report.AttachmentAnalysis == nil {
+		t.Fatal("AttachmentAnalysis should be present")
+	}
+	if report.AttachmentAnalysis.HasAttachments {
+		t.Error("HasAttachments should be false")
 	}
 }
 
 func TestGenerateReportWithSpamAssassin(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
 	testID := uuid.New()
 
 	email := createTestEmailWithSpamAssassin()
@@ -150,7 +172,7 @@ func TestGenerateReportWithSpamAssassin(t *testing.T) {
 }
 
 func TestGenerateRawEmail(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", "", "", false, 10*time.Second, 25<<20)
 
 	tests := []struct {
 		name     string

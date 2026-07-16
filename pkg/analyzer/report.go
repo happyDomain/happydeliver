@@ -37,8 +37,9 @@ type ReportGenerator struct {
 	dnsAnalyzer     *DNSAnalyzer
 	rblChecker      *DNSListChecker
 	dnswlChecker    *DNSListChecker
-	contentAnalyzer *ContentAnalyzer
-	headerAnalyzer  *HeaderAnalyzer
+	contentAnalyzer    *ContentAnalyzer
+	headerAnalyzer     *HeaderAnalyzer
+	attachmentAnalyzer *AttachmentAnalyzer
 }
 
 // NewReportGenerator creates a new report generator
@@ -50,16 +51,22 @@ func NewReportGenerator(
 	dnswls []string,
 	checkAllIPs bool,
 	rspamdAPIURL string,
+	clamavAddress string,
+	virustotalAPIKey string,
+	virustotalUpload bool,
+	scanTimeout time.Duration,
+	maxAttachmentSize int64,
 ) *ReportGenerator {
 	return &ReportGenerator{
-		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
-		spamAnalyzer:    NewSpamAssassinAnalyzer(),
-		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
-		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
-		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
-		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
-		contentAnalyzer: NewContentAnalyzer(httpTimeout),
-		headerAnalyzer:  NewHeaderAnalyzer(),
+		authAnalyzer:       NewAuthenticationAnalyzer(receiverHostname),
+		spamAnalyzer:       NewSpamAssassinAnalyzer(),
+		rspamdAnalyzer:     NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
+		dnsAnalyzer:        NewDNSAnalyzer(dnsTimeout),
+		rblChecker:         NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
+		dnswlChecker:       NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
+		contentAnalyzer:    NewContentAnalyzer(httpTimeout),
+		headerAnalyzer:     NewHeaderAnalyzer(),
+		attachmentAnalyzer: NewAttachmentAnalyzer(clamavAddress, virustotalAPIKey, virustotalUpload, scanTimeout, maxAttachmentSize),
 	}
 }
 
@@ -74,6 +81,7 @@ type AnalysisResults struct {
 	DNSWL          *DNSListResults
 	SpamAssassin   *model.SpamAssassinResult
 	Rspamd         *model.RspamdResult
+	Attachments    *AttachmentResults
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -95,6 +103,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(email)
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
+	results.Attachments = r.attachmentAnalyzer.AnalyzeAttachments(email)
 
 	return results
 }
@@ -151,6 +160,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		_, whitelistGrade = r.dnswlChecker.CalculateScore(results.DNSWL, true)
 	}
 
+	attachmentsScore, attachmentsGrade := r.attachmentAnalyzer.CalculateAttachmentScore(results.Attachments)
+
 	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
 	rspamdScore, rspamdGrade := r.rspamdAnalyzer.CalculateRspamdScore(results.Rspamd)
 
@@ -186,6 +197,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		HeaderGrade:         model.ScoreSummaryHeaderGrade(headerGrade),
 		SpamScore:           spamScore,
 		SpamGrade:           model.ScoreSummarySpamGrade(spamGrade),
+		AttachmentsScore:    attachmentsScore,
+		AttachmentsGrade:    model.ScoreSummaryAttachmentsGrade(attachmentsGrade),
 	}
 
 	// Add authentication results
@@ -195,6 +208,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	if results.Content != nil {
 		contentAnalysis := r.contentAnalyzer.GenerateContentAnalysis(results.Content)
 		report.ContentAnalysis = contentAnalysis
+	}
+
+	// Add attachment analysis
+	if results.Attachments != nil {
+		report.AttachmentAnalysis = r.attachmentAnalyzer.GenerateAttachmentAnalysis(results.Attachments)
 	}
 
 	// Add DNS records
@@ -244,6 +262,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		report.Summary.ContentScore,
 		report.Summary.HeaderScore,
 		report.Summary.SpamScore,
+		report.Summary.AttachmentsScore,
 	}
 
 	var totalScore int
@@ -267,6 +286,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		string(report.Summary.ContentGrade),
 		string(report.Summary.HeaderGrade),
 		string(report.Summary.SpamGrade),
+		string(report.Summary.AttachmentsGrade),
 	}
 	if report.Score >= 100 {
 		hasLessThanA := false

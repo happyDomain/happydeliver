@@ -75,6 +75,9 @@ type AnalysisConfig struct {
 	DNSWLs       []string
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
+
+	ScanTimeout       time.Duration // Timeout for external attachment scans
+	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -100,6 +103,9 @@ func DefaultConfig() *Config {
 			RBLs:        []string{},
 			DNSWLs:      []string{},
 			CheckAllIPs: false, // By default, only check the first IP
+
+			ScanTimeout:       30 * time.Second,
+			MaxAttachmentSize: 25 << 20, // 25 MiB, matches clamd's default StreamMaxLength
 		},
 	}
 }

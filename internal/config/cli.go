@@ -40,6 +40,8 @@ func declareFlags(o *Config) {
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
 	flag.BoolVar(&o.Analysis.CheckAllIPs, "check-all-ips", o.Analysis.CheckAllIPs, "Check all IPs found in email headers against RBLs (not just the first one)")
 	flag.StringVar(&o.Analysis.RspamdAPIURL, "rspamd-api-url", o.Analysis.RspamdAPIURL, "rspamd API URL for symbol descriptions (default: use embedded list)")
+	flag.DurationVar(&o.Analysis.ScanTimeout, "scan-timeout", o.Analysis.ScanTimeout, "Timeout for external attachment scans")
+	flag.Int64Var(&o.Analysis.MaxAttachmentSize, "max-attachment-size", o.Analysis.MaxAttachmentSize, "Maximum attachment size in bytes to analyze")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")

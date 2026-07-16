@@ -1,4 +1,5 @@
 // Component exports
+export { default as AttachmentAnalysisCard } from "./AttachmentAnalysisCard.svelte";
 export { default as AuthenticationCard } from "./AuthenticationCard.svelte";
 export { default as BimiRecordDisplay } from "./BimiRecordDisplay.svelte";
 export { default as BlacklistCard } from "./BlacklistCard.svelte";

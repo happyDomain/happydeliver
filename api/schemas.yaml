@@ -121,6 +121,8 @@ components:
                 listed: false
         content_analysis:
           $ref: '#/components/schemas/ContentAnalysis'
+        attachment_analysis:
+          $ref: '#/components/schemas/AttachmentAnalysis'
         header_analysis:
           $ref: '#/components/schemas/HeaderAnalysis'
         raw_headers:
@@ -145,6 +147,8 @@ components:
         - header_grade
         - content_score
         - content_grade
+        - attachments_score
+        - attachments_grade
       properties:
         dns_score:
           type: integer
@@ -208,6 +212,17 @@ components:
           description: Content quality score (in percentage)
           example: 18
         content_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
+        attachments_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Attachment harmfulness score (in percentage, 100 = no attachments or all clean)
+          example: 100
+        attachments_grade:
           type: string
           enum: [A+, A, B, C, D, E, F]
           description: Letter grade representation of the score (A+ is best, F is worst)
@@ -285,6 +300,139 @@ components:
           type: string
           description: How to fix this issue
           example: "Add descriptive alt text to all images for better accessibility and deliverability"
+
+    AttachmentAnalysis:
+      type: object
+      required:
+        - has_attachments
+      properties:
+        has_attachments:
+          type: boolean
+          description: Whether the email contains attachments
+          example: true
+        clamav_enabled:
+          type: boolean
+          description: Whether ClamAV scanning was configured on the server
+          example: true
+        virustotal_enabled:
+          type: boolean
+          description: Whether VirusTotal lookups were configured on the server
+          example: false
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentCheck'
+          description: Analysis of each attachment found in the email
+
+    AttachmentCheck:
+      type: object
+      required:
+        - size
+        - sha256
+      properties:
+        filename:
+          type: string
+          description: Attachment filename as declared in the email
+          example: "invoice.pdf"
+        declared_content_type:
+          type: string
+          description: Content-Type declared in the MIME part
+          example: "application/pdf"
+        detected_content_type:
+          type: string
+          description: Content type detected from the file's magic bytes
+          example: "application/pdf"
+        size:
+          type: integer
+          format: int64
+          description: Decoded attachment size in bytes
+          example: 48213
+        sha256:
+          type: string
+          description: SHA-256 checksum of the decoded attachment
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        inline:
+          type: boolean
+          description: Whether this is an inline part (e.g. embedded image) rather than a regular attachment
+          example: false
+        clamav:
+          $ref: '#/components/schemas/ClamAVResult'
+        virustotal:
+          $ref: '#/components/schemas/VirusTotalResult'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentIssue'
+          description: Issues found in this attachment
+
+    ClamAVResult:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [clean, infected, error, skipped, too_large]
+          description: ClamAV scan outcome
+          example: "clean"
+        signature:
+          type: string
+          description: Malware signature name when infected
+          example: "Eicar-Signature"
+
+    VirusTotalResult:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [clean, suspicious, malicious, unknown, pending, error, skipped]
+          description: VirusTotal lookup outcome (unknown = hash not in VT database, pending = uploaded and awaiting analysis)
+          example: "clean"
+        positives:
+          type: integer
+          description: Number of engines flagging the file as malicious or suspicious
+          example: 0
+        total:
+          type: integer
+          description: Total number of engines that analyzed the file
+          example: 74
+        permalink:
+          type: string
+          format: uri
+          description: Link to the VirusTotal report for this file
+          example: "https://www.virustotal.com/gui/file/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    AttachmentIssue:
+      type: object
+      required:
+        - type
+        - severity
+        - message
+      properties:
+        type:
+          type: string
+          enum: [malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped]
+          description: Type of attachment issue
+          example: "double_extension"
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+          description: Issue severity
+          example: "high"
+        message:
+          type: string
+          description: Human-readable description
+          example: "Filename 'invoice.pdf.exe' uses a deceptive double extension"
+        location:
+          type: string
+          description: Where the issue was found (attachment name, or path inside an archive)
+          example: "invoice.zip → payload.pdf.exe"
+        advice:
+          type: string
+          description: Recommendation about this issue
+          example: "Executable files should never be sent as email attachments"
 
     LinkCheck:
       type: object

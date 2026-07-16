@@ -22,10 +22,12 @@
 package analyzer
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net/mail"
 	"net/textproto"
 	"strings"
@@ -50,10 +52,45 @@ type MessagePart struct {
 	ContentType string
 	Encoding    string
 	Content     string
+	Filename    string // From Content-Disposition filename= or Content-Type name=
+	Disposition string // "attachment", "inline", or ""
+	ContentID   string // Content-ID header value, angle brackets stripped
 	IsHTML      bool
 	IsText      bool
 	Boundary    string
 	Parts       []MessagePart // For nested multipart messages
+}
+
+// DecodedBytes returns the part content with its Content-Transfer-Encoding decoded
+func (p *MessagePart) DecodedBytes() ([]byte, error) {
+	switch strings.ToLower(strings.TrimSpace(p.Encoding)) {
+	case "base64":
+		// Strip transport whitespace, then tolerate missing padding
+		compact := strings.Map(func(r rune) rune {
+			switch r {
+			case '\r', '\n', ' ', '\t':
+				return -1
+			}
+			return r
+		}, p.Content)
+		decoded, err := base64.StdEncoding.DecodeString(compact)
+		if err != nil {
+			decoded, err = base64.RawStdEncoding.DecodeString(strings.TrimRight(compact, "="))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode base64 content: %w", err)
+		}
+		return decoded, nil
+	case "quoted-printable":
+		decoded, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(p.Content)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode quoted-printable content: %w", err)
+		}
+		return decoded, nil
+	default:
+		// 7bit, 8bit, binary or unspecified
+		return []byte(p.Content), nil
+	}
 }
 
 // ParseEmail parses an email message from a reader
@@ -111,6 +148,19 @@ func ParseEmail(r io.Reader) (*EmailMessage, error) {
 		parts, err := parseMIMEParts(msg.Body, contentType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse MIME parts: %w", err)
+		}
+
+		// For non-multipart messages, part metadata lives in the top-level headers
+		if mediaType, _, err := mime.ParseMediaType(contentType); err == nil &&
+			!strings.HasPrefix(mediaType, "multipart/") && len(parts) == 1 {
+			parts[0].Encoding = msg.Header.Get("Content-Transfer-Encoding")
+			parts[0].Disposition = partDisposition(msg.Header.Get("Content-Disposition"))
+			parts[0].ContentID = strings.Trim(msg.Header.Get("Content-Id"), "<>")
+			if cd := msg.Header.Get("Content-Disposition"); cd != "" && parts[0].Filename == "" {
+				if _, cdParams, err := mime.ParseMediaType(cd); err == nil {
+					parts[0].Filename = decodeMIMEValue(cdParams["filename"])
+				}
+			}
 		}
 		email.Parts = parts
 	}
@@ -173,6 +223,9 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 					ContentType: partContentType,
 					Encoding:    part.Header.Get("Content-Transfer-Encoding"),
 					Content:     string(content),
+					Filename:    partFilename(part, partContentType),
+					Disposition: partDisposition(part.Header.Get("Content-Disposition")),
+					ContentID:   strings.Trim(part.Header.Get("Content-Id"), "<>"),
 					IsHTML:      strings.Contains(strings.ToLower(partMediaType), "html"),
 					IsText:      strings.Contains(strings.ToLower(partMediaType), "text"),
 				}
@@ -190,6 +243,7 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 			{
 				ContentType: contentType,
 				Content:     string(content),
+				Filename:    decodeMIMEValue(params["name"]),
 				IsHTML:      strings.Contains(strings.ToLower(mediaType), "html"),
 				IsText:      strings.Contains(strings.ToLower(mediaType), "text"),
 			},
@@ -197,6 +251,45 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 	}
 
 	return parts, nil
+}
+
+// partFilename extracts a part's filename from Content-Disposition (RFC 2231
+// aware via part.FileName) with a fallback to the deprecated Content-Type
+// name= parameter
+func partFilename(part *multipart.Part, partContentType string) string {
+	if filename := part.FileName(); filename != "" {
+		return decodeMIMEValue(filename)
+	}
+	if _, ctParams, err := mime.ParseMediaType(partContentType); err == nil {
+		return decodeMIMEValue(ctParams["name"])
+	}
+	return ""
+}
+
+// partDisposition returns the normalized disposition type ("attachment",
+// "inline", ...) from a Content-Disposition header value
+func partDisposition(headerValue string) string {
+	if headerValue == "" {
+		return ""
+	}
+	disposition, _, err := mime.ParseMediaType(headerValue)
+	if err != nil {
+		// Fall back to the first token for slightly malformed headers
+		return strings.ToLower(strings.TrimSpace(strings.Split(headerValue, ";")[0]))
+	}
+	return disposition
+}
+
+// decodeMIMEValue decodes RFC 2047 encoded-words in a header parameter value
+func decodeMIMEValue(value string) string {
+	if value == "" {
+		return ""
+	}
+	decoder := mime.WordDecoder{}
+	if decoded, err := decoder.DecodeHeader(value); err == nil {
+		return decoded
+	}
+	return value
 }
 
 // buildRawHeaders reconstructs the raw header string
@@ -295,6 +388,31 @@ func (e *EmailMessage) GetTextParts() []MessagePart {
 func (e *EmailMessage) GetHTMLParts() []MessagePart {
 	return filterParts(e.Parts, func(p MessagePart) bool {
 		return p.IsHTML
+	})
+}
+
+// IsInline reports whether the part is an inline resource (e.g. an image
+// embedded in the HTML body) rather than a regular attachment
+func (p *MessagePart) IsInline() bool {
+	return p.Disposition == "inline" || (p.Disposition == "" && p.ContentID != "")
+}
+
+// GetAttachments returns all parts carrying a payload to analyze: explicit
+// attachments, parts with a filename, inline resources (embedded images), and
+// any leaf part that is not a text body
+func (e *EmailMessage) GetAttachments() []MessagePart {
+	return filterParts(e.Parts, func(p MessagePart) bool {
+		if p.Disposition == "attachment" || p.Filename != "" || p.ContentID != "" {
+			return true
+		}
+		mediaType, _, err := mime.ParseMediaType(p.ContentType)
+		if err != nil {
+			mediaType = strings.ToLower(strings.TrimSpace(strings.Split(p.ContentType, ";")[0]))
+		}
+		return mediaType != "" &&
+			!strings.HasPrefix(mediaType, "text/") &&
+			!strings.HasPrefix(mediaType, "multipart/") &&
+			!strings.HasPrefix(mediaType, "message/")
 	})
 }
 

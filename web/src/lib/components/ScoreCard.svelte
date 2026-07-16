@@ -138,6 +138,23 @@
                         </div>
                     </a>
                 </div>
+                {#if summary.attachments_grade !== undefined}
+                    <div class="col-sm-6 col-md-4 col-lg">
+                        <a href="#attachment-details" class="text-decoration-none">
+                            <div
+                                class="p-2 rounded text-center summary-card"
+                                class:bg-light={$theme === "light"}
+                                class:bg-secondary={$theme !== "light"}
+                            >
+                                <GradeDisplay
+                                    grade={summary.attachments_grade}
+                                    score={summary.attachments_score}
+                                />
+                                <small class="text-muted d-block">Attachments</small>
+                            </div>
+                        </a>
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>
