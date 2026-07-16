@@ -185,6 +185,30 @@ HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com ./happyDeliver server
 
 If the value is misconfigured, happyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
 
+#### Attachment Scanning
+
+happyDeliver analyzes email attachments: file type mismatches (a `.pdf` that is really an executable, `.pdf.exe` double extensions), Office macros, PDF active content, nested and password-protected archives. Two optional external scanners improve detection:
+
+- **ClamAV**: point happyDeliver at a running `clamd` daemon:
+
+  ```bash
+  ./happyDeliver server -clamav-address tcp://127.0.0.1:3310
+  # or a unix socket:
+  ./happyDeliver server -clamav-address unix:///run/clamav/clamd.sock
+  ```
+
+  With docker compose, start the bundled ClamAV service (requires ~1.5 GB RAM): `docker compose --profile clamav up -d`, then set `HAPPYDELIVER_CLAMAV_ADDRESS=tcp://clamav:3310`.
+
+- **VirusTotal**: attachment SHA-256 hashes are looked up against the VirusTotal database (file content is *not* shared):
+
+  ```bash
+  ./happyDeliver server -virustotal-api-key YOUR_API_KEY
+  ```
+
+  Add `-virustotal-upload` to also submit files unknown to VirusTotal for analysis. **Warning:** uploaded files are shared with the VirusTotal community; do not enable it if test emails may contain confidential documents. Note the free API tier is limited to 4 requests/minute.
+
+Related options: `-scan-timeout` (default 30s) bounds each external scan, and `-max-attachment-size` (default 25 MiB) caps the size of analyzed attachments. When no scanner is configured, static analysis still runs and scanner results are reported as `skipped` without affecting the score.
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.

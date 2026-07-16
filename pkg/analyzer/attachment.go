@@ -145,10 +145,11 @@ func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *Attachment
 			continue
 		}
 
-		// Offline checks: filename tricks, type mismatch
+		// Offline checks: filename tricks, type mismatch, harmful content, archives
 		detectedType, findings := staticCheckAttachment(part.Filename, part.ContentType, data, location)
 		result.DetectedType = detectedType
 		result.Findings = append(result.Findings, findings...)
+		result.Findings = append(result.Findings, inspectArchive(data, location, 0, nil)...)
 
 		// External scanners, bounded concurrency
 		if a.clamav != nil {
