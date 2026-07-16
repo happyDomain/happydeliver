@@ -50,7 +50,8 @@ const attachmentScanConcurrency = 4
 
 // AttachmentAnalyzer extracts email attachments and analyzes their harmfulness
 type AttachmentAnalyzer struct {
-	clamav      *ClamAVClient // nil = disabled
+	clamav      *ClamAVClient     // nil = disabled
+	virustotal  *VirusTotalClient // nil = disabled
 	scanTimeout time.Duration
 	maxSize     int64 // per-attachment size cap for content analysis
 }
@@ -60,6 +61,7 @@ type AttachmentAnalyzer struct {
 func NewAttachmentAnalyzer(clamavAddress, virustotalAPIKey string, virustotalUpload bool, scanTimeout time.Duration, maxSize int64) *AttachmentAnalyzer {
 	return &AttachmentAnalyzer{
 		clamav:      NewClamAVClient(clamavAddress, scanTimeout),
+		virustotal:  NewVirusTotalClient(virustotalAPIKey, virustotalUpload, scanTimeout),
 		scanTimeout: scanTimeout,
 		maxSize:     maxSize,
 	}
@@ -81,13 +83,15 @@ type AttachmentResult struct {
 	Size         int64
 	Inline       bool
 	ClamAV       *ClamAVScan // nil when ClamAV is disabled or content unavailable
+	VirusTotal   *VTScan     // nil when VirusTotal is disabled or content unavailable
 	Findings     []AttachmentFinding
 }
 
 // AnalyzeAttachments extracts and analyzes every attachment of the email
 func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *AttachmentResults {
 	results := &AttachmentResults{
-		ClamAVEnabled: a.clamav != nil,
+		ClamAVEnabled:     a.clamav != nil,
+		VirusTotalEnabled: a.virustotal != nil,
 	}
 
 	attachments := email.GetAttachments()
@@ -154,6 +158,18 @@ func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *Attachment
 				result.ClamAV = a.clamav.ScanBytes(ctx, data)
 			}(result, data)
 		}
+		if a.virustotal != nil {
+			wg.Add(1)
+			go func(result *AttachmentResult, sha string, data []byte) {
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
+				defer cancel()
+				result.VirusTotal = a.virustotal.CheckHash(ctx, sha, data)
+			}(result, result.SHA256, data)
+		}
 	}
 
 	wg.Wait()
@@ -174,6 +190,26 @@ func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *Attachment
 				Location: location,
 				Advice:   "This attachment is malicious and must not be distributed",
 			})
+		}
+		if result.VirusTotal != nil {
+			switch result.VirusTotal.Status {
+			case "malicious":
+				result.Findings = append(result.Findings, AttachmentFinding{
+					Type:     model.AttachmentIssueTypeMalwareDetected,
+					Severity: model.AttachmentIssueSeverityCritical,
+					Message:  fmt.Sprintf("VirusTotal flags this file as malicious (%d/%d engines)", result.VirusTotal.Positives, result.VirusTotal.Total),
+					Location: location,
+					Advice:   "This attachment is known to be malicious and must not be distributed",
+				})
+			case "suspicious":
+				result.Findings = append(result.Findings, AttachmentFinding{
+					Type:     model.AttachmentIssueTypeMalwareDetected,
+					Severity: model.AttachmentIssueSeverityHigh,
+					Message:  fmt.Sprintf("VirusTotal flags this file as suspicious (%d/%d engines)", result.VirusTotal.Positives, result.VirusTotal.Total),
+					Location: location,
+					Advice:   "Several engines consider this attachment suspicious; verify its origin before opening it",
+				})
+			}
 		}
 	}
 
@@ -221,7 +257,7 @@ func (a *AttachmentAnalyzer) GenerateAttachmentAnalysis(results *AttachmentResul
 		}
 
 		check.Clamav = clamavToModel(result.ClamAV, results.ClamAVEnabled)
-		check.Virustotal = &model.VirusTotalResult{Status: model.VirusTotalResultStatusSkipped}
+		check.Virustotal = virustotalToModel(result.VirusTotal, results.VirusTotalEnabled)
 
 		if len(result.Findings) > 0 {
 			issues := make([]model.AttachmentIssue, 0, len(result.Findings))
@@ -266,6 +302,27 @@ func clamavToModel(scan *ClamAVScan, enabled bool) *model.ClamAVResult {
 	return result
 }
 
+// virustotalToModel converts a VirusTotal scan to the API model, mapping a
+// missing scan to the skipped status
+func virustotalToModel(scan *VTScan, enabled bool) *model.VirusTotalResult {
+	if scan == nil {
+		if !enabled {
+			return &model.VirusTotalResult{Status: model.VirusTotalResultStatusSkipped}
+		}
+		return nil
+	}
+
+	result := &model.VirusTotalResult{Status: model.VirusTotalResultStatus(scan.Status)}
+	if scan.Total > 0 {
+		result.Positives = utils.PtrTo(scan.Positives)
+		result.Total = utils.PtrTo(scan.Total)
+	}
+	if scan.Permalink != "" {
+		result.Permalink = utils.PtrTo(scan.Permalink)
+	}
+	return result
+}
+
 // CalculateAttachmentScore computes the attachments category score.
 // An email without attachments scores a perfect 100.
 func (a *AttachmentAnalyzer) CalculateAttachmentScore(results *AttachmentResults) (int, string) {
@@ -281,6 +338,13 @@ func (a *AttachmentAnalyzer) CalculateAttachmentScore(results *AttachmentResults
 		// Malware verdicts floor the score
 		if result.ClamAV != nil && result.ClamAV.Status == "infected" {
 			return 0, ScoreToGrade(0)
+		}
+		if result.VirusTotal != nil && result.VirusTotal.Status == "malicious" {
+			return 0, ScoreToGrade(0)
+		}
+
+		if result.VirusTotal != nil && result.VirusTotal.Status == "suspicious" {
+			score -= 40
 		}
 
 		// One penalty per finding type per attachment
