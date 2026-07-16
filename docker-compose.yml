@@ -25,6 +25,9 @@ services:
     environment:
       # Set your domain
       HAPPYDELIVER_DOMAIN: happydeliver.local
+      # Attachment scanning (optional): start the clamav profile and uncomment
+      # HAPPYDELIVER_CLAMAV_ADDRESS: tcp://clamav:3310
+      # HAPPYDELIVER_VIRUSTOTAL_API_KEY: your-api-key
 
     ports:
       # SMTP port
@@ -41,6 +44,22 @@ services:
     dns:
       - 172.28.0.53
     restart: unless-stopped
+
+  # Optional ClamAV daemon for attachment scanning (needs ~1.5 GB RAM).
+  # Start with: docker compose --profile clamav up -d
+  clamav:
+    image: clamav/clamav:stable
+    profiles:
+      - clamav
+    restart: unless-stopped
+    volumes:
+      # Persist virus definitions between restarts
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      retries: 3
+      start_period: 300s
 
 configs:
   unbound_conf:
@@ -70,6 +89,7 @@ configs:
 volumes:
   data:
   logs:
+  clamav_db:
 
 networks:
   default:

@@ -76,6 +76,7 @@ type AnalysisConfig struct {
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
 
+	ClamAVAddress     string        // clamd address (tcp://host:port, unix:///path or host:port). Empty = disabled
 	ScanTimeout       time.Duration // Timeout for external attachment scans
 	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }

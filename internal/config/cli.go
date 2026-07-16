@@ -40,6 +40,7 @@ func declareFlags(o *Config) {
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
 	flag.BoolVar(&o.Analysis.CheckAllIPs, "check-all-ips", o.Analysis.CheckAllIPs, "Check all IPs found in email headers against RBLs (not just the first one)")
 	flag.StringVar(&o.Analysis.RspamdAPIURL, "rspamd-api-url", o.Analysis.RspamdAPIURL, "rspamd API URL for symbol descriptions (default: use embedded list)")
+	flag.StringVar(&o.Analysis.ClamAVAddress, "clamav-address", o.Analysis.ClamAVAddress, "clamd address for attachment scanning (tcp://host:port, unix:///path or host:port; empty = disabled)")
 	flag.DurationVar(&o.Analysis.ScanTimeout, "scan-timeout", o.Analysis.ScanTimeout, "Timeout for external attachment scans")
 	flag.Int64Var(&o.Analysis.MaxAttachmentSize, "max-attachment-size", o.Analysis.MaxAttachmentSize, "Maximum attachment size in bytes to analyze")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")

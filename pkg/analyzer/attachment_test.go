@@ -126,6 +126,35 @@ func TestAnalyzeAttachmentsCleanPDF(t *testing.T) {
 	}
 }
 
+func TestAnalyzeAttachmentsWithClamAV(t *testing.T) {
+	analyzer := NewAttachmentAnalyzer(fakeClamd(t), "", false, 5*time.Second, 25<<20)
+
+	rawEmail := buildAttachmentEmail("virus.txt", "text/plain", []byte(eicarTestString))
+
+	results := analyzeTestEmail(t, analyzer, rawEmail)
+	if !results.ClamAVEnabled {
+		t.Fatal("Expected ClamAV enabled")
+	}
+	if len(results.Attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(results.Attachments))
+	}
+
+	att := results.Attachments[0]
+	if att.ClamAV == nil || att.ClamAV.Status != "infected" {
+		t.Fatalf("Expected infected ClamAV status, got %+v", att.ClamAV)
+	}
+
+	types := findingTypes(att.Findings)
+	if types[model.AttachmentIssueTypeMalwareDetected] == 0 {
+		t.Errorf("Expected malware_detected finding, got %+v", att.Findings)
+	}
+
+	score, grade := analyzer.CalculateAttachmentScore(results)
+	if score != 0 || grade != "F" {
+		t.Errorf("Expected 0/F for infected attachment, got %d/%s", score, grade)
+	}
+}
+
 func TestAnalyzeAttachmentsScannersDisabled(t *testing.T) {
 	analyzer := newOfflineAnalyzer()
 	rawEmail := buildAttachmentEmail("notes.txt", "text/plain", []byte("meeting notes"))
