@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -55,6 +56,15 @@ var documentExtensions = map[string]bool{
 	"mp3": true, "mp4": true, "avi": true,
 }
 
+// macroEnabledExtensions are Office formats that may carry VBA macros by design
+var macroEnabledExtensions = map[string]bool{
+	"docm": true, "dotm": true, "xlsm": true, "xltm": true, "xlam": true,
+	"pptm": true, "potm": true, "ppam": true, "ppsm": true, "sldm": true,
+}
+
+// ole2Magic is the magic number of legacy OLE2 compound files (doc, xls, ppt, msi)
+var ole2Magic = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
+
 // staticCheckAttachment runs every offline detection on an attachment or
 // archive member: filename tricks, declared/detected type mismatch and
 // harmful-content heuristics. location identifies the file in messages
@@ -66,6 +76,7 @@ func staticCheckAttachment(filename, declaredType string, data []byte, location 
 	findings = append(findings, checkFilename(filename, location)...)
 	findings = append(findings, checkTypeMismatch(filename, declaredType, mtype, location)...)
 	findings = append(findings, detectExecutable(data, location)...)
+	findings = append(findings, detectMacros(filename, data, location)...)
 
 	return detectedType, findings
 }
@@ -241,4 +252,56 @@ func isMachO(data []byte) bool {
 		return true
 	}
 	return false
+}
+// detectMacros looks for VBA macros in Office documents: an OOXML archive
+// containing vbaProject.bin, a legacy OLE2 file with VBA markers, or a
+// macro-enabled extension as fallback
+func detectMacros(filename string, data []byte, location string) (findings []AttachmentFinding) {
+	// OOXML documents are zip archives; macros live in a vbaProject.bin entry
+	if bytes.HasPrefix(data, []byte("PK")) {
+		if reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data))); err == nil {
+			for _, entry := range reader.File {
+				if strings.HasSuffix(entry.Name, "vbaProject.bin") {
+					return []AttachmentFinding{{
+						Type:     model.AttachmentIssueTypeMacroDetected,
+						Severity: model.AttachmentIssueSeverityHigh,
+						Message:  "Office document contains VBA macros (vbaProject.bin)",
+						Location: location,
+						Advice:   "Macros in email attachments are a primary malware infection vector; only enable them from fully trusted sources",
+					}}
+				}
+			}
+			return nil
+		}
+	}
+
+	// Legacy OLE2 compound files: heuristic marker search
+	if bytes.HasPrefix(data, ole2Magic) {
+		lower := bytes.ToLower(data)
+		if bytes.Contains(lower, []byte("vba")) || bytes.Contains(lower, []byte("macros")) ||
+			bytes.Contains(data, []byte("\x00Attribut")) {
+			return []AttachmentFinding{{
+				Type:     model.AttachmentIssueTypeMacroDetected,
+				Severity: model.AttachmentIssueSeverityHigh,
+				Message:  "Legacy Office document may contain VBA macros (heuristic detection)",
+				Location: location,
+				Advice:   "Macros in email attachments are a primary malware infection vector; only enable them from fully trusted sources",
+			}}
+		}
+		return nil
+	}
+
+	// Fallback on macro-enabled extensions when content inspection was inconclusive
+	ext := strings.ToLower(strings.TrimPrefix(path.Ext(filename), "."))
+	if macroEnabledExtensions[ext] {
+		return []AttachmentFinding{{
+			Type:     model.AttachmentIssueTypeMacroDetected,
+			Severity: model.AttachmentIssueSeverityMedium,
+			Message:  fmt.Sprintf("File extension .%s indicates a macro-enabled Office document", ext),
+			Location: location,
+			Advice:   "Macro-enabled Office formats should be treated with caution",
+		}}
+	}
+
+	return nil
 }
