@@ -149,3 +149,23 @@ func TestStaticCheckOLE2Macro(t *testing.T) {
 		t.Errorf("Expected macro_detected finding for OLE2 with VBA marker, got %+v", findings)
 	}
 }
+
+func TestStaticCheckPDFJavaScript(t *testing.T) {
+	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\nendobj")
+	_, findings := staticCheckAttachment("active.pdf", "application/pdf", pdf, "active.pdf")
+
+	types := findingTypes(findings)
+	if types[model.AttachmentIssueTypePdfActiveContent] < 2 {
+		t.Errorf("Expected JavaScript + OpenAction findings, got %+v", findings)
+	}
+}
+
+func TestStaticCheckPDFTokenNotPrefix(t *testing.T) {
+	// /JSFoo must not match the /JS token
+	pdf := []byte("%PDF-1.4 << /JSFoo (bar) >>")
+	_, findings := staticCheckAttachment("x.pdf", "application/pdf", pdf, "x.pdf")
+
+	if types := findingTypes(findings); types[model.AttachmentIssueTypePdfActiveContent] != 0 {
+		t.Errorf("Expected no PDF active content finding, got %+v", findings)
+	}
+}

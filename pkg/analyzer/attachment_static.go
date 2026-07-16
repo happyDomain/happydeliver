@@ -77,6 +77,7 @@ func staticCheckAttachment(filename, declaredType string, data []byte, location 
 	findings = append(findings, checkTypeMismatch(filename, declaredType, mtype, location)...)
 	findings = append(findings, detectExecutable(data, location)...)
 	findings = append(findings, detectMacros(filename, data, location)...)
+	findings = append(findings, detectPDFActiveContent(data, location)...)
 
 	return detectedType, findings
 }
@@ -305,3 +306,74 @@ func detectMacros(filename string, data []byte, location string) (findings []Att
 
 	return nil
 }
+// detectPDFActiveContent looks for active-content tokens in PDF files
+func detectPDFActiveContent(data []byte, location string) (findings []AttachmentFinding) {
+	if !bytes.Contains(data[:min(len(data), 1024)], []byte("%PDF")) {
+		return nil
+	}
+
+	if containsPDFToken(data, "/JavaScript") || containsPDFToken(data, "/JS") {
+		findings = append(findings, AttachmentFinding{
+			Type:     model.AttachmentIssueTypePdfActiveContent,
+			Severity: model.AttachmentIssueSeverityHigh,
+			Message:  "PDF contains embedded JavaScript",
+			Location: location,
+			Advice:   "JavaScript in PDF files is frequently used to exploit reader vulnerabilities",
+		})
+	}
+	if containsPDFToken(data, "/Launch") {
+		findings = append(findings, AttachmentFinding{
+			Type:     model.AttachmentIssueTypePdfActiveContent,
+			Severity: model.AttachmentIssueSeverityHigh,
+			Message:  "PDF contains a /Launch action (can execute external programs)",
+			Location: location,
+			Advice:   "Launch actions allow a PDF to start external programs and should not appear in legitimate documents",
+		})
+	}
+	if containsPDFToken(data, "/OpenAction") || containsPDFToken(data, "/AA") {
+		findings = append(findings, AttachmentFinding{
+			Type:     model.AttachmentIssueTypePdfActiveContent,
+			Severity: model.AttachmentIssueSeverityMedium,
+			Message:  "PDF contains automatic actions (/OpenAction or /AA)",
+			Location: location,
+			Advice:   "Automatic actions run when the document opens and are often combined with embedded JavaScript",
+		})
+	}
+	if containsPDFToken(data, "/EmbeddedFile") {
+		findings = append(findings, AttachmentFinding{
+			Type:     model.AttachmentIssueTypePdfActiveContent,
+			Severity: model.AttachmentIssueSeverityInfo,
+			Message:  "PDF contains embedded files",
+			Location: location,
+			Advice:   "Embedded files inside PDFs can smuggle payloads past filters",
+		})
+	}
+
+	return findings
+}
+
+// containsPDFToken searches for a PDF name token ensuring it is not merely a
+// prefix of a longer name (e.g. /JS must not match /JSFoo)
+func containsPDFToken(data []byte, token string) bool {
+	for offset := 0; ; {
+		idx := bytes.Index(data[offset:], []byte(token))
+		if idx < 0 {
+			return false
+		}
+		after := offset + idx + len(token)
+		if after >= len(data) || isPDFDelimiter(data[after]) {
+			return true
+		}
+		offset = after
+	}
+}
+
+// isPDFDelimiter reports whether the byte ends a PDF name token
+func isPDFDelimiter(b byte) bool {
+	switch b {
+	case ' ', '\t', '\r', '\n', '\f', '\x00', '/', '<', '>', '[', ']', '(', ')':
+		return true
+	}
+	return false
+}
+
