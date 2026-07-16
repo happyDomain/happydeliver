@@ -132,9 +132,9 @@ func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *Attachment
 		checksum := sha256.Sum256(data)
 		result.SHA256 = hex.EncodeToString(checksum[:])
 		result.Size = int64(len(data))
-		result.DetectedType = detectContentType(data)
 
 		if a.maxSize > 0 && result.Size > a.maxSize {
+			result.DetectedType = detectContentType(data)
 			result.Findings = append(result.Findings, AttachmentFinding{
 				Type:     model.AttachmentIssueTypeScanSkipped,
 				Severity: model.AttachmentIssueSeverityInfo,
@@ -144,6 +144,11 @@ func (a *AttachmentAnalyzer) AnalyzeAttachments(email *EmailMessage) *Attachment
 			})
 			continue
 		}
+
+		// Offline checks: filename tricks, type mismatch
+		detectedType, findings := staticCheckAttachment(part.Filename, part.ContentType, data, location)
+		result.DetectedType = detectedType
+		result.Findings = append(result.Findings, findings...)
 
 		// External scanners, bounded concurrency
 		if a.clamav != nil {

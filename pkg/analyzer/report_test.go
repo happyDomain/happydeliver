@@ -24,6 +24,7 @@ package analyzer
 import (
 	"net/mail"
 	"net/textproto"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,6 +149,25 @@ func TestGenerateReportAttachments(t *testing.T) {
 	}
 	if report.AttachmentAnalysis.HasAttachments {
 		t.Error("HasAttachments should be false")
+	}
+
+	// Email with a disguised executable attachment tanks the category and
+	// drags the overall grade down
+	rawEmail := buildAttachmentEmail("invoice.pdf.exe", "application/pdf", mzStub)
+	parsed, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+	report = gen.GenerateReport(testID, gen.AnalyzeEmail(parsed))
+
+	if report.Summary.AttachmentsScore > 30 {
+		t.Errorf("AttachmentsScore = %d for a disguised executable, want heavily degraded", report.Summary.AttachmentsScore)
+	}
+	if !report.AttachmentAnalysis.HasAttachments {
+		t.Error("HasAttachments should be true")
+	}
+	if report.AttachmentAnalysis.Attachments == nil || len(*report.AttachmentAnalysis.Attachments) != 1 {
+		t.Fatal("Expected one attachment check in the report")
 	}
 }
 
