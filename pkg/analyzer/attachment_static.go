@@ -78,6 +78,7 @@ func staticCheckAttachment(filename, declaredType string, data []byte, location 
 	findings = append(findings, detectExecutable(data, location)...)
 	findings = append(findings, detectMacros(filename, data, location)...)
 	findings = append(findings, detectPDFActiveContent(data, location)...)
+	findings = append(findings, detectScript(filename, mtype, data, location)...)
 
 	return detectedType, findings
 }
@@ -254,6 +255,7 @@ func isMachO(data []byte) bool {
 	}
 	return false
 }
+
 // detectMacros looks for VBA macros in Office documents: an OOXML archive
 // containing vbaProject.bin, a legacy OLE2 file with VBA markers, or a
 // macro-enabled extension as fallback
@@ -306,6 +308,7 @@ func detectMacros(filename string, data []byte, location string) (findings []Att
 
 	return nil
 }
+
 // detectPDFActiveContent looks for active-content tokens in PDF files
 func detectPDFActiveContent(data []byte, location string) (findings []AttachmentFinding) {
 	if !bytes.Contains(data[:min(len(data), 1024)], []byte("%PDF")) {
@@ -377,3 +380,37 @@ func isPDFDelimiter(b byte) bool {
 	return false
 }
 
+// detectScript flags script payloads and HTML-smuggling attachments
+func detectScript(filename string, mtype *mimetype.MIME, data []byte, location string) (findings []AttachmentFinding) {
+	if bytes.HasPrefix(data, []byte("#!")) {
+		return []AttachmentFinding{{
+			Type:     model.AttachmentIssueTypeScriptContent,
+			Severity: model.AttachmentIssueSeverityMedium,
+			Message:  "Attachment is an executable script (shebang)",
+			Location: location,
+			Advice:   "Scripts delivered by email should be treated as hostile",
+		}}
+	}
+
+	ext := strings.ToLower(strings.TrimPrefix(path.Ext(filename), "."))
+	isHTML := ext == "html" || ext == "htm" || mimeMatches(mtype, "text/html")
+	if isHTML && bytes.Contains(bytes.ToLower(data), []byte("<script")) {
+		severity := model.AttachmentIssueSeverityMedium
+		message := "HTML attachment contains scripts"
+		lower := bytes.ToLower(data)
+		// HTML smuggling: scripted attachment that decodes an embedded payload
+		if bytes.Contains(lower, []byte("atob")) || bytes.Contains(lower, []byte("blob")) {
+			severity = model.AttachmentIssueSeverityHigh
+			message = "HTML attachment contains scripts that decode an embedded payload (HTML smuggling pattern)"
+		}
+		findings = append(findings, AttachmentFinding{
+			Type:     model.AttachmentIssueTypeScriptContent,
+			Severity: severity,
+			Message:  message,
+			Location: location,
+			Advice:   "HTML attachments with scripts are used to assemble malware in the recipient's browser",
+		})
+	}
+
+	return findings
+}
