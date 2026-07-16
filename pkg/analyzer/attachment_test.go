@@ -199,6 +199,29 @@ func TestAnalyzeAttachmentsOversize(t *testing.T) {
 	}
 }
 
+func TestGenerateAttachmentAnalysisModel(t *testing.T) {
+	analyzer := newOfflineAnalyzer()
+	pdf := []byte("%PDF-1.4 << /JavaScript (x) /JS (y) >>")
+	rawEmail := buildAttachmentEmail("active.pdf", "application/pdf", pdf)
+
+	results := analyzeTestEmail(t, analyzer, rawEmail)
+	analysis := analyzer.GenerateAttachmentAnalysis(results)
+
+	if !analysis.HasAttachments {
+		t.Fatal("Expected HasAttachments true")
+	}
+	check := (*analysis.Attachments)[0]
+	if check.Filename == nil || *check.Filename != "active.pdf" {
+		t.Errorf("Unexpected filename: %v", check.Filename)
+	}
+	if check.Issues == nil || len(*check.Issues) == 0 {
+		t.Fatal("Expected issues in the generated analysis")
+	}
+	if (*check.Issues)[0].Type != model.AttachmentIssueTypePdfActiveContent {
+		t.Errorf("Expected pdf_active_content issue, got %s", (*check.Issues)[0].Type)
+	}
+}
+
 func TestCalculateAttachmentScoreDeduplication(t *testing.T) {
 	analyzer := newOfflineAnalyzer()
 	results := &AttachmentResults{
