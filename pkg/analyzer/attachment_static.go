@@ -22,6 +22,8 @@
 package analyzer
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"mime"
 	"path"
@@ -54,15 +56,16 @@ var documentExtensions = map[string]bool{
 }
 
 // staticCheckAttachment runs every offline detection on an attachment or
-// archive member: filename tricks and declared/detected type mismatch.
-// location identifies the file in messages (bare filename, or a path like
-// "invoice.zip → payload.exe").
+// archive member: filename tricks, declared/detected type mismatch and
+// harmful-content heuristics. location identifies the file in messages
+// (bare filename, or a path like "invoice.zip → payload.exe").
 func staticCheckAttachment(filename, declaredType string, data []byte, location string) (detectedType string, findings []AttachmentFinding) {
 	mtype := mimetype.Detect(data)
 	detectedType = mtype.String()
 
 	findings = append(findings, checkFilename(filename, location)...)
 	findings = append(findings, checkTypeMismatch(filename, declaredType, mtype, location)...)
+	findings = append(findings, detectExecutable(data, location)...)
 
 	return detectedType, findings
 }
@@ -189,6 +192,53 @@ func isExecutableMIME(mtype *mimetype.MIME) bool {
 		if mimeMatches(mtype, executable) {
 			return true
 		}
+	}
+	return false
+}
+
+// detectExecutable looks for executable file magic numbers
+func detectExecutable(data []byte, location string) (findings []AttachmentFinding) {
+	if len(data) < 4 {
+		return nil
+	}
+
+	var format string
+	switch {
+	case bytes.HasPrefix(data, []byte("MZ")):
+		format = "Windows executable (PE)"
+	case bytes.HasPrefix(data, []byte("\x7fELF")):
+		format = "Linux executable (ELF)"
+	case isMachO(data):
+		format = "macOS executable (Mach-O)"
+	default:
+		return nil
+	}
+
+	return []AttachmentFinding{{
+		Type:     model.AttachmentIssueTypeExecutableContent,
+		Severity: model.AttachmentIssueSeverityHigh,
+		Message:  fmt.Sprintf("Attachment content is a %s", format),
+		Location: location,
+		Advice:   "Executables delivered by email are almost always malicious; verify the sender and the file's purpose",
+	}}
+}
+
+// isMachO checks the four Mach-O magic numbers (32/64 bit, both endiannesses)
+// plus the universal-binary magic
+func isMachO(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	switch binary.BigEndian.Uint32(data[:4]) {
+	case 0xfeedface, 0xcefaedfe, // 32-bit BE / LE
+		0xfeedfacf, 0xcffaedfe, // 64-bit BE / LE
+		0xcafebabe: // universal binary (also Java class files)
+		// Java class files share 0xcafebabe: their next 4 bytes are a version
+		// number >= 45, while universal binaries store a small architecture count
+		if binary.BigEndian.Uint32(data[:4]) == 0xcafebabe {
+			return len(data) >= 8 && binary.BigEndian.Uint32(data[4:8]) < 40
+		}
+		return true
 	}
 	return false
 }
