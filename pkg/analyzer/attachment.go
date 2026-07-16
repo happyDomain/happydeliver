@@ -382,10 +382,14 @@ func findingPenalty(finding AttachmentFinding) int {
 	case model.AttachmentIssueTypeMacroDetected:
 		return 30
 	case model.AttachmentIssueTypePdfActiveContent, model.AttachmentIssueTypeScriptContent:
-		if finding.Severity == model.AttachmentIssueSeverityHigh {
+		switch finding.Severity {
+		case model.AttachmentIssueSeverityHigh:
 			return 30
+		case model.AttachmentIssueSeverityMedium:
+			return 15
+		default:
+			return 0
 		}
-		return 15
 	case model.AttachmentIssueTypeTypeMismatch:
 		if finding.Severity == model.AttachmentIssueSeverityHigh {
 			return 40
