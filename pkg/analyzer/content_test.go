@@ -1065,12 +1065,12 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 	if analysis.Links == nil || len(*analysis.Links) != 1 {
 		t.Fatalf("expected 1 link in analysis, got %v", analysis.Links)
 	}
-	if (*analysis.Links)[0].Status != model.Broken {
-		t.Errorf("template link status = %q, want %q", (*analysis.Links)[0].Status, model.Broken)
+	if (*analysis.Links)[0].Status != model.LinkCheckStatusBroken {
+		t.Errorf("template link status = %q, want %q", (*analysis.Links)[0].Status, model.LinkCheckStatusBroken)
 	}
 
 	// It must not be counted as an unsubscribe method
-	if analysis.UnsubscribeMethods != nil && slices.Contains(*analysis.UnsubscribeMethods, model.Link) {
+	if analysis.UnsubscribeMethods != nil && slices.Contains(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsLink) {
 		t.Errorf("template link wrongly counted as an unsubscribe method: %v", *analysis.UnsubscribeMethods)
 	}
 
@@ -1078,7 +1078,7 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 	foundIssue := false
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
-			if issue.Type == model.UnreplacedTemplate {
+			if issue.Type == model.ContentIssueTypeUnreplacedTemplate {
 				foundIssue = true
 			}
 		}

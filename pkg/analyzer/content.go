@@ -800,7 +800,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	if !results.HTMLValid && len(results.HTMLErrors) > 0 {
 		for _, errMsg := range results.HTMLErrors {
 			htmlIssues = append(htmlIssues, model.ContentIssue{
-				Type:     model.BrokenHtml,
+				Type:     model.ContentIssueTypeBrokenHtml,
 				Severity: model.ContentIssueSeverityHigh,
 				Message:  errMsg,
 				Advice:   utils.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
@@ -818,7 +818,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 		}
 		if missingAltCount > 0 {
 			htmlIssues = append(htmlIssues, model.ContentIssue{
-				Type:     model.MissingAlt,
+				Type:     model.ContentIssueTypeMissingAlt,
 				Severity: model.ContentIssueSeverityMedium,
 				Message:  fmt.Sprintf("%d image(s) missing alt attributes", missingAltCount),
 				Advice:   utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
@@ -829,7 +829,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	// Add excessive images issue
 	if results.ImageTextRatio > 10.0 {
 		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ExcessiveImages,
+			Type:     model.ContentIssueTypeExcessiveImages,
 			Severity: model.ContentIssueSeverityMedium,
 			Message:  "Email is excessively image-heavy",
 			Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
@@ -843,7 +843,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 		}
 		location := link.URL
 		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.UnreplacedTemplate,
+			Type:     model.ContentIssueTypeUnreplacedTemplate,
 			Severity: model.ContentIssueSeverityHigh,
 			Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
 			Location: &location,
@@ -854,7 +854,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	// Add suspicious URL issues
 	for _, suspURL := range results.SuspiciousURLs {
 		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.SuspiciousLink,
+			Type:     model.ContentIssueTypeSuspiciousLink,
 			Severity: model.ContentIssueSeverityHigh,
 			Message:  "Suspicious URL detected",
 			Location: &suspURL,
@@ -865,7 +865,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	// Add harmful HTML tag issues
 	for _, harmfulIssue := range results.HarmfullIssues {
 		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.DangerousHtml,
+			Type:     model.ContentIssueTypeDangerousHtml,
 			Severity: model.ContentIssueSeverityCritical,
 			Message:  harmfulIssue,
 			Advice:   utils.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
@@ -875,7 +875,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	// Add general content issues (like external stylesheets)
 	for _, contentIssue := range results.ContentIssues {
 		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.BrokenHtml,
+			Type:     model.ContentIssueTypeBrokenHtml,
 			Severity: model.ContentIssueSeverityLow,
 			Message:  contentIssue,
 			Advice:   utils.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
@@ -890,16 +890,16 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	if len(results.Links) > 0 {
 		links := make([]model.LinkCheck, 0, len(results.Links))
 		for _, link := range results.Links {
-			status := model.Valid
+			status := model.LinkCheckStatusValid
 			if !link.Valid {
 				// Link could not be parsed/validated (e.g. unreplaced template placeholder)
-				status = model.Broken
+				status = model.LinkCheckStatusBroken
 			} else if link.Status >= 400 {
-				status = model.Broken
+				status = model.LinkCheckStatusBroken
 			} else if !link.IsSafe {
-				status = model.Suspicious
+				status = model.LinkCheckStatusSuspicious
 			} else if link.Warning != "" {
-				status = model.Timeout
+				status = model.LinkCheckStatusTimeout
 			}
 
 			apiLink := model.LinkCheck{
@@ -946,19 +946,19 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 
 	// Unsubscribe methods
 	if results.HasUnsubscribe {
-		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.Link)
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsLink)
 	}
 
 	for _, url := range c.listUnsubscribeURLs {
 		if strings.HasPrefix(url, "mailto:") {
-			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.Mailto)
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsMailto)
 		} else if strings.HasPrefix(url, "http:") || strings.HasPrefix(url, "https:") {
-			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ListUnsubscribeHeader)
+			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsListUnsubscribeHeader)
 		}
 	}
 
-	if slices.Contains(*analysis.UnsubscribeMethods, model.ListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
-		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.OneClick)
+	if slices.Contains(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
+		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsOneClick)
 	}
 
 	return analysis

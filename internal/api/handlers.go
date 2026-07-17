@@ -274,9 +274,9 @@ func (h *APIHandler) GetStatus(c *gin.Context) {
 	}
 
 	// Determine overall status
-	overallStatus := model.Healthy
+	overallStatus := model.StatusStatusHealthy
 	if dbStatus == model.StatusComponentsDatabaseDown {
-		overallStatus = model.Unhealthy
+		overallStatus = model.StatusStatusUnhealthy
 	}
 
 	mtaStatus := model.StatusComponentsMtaUp

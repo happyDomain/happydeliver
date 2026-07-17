@@ -63,7 +63,7 @@ func (a *AuthenticationAnalyzer) parseIPRevResult(part string) *model.IPRevResul
 func (a *AuthenticationAnalyzer) calculateIPRevScore(results *model.AuthenticationResults) (score int) {
 	if results.Iprev != nil {
 		switch results.Iprev.Result {
-		case model.Pass:
+		case model.IPRevResultResultPass:
 			return 100
 		default: // fail, temperror, permerror
 			return 0

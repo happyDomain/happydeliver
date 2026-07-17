@@ -5,5 +5,7 @@ generate:
 output: internal/model/types.gen.go
 output-options:
   skip-prune: true
+compatibility:
+  always-prefix-enum-values: true
 import-mapping:
   ./schemas.yaml: "-"
