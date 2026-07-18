@@ -139,18 +139,42 @@ func (d *DNSAnalyzer) checkDKIMRecord(h DKIMHeader) *model.DKIMRecord {
 	// Concatenate all TXT record parts (DKIM can be split)
 	dkimRecord := strings.Join(txtRecords, "")
 
-	if !d.validateDKIM(dkimRecord) {
+	tags := parseDKIMTags(dkimRecord)
+
+	v, hasV := tags["v"]
+
+	// A record carrying a foreign version tag (e.g. a DMARC record served in
+	// place of a missing DKIM record by a misbehaving resolver) is not a DKIM
+	// record at all, and must not be surfaced as a malformed DKIM record.
+	if hasV && !strings.EqualFold(v, "DKIM1") {
 		return &model.DKIMRecord{
 			Selector:         h.Selector,
 			Domain:           h.Domain,
 			Record:           utils.PtrTo(dkimRecord),
 			SigningAlgorithm: signingAlgorithmPtr(h.Algorithm),
 			Valid:            false,
-			Error:            utils.PtrTo("DKIM record appears malformed"),
+			Error:            utils.PtrTo(notADKIMRecordError(tags)),
 		}
 	}
 
-	tags := parseDKIMTags(dkimRecord)
+	// A DKIM record must carry a public key (p=) tag.
+	if _, hasP := tags["p"]; !hasP {
+		// With an explicit v=DKIM1 this is a DKIM record that is merely missing
+		// its key; without any DKIM version tag (and no key) the record is not
+		// a DKIM record at all — e.g. an unrelated TXT value served here.
+		errMsg := notADKIMRecordError(tags)
+		if hasV {
+			errMsg = "DKIM record is missing the required public key (p=) tag"
+		}
+		return &model.DKIMRecord{
+			Selector:         h.Selector,
+			Domain:           h.Domain,
+			Record:           utils.PtrTo(dkimRecord),
+			SigningAlgorithm: signingAlgorithmPtr(h.Algorithm),
+			Valid:            false,
+			Error:            utils.PtrTo(errMsg),
+		}
+	}
 
 	keyType := tags["k"]
 	if keyType == "" {
@@ -188,18 +212,15 @@ func signingAlgorithmPtr(a string) *string {
 	return &a
 }
 
-// validateDKIM performs basic DKIM record validation.
-func (d *DNSAnalyzer) validateDKIM(record string) bool {
-	if !strings.Contains(record, "p=") {
-		return false
+// notADKIMRecordError builds an explanatory error for a record found at the
+// DKIM location that is not a DKIM key record, hinting at the likely
+// misconfiguration (or misbehaving resolver) when a known record type is
+// detected.
+func notADKIMRecordError(tags map[string]string) string {
+	if desc := describeMisplacedRecord(tags["v"], "DKIM"); desc != "" {
+		return fmt.Sprintf("No DKIM record found (%s is published at the DKIM location; this is a misconfiguration)", desc)
 	}
-
-	// If v= is present, it must be DKIM1
-	if strings.Contains(record, "v=") && !strings.Contains(record, "v=DKIM1") {
-		return false
-	}
-
-	return true
+	return "No DKIM record found (the record at the DKIM location is not a DKIM key record)"
 }
 
 func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (score int) {

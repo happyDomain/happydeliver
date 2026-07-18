@@ -26,8 +26,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"strings"
 	"testing"
-	"time"
 )
 
 func TestParseDKIMSignatures(t *testing.T) {
@@ -247,48 +247,62 @@ func TestParseDKIMSignatures(t *testing.T) {
 	}
 }
 
-func TestValidateDKIM(t *testing.T) {
-	tests := []struct {
-		name     string
-		record   string
-		expected bool
-	}{
-		{
-			name:     "Valid DKIM with version",
-			record:   "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
-			expected: true,
-		},
-		{
-			name:     "Valid DKIM without version",
-			record:   "k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
-			expected: true,
-		},
-		{
-			name:     "Invalid DKIM - no public key",
-			record:   "v=DKIM1; k=rsa",
-			expected: false,
-		},
-		{
-			name:     "Invalid DKIM - wrong version",
-			record:   "v=DKIM2; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
-			expected: false,
-		},
-		{
-			name:     "Invalid DKIM - empty",
-			record:   "",
-			expected: false,
-		},
+func TestCheckDKIMRecordRejectsForeignRecord(t *testing.T) {
+	// A misbehaving resolver serving a DMARC record where the DKIM key should be
+	// must not be reported as a malformed DKIM record.
+	const phantom = "v=DMARC1;p=quarantine;pct=0;rua=mailto:dmarc_rua@emaildefense.proofpoint.com;fo=1"
+
+	analyzer := newMockAnalyzer(map[string][]string{
+		"mail._domainkey.example.com": {phantom},
+	}, nil)
+
+	rec := analyzer.checkDKIMRecord(DKIMHeader{Domain: "example.com", Selector: "mail", Algorithm: "rsa-sha256"})
+	if rec.Valid {
+		t.Fatalf("expected DKIM record to be invalid, got valid")
 	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "No DKIM record found") {
+		t.Errorf("Error = %v, want to contain %q", rec.Error, "No DKIM record found")
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "a DMARC record") {
+		t.Errorf("Error = %v, want to mention the misplaced DMARC record", rec.Error)
+	}
+	// The extracted key metadata must not be populated from the foreign record.
+	if rec.KeyType != nil || rec.KeySize != nil {
+		t.Errorf("KeyType/KeySize should be nil for a non-DKIM record, got %v/%v", rec.KeyType, rec.KeySize)
+	}
+}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+func TestCheckDKIMRecordMissingPublicKey(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"mail._domainkey.example.com": {"v=DKIM1; k=rsa"},
+	}, nil)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.validateDKIM(tt.record)
-			if result != tt.expected {
-				t.Errorf("validateDKIM(%q) = %v, want %v", tt.record, result, tt.expected)
-			}
-		})
+	rec := analyzer.checkDKIMRecord(DKIMHeader{Domain: "example.com", Selector: "mail"})
+	if rec.Valid {
+		t.Fatalf("expected DKIM record to be invalid, got valid")
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "public key") {
+		t.Errorf("Error = %v, want to mention the missing public key", rec.Error)
+	}
+}
+
+func TestCheckDKIMRecordUnrelatedTXT(t *testing.T) {
+	// An unrelated TXT value (no DKIM version tag, no public key) served at the
+	// DKIM location is not a malformed DKIM record; it is simply not a DKIM
+	// record, and must not be reported as "missing the public key".
+	analyzer := newMockAnalyzer(map[string][]string{
+		"mail._domainkey.example.com": {"pardot123456=abcdef"},
+	}, nil)
+
+	rec := analyzer.checkDKIMRecord(DKIMHeader{Domain: "example.com", Selector: "mail"})
+	if rec.Valid {
+		t.Fatalf("expected DKIM record to be invalid, got valid")
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "No DKIM record found") {
+		t.Errorf("Error = %v, want to contain %q", rec.Error, "No DKIM record found")
+	}
+	if rec.Error != nil && strings.Contains(*rec.Error, "public key") {
+		t.Errorf("Error = %v, should not claim a missing public key for a non-DKIM record", rec.Error)
 	}
 }
 

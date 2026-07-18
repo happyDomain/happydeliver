@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 )
 
 // formatDNSError renders a resolution error without exposing the upstream
@@ -37,6 +38,52 @@ func formatDNSError(err error) string {
 		return sanitized.Error()
 	}
 	return err.Error()
+}
+
+// leadingVersion returns the value of a record's leading "v=" tag (up to the
+// first ';' or whitespace), or "" if the record does not start with one. It
+// handles both ';'-delimited records (BIMI/DKIM/DMARC) and space-delimited
+// ones (SPF).
+func leadingVersion(record string) string {
+	r := strings.TrimSpace(record)
+	if !strings.HasPrefix(r, "v=") {
+		return ""
+	}
+	v := r[len("v="):]
+	if i := strings.IndexAny(v, "; \t"); i >= 0 {
+		v = v[:i]
+	}
+	return v
+}
+
+// describeMisplacedRecord returns a human-readable description ("a DMARC
+// record", "an SPF record", …) of a record identified by its "v=" version
+// value, or "" when the version is unknown. It is used to explain the common
+// misconfiguration (or misbehaving resolver) where a record of the wrong type
+// is served at a BIMI/DKIM/SPF location.
+//
+// ownFamily names the record type expected at the caller's location (e.g.
+// "DKIM" for a DKIM lookup). A record whose version belongs to that family
+// (an unsupported-version record of the location's own type, such as a
+// "v=DKIM2" at the DKIM location) is not "misplaced", so "" is returned and
+// the caller falls back to its generic message.
+func describeMisplacedRecord(version, ownFamily string) string {
+	v := strings.ToUpper(version)
+	if ownFamily != "" && strings.HasPrefix(v, strings.ToUpper(ownFamily)) {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(v, "DMARC"):
+		return "a DMARC record"
+	case strings.HasPrefix(v, "SPF"):
+		return "an SPF record"
+	case strings.HasPrefix(v, "DKIM"):
+		return "a DKIM record"
+	case strings.HasPrefix(v, "BIMI"):
+		return "a BIMI record"
+	default:
+		return ""
+	}
 }
 
 // DNSResolver defines the interface for DNS resolution operations.

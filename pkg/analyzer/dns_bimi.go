@@ -137,16 +137,10 @@ func isBIMIRecord(tags map[string]string) bool {
 // BIMI location that is not a BIMI record, hinting at the likely
 // misconfiguration when a known record type is detected.
 func notABIMIRecordError(tags map[string]string) string {
-	switch v := strings.ToUpper(tags["v"]); {
-	case strings.HasPrefix(v, "DMARC"):
-		return "No BIMI record found (a DMARC record is published at the BIMI location; this is a misconfiguration)"
-	case strings.HasPrefix(v, "SPF"):
-		return "No BIMI record found (an SPF record is published at the BIMI location; this is a misconfiguration)"
-	case strings.HasPrefix(v, "DKIM"):
-		return "No BIMI record found (a DKIM record is published at the BIMI location; this is a misconfiguration)"
-	default:
-		return "No BIMI record found (the record at the BIMI location does not begin with v=BIMI1)"
+	if desc := describeMisplacedRecord(tags["v"], "BIMI"); desc != "" {
+		return fmt.Sprintf("No BIMI record found (%s is published at the BIMI location; this is a misconfiguration)", desc)
 	}
+	return "No BIMI record found (the record at the BIMI location does not begin with v=BIMI1)"
 }
 
 // extractBIMITag extracts a tag value from a BIMI record.

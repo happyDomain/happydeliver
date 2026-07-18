@@ -87,7 +87,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 			{
 				Domain: &domain,
 				Valid:  false,
-				Error:  utils.PtrTo("No SPF record found"),
+				Error:  utils.PtrTo(noSPFRecordError(txtRecords)),
 			},
 		}
 	}
@@ -159,6 +159,18 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	return &results
+}
+
+// noSPFRecordError explains the absence of an SPF record, hinting at the likely
+// misconfiguration (or misbehaving resolver) when a record of another known
+// type was served at the SPF location instead.
+func noSPFRecordError(txtRecords []string) string {
+	for _, txt := range txtRecords {
+		if desc := describeMisplacedRecord(leadingVersion(txt), "SPF"); desc != "" {
+			return fmt.Sprintf("No SPF record found (%s is published at this location instead; this is a misconfiguration)", desc)
+		}
+	}
+	return "No SPF record found"
 }
 
 // extractSPFIncludes extracts all include: domains from an SPF record

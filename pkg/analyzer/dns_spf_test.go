@@ -282,3 +282,41 @@ func TestExtractSPFRedirect(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckSPFRecordsForeignRecordHint(t *testing.T) {
+	// When a record of another type is served at the SPF location (e.g. by a
+	// misbehaving resolver), SPF correctly reports no record but hints at the
+	// misconfiguration.
+	const phantom = "v=DMARC1;p=quarantine;pct=0;rua=mailto:dmarc_rua@emaildefense.proofpoint.com;fo=1"
+
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com": {phantom},
+	}, nil)
+
+	records := analyzer.checkSPFRecords("example.com")
+	if records == nil || len(*records) != 1 {
+		t.Fatalf("expected exactly one SPF result, got %v", records)
+	}
+	rec := (*records)[0]
+	if rec.Valid {
+		t.Fatalf("expected SPF record to be invalid, got valid")
+	}
+	if rec.Record != nil {
+		t.Errorf("Record should be nil (the foreign record must not be adopted as SPF), got %q", *rec.Record)
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "No SPF record found") {
+		t.Errorf("Error = %v, want to contain %q", rec.Error, "No SPF record found")
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "a DMARC record") {
+		t.Errorf("Error = %v, want to mention the misplaced DMARC record", rec.Error)
+	}
+}
+
+func TestNoSPFRecordErrorPlain(t *testing.T) {
+	if got := noSPFRecordError(nil); got != "No SPF record found" {
+		t.Errorf("noSPFRecordError(nil) = %q, want %q", got, "No SPF record found")
+	}
+	if got := noSPFRecordError([]string{"some unrelated txt value"}); got != "No SPF record found" {
+		t.Errorf("noSPFRecordError(unrelated) = %q, want plain message", got)
+	}
+}
