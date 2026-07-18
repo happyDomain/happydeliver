@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestCalculateHeaderScore(t *testing.T) {
@@ -583,18 +584,18 @@ func TestParseReceivedHeader(t *testing.T) {
 		{
 			name:          "Complete Received header",
 			receivedValue: "from mail.example.com (mail.example.com [192.0.2.1]) by mx.receiver.com (Postfix) with ESMTPS id ABC123 for <user@receiver.com>; Mon, 01 Jan 2024 12:00:00 +0000",
-			expectFrom:    strPtr("mail.example.com"),
-			expectBy:      strPtr("mx.receiver.com"),
-			expectWith:    strPtr("ESMTPS"),
-			expectId:      strPtr("ABC123"),
-			expectIp:      strPtr("192.0.2.1"),
+			expectFrom:    utils.PtrTo("mail.example.com"),
+			expectBy:      utils.PtrTo("mx.receiver.com"),
+			expectWith:    utils.PtrTo("ESMTPS"),
+			expectId:      utils.PtrTo("ABC123"),
+			expectIp:      utils.PtrTo("192.0.2.1"),
 			expectHasTs:   true,
 		},
 		{
 			name:          "Minimal Received header",
 			receivedValue: "from sender.example.com by receiver.example.com",
-			expectFrom:    strPtr("sender.example.com"),
-			expectBy:      strPtr("receiver.example.com"),
+			expectFrom:    utils.PtrTo("sender.example.com"),
+			expectBy:      utils.PtrTo("receiver.example.com"),
 			expectWith:    nil,
 			expectId:      nil,
 			expectIp:      nil,
@@ -603,19 +604,19 @@ func TestParseReceivedHeader(t *testing.T) {
 		{
 			name:          "Received header with ESMTPA",
 			receivedValue: "from [192.0.2.50] by mail.example.com with ESMTPA id XYZ789; Tue, 02 Jan 2024 08:30:00 -0500",
-			expectFrom:    strPtr("[192.0.2.50]"),
-			expectBy:      strPtr("mail.example.com"),
-			expectWith:    strPtr("ESMTPA"),
-			expectId:      strPtr("XYZ789"),
-			expectIp:      strPtr("192.0.2.50"),
+			expectFrom:    utils.PtrTo("[192.0.2.50]"),
+			expectBy:      utils.PtrTo("mail.example.com"),
+			expectWith:    utils.PtrTo("ESMTPA"),
+			expectId:      utils.PtrTo("XYZ789"),
+			expectIp:      utils.PtrTo("192.0.2.50"),
 			expectHasTs:   true,
 		},
 		{
 			name:          "Received header without IP",
 			receivedValue: "from mail.example.com by mx.receiver.com with SMTP; Wed, 03 Jan 2024 14:20:00 +0000",
-			expectFrom:    strPtr("mail.example.com"),
-			expectBy:      strPtr("mx.receiver.com"),
-			expectWith:    strPtr("SMTP"),
+			expectFrom:    utils.PtrTo("mail.example.com"),
+			expectBy:      utils.PtrTo("mx.receiver.com"),
+			expectWith:    utils.PtrTo("SMTP"),
 			expectId:      nil,
 			expectIp:      nil,
 			expectHasTs:   true,
@@ -624,9 +625,9 @@ func TestParseReceivedHeader(t *testing.T) {
 			name:          "Postfix local delivery with userid",
 			receivedValue: "by grunt.ycc.fr (Postfix, from userid 1000) id 67276801A8; Fri, 24 Oct 2025 04:17:25 +0200 (CEST)",
 			expectFrom:    nil,
-			expectBy:      strPtr("grunt.ycc.fr"),
+			expectBy:      utils.PtrTo("grunt.ycc.fr"),
 			expectWith:    nil,
-			expectId:      strPtr("67276801A8"),
+			expectId:      utils.PtrTo("67276801A8"),
 			expectIp:      nil,
 			expectHasTs:   true,
 		},
@@ -694,9 +695,9 @@ func TestParseReceivedTLS(t *testing.T) {
 				"key-exchange x25519 server-signature ECDSA (prime256v1) server-digest SHA256) " +
 				"(No client certificate requested) " +
 				"by mx.example.org (Postfix) with ESMTPSA id 1EFD11611EA; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)",
-			expectVersion:  strPtr("TLSv1.3"),
-			expectCipher:   strPtr("TLS_AES_256_GCM_SHA384"),
-			expectBits:     intPtr(256),
+			expectVersion:  utils.PtrTo("TLSv1.3"),
+			expectCipher:   utils.PtrTo("TLS_AES_256_GCM_SHA384"),
+			expectBits:     utils.PtrTo(256),
 			expectVerified: nil,
 		},
 		{
@@ -705,10 +706,10 @@ func TestParseReceivedTLS(t *testing.T) {
 				"(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits)) " +
 				"(Client CN \"example\", Issuer \"CA\" (verified OK)) " +
 				"by mx.receiver.com (Postfix) with ESMTPS id ABC; Mon, 01 Jan 2024 12:00:00 +0000",
-			expectVersion:  strPtr("TLSv1.2"),
-			expectCipher:   strPtr("ECDHE-RSA-AES128-GCM-SHA256"),
-			expectBits:     intPtr(128),
-			expectVerified: boolPtr(true),
+			expectVersion:  utils.PtrTo("TLSv1.2"),
+			expectCipher:   utils.PtrTo("ECDHE-RSA-AES128-GCM-SHA256"),
+			expectBits:     utils.PtrTo(128),
+			expectVerified: utils.PtrTo(true),
 		},
 		{
 			name:          "Plaintext (no TLS)",
@@ -1115,14 +1116,6 @@ func TestFindHeaderIssues_FakeReply(t *testing.T) {
 }
 
 // Helper functions for testing
-func strPtr(s string) *string {
-	return &s
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func ptrToStr(p *string) string {
 	if p == nil {
 		return "<nil>"
