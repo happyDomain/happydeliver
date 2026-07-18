@@ -19,90 +19,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+package bimi
 
 import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"mime"
-	"net/http"
-	"net/url"
 	"strings"
-
-	"git.happydns.org/happyDeliver/internal/model"
 )
 
-// maxBIMILogoSize is the maximum size allowed for a BIMI SVG logo (BIMI
-// group recommendation: 32 kilobytes).
-const maxBIMILogoSize = 32 * 1024
-
-// maxBIMIFileSize is a hard cap on any file downloaded during BIMI
-// evidence collection (VMC chains are larger than logos).
-const maxBIMIFileSize = 512 * 1024
-
-// bimiCheck is a small helper to build model.BIMICheck values.
-func bimiCheck(name, description string, status model.BIMICheckStatus, messages ...string) model.BIMICheck {
-	c := model.BIMICheck{
-		Name:        name,
-		Description: description,
-		Status:      status,
-	}
-	if len(messages) > 0 {
-		c.Messages = &messages
-	}
-	return c
-}
-
-// fetchBIMIFile downloads a file referenced by a BIMI record and validates
-// transport requirements (HTTPS, reachability, size). It returns the file
-// content, the Content-Type announced by the server and the list of
-// problems encountered (empty when the fetch is acceptable).
-func (d *DNSAnalyzer) fetchBIMIFile(fileURL string, maxSize int64) (content []byte, contentType string, problems []string) {
-	u, err := url.Parse(fileURL)
-	if err != nil {
-		return nil, "", []string{fmt.Sprintf("Invalid URL: %s", err)}
-	}
-
-	if !strings.EqualFold(u.Scheme, "https") {
-		problems = append(problems, fmt.Sprintf("URL uses %q scheme: BIMI requires files to be served over HTTPS", u.Scheme))
-		return nil, "", problems
-	}
-
-	resp, err := d.httpClient.Get(fileURL)
-	if err != nil {
-		problems = append(problems, fmt.Sprintf("Unable to retrieve file: %s", err))
-		return nil, "", problems
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		problems = append(problems, fmt.Sprintf("Server responded with HTTP status %d instead of 200", resp.StatusCode))
-		return nil, "", problems
-	}
-
-	content, err = io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
-	if err != nil {
-		problems = append(problems, fmt.Sprintf("Error while downloading file: %s", err))
-		return nil, "", problems
-	}
-
-	if int64(len(content)) > maxSize {
-		problems = append(problems, fmt.Sprintf("File exceeds the maximum allowed size of %d bytes", maxSize))
-		return nil, "", problems
-	}
-
-	contentType = resp.Header.Get("Content-Type")
-	if mt, _, err := mime.ParseMediaType(contentType); err == nil {
-		contentType = mt
-	}
-
-	return content, contentType, nil
-}
-
-// checkBIMILogoXML performs an xmllint-like well-formedness check on the
-// SVG document, reporting the position of the first syntax error.
-func checkBIMILogoXML(content []byte) *model.BIMICheck {
+// CheckLogoXML performs an xmllint-like well-formedness check on the SVG
+// document, reporting the position of the first syntax error.
+func CheckLogoXML(content []byte) Check {
 	decoder := xml.NewDecoder(strings.NewReader(string(content)))
 	decoder.Strict = true
 
@@ -117,9 +45,8 @@ func checkBIMILogoXML(content []byte) *model.BIMICheck {
 			if syntaxErr, ok := err.(*xml.SyntaxError); ok {
 				msg = fmt.Sprintf("line %d: %s", syntaxErr.Line, syntaxErr.Msg)
 			}
-			c := bimiCheck("logo_xml", "Logo XML well-formedness", model.BIMICheckStatusFail,
+			return newCheck("logo_xml", "Logo XML well-formedness", StatusFail,
 				fmt.Sprintf("The SVG file is not well-formed XML: %s", msg))
-			return &c
 		}
 		if _, ok := tok.(xml.StartElement); ok {
 			hasRootElement = true
@@ -127,13 +54,11 @@ func checkBIMILogoXML(content []byte) *model.BIMICheck {
 	}
 
 	if !hasRootElement {
-		c := bimiCheck("logo_xml", "Logo XML well-formedness", model.BIMICheckStatusFail,
+		return newCheck("logo_xml", "Logo XML well-formedness", StatusFail,
 			"The file does not contain any XML element: it does not look like an SVG document")
-		return &c
 	}
 
-	c := bimiCheck("logo_xml", "Logo XML well-formedness", model.BIMICheckStatusPass)
-	return &c
+	return newCheck("logo_xml", "Logo XML well-formedness", StatusPass)
 }
 
 // svgTinyPSForbiddenElements lists the SVG elements prohibited by the SVG
@@ -157,9 +82,9 @@ var svgTinyPSForbiddenElements = map[string]string{
 	"image":            "raster/external images are not allowed",
 }
 
-// checkBIMILogoSVGTinyPS validates the SVG document against the SVG Tiny
+// CheckLogoSVGTinyPS validates the SVG document against the SVG Tiny
 // Portable/Secure profile required by BIMI.
-func checkBIMILogoSVGTinyPS(content []byte) *model.BIMICheck {
+func CheckLogoSVGTinyPS(content []byte) Check {
 	var problems []string
 
 	decoder := xml.NewDecoder(strings.NewReader(string(content)))
@@ -178,9 +103,8 @@ func checkBIMILogoSVGTinyPS(content []byte) *model.BIMICheck {
 		}
 		if err != nil {
 			// Well-formedness is reported by the dedicated XML check
-			c := bimiCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", model.BIMICheckStatusSkipped,
+			return newCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", StatusSkipped,
 				"Skipped: the file could not be parsed as XML")
-			return &c
 		}
 
 		switch t := tok.(type) {
@@ -270,86 +194,8 @@ func checkBIMILogoSVGTinyPS(content []byte) *model.BIMICheck {
 	}
 
 	if len(problems) > 0 {
-		c := bimiCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", model.BIMICheckStatusFail, problems...)
-		return &c
+		return newCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", StatusFail, problems...)
 	}
 
-	c := bimiCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", model.BIMICheckStatusPass)
-	return &c
-}
-
-// runBIMIChecks performs the evidence checks (logo download, XML
-// well-formedness, SVG P/S profile, VMC analysis) for a syntactically
-// valid BIMI record, filling record.Checks and record.Vmc. It returns
-// false when at least one mandatory check failed.
-func (d *DNSAnalyzer) runBIMIChecks(record *model.BIMIRecord) bool {
-	var checks []model.BIMICheck
-	allPassed := true
-
-	logoURL := ""
-	if record.LogoUrl != nil {
-		logoURL = *record.LogoUrl
-	}
-	vmcURL := ""
-	if record.VmcUrl != nil {
-		vmcURL = *record.VmcUrl
-	}
-
-	var logoContent []byte
-
-	if logoURL == "" {
-		checks = append(checks,
-			bimiCheck("logo_fetch", "Logo file retrieval", model.BIMICheckStatusSkipped,
-				"No logo URL published (declination record)"))
-	} else {
-		content, contentType, problems := d.fetchBIMIFile(logoURL, maxBIMILogoSize)
-		if len(problems) > 0 {
-			checks = append(checks, bimiCheck("logo_fetch", "Logo file retrieval", model.BIMICheckStatusFail, problems...))
-			allPassed = false
-		} else {
-			logoContent = content
-			if contentType != "image/svg+xml" {
-				checks = append(checks, bimiCheck("logo_fetch", "Logo file retrieval", model.BIMICheckStatusWarning,
-					fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
-			} else {
-				checks = append(checks, bimiCheck("logo_fetch", "Logo file retrieval", model.BIMICheckStatusPass))
-			}
-		}
-
-		if logoContent == nil {
-			checks = append(checks,
-				bimiCheck("logo_xml", "Logo XML well-formedness", model.BIMICheckStatusSkipped,
-					"Skipped: the logo could not be retrieved"),
-				bimiCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", model.BIMICheckStatusSkipped,
-					"Skipped: the logo could not be retrieved"))
-		} else {
-			xmlCheck := checkBIMILogoXML(logoContent)
-			checks = append(checks, *xmlCheck)
-			if xmlCheck.Status == model.BIMICheckStatusFail {
-				allPassed = false
-			}
-
-			svgCheck := checkBIMILogoSVGTinyPS(logoContent)
-			checks = append(checks, *svgCheck)
-			if svgCheck.Status == model.BIMICheckStatusFail {
-				allPassed = false
-			}
-		}
-	}
-
-	if vmcURL == "" {
-		checks = append(checks,
-			bimiCheck("vmc", "Verified Mark Certificate", model.BIMICheckStatusSkipped,
-				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
-	} else {
-		vmcCheck, vmcInfo := d.analyzeBIMIVMC(vmcURL, record.Domain, logoContent)
-		checks = append(checks, *vmcCheck)
-		record.Vmc = vmcInfo
-		if vmcCheck.Status == model.BIMICheckStatusFail {
-			allPassed = false
-		}
-	}
-
-	record.Checks = &checks
-	return allPassed
+	return newCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", StatusPass)
 }

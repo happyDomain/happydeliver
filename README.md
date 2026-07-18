@@ -279,6 +279,37 @@ cat email.eml | ./happyDeliver analyze -recipient test-uuid@yourdomain.com
 
 **Note:** In production, emails are delivered via LMTP (see integration instructions above).
 
+## Go Libraries
+
+Beyond the server and CLI, happyDeliver publishes some of its email checks as
+standalone Go libraries under `pkg/`, so you can embed the same validation
+logic in your own tools without running the whole platform. They have no
+dependency on the server, its API or a database, and reach the network only
+through interfaces you provide (so they are easy to test and to point at your
+own resolver or HTTP client).
+
+### `pkg/bimi`: BIMI validation
+
+Validate [BIMI](https://bimigroup.org/) records and the assets they reference
+(the SVG Tiny Portable/Secure logo and the Verified Mark Certificate, or VMC),
+and get back, for each record, the detailed evidence explaining *why* it is
+valid or not (rather than a bare yes/no).
+
+```go
+import "git.happydns.org/happyDeliver/pkg/bimi"
+
+v := bimi.NewValidator()
+rec, err := v.Analyze(ctx, "example.com", "default")
+// rec.Valid, rec.Error, rec.Checks (per-asset evidence) and rec.VMC
+```
+
+You can also call the individual checks directly when you already hold the
+inputs: `ParseRecord` (a record string), `CheckLogoXML` / `CheckLogoSVGTinyPS`
+(an SVG document), or `AnalyzeVMC` (a PEM certificate chain).
+
+More checks (SPF, DKIM, DMARC, ...) will be made available as libraries here
+over time.
+
 ## Use with happyDomain
 
 happyDeliver can be driven by [happyDomain](https://happydomain.org) through

@@ -23,153 +23,122 @@ package analyzer
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/bimi"
 )
 
-// checkBIMIRecord looks up and validates BIMI record for a domain and selector
+// checkBIMIRecord looks up and validates the BIMI record for a domain and
+// selector. The actual validation lives in the reusable pkg/bimi package;
+// this method adapts its result to the API model.
 func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord {
-	// BIMI records are at: selector._bimi.domain
-	bimiDomain := fmt.Sprintf("%s._bimi.%s", selector, domain)
+	validator := &bimi.Validator{
+		HTTPClient: d.httpClient,
+		Resolver:   d.resolver,
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	// Bound only the DNS lookup by d.Timeout. Asset validation runs with a
+	// deadline-free context so each logo/VMC download gets its own independent
+	// budget from d.httpClient.Timeout, rather than sharing a single deadline
+	// across the DNS lookup and both fetches (a slow-but-valid VMC would
+	// otherwise fail once the logo download consumed most of the budget).
+	lookupCtx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
-	txtRecords, err := d.resolver.LookupTXT(ctx, bimiDomain)
+	rec, err := validator.Lookup(lookupCtx, domain, selector)
 	if err != nil {
+		msg := "No BIMI record found"
+		if !errors.Is(err, bimi.ErrNoRecord) {
+			msg = fmt.Sprintf("Failed to lookup BIMI record: %s", formatDNSError(err))
+		}
 		return &model.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
 			Valid:    false,
-			Error:    utils.PtrTo(fmt.Sprintf("Failed to lookup BIMI record: %s", formatDNSError(err))),
+			Error:    utils.PtrTo(msg),
 		}
 	}
 
-	if len(txtRecords) == 0 {
-		return &model.BIMIRecord{
-			Selector: selector,
-			Domain:   domain,
-			Valid:    false,
-			Error:    utils.PtrTo("No BIMI record found"),
-		}
+	if rec.Valid {
+		validator.ValidateAssets(context.Background(), rec)
 	}
 
-	// Concatenate all TXT record parts (BIMI can be split)
-	bimiRecord := strings.Join(txtRecords, "")
-
-	tags := parseBIMITags(bimiRecord)
-
-	// The record at selector._bimi must begin with a "v=BIMI1" version tag.
-	// Some domains (notably several Proofpoint-hosted ones) mistakenly publish
-	// a DMARC record at the BIMI location. Such a record is not a malformed
-	// BIMI record: it simply is not a BIMI record at all, so report it as
-	// "no BIMI record found" rather than surfacing bogus logo/VMC URLs.
-	if !isBIMIRecord(tags) {
-		return &model.BIMIRecord{
-			Selector: selector,
-			Domain:   domain,
-			Record:   &bimiRecord,
-			Valid:    false,
-			Error:    utils.PtrTo(notABIMIRecordError(tags)),
-		}
-	}
-
-	// Extract logo URL (l tag) and VMC URL (a tag)
-	logoURL := tags["l"]
-	vmcURL := tags["a"]
-
-	// A valid BIMI record must carry a logo URL tag (l=)
-	if _, ok := tags["l"]; !ok {
-		return &model.BIMIRecord{
-			Selector: selector,
-			Domain:   domain,
-			Record:   &bimiRecord,
-			LogoUrl:  &logoURL,
-			VmcUrl:   &vmcURL,
-			Valid:    false,
-			Error:    utils.PtrTo("BIMI record is missing the required logo (l=) tag"),
-		}
-	}
-
-	record := &model.BIMIRecord{
-		Selector: selector,
-		Domain:   domain,
-		Record:   &bimiRecord,
-		LogoUrl:  &logoURL,
-		VmcUrl:   &vmcURL,
-		Valid:    true,
-	}
-
-	// Run evidence checks (logo retrieval, SVG P/S profile, VMC): a BIMI
-	// record only leads to a displayed logo if its assets are compliant.
-	if !d.runBIMIChecks(record) {
-		record.Valid = false
-		record.Error = utils.PtrTo("BIMI assets failed validation, see detailed checks below")
-	}
-
-	return record
+	return bimiRecordToModel(rec)
 }
 
-// parseBIMITags parses a BIMI record into its tag=value pairs. Pairs are
-// separated by ';' and only the first occurrence of a tag is kept. Parsing on
-// delimiters (rather than a substring regex) avoids matching a tag name inside
-// another tag's value, e.g. "a" inside DMARC's "rua=".
-func parseBIMITags(record string) map[string]string {
-	tags := make(map[string]string)
-	for _, part := range strings.Split(record, ";") {
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			continue
+// bimiRecordToModel converts a *bimi.Record into the API *model.BIMIRecord.
+func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
+	m := &model.BIMIRecord{
+		Selector: r.Selector,
+		Domain:   r.Domain,
+		Valid:    r.Valid,
+		LogoUrl:  utils.PtrTo(r.LogoURL),
+		VmcUrl:   utils.PtrTo(r.VMCURL),
+	}
+	if r.Record != "" {
+		m.Record = utils.PtrTo(r.Record)
+	}
+	if r.Error != "" {
+		m.Error = utils.PtrTo(r.Error)
+	}
+	if len(r.Checks) > 0 {
+		m.Checks = utils.PtrTo(bimiChecksToModel(r.Checks))
+	}
+	if r.VMC != nil {
+		m.Vmc = bimiVMCToModel(r.VMC)
+	}
+	return m
+}
+
+func bimiChecksToModel(checks []bimi.Check) []model.BIMICheck {
+	out := make([]model.BIMICheck, len(checks))
+	for i, c := range checks {
+		out[i] = model.BIMICheck{
+			Name:        c.Name,
+			Description: c.Description,
+			Status:      model.BIMICheckStatus(c.Status),
 		}
-		key := strings.TrimSpace(kv[0])
-		if key == "" {
-			continue
-		}
-		if _, exists := tags[key]; !exists {
-			tags[key] = strings.TrimSpace(kv[1])
+		if len(c.Messages) > 0 {
+			messages := c.Messages
+			out[i].Messages = &messages
 		}
 	}
-	return tags
+	return out
 }
 
-// isBIMIRecord reports whether the parsed tags describe a BIMI record, i.e.
-// carry a version tag equal to "BIMI1".
-func isBIMIRecord(tags map[string]string) bool {
-	v, ok := tags["v"]
-	return ok && strings.EqualFold(v, "BIMI1")
-}
-
-// notABIMIRecordError builds an explanatory error for a record found at the
-// BIMI location that is not a BIMI record, hinting at the likely
-// misconfiguration when a known record type is detected.
-func notABIMIRecordError(tags map[string]string) string {
-	if desc := describeMisplacedRecord(tags["v"], "BIMI"); desc != "" {
-		return fmt.Sprintf("No BIMI record found (%s is published at the BIMI location; this is a misconfiguration)", desc)
+func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
+	m := &model.VMCInfo{
+		Valid:       v.Valid,
+		HasBimiEku:  v.HasBimiEku,
+		HasLogotype: v.HasLogotype,
+		LogoMatches: v.LogoMatches,
 	}
-	return "No BIMI record found (the record at the BIMI location does not begin with v=BIMI1)"
-}
-
-// extractBIMITag extracts a tag value from a BIMI record.
-func (d *DNSAnalyzer) extractBIMITag(record, tag string) string {
-	return parseBIMITags(record)[tag]
-}
-
-// validateBIMI performs basic BIMI record validation
-func (d *DNSAnalyzer) validateBIMI(record string) bool {
-	tags := parseBIMITags(record)
-
-	// Must carry a v=BIMI1 version tag
-	if !isBIMIRecord(tags) {
-		return false
+	if v.Issuer != "" {
+		m.Issuer = utils.PtrTo(v.Issuer)
 	}
-
-	// Must have a logo URL tag (l=)
-	if _, ok := tags["l"]; !ok {
-		return false
+	if v.Subject != "" {
+		m.Subject = utils.PtrTo(v.Subject)
 	}
-
-	return true
+	if v.SerialNumber != "" {
+		m.SerialNumber = utils.PtrTo(v.SerialNumber)
+	}
+	if !v.NotBefore.IsZero() {
+		m.NotBefore = utils.PtrTo(v.NotBefore)
+	}
+	if !v.NotAfter.IsZero() {
+		m.NotAfter = utils.PtrTo(v.NotAfter)
+	}
+	if v.ChainLength > 0 {
+		m.ChainLength = utils.PtrTo(v.ChainLength)
+	}
+	if len(v.SanDomains) > 0 {
+		m.SanDomains = utils.PtrTo(v.SanDomains)
+	}
+	if v.Error != "" {
+		m.Error = utils.PtrTo(v.Error)
+	}
+	return m
 }

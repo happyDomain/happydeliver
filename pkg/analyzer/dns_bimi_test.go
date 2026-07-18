@@ -24,167 +24,77 @@ package analyzer
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
-func TestExtractBIMITag(t *testing.T) {
+// Record parsing and asset validation are covered by the reusable pkg/bimi
+// package. These tests exercise the analyzer adapter: DNS lookup wiring and
+// the mapping of *bimi.Record onto the API *model.BIMIRecord.
+
+func TestCheckBIMIRecordLookup(t *testing.T) {
 	tests := []struct {
-		name          string
-		record        string
-		tag           string
-		expectedValue string
+		name         string
+		domain       string
+		txt          map[string][]string
+		wantValid    bool
+		wantLogoURL  string
+		wantVMCURL   string
+		wantErrSubst string
 	}{
 		{
-			name:          "Extract logo URL (l tag)",
-			record:        "v=BIMI1; l=https://example.com/logo.svg",
-			tag:           "l",
-			expectedValue: "https://example.com/logo.svg",
+			name:   "no BIMI record published",
+			domain: "example.com",
+			txt:    map[string][]string{},
+			// _bimi lookup returns NXDOMAIN via the mock resolver
+			wantValid:    false,
+			wantErrSubst: "Failed to lookup BIMI record",
 		},
 		{
-			name:          "Extract VMC URL (a tag)",
-			record:        "v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem",
-			tag:           "a",
-			expectedValue: "https://example.com/vmc.pem",
+			name:   "malformed record (missing version)",
+			domain: "example.com",
+			txt: map[string][]string{
+				"default._bimi.example.com": {"l=https://example.com/logo.svg"},
+			},
+			wantValid:    false,
+			wantLogoURL:  "https://example.com/logo.svg",
+			wantErrSubst: "v=BIMI1",
 		},
 		{
-			name:          "Tag not found",
-			record:        "v=BIMI1; l=https://example.com/logo.svg",
-			tag:           "a",
-			expectedValue: "",
+			name:   "declination record is syntactically valid",
+			domain: "example.com",
+			txt: map[string][]string{
+				"default._bimi.example.com": {"v=BIMI1; l=;"},
+			},
+			// No assets to fetch: all checks skipped, record stays valid.
+			wantValid: true,
 		},
-		{
-			name:          "Tag with spaces",
-			record:        "v=BIMI1; l= https://example.com/logo.svg ",
-			tag:           "l",
-			expectedValue: "https://example.com/logo.svg",
-		},
-		{
-			name:          "Empty record",
-			record:        "",
-			tag:           "l",
-			expectedValue: "",
-		},
-	}
-
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractBIMITag(tt.record, tt.tag)
-			if result != tt.expectedValue {
-				t.Errorf("extractBIMITag(%q, %q) = %q, want %q", tt.record, tt.tag, result, tt.expectedValue)
-			}
-		})
-	}
-}
-
-func TestValidateBIMI(t *testing.T) {
-	tests := []struct {
-		name     string
-		record   string
-		expected bool
-	}{
-		{
-			name:     "Valid BIMI with logo URL",
-			record:   "v=BIMI1; l=https://example.com/logo.svg",
-			expected: true,
-		},
-		{
-			name:     "Valid BIMI with logo and VMC",
-			record:   "v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem",
-			expected: true,
-		},
-		{
-			name:     "Invalid BIMI - no version",
-			record:   "l=https://example.com/logo.svg",
-			expected: false,
-		},
-		{
-			name:     "Invalid BIMI - wrong version",
-			record:   "v=BIMI2; l=https://example.com/logo.svg",
-			expected: false,
-		},
-		{
-			name:     "Invalid BIMI - no logo URL",
-			record:   "v=BIMI1",
-			expected: false,
-		},
-		{
-			name:     "Invalid BIMI - empty",
-			record:   "",
-			expected: false,
-		},
-	}
-
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.validateBIMI(tt.record)
-			if result != tt.expected {
-				t.Errorf("validateBIMI(%q) = %v, want %v", tt.record, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestExtractBIMITagDoesNotMatchSubstring(t *testing.T) {
-	// A DMARC record mistakenly published at the BIMI location must not yield a
-	// VMC URL: the "a" tag must not match the "a=" inside DMARC's "rua=".
-	analyzer := NewDNSAnalyzer(5 * time.Second)
-	record := "v=DMARC1;p=quarantine;rua=mailto:dmarc_rua@example.com;ruf=mailto:dmarc_ruf@example.com"
-
-	if got := analyzer.extractBIMITag(record, "a"); got != "" {
-		t.Errorf("extractBIMITag(%q, \"a\") = %q, want \"\"", record, got)
-	}
-	if got := analyzer.extractBIMITag(record, "l"); got != "" {
-		t.Errorf("extractBIMITag(%q, \"l\") = %q, want \"\"", record, got)
-	}
-}
-
-func TestIsBIMIRecord(t *testing.T) {
-	tests := []struct {
-		name     string
-		record   string
-		expected bool
-	}{
-		{"BIMI record", "v=BIMI1; l=https://example.com/logo.svg", true},
-		{"BIMI record lowercase version", "v=bimi1; l=https://example.com/logo.svg", true},
-		{"DMARC record at BIMI location", "v=DMARC1;p=quarantine;rua=mailto:dmarc@example.com", false},
-		{"SPF record", "v=spf1 ip4:170.168.61.189 -all", false},
-		{"No version tag", "l=https://example.com/logo.svg", false},
-		{"Empty", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isBIMIRecord(parseBIMITags(tt.record)); got != tt.expected {
-				t.Errorf("isBIMIRecord(%q) = %v, want %v", tt.record, got, tt.expected)
-			}
-		})
-	}
-}
+			analyzer := newMockAnalyzer(tt.txt, nil)
+			rec := analyzer.checkBIMIRecord(tt.domain, "default")
 
-func TestNotABIMIRecordError(t *testing.T) {
-	tests := []struct {
-		name       string
-		record     string
-		wantSubstr string
-	}{
-		{"DMARC misconfiguration", "v=DMARC1;p=reject", "DMARC record"},
-		{"SPF misconfiguration", "v=spf1 -all", "SPF record"},
-		{"DKIM misconfiguration", "v=DKIM1; k=rsa; p=abc", "DKIM record"},
-		{"Unknown", "garbage", "does not begin with v=BIMI1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := notABIMIRecordError(parseBIMITags(tt.record))
-			if !strings.HasPrefix(got, "No BIMI record found") {
-				t.Errorf("notABIMIRecordError(%q) = %q, want prefix %q", tt.record, got, "No BIMI record found")
+			if rec.Valid != tt.wantValid {
+				errStr := ""
+				if rec.Error != nil {
+					errStr = *rec.Error
+				}
+				t.Errorf("Valid = %t, want %t (error: %q)", rec.Valid, tt.wantValid, errStr)
 			}
-			if !strings.Contains(got, tt.wantSubstr) {
-				t.Errorf("notABIMIRecordError(%q) = %q, want to contain %q", tt.record, got, tt.wantSubstr)
+			if tt.wantLogoURL != "" {
+				if rec.LogoUrl == nil || *rec.LogoUrl != tt.wantLogoURL {
+					t.Errorf("LogoUrl = %v, want %q", rec.LogoUrl, tt.wantLogoURL)
+				}
+			}
+			if tt.wantVMCURL != "" {
+				if rec.VmcUrl == nil || *rec.VmcUrl != tt.wantVMCURL {
+					t.Errorf("VmcUrl = %v, want %q", rec.VmcUrl, tt.wantVMCURL)
+				}
+			}
+			if tt.wantErrSubst != "" {
+				if rec.Error == nil || !strings.Contains(*rec.Error, tt.wantErrSubst) {
+					t.Errorf("Error = %v, want substring %q", rec.Error, tt.wantErrSubst)
+				}
 			}
 		})
 	}
