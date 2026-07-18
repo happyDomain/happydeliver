@@ -24,7 +24,6 @@ package analyzer
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -61,12 +60,29 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 	// Concatenate all TXT record parts (BIMI can be split)
 	bimiRecord := strings.Join(txtRecords, "")
 
-	// Extract logo URL and VMC URL
-	logoURL := d.extractBIMITag(bimiRecord, "l")
-	vmcURL := d.extractBIMITag(bimiRecord, "a")
+	tags := parseBIMITags(bimiRecord)
 
-	// Basic validation - should contain "v=BIMI1" and "l=" (logo URL)
-	if !d.validateBIMI(bimiRecord) {
+	// The record at selector._bimi must begin with a "v=BIMI1" version tag.
+	// Some domains (notably several Proofpoint-hosted ones) mistakenly publish
+	// a DMARC record at the BIMI location. Such a record is not a malformed
+	// BIMI record: it simply is not a BIMI record at all, so report it as
+	// "no BIMI record found" rather than surfacing bogus logo/VMC URLs.
+	if !isBIMIRecord(tags) {
+		return &model.BIMIRecord{
+			Selector: selector,
+			Domain:   domain,
+			Record:   &bimiRecord,
+			Valid:    false,
+			Error:    utils.PtrTo(notABIMIRecordError(tags)),
+		}
+	}
+
+	// Extract logo URL (l tag) and VMC URL (a tag)
+	logoURL := tags["l"]
+	vmcURL := tags["a"]
+
+	// A valid BIMI record must carry a logo URL tag (l=)
+	if _, ok := tags["l"]; !ok {
 		return &model.BIMIRecord{
 			Selector: selector,
 			Domain:   domain,
@@ -74,7 +90,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 			LogoUrl:  &logoURL,
 			VmcUrl:   &vmcURL,
 			Valid:    false,
-			Error:    utils.PtrTo("BIMI record appears malformed"),
+			Error:    utils.PtrTo("BIMI record is missing the required logo (l=) tag"),
 		}
 	}
 
@@ -88,26 +104,67 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 	}
 }
 
-// extractBIMITag extracts a tag value from a BIMI record
-func (d *DNSAnalyzer) extractBIMITag(record, tag string) string {
-	// Look for tag=value pattern
-	re := regexp.MustCompile(tag + `=([^;]+)`)
-	matches := re.FindStringSubmatch(record)
-	if len(matches) > 1 {
-		return strings.TrimSpace(matches[1])
+// parseBIMITags parses a BIMI record into its tag=value pairs. Pairs are
+// separated by ';' and only the first occurrence of a tag is kept. Parsing on
+// delimiters (rather than a substring regex) avoids matching a tag name inside
+// another tag's value, e.g. "a" inside DMARC's "rua=".
+func parseBIMITags(record string) map[string]string {
+	tags := make(map[string]string)
+	for _, part := range strings.Split(record, ";") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		if key == "" {
+			continue
+		}
+		if _, exists := tags[key]; !exists {
+			tags[key] = strings.TrimSpace(kv[1])
+		}
 	}
-	return ""
+	return tags
+}
+
+// isBIMIRecord reports whether the parsed tags describe a BIMI record, i.e.
+// carry a version tag equal to "BIMI1".
+func isBIMIRecord(tags map[string]string) bool {
+	v, ok := tags["v"]
+	return ok && strings.EqualFold(v, "BIMI1")
+}
+
+// notABIMIRecordError builds an explanatory error for a record found at the
+// BIMI location that is not a BIMI record, hinting at the likely
+// misconfiguration when a known record type is detected.
+func notABIMIRecordError(tags map[string]string) string {
+	switch v := strings.ToUpper(tags["v"]); {
+	case strings.HasPrefix(v, "DMARC"):
+		return "No BIMI record found (a DMARC record is published at the BIMI location; this is a misconfiguration)"
+	case strings.HasPrefix(v, "SPF"):
+		return "No BIMI record found (an SPF record is published at the BIMI location; this is a misconfiguration)"
+	case strings.HasPrefix(v, "DKIM"):
+		return "No BIMI record found (a DKIM record is published at the BIMI location; this is a misconfiguration)"
+	default:
+		return "No BIMI record found (the record at the BIMI location does not begin with v=BIMI1)"
+	}
+}
+
+// extractBIMITag extracts a tag value from a BIMI record.
+func (d *DNSAnalyzer) extractBIMITag(record, tag string) string {
+	return parseBIMITags(record)[tag]
 }
 
 // validateBIMI performs basic BIMI record validation
 func (d *DNSAnalyzer) validateBIMI(record string) bool {
-	// Must start with v=BIMI1
-	if !strings.HasPrefix(record, "v=BIMI1") {
+	tags := parseBIMITags(record)
+
+	// Must carry a v=BIMI1 version tag
+	if !isBIMIRecord(tags) {
 		return false
 	}
 
 	// Must have a logo URL tag (l=)
-	if !strings.Contains(record, "l=") {
+	if _, ok := tags["l"]; !ok {
 		return false
 	}
 

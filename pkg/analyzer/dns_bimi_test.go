@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -122,6 +123,68 @@ func TestValidateBIMI(t *testing.T) {
 			result := analyzer.validateBIMI(tt.record)
 			if result != tt.expected {
 				t.Errorf("validateBIMI(%q) = %v, want %v", tt.record, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExtractBIMITagDoesNotMatchSubstring(t *testing.T) {
+	// A DMARC record mistakenly published at the BIMI location must not yield a
+	// VMC URL: the "a" tag must not match the "a=" inside DMARC's "rua=".
+	analyzer := NewDNSAnalyzer(5 * time.Second)
+	record := "v=DMARC1;p=quarantine;rua=mailto:dmarc_rua@example.com;ruf=mailto:dmarc_ruf@example.com"
+
+	if got := analyzer.extractBIMITag(record, "a"); got != "" {
+		t.Errorf("extractBIMITag(%q, \"a\") = %q, want \"\"", record, got)
+	}
+	if got := analyzer.extractBIMITag(record, "l"); got != "" {
+		t.Errorf("extractBIMITag(%q, \"l\") = %q, want \"\"", record, got)
+	}
+}
+
+func TestIsBIMIRecord(t *testing.T) {
+	tests := []struct {
+		name     string
+		record   string
+		expected bool
+	}{
+		{"BIMI record", "v=BIMI1; l=https://example.com/logo.svg", true},
+		{"BIMI record lowercase version", "v=bimi1; l=https://example.com/logo.svg", true},
+		{"DMARC record at BIMI location", "v=DMARC1;p=quarantine;rua=mailto:dmarc@example.com", false},
+		{"SPF record", "v=spf1 ip4:170.168.61.189 -all", false},
+		{"No version tag", "l=https://example.com/logo.svg", false},
+		{"Empty", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isBIMIRecord(parseBIMITags(tt.record)); got != tt.expected {
+				t.Errorf("isBIMIRecord(%q) = %v, want %v", tt.record, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNotABIMIRecordError(t *testing.T) {
+	tests := []struct {
+		name       string
+		record     string
+		wantSubstr string
+	}{
+		{"DMARC misconfiguration", "v=DMARC1;p=reject", "DMARC record"},
+		{"SPF misconfiguration", "v=spf1 -all", "SPF record"},
+		{"DKIM misconfiguration", "v=DKIM1; k=rsa; p=abc", "DKIM record"},
+		{"Unknown", "garbage", "does not begin with v=BIMI1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := notABIMIRecordError(parseBIMITags(tt.record))
+			if !strings.HasPrefix(got, "No BIMI record found") {
+				t.Errorf("notABIMIRecordError(%q) = %q, want prefix %q", tt.record, got, "No BIMI record found")
+			}
+			if !strings.Contains(got, tt.wantSubstr) {
+				t.Errorf("notABIMIRecordError(%q) = %q, want to contain %q", tt.record, got, tt.wantSubstr)
 			}
 		})
 	}
