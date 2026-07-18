@@ -609,23 +609,23 @@ func (h *HeaderAnalyzer) hasReplyPrefix(subject string) bool {
 	s := strings.ToLower(strings.TrimSpace(subject))
 
 	prefixes := []string{
-		"re:",           // English / universal
-		"fwd:",          // English forward
-		"fw:",           // English forward (short)
-		"aw:",           // German Antwort
-		"wg:",           // German Weitergeleitet
-		"sv:",           // Scandinavian Svar
-		"vs:",           // Finnish Vastaus / Norwegian
-		"ref:",          // Some clients
-		"rép:",          // French Réponse
-		"tr:",           // French Transfert
-		"odp:",          // Polish Odpowiedź
-		"ynt:",          // Turkish Yanıt
-		"res:",          // Portuguese/Spanish Resposta/Respuesta
-		"enc:",          // Spanish Enviado/Reenviado
-		"vl:",           // Dutch Verwijzing
-		"antw:",         // Dutch Antwoord
-		"rv:",           // Norwegian/Swedish
+		"re:",   // English / universal
+		"fwd:",  // English forward
+		"fw:",   // English forward (short)
+		"aw:",   // German Antwort
+		"wg:",   // German Weitergeleitet
+		"sv:",   // Scandinavian Svar
+		"vs:",   // Finnish Vastaus / Norwegian
+		"ref:",  // Some clients
+		"rép:",  // French Réponse
+		"tr:",   // French Transfert
+		"odp:",  // Polish Odpowiedź
+		"ynt:",  // Turkish Yanıt
+		"res:",  // Portuguese/Spanish Resposta/Respuesta
+		"enc:",  // Spanish Enviado/Reenviado
+		"vl:",   // Dutch Verwijzing
+		"antw:", // Dutch Antwoord
+		"rv:",   // Norwegian/Swedish
 	}
 
 	for _, p := range prefixes {

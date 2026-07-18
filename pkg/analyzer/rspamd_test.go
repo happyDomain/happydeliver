@@ -42,13 +42,13 @@ func TestAnalyzeRspamdNoHeaders(t *testing.T) {
 
 func TestParseSpamdResult(t *testing.T) {
 	tests := []struct {
-		name               string
-		header             string
-		expectedScore      float32
-		expectedThreshold  float32
-		expectedIsSpam     bool
-		expectedSymbols    map[string]float32
-		expectedSymParams  map[string]string
+		name              string
+		header            string
+		expectedScore     float32
+		expectedThreshold float32
+		expectedIsSpam    bool
+		expectedSymbols   map[string]float32
+		expectedSymParams map[string]string
 	}{
 		{
 			name:              "Clean email negative score",
@@ -71,8 +71,8 @@ func TestParseSpamdResult(t *testing.T) {
 			expectedThreshold: 15.00,
 			expectedIsSpam:    true,
 			expectedSymbols: map[string]float32{
-				"BAYES_99":        5.00,
-				"SPOOFED_SENDER":  3.50,
+				"BAYES_99":       5.00,
+				"SPOOFED_SENDER": 3.50,
 			},
 			expectedSymParams: map[string]string{
 				"BAYES_99": "1.00",
@@ -183,8 +183,8 @@ func TestAnalyzeRspamd(t *testing.T) {
 		{
 			name: "Full headers clean email",
 			headers: map[string]string{
-				"X-Spamd-Result": "default: False [-3.91 / 15.00];\n\tALL_TRUSTED(-1.00)[local]",
-				"X-Rspamd-Score": "-3.91",
+				"X-Spamd-Result":  "default: False [-3.91 / 15.00];\n\tALL_TRUSTED(-1.00)[local]",
+				"X-Rspamd-Score":  "-3.91",
 				"X-Rspamd-Server": "mail.example.com",
 			},
 			expectedScore:     -3.91,
@@ -412,4 +412,3 @@ func TestAnalyzeRspamdRealEmail(t *testing.T) {
 		t.Errorf("CalculateRspamdScore = %d, want 100", score)
 	}
 }
-

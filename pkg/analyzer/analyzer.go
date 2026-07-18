@@ -28,8 +28,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // EmailAnalyzer provides high-level email analysis functionality
