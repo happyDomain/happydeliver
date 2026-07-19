@@ -538,6 +538,40 @@
         }
     }
 
+    function formatAge(ms: number): string {
+        // Pinned to English: this phrase is embedded in a hardcoded English sentence.
+        const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+        const minutes = Math.round(ms / 60000);
+        if (minutes < 60) {
+            return rtf.format(-minutes, "minute");
+        }
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) {
+            return rtf.format(-hours, "hour");
+        }
+        return rtf.format(-Math.round(hours / 24), "day");
+    }
+
+    function formatTimestamp(dateStr: string): string {
+        return new Date(dateStr).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
+    const reportAge = $derived(Date.now() - new Date(report.created_at).getTime());
+    const knownAge = $derived(!Number.isNaN(reportAge));
+
+    const staleness = $derived.by((): "info" | "warning" | null => {
+        if (!knownAge) return null;
+        if (reportAge > 24 * 3600 * 1000) return "warning";
+        if (reportAge > 6 * 3600 * 1000) return "info";
+        return null;
+    });
+
     const summarySegments = $derived(buildSummary());
 </script>
 
@@ -547,7 +581,19 @@
             <i class="bi bi-card-text me-2"></i>
             Summary
         </h5>
-        <p class="card-text text-muted" class:mb-0={!children} style="line-height: 1.8;">
+        {#if staleness}
+            <div class="alert alert-{staleness} py-2 px-3 mb-3 small">
+                <i class="bi bi-clock-history me-2"></i>
+                This report was generated <strong>{formatAge(reportAge)}</strong> and may no longer reflect
+                your current configuration. Send another email to the same test address to re-run the
+                checks.
+            </div>
+        {/if}
+        <p
+            class="card-text text-muted"
+            class:mb-0={!children && !knownAge}
+            style="line-height: 1.8;"
+        >
             {#each summarySegments as segment}
                 {#if segment.link}
                     <a
@@ -586,6 +632,15 @@
                 it will most likely be rejected by most providers.{:else}!{/if} Check the details below
             🔽
         </p>
+        {#if knownAge}
+            <p class="text-muted small fst-italic" class:mb-0={!children}>
+                <i class="bi bi-clock-history me-1"></i>
+                <!-- The alert above already states the age: don't repeat it here. -->
+                Report generated {staleness ? "" : formatAge(reportAge) + ", "}on {formatTimestamp(
+                    report.created_at,
+                )}.
+            </p>
+        {/if}
         {@render children?.()}
     </div>
 </div>
