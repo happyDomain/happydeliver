@@ -109,7 +109,8 @@
 
         // SPF specific issues
         if (spfResult && spfResult !== "pass") {
-            segments.push({ text: ". SPF check " });
+            // The "none" case reads as its own sentence, not as a "SPF check ..." clause.
+            segments.push({ text: spfResult === "none" ? ". " : ". SPF check " });
             if (spfResult === "fail") {
                 segments.push({
                     text: "failed",
