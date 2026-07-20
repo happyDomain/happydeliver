@@ -8,6 +8,8 @@
 
     let { receivedChain }: Props = $props();
 
+    const last = receivedChain.length - 1;
+
     // Mirror of the backend protocolIndicatesTLS (RFC 3848): the transport keyword
     // gains a trailing "S" when TLS was used (ESMTPS, ESMTPSA, SMTPS, LMTPS, LMTPSA...).
     function protocolIndicatesTLS(withProto: string | undefined | null): boolean {
@@ -25,20 +27,18 @@
 </script>
 
 {#if receivedChain && receivedChain.length > 0}
-    <div class="card shadow-sm" id="email-path">
-        <div
-            class="card-header"
-            class:bg-white={$theme === "light"}
-            class:bg-dark={$theme !== "light"}
-        >
+    <div id="email-path">
+        <div class:bg-white={$theme === "light"} class:bg-dark={$theme !== "light"}>
             <h4 class="mb-0">
                 <i class="bi bi-pin-map me-2"></i>
                 Email Path
             </h4>
         </div>
-        <div class="list-group list-group-flush">
+        <div class="timeline">
+            <div class="rail"></div>
             {#each receivedChain as hop, i}
-                <div class="list-group-item">
+                <div class="line" class:lastline={i === last}>
+                    <div class="dot" class:final={i === last}></div>
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">
                             <span class="badge bg-primary me-2">{receivedChain.length - i}</span>
@@ -137,3 +137,65 @@
         </div>
     </div>
 {/if}
+
+<style>
+    .timeline {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        padding-left: 28px;
+    }
+    .rail {
+        position: absolute;
+        left: 10px;
+        top: 14px;
+        bottom: 14px;
+        width: 1px;
+        background: var(--bs-border-color);
+    }
+    .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--bs-secondary);
+        position: relative;
+    }
+    .row.lastrow {
+        border-bottom: none;
+    }
+    .dot {
+        position: absolute;
+        left: -23px;
+        top: 18px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--bs-canvas);
+        border: 2px solid var(--bs-border-color);
+    }
+    .dot.final {
+        background: var(--bs-primary);
+        border-color: var(--bs-primary);
+    }
+    .host {
+        font-family: var(--hd-font-mono);
+        font-size: 13px;
+        color: var(--hd-fg-1);
+        font-weight: 500;
+    }
+    .sub {
+        font-family: var(--hd-font-mono);
+        font-size: 11px;
+        color: var(--hd-fg-4);
+        margin-top: 3px;
+    }
+    .side {
+        text-align: right;
+    }
+    .delay {
+        font-family: var(--hd-font-mono);
+        font-size: 12px;
+        color: var(--hd-fg-2);
+    }
+</style>

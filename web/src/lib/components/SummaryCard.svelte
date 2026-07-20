@@ -441,7 +441,11 @@
 
         // One-click unsubscribe check
         const unsubscribeMethods = report.content_analysis?.unsubscribe_methods;
-        if (unsubscribeMethods && unsubscribeMethods.length > 0 && !unsubscribeMethods.includes("one-click")) {
+        if (
+            unsubscribeMethods &&
+            unsubscribeMethods.length > 0 &&
+            !unsubscribeMethods.includes("one-click")
+        ) {
             segments.push({ text: ". This email could benefit from " });
             segments.push({
                 text: "one-click unsubscribe",
@@ -576,74 +580,57 @@
     const summarySegments = $derived(buildSummary());
 </script>
 
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body p-4">
-        <h5 class="card-title mb-3">
-            <i class="bi bi-card-text me-2"></i>
-            Summary
-        </h5>
-        {#if staleness}
-            <div class="alert alert-{staleness} py-2 px-3 mb-3 small">
-                <i class="bi bi-clock-history me-2"></i>
-                This report was generated <strong>{formatAge(reportAge)}</strong> and may no longer reflect
-                your current configuration. Send another email to the same test address to re-run the
-                checks.
-            </div>
-        {/if}
-        <p
-            class="card-text text-muted"
-            class:mb-0={!children && !knownAge}
-            style="line-height: 1.8;"
-        >
-            {#each summarySegments as segment}
-                {#if segment.link}
-                    <a
-                        href={segment.link}
-                        class="summary-link {segment.highlight
-                            ? getColorClass(segment.highlight.color)
-                            : ''} {segment.highlight?.bold ? 'highlighted' : ''} {segment.highlight
-                            ?.emphasis
-                            ? 'fst-italic'
-                            : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}"
-                    >
-                        {segment.text}
-                    </a>
-                {:else if segment.highlight}
-                    <span
-                        class="{getColorClass(segment.highlight.color)} {segment.highlight.bold
-                            ? 'highlighted'
-                            : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment
-                            .highlight?.monospace
-                            ? 'font-monospace'
-                            : ''}"
-                    >
-                        {segment.text}
-                    </span>
-                {:else}
+<div class="">
+    <h5 class="mb-3">
+        <i class="bi bi-card-text me-2"></i>
+        Summary
+    </h5>
+    {#if staleness}
+        <div class="alert alert-{staleness} py-2 px-3 mb-3 small">
+            <i class="bi bi-clock-history me-2"></i>
+            This report was generated <strong>{formatAge(reportAge)}</strong> and may no longer reflect
+            your current configuration. Send another email to the same test address to re-run the checks.
+        </div>
+    {/if}
+    <p class="card-text text-muted" class:mb-0={!children && !knownAge} style="line-height: 1.8;">
+        {#each summarySegments as segment}
+            {#if segment.link}
+                <a
+                    href={segment.link}
+                    class="summary-link {segment.highlight
+                        ? getColorClass(segment.highlight.color)
+                        : ''} {segment.highlight?.bold ? 'highlighted' : ''} {segment.highlight
+                        ?.emphasis
+                        ? 'fst-italic'
+                        : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}"
+                >
                     {segment.text}
-                {/if}
-            {/each}
-            Overall, your email received a grade <GradeDisplay
-                grade={report.grade}
-                score={report.score}
-                size="inline"
-            />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}:
-                you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}:
-                you could have delivery issues with common providers.{:else if report.grade == "F"}:
-                it will most likely be rejected by most providers.{:else}!{/if} Check the details below
-            🔽
-        </p>
-        {#if knownAge}
-            <p class="text-muted small fst-italic" class:mb-0={!children}>
-                <i class="bi bi-clock-history me-1"></i>
-                <!-- The alert above already states the age: don't repeat it here. -->
-                Report generated {staleness ? "" : formatAge(reportAge) + ", "}on {formatTimestamp(
-                    report.created_at,
-                )}.
-            </p>
-        {/if}
-        {@render children?.()}
-    </div>
+                </a>
+            {:else if segment.highlight}
+                <span
+                    class="{getColorClass(segment.highlight.color)} {segment.highlight.bold
+                        ? 'highlighted'
+                        : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment.highlight
+                        ?.monospace
+                        ? 'font-monospace'
+                        : ''}"
+                >
+                    {segment.text}
+                </span>
+            {:else}
+                {segment.text}
+            {/if}
+        {/each}
+        Overall, your email received a grade <GradeDisplay
+            grade={report.grade}
+            score={report.score}
+            size="inline"
+        />{#if report.grade == "A" || report.grade == "A+"}, well done 🎉{:else if report.grade == "C" || report.grade == "D"}:
+            you should try to increase your score to ensure inbox delivery.{:else if report.grade == "E"}:
+            you could have delivery issues with common providers.{:else if report.grade == "F"}: it
+            will most likely be rejected by most providers.{:else}!{/if} Check the details below 🔽
+    </p>
+    {@render children?.()}
 </div>
 
 <style>

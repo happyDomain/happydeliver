@@ -277,6 +277,7 @@
                         score={report.score}
                         summary={report.summary}
                         {reanalyzing}
+                        {report}
                     />
                 </div>
             </div>
