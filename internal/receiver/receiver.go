@@ -187,10 +187,10 @@ func ExtractRecipientFromHeaders(rawEmail []byte) (string, error) {
 
 	// Look for common recipient headers
 	headerPatterns := []string{
-		`(?i)^To:\s*(.+)$`,
-		`(?i)^X-Original-To:\s*(.+)$`,
-		`(?i)^Delivered-To:\s*(.+)$`,
-		`(?i)^Envelope-To:\s*(.+)$`,
+		`(?im)^To:\s*(.+)$`,
+		`(?im)^X-Original-To:\s*(.+)$`,
+		`(?im)^Delivered-To:\s*(.+)$`,
+		`(?im)^Envelope-To:\s*(.+)$`,
 	}
 
 	for _, pattern := range headerPatterns {
