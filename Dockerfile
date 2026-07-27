@@ -160,6 +160,7 @@ RUN chmod +x /usr/local/bin/happyDeliver
 # Copy configuration files
 COPY docker/postfix/ /etc/postfix/
 COPY docker/authentication_milter/authentication_milter.json /etc/authentication_milter.json
+COPY docker/authentication_milter/mail-dmarc.ini /etc/mail-dmarc.ini
 COPY docker/spamassassin/ /etc/mail/spamassassin/
 COPY docker/rspamd/local.d/ /etc/rspamd/local.d/
 COPY docker/supervisor/ /etc/supervisor/

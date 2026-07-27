@@ -40,6 +40,7 @@ EOF
 
 # Replace placeholders in configurations
 sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/authentication_milter.json
+sed -i -e "s/__HOSTNAME__/${HOSTNAME}/g" -e "s/__DOMAIN__/${HAPPYDELIVER_DOMAIN}/g" /etc/mail-dmarc.ini
 
 # Initialize Postfix aliases
 if [ -f /etc/postfix/aliases ]; then

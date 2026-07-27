@@ -45,7 +45,9 @@
 
         "DMARC" : {
             "hide_none" : 0,
-            "detect_list_id" : "1"
+            "detect_list_id" : "1",
+            "config_file" : "/etc/mail-dmarc.ini",
+            "no_report" : 1
         },
 
         "BIMI" : {},
