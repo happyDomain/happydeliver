@@ -276,6 +276,7 @@
                         grade={report.grade}
                         score={report.score}
                         summary={report.summary}
+                        authentication={report.authentication}
                         {reanalyzing}
                     />
                 </div>

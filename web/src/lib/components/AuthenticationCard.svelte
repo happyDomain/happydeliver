@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
+    import { hasNoAuthenticationResults } from "$lib/authentication";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -13,11 +14,7 @@
 
     let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
 
-    let allRequiredMissing = $derived(
-        !authentication.spf &&
-            (!authentication.dkim || authentication.dkim.length === 0) &&
-            !authentication.dmarc,
-    );
+    let allRequiredMissing = $derived(hasNoAuthenticationResults(authentication));
 
     function getAuthResultClass(result: string, noneIsFail: boolean): string {
         switch (result) {
@@ -92,13 +89,18 @@
                 Authentication
             </span>
             <span>
-                {#if authenticationScore !== undefined}
-                    <span class="badge bg-{getScoreColorClass(authenticationScore)}">
-                        {authenticationScore}%
-                    </span>
-                {/if}
-                {#if authenticationGrade !== undefined}
-                    <GradeDisplay grade={authenticationGrade} size="small" />
+                {#if allRequiredMissing}
+                    <!-- No Authentication-Results header: the score below is not the sender's. -->
+                    <GradeDisplay grade="N/A" size="small" />
+                {:else}
+                    {#if authenticationScore !== undefined}
+                        <span class="badge bg-{getScoreColorClass(authenticationScore)}">
+                            {authenticationScore}%
+                        </span>
+                    {/if}
+                    {#if authenticationGrade !== undefined}
+                        <GradeDisplay grade={authenticationGrade} size="small" />
+                    {/if}
                 {/if}
             </span>
         </h4>
@@ -109,7 +111,10 @@
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 <strong>No authentication results found.</strong>
                 <p class="mb-0 mt-1">
-                    This usually means either:
+                    This is not a problem with the analysed email: this server could not evaluate
+                    SPF, DKIM and DMARC, so the authentication grade is reported as
+                    <strong>N/A</strong>. The administrator of this HappyDeliver instance should
+                    look at it, as it usually means either:
                 </p>
                 <ul class="mb-0 mt-1">
                     <li>
