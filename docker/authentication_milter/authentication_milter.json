@@ -13,6 +13,13 @@
     "dns_timeout"     : 10,
     "dns_retry"       : 2,
 
+    "min_children"           : 2,
+    "max_children"           : 8,
+    "min_spare_children"     : 1,
+    "max_spare_children"     : 2,
+    "max_requests_per_child" : 100,
+    "max_dequeue"            : 1,
+
     "handlers" : {
 
         "Sanitize" : {
