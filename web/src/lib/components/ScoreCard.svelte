@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { ScoreSummary } from "$lib/api/types.gen";
+    import type { AuthenticationResults, ScoreSummary } from "$lib/api/types.gen";
+    import { hasNoAuthenticationResults } from "$lib/authentication";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
 
@@ -8,9 +9,14 @@
         score: number;
         reanalyzing?: boolean;
         summary?: ScoreSummary;
+        authentication?: AuthenticationResults;
     }
 
-    let { grade, score, reanalyzing, summary }: Props = $props();
+    let { grade, score, reanalyzing, summary, authentication }: Props = $props();
+
+    // Without an Authentication-Results header there is nothing to grade: the
+    // computed F reflects our own configuration, not the sender's.
+    let authenticationUnavailable = $derived(hasNoAuthenticationResults(authentication));
 
     function getScoreLabel(grade: string): string {
         switch (grade) {
@@ -72,11 +78,18 @@
                             class="p-2 rounded text-center summary-card"
                             class:bg-light={$theme === "light"}
                             class:bg-secondary={$theme !== "light"}
+                            title={authenticationUnavailable
+                                ? "This server did not report any authentication result, so no grade can be computed. Contact the administrator of this instance."
+                                : undefined}
                         >
-                            <GradeDisplay
-                                grade={summary.authentication_grade}
-                                score={summary.authentication_score}
-                            />
+                            {#if authenticationUnavailable}
+                                <GradeDisplay grade="N/A" />
+                            {:else}
+                                <GradeDisplay
+                                    grade={summary.authentication_grade}
+                                    score={summary.authentication_score}
+                                />
+                            {/if}
                             <small class="text-muted d-block">Authentication</small>
                         </div>
                     </a>

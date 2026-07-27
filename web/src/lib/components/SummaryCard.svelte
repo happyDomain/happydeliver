@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Report } from "$lib/api/types.gen";
+    import { hasNoAuthenticationResults } from "$lib/authentication";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface TextSegment {
@@ -19,6 +20,8 @@
     }
 
     let { children, report }: Props = $props();
+
+    const authenticationUnavailable = $derived(hasNoAuthenticationResults(report.authentication));
 
     function buildSummary(): TextSegment[] {
         const segments: TextSegment[] = [];
@@ -80,7 +83,15 @@
         const dmarcResult = report.authentication?.dmarc?.result;
 
         segments.push({ text: " which is " });
-        if (spfResult === "pass" || dmarcResult === "pass") {
+        if (authenticationUnavailable) {
+            // No Authentication-Results header at all: don't blame the sender.
+            segments.push({
+                text: "of unknown authentication status",
+                highlight: { color: "warning", bold: true },
+                link: "#authentication-details",
+            });
+            segments.push({ text: " (this server did not verify SPF, DKIM nor DMARC)" });
+        } else if (spfResult === "pass" || dmarcResult === "pass") {
             segments.push({
                 text: "authenticated",
                 highlight: { color: "good", bold: true },
@@ -441,7 +452,11 @@
 
         // One-click unsubscribe check
         const unsubscribeMethods = report.content_analysis?.unsubscribe_methods;
-        if (unsubscribeMethods && unsubscribeMethods.length > 0 && !unsubscribeMethods.includes("one-click")) {
+        if (
+            unsubscribeMethods &&
+            unsubscribeMethods.length > 0 &&
+            !unsubscribeMethods.includes("one-click")
+        ) {
             segments.push({ text: ". This email could benefit from " });
             segments.push({
                 text: "one-click unsubscribe",
@@ -582,6 +597,23 @@
             <i class="bi bi-card-text me-2"></i>
             Summary
         </h5>
+        {#if authenticationUnavailable}
+            <div class="alert alert-warning py-2 px-3 mb-3 small" id="authentication-unavailable">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong
+                    >Authentication could not be checked: this is a server-side issue.</strong
+                >
+                <span class="d-block mt-1">
+                    This HappyDeliver instance did not add an <code>Authentication-Results</code>
+                    header to the received message, so SPF, DKIM and DMARC results are unknown and reported
+                    as <strong>N/A</strong> instead of a grade. Nothing in the summary below
+                    reflects a problem with your email on this point; the
+                    <strong>administrator of this instance</strong> should configure the receiving
+                    mail server to verify authentication (or fix the
+                    <code>--receiver-hostname</code> setting).
+                </span>
+            </div>
+        {/if}
         {#if staleness}
             <div class="alert alert-{staleness} py-2 px-3 mb-3 small">
                 <i class="bi bi-clock-history me-2"></i>
