@@ -32,10 +32,9 @@ RUN go generate ./... && \
     CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o happyDeliver ./cmd/happyDeliver
 
 # Stage 3: Prepare perl and spamass-milt
-FROM alpine:3 AS pl
+FROM alpine:3.24 AS pl
 
-RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-    apk add --no-cache \
+RUN apk add --no-cache \
     build-base \
     libmilter-dev \
     musl-obstack-dev \
@@ -56,7 +55,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     perl-json-xs \
     perl-list-moreutils \
     perl-moose \
-    perl-net-idn-encode@edge \
+    perl-net-idn-encode \
     perl-net-ssleay \
     perl-netaddr-ip \
     perl-package-stash \
@@ -85,11 +84,10 @@ RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milt
     ./configure && make install
 
 # Stage 4: Runtime image with Postfix and all filters
-FROM alpine:3
+FROM alpine:3.24
 
 # Install all required packages
-RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-    apk add --no-cache \
+RUN apk add --no-cache \
     bash \
     ca-certificates \
     libmilter \
@@ -109,7 +107,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
     perl-json-xs \
     perl-list-moreutils \
     perl-moose \
-    perl-net-idn-encode@edge \
+    perl-net-idn-encode \
     perl-net-ssleay \
     perl-netaddr-ip \
     perl-package-stash \
