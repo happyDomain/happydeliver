@@ -4,6 +4,12 @@
     "local>iac/renovate-config",
     "local>iac/renovate-config//automerge-common"
   ],
+  "customDatasources": {
+    "savannah-spamass-milter": {
+      "defaultRegistryUrlTemplate": "https://download.savannah.nongnu.org/releases/spamass-milt/",
+      "format": "html"
+    }
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -20,6 +26,11 @@
       "matchDatasources": ["cpan"],
       "matchPackageNames": ["Mail::DMARC"],
       "allowedVersions": "<1.20260612"
+    },
+    {
+      "description": "Savannah serves spamass-milter as a plain directory index; keep only the .tar.gz entries (drops .sig, .bz2 and the sort links).",
+      "matchDatasources": ["custom.savannah-spamass-milter"],
+      "extractVersion": "^spamass-milter-(?<version>.+)\\.tar\\.gz$"
     }
   ]
 }

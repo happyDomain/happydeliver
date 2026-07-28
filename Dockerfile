@@ -86,9 +86,11 @@ RUN cpanm --notest Mail::SPF && \
     cpanm --notest "Mail::DMARC~== ${MAIL_DMARC_VERSION}" && \
     cpanm --notest "Mail::Milter::Authentication~== ${AUTHENTICATION_MILTER_VERSION}";
 
-RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milter-0.4.0.tar.gz && \
-    tar xzf spamass-milter-0.4.0.tar.gz && \
-    cd spamass-milter-0.4.0 && \
+# renovate: datasource=custom.savannah-spamass-milter depName=spamass-milter versioning=loose
+ARG SPAMASS_MILT_VERSION=0.4.0
+RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milter-${SPAMASS_MILT_VERSION}.tar.gz && \
+    tar xzf spamass-milter-${SPAMASS_MILT_VERSION}.tar.gz && \
+    cd spamass-milter-${SPAMASS_MILT_VERSION} && \
     ./configure && make install
 
 # Stage 4: Runtime image with Postfix and all filters
