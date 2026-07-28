@@ -40,6 +40,12 @@ EOF
 
 # Replace placeholders in configurations
 sed -i "s/__HOSTNAME__/${HOSTNAME}/g" /etc/authentication_milter.json
+
+# Opt-in verbose milter tracing (MILTER_DEBUG=1).
+if [ "${MILTER_DEBUG}" = "1" ]; then
+    echo "Enabling authentication_milter debug logging..."
+    sed -i 's/"debug"       : 0,/"debug"       : 1,/' /etc/authentication_milter.json
+fi
 sed -i -e "s/__HOSTNAME__/${HOSTNAME}/g" -e "s/__DOMAIN__/${HAPPYDELIVER_DOMAIN}/g" /etc/mail-dmarc.ini
 
 # Initialize Postfix aliases

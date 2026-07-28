@@ -1,6 +1,8 @@
 {
     "logtoerr"    : "1",
     "error_log"   : "",
+
+    "debug"       : 0,
     "connection"  : "unix:/var/spool/postfix/authentication_milter/authentication_milter.sock",
     "umask"       : "0007",
     "runas"       : "mail",
