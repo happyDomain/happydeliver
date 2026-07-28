@@ -74,9 +74,17 @@ RUN apk add --no-cache \
     && \
     ln -s /usr/bin/ld /bin/ld
 
+# PINNED: >=1.20260612 recurses unboundedly with the milter's Resolver (OOM, no
+# mail authenticated). Unpin once fastmail/authentication_milter#180 is released.
+# renovate: datasource=cpan depName=Mail::DMARC
+ARG MAIL_DMARC_VERSION=1.20260306
+# renovate: datasource=cpan depName=Mail::Milter::Authentication
+ARG AUTHENTICATION_MILTER_VERSION=4.20260722
+
 RUN cpanm --notest Mail::SPF && \
     cpanm --notest Mail::DKIM && \
-    cpanm --notest Mail::Milter::Authentication
+    cpanm --notest "Mail::DMARC~== ${MAIL_DMARC_VERSION}" && \
+    cpanm --notest "Mail::Milter::Authentication~== ${AUTHENTICATION_MILTER_VERSION}";
 
 RUN wget https://download.savannah.nongnu.org/releases/spamass-milt/spamass-milter-0.4.0.tar.gz && \
     tar xzf spamass-milter-0.4.0.tar.gz && \

@@ -3,5 +3,23 @@
   "extends": [
     "local>iac/renovate-config",
     "local>iac/renovate-config//automerge-common"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update *_VERSION build args in Dockerfile carrying a renovate annotation",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+ARG \\w+_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Mail::DMARC >=1.20260612 performs a DNS tree walk in get_organizational_domain (RFC 9989), which recurses unboundedly with authentication_milter's Resolver: children OOM and no mail is authenticated. Keep below that until fastmail/authentication_milter#180 ships a fix.",
+      "matchDatasources": ["cpan"],
+      "matchPackageNames": ["Mail::DMARC"],
+      "allowedVersions": "<1.20260612"
+    }
   ]
 }
