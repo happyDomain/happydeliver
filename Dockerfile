@@ -79,7 +79,7 @@ RUN apk add --no-cache \
 # renovate: datasource=cpan depName=Mail::DMARC
 ARG MAIL_DMARC_VERSION=1.20260306
 # renovate: datasource=cpan depName=Mail::Milter::Authentication
-ARG AUTHENTICATION_MILTER_VERSION=4.20260722
+ARG AUTHENTICATION_MILTER_VERSION=4.20260730
 
 RUN cpanm --notest Mail::SPF && \
     cpanm --notest Mail::DKIM && \
