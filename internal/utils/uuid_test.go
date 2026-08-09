@@ -43,9 +43,14 @@ func TestUUIDToBase32(t *testing.T) {
 			t.Errorf("expected 3 hyphens, got %d in %q", n, got)
 		}
 
-		for seg := range strings.SplitSeq(got, "-") {
-			if len(seg) > 7 {
-				t.Errorf("segment %q longer than 7 chars in %q", seg, got)
+		segs := strings.Split(got, "-")
+		for i, seg := range segs {
+			if i < len(segs)-1 {
+				if len(seg) != 7 {
+					t.Errorf("segment %d: expected 7 chars, got %d in %q", i, len(seg), got)
+				}
+			} else if len(seg) == 0 || len(seg) > 7 {
+				t.Errorf("last segment %q has invalid length in %q", seg, got)
 			}
 		}
 	})
