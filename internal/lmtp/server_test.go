@@ -160,10 +160,23 @@ func TestSessionReset(t *testing.T) {
 }
 
 func TestSessionLogout(t *testing.T) {
-	s := &Session{}
-	if err := s.Logout(); err != nil {
-		t.Errorf("Logout should succeed, got %v", err)
-	}
+	t.Run("new session", func(t *testing.T) {
+		s := &Session{}
+		if err := s.Logout(); err != nil {
+			t.Errorf("Logout should succeed, got %v", err)
+		}
+	})
+
+	t.Run("session with prior activity", func(t *testing.T) {
+		s := &Session{
+			backend:    &Backend{},
+			from:       "sender@example.com",
+			recipients: []string{"a@example.com", "b@example.com"},
+		}
+		if err := s.Logout(); err != nil {
+			t.Errorf("Logout should succeed even after MAIL/RCPT activity, got %v", err)
+		}
+	})
 }
 
 func TestStartServerListenError(t *testing.T) {
