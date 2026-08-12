@@ -19,6 +19,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package lmtp implements the LMTP (Local Mail Transfer Protocol) server
+// that receives test emails from the local MTA and hands them off to the
+// receiver/analyzer pipeline. LMTP is SMTP's variant for local delivery
+// (RFC 2033): unlike SMTP it reports a separate delivery status per
+// recipient instead of a single status for the whole message, which is why
+// the tests below exercise the per-recipient RCPT/DATA behavior explicitly.
+//
+// This file tests the Backend (session factory) and Session (one LMTP
+// conversation: MAIL FROM / RCPT TO / DATA / RSET / QUIT) against a
+// mockStorage in-memory stand-in, plus StartServer's listener setup.
 package lmtp
 
 import (
