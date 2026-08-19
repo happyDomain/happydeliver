@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -199,9 +200,11 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 				partContentType = "text/plain"
 			}
 
-			// Check if this part is also multipart
+			// Check if this part is also multipart, or a forwarded/embedded
+			// message whose own attachments must remain reachable
 			partMediaType, _, _ := mime.ParseMediaType(partContentType)
-			if strings.HasPrefix(partMediaType, "multipart/") {
+			switch {
+			case strings.HasPrefix(partMediaType, "multipart/"):
 				// Recursively parse nested multipart
 				nestedParts, err := parseMIMEParts(part, partContentType)
 				if err != nil {
@@ -212,7 +215,31 @@ func parseMIMEParts(body io.Reader, contentType string) ([]MessagePart, error) {
 					Encoding:    part.Header.Get("Content-Transfer-Encoding"),
 					Parts:       nestedParts,
 				})
-			} else {
+			case partMediaType == "message/rfc822" || partMediaType == "message/global" || partMediaType == "message/news":
+				encoding := part.Header.Get("Content-Transfer-Encoding")
+				raw, err := io.ReadAll(part)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read embedded message: %w", err)
+				}
+				decoded, err := (&MessagePart{Content: string(raw), Encoding: encoding}).DecodedBytes()
+				if err != nil {
+					decoded = raw
+				}
+
+				var nestedParts []MessagePart
+				if nested, err := ParseEmail(bytes.NewReader(decoded)); err == nil {
+					nestedParts = nested.Parts
+				}
+
+				parts = append(parts, MessagePart{
+					ContentType: partContentType,
+					Encoding:    encoding,
+					Filename:    partFilename(part, partContentType),
+					Disposition: partDisposition(part.Header.Get("Content-Disposition")),
+					ContentID:   strings.Trim(part.Header.Get("Content-Id"), "<>"),
+					Parts:       nestedParts,
+				})
+			default:
 				// Read the part content
 				content, err := io.ReadAll(part)
 				if err != nil {
