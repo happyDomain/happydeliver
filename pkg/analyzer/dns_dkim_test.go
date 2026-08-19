@@ -247,6 +247,15 @@ func TestParseDKIMSignatures(t *testing.T) {
 	}
 }
 
+// The next three tests exercise checkDKIMRecord's classification of a
+// non-conforming TXT record found at the DKIM selector location. The
+// decisive factor is the "v=" tag: an explicit "v=" that isn't "DKIM1"
+// (e.g. a DMARC record) is reported as a foreign record, not a malformed
+// DKIM one (TestCheckDKIMRecordRejectsForeignRecord); "v=DKIM1" present but
+// no "p=" key is reported as a DKIM record missing its public key
+// (TestCheckDKIMRecordMissingPublicKey); and no "v=" tag at all, with no
+// "p=" either, is treated the same as a foreign record — an unrelated TXT
+// value that happens to live at that name (TestCheckDKIMRecordUnrelatedTXT).
 func TestCheckDKIMRecordRejectsForeignRecord(t *testing.T) {
 	// A misbehaving resolver serving a DMARC record where the DKIM key should be
 	// must not be reported as a malformed DKIM record.
@@ -346,6 +355,13 @@ func TestParseDKIMTags(t *testing.T) {
 	}
 }
 
+// TestParseKeySize exercises parseKeySize, which derives a bit size from the
+// "k=" and "p=" DKIM tags. For "ed25519" it always returns 256 regardless of
+// "p="; for "rsa" (or an empty "k=", which defaults to RSA per RFC 6376) it
+// base64-decodes "p=" (with or without padding) as a DER-encoded PKIX public
+// key and returns its size in bits, e.g. a 2048-bit RSA key's DER yields
+// 2048. It returns nil for an unrecognized key type, or for "rsa"/"" whose
+// "p=" isn't valid base64 or doesn't decode to a parseable public key.
 func TestParseKeySize(t *testing.T) {
 	// Generate a real RSA key for testing
 	rsaKey1024, _ := rsa.GenerateKey(rand.Reader, 1024)

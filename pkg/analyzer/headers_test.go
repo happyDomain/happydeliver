@@ -215,6 +215,12 @@ func TestCheckHeader(t *testing.T) {
 	}
 }
 
+// TestHeaderAnalyzer_IsValidMessageID exercises isValidMessageID. A
+// Message-ID is valid only in the RFC 5322 "<local@domain>" shape:
+// surrounded by angle brackets, exactly one "@" splitting a non-empty local
+// part from a non-empty domain, e.g. "<abc123@example.com>". Missing the
+// brackets, missing or duplicated "@", or an empty local/domain part (e.g.
+// "<@example.com>" or "<abc123@>") are all invalid.
 func TestHeaderAnalyzer_IsValidMessageID(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -270,6 +276,12 @@ func TestHeaderAnalyzer_IsValidMessageID(t *testing.T) {
 	}
 }
 
+// TestHeaderAnalyzer_ExtractDomain exercises extractDomain, which returns
+// everything after the last "@" in the input, after trimming leading/
+// trailing '<', '>' and spaces. It tolerates a display name before the
+// address ("User Name <user@example.com>" -> "example.com") and surrounding
+// whitespace, but returns "" when there's no "@" at all (e.g. "not-an-email"
+// or "").
 func TestHeaderAnalyzer_ExtractDomain(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -400,6 +412,15 @@ func createHeaderWithFields(fields map[string]string) mail.Header {
 	return header
 }
 
+// TestParseReceivedChain exercises parseReceivedChain, which turns each
+// "Received:" header into a hop by pulling out loosely-ordered clauses:
+// "from <host> (... [<ip>])", "by <host>", "with <protocol>", "id <id>", and
+// a trailing date. Only "from" and "by" are needed for a hop to be produced
+// at all (e.g. "from unknown by localhost" still yields one hop with just
+// those two fields); the IP is taken from inside the "from" clause's
+// brackets and has any "IPv6:" label stripped (e.g. "[IPv6:2607:...]" ->
+// "2607:..."); folded/multi-line header values are unfolded before parsing,
+// so a clause split across lines is still recognized.
 func TestParseReceivedChain(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -570,6 +591,11 @@ func TestParseReceivedChain(t *testing.T) {
 	}
 }
 
+// TestParseReceivedHeader exercises parseReceivedHeader, the single-header
+// parser behind parseReceivedChain (see the criteria documented on
+// TestParseReceivedChain above). It additionally covers a "by"-only hop with
+// no "from" clause at all ("by grunt.ycc.fr ... id 67276801A8"), e.g. a
+// Postfix local-delivery line, which still produces a hop.
 func TestParseReceivedHeader(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -797,6 +823,14 @@ func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 	}
 }
 
+// TestHeaderAnalyzer_ParseEmailDate exercises parseEmailDate. Accepted input
+// is an RFC 5322-style date, with or without a leading day-of-week, a
+// single- or double-digit day, and either a numeric zone offset ("-0700") or
+// zone abbreviation ("MST"), optionally followed by a parenthesized zone
+// comment ("+0000 (UTC)") — e.g. "Mon, 02 Jan 2006 15:04:05 -0700" and
+// "2 Jan 2006 15:04:05 -0700" both parse. Anything else fails, including
+// well-formed-but-different formats: an empty string, free text ("not a
+// date"), and even ISO 8601 ("2024-01-01T12:00:00Z") are all rejected.
 func TestHeaderAnalyzer_ParseEmailDate(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -975,6 +1009,14 @@ func TestCheckHeader_DateValidation(t *testing.T) {
 	}
 }
 
+// TestHasReplyPrefix exercises hasReplyPrefix, which reports true if the
+// subject, case-insensitively, starts with one of a fixed list of
+// reply/forward markers immediately followed by ":" — "re:", "fwd:", "fw:",
+// plus non-English equivalents like German "aw:"/"wg:" or French "rép:"/
+// "tr:" (e.g. "RE: Hello" and "aw: Hallo" both match). A word that merely
+// starts with the same letters but isn't followed by ":" at that position
+// does not match, even if it looks similar — "react:" doesn't match "re:"
+// (the third character is "a", not ":"), and "reference:" doesn't either.
 func TestHasReplyPrefix(t *testing.T) {
 	tests := []struct {
 		subject  string

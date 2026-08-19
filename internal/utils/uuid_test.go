@@ -71,6 +71,14 @@ func TestUUIDToBase32(t *testing.T) {
 	})
 }
 
+// TestBase32ToUUID exercises Base32ToUUID, the inverse of UUIDToBase32. Input
+// is valid when, after stripping any hyphens and uppercasing, it's an RFC
+// 4648 Base32 string (no padding) that decodes to exactly 16 bytes — e.g.
+// "64s3z6v-fmzxeu5-dfor4ne-3bqp4" and its unhyphenated, upper- or lowercase
+// forms all decode to the same UUID. It's rejected either because the
+// characters aren't valid Base32 symbols (subtests below note '0', '1', '8',
+// '9' aren't in the alphabet, e.g. "0189") or because the decoded length
+// isn't 16 bytes (e.g. "aa" decodes to a single byte).
 func TestBase32ToUUID(t *testing.T) {
 	t.Run("with hyphens", func(t *testing.T) {
 		id := uuid.MustParse("12345678-1234-1234-1234-123456789abc")

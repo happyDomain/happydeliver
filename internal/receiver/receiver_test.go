@@ -214,6 +214,18 @@ func TestProcessEmailBytesReceiverHostnameMismatch(t *testing.T) {
 	}
 }
 
+// TestExtractTestID exercises extractTestID, which recovers the UUID a test
+// email was addressed to. A valid address has the shape
+// "<prefix><base32-uuid>@<domain>" (angle brackets optional), e.g. with the
+// default "test-" prefix:
+//
+//	test-64s3z6vfmzxeu5dfor4ne3bqp4@example.com  -> valid, decodes to a UUID
+//
+// It is rejected when any of these hold:
+//   - there is no "@" splitting local-part and domain ("test-whatever")
+//   - the local part doesn't start with the configured prefix ("nope-abcd@example.com")
+//   - the remainder isn't valid Base32 ("test-not!valid!base32@example.com")
+//   - the decoded Base32 isn't exactly 16 bytes, i.e. a full UUID ("test-AA@example.com")
 func TestExtractTestID(t *testing.T) {
 	r := NewEmailReceiver(&mockStorage{}, testConfig())
 
@@ -283,6 +295,17 @@ func TestBase32ToUUIDRoundTrip(t *testing.T) {
 	})
 }
 
+// TestExtractRecipientFromHeaders exercises ExtractRecipientFromHeaders,
+// which pulls the delivery address out of a raw email's headers by trying,
+// in order, To, X-Original-To, Delivered-To, then Envelope-To, and returning
+// the first one found. For example:
+//
+//	To: <user@example.com>          -> "user@example.com" (angle brackets stripped)
+//	To: a@example.com, b@example.com -> "a@example.com"    (first of a comma list)
+//
+// It fails only when none of those four headers are present in the input at
+// all (a header present but empty is treated the same as absent and falls
+// through to the next candidate).
 func TestExtractRecipientFromHeaders(t *testing.T) {
 	tests := []struct {
 		name  string

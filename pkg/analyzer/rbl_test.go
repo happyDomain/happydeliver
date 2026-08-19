@@ -69,6 +69,11 @@ func TestNewRBLChecker(t *testing.T) {
 	}
 }
 
+// TestReverseIP exercises reverseIP; see its doc comment in rbl.go for the
+// DNSBL/DNSWL query-name convention it implements: an IPv4 address reverses
+// its 4 octets ("192.0.2.1" -> "1.2.0.192"), an IPv6 address reverses all 32
+// nibbles least-significant-first ("2001:db8::1" -> "1.0.0...8.b.d.0.1.0.0.2").
+// Anything net.ParseIP can't parse, including the empty string, returns "".
 func TestReverseIP(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -119,6 +124,11 @@ func TestReverseIP(t *testing.T) {
 	}
 }
 
+// TestIsPublicIP exercises isPublicIP. An address is public if it parses
+// (via net.ParseIP) and is none of: private-range, loopback, link-local
+// unicast/multicast, or unspecified ("0.0.0.0"/"::") — e.g. "8.8.8.8" is
+// public but "10.0.0.1", "127.0.0.1", and "169.254.1.1" are not. An
+// unparseable string is treated as not public.
 func TestIsPublicIP(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -179,6 +189,14 @@ func TestIsPublicIP(t *testing.T) {
 	}
 }
 
+// TestExtractIPs exercises extractIPs, which scans "Received" headers (and
+// falls back to "X-Originating-IP") for candidate addresses in brackets,
+// e.g. "[198.51.100.1]" or "[IPv6:2001:db8::1]" (the "IPv6:" label is
+// stripped before parsing). A candidate is kept only if it parses as an IP
+// and isPublicIP accepts it — a private address like "[192.168.1.10]" is
+// silently dropped rather than erroring — and duplicates are deduped on the
+// canonical form net.IP.String() produces, so equivalent spellings (e.g. an
+// IPv4-mapped IPv6 address and its plain IPv4 form) collapse to one entry.
 func TestExtractIPs(t *testing.T) {
 	tests := []struct {
 		name        string

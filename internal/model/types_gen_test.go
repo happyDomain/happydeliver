@@ -34,6 +34,22 @@ type enumValidCase struct {
 // TestEnumValidKnownMembers asserts that every generated enum constant is
 // reported as a valid member by its Valid() method. This exercises each case
 // arm of the generated switch statements.
+//
+// Each generated enum is a named string type with a fixed, spec-defined set
+// of constants and a Valid() method that switches over exactly those
+// constants. A value is valid if and only if it equals one of the declared
+// constants for its type; anything else, however superficially similar,
+// is not. For example, for DMARCRecordPolicy (declared constants: "none",
+// "quarantine", "reject"):
+//
+//	DMARCRecordPolicyReject           -> valid:   Valid() reports true
+//	DMARCRecordPolicy("Reject")       -> invalid: wrong case
+//	DMARCRecordPolicy("rejected")     -> invalid: not one of the declared members
+//	DMARCRecordPolicy("")             -> invalid: empty string isn't a declared member
+//
+// This test checks the positive side (every declared constant reports
+// valid); TestEnumValidRejectsUnknown below checks the negative side (an
+// arbitrary out-of-set string reports invalid) for the same set of types.
 func TestEnumValidKnownMembers(t *testing.T) {
 	cases := []enumValidCase{
 		{"ARCResultResult", []func() bool{

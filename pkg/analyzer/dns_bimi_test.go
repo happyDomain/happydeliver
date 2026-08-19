@@ -78,6 +78,11 @@ func TestExtractBIMITag(t *testing.T) {
 	}
 }
 
+// TestValidateBIMI exercises validateBIMI. A record is valid only if it
+// carries both a case-insensitive "v=BIMI1" tag and a logo URL tag ("l=",
+// any value including empty counts as present); missing either tag, or a
+// mismatched version ("v=BIMI2"), makes it invalid — a VMC tag ("a=") is
+// never required.
 func TestValidateBIMI(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -142,6 +147,11 @@ func TestExtractBIMITagDoesNotMatchSubstring(t *testing.T) {
 	}
 }
 
+// TestIsBIMIRecord exercises isBIMIRecord, which only checks the "v=" tag
+// (case-insensitively) equals "BIMI1" — it does not require a logo URL or
+// any other tag. So "v=bimi1; l=..." counts as a BIMI record but a
+// well-formed DMARC or SPF record found at the BIMI DNS location, or a
+// record missing "v=" entirely, does not.
 func TestIsBIMIRecord(t *testing.T) {
 	tests := []struct {
 		name     string

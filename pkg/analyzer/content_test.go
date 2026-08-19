@@ -109,6 +109,15 @@ func TestExtractTextFromHTML(t *testing.T) {
 	}
 }
 
+// TestIsUnsubscribeLink exercises isUnsubscribeLink. A link counts as an
+// unsubscribe link if its href exactly matches one of the URLs advertised in
+// the List-Unsubscribe header, or if either the href or the visible link
+// text contains one of a large multilingual keyword list, case-insensitively
+// ("unsubscribe", "opt-out", "remove", "abmelden", "désabonner", ...) — a
+// match in either place is sufficient. The one override: a href containing
+// an unreplaced template placeholder (see TestIsTemplatePlaceholderURL) is
+// never counted, even if it also contains "unsubscribe" literally, since it
+// isn't a working link.
 func TestIsUnsubscribeLink(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -256,6 +265,16 @@ func TestIsUnsubscribeLink(t *testing.T) {
 	}
 }
 
+// TestIsSuspiciousURL exercises isSuspiciousURL. A "mailto:" URL is never
+// flagged, whatever it contains. Otherwise a URL is suspicious if any of:
+// the host is a literal IP address rather than a domain (IPv4 or IPv6, e.g.
+// "https://192.168.1.1/..." or "https://[2001:db8::1]/..."); the host is a
+// known shortener (bit.ly, tinyurl.com, ...); the host has more than 4
+// dot-separated labels (e.g. "a.b.c.d.e.example.com"); the URL contains an
+// "@" anywhere (a classic phishing trick, since browsers ignore everything
+// before it in the host); or the host contains "[]()<>" . A plain
+// "https://example.com/page" or an ordinary subdomain matches none of these
+// and is not suspicious.
 func TestIsSuspiciousURL(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -331,6 +350,12 @@ func TestIsSuspiciousURL(t *testing.T) {
 	}
 }
 
+// TestIsIPAddress exercises isIPAddress, a deliberately loose heuristic
+// rather than strict IP parsing: after stripping a trailing ":<port>", a
+// host counts as an IP if it's 4 dot-separated all-digit groups (IPv4, e.g.
+// "192.168.1.1") or simply contains any ":" at all (treated as IPv6, e.g.
+// "2001:db8::1" — no bracket or format validation). Anything else, including
+// "localhost" and ordinary domains/subdomains, is not an IP.
 func TestIsIPAddress(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1001,6 +1026,11 @@ func TestHasDomainMisalignment(t *testing.T) {
 	}
 }
 
+// TestIsTemplatePlaceholderURL exercises isTemplatePlaceholderURL against
+// templatePlaceholderRegex; see that regex's doc comment in content.go for
+// the full grammar (curly/dollar/percent/bracket tags, Mailchimp merge tags,
+// URL-encoded curly braces) and why percent-encoded octets like "%C3%A9" or
+// "%E2%80%A6" are deliberately not mistaken for a "%tag%" placeholder.
 func TestIsTemplatePlaceholderURL(t *testing.T) {
 	tests := []struct {
 		name     string

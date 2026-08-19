@@ -100,6 +100,12 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
+// TestValidate exercises Config.Validate. A config is valid when: the email
+// domain is non-empty and combines with TestAddressPrefix into an
+// RFC-5322-parseable address (e.g. "example.com" -> "test-1234-5678-9090@example.com"
+// passes, "not a valid domain" fails because the resulting address isn't a
+// valid email), the database type is exactly "sqlite" or "postgres" (any
+// other value, e.g. "mysql", is rejected), and the DSN is non-empty.
 func TestValidate(t *testing.T) {
 	valid := func() *Config {
 		return &Config{
@@ -133,6 +139,14 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+// TestParseLine exercises parseLine, which turns one "key = value" config
+// line into a flag.Set call. A key is accepted once normalized: an optional
+// "HAPPYDELIVER_" or "HAPPYDOMAIN_" prefix is stripped, underscores become
+// hyphens, and it's lowercased, so "HAPPYDELIVER_DATABASE_TYPE" and
+// "database-type" both resolve to the same registered flag. A line is
+// rejected only if the normalized key has no matching flag ("does-not-exist
+// = value"); an empty value ("bind =") is silently skipped rather than
+// applied or rejected.
 func TestParseLine(t *testing.T) {
 	t.Run("sets flag value", func(t *testing.T) {
 		c := DefaultConfig()
@@ -385,6 +399,12 @@ func TestStringArray(t *testing.T) {
 	})
 }
 
+// TestURL exercises the URL flag.Value wrapper's Set method, which delegates
+// to net/url.Parse and is therefore lenient: "https://example.com/survey"
+// parses as an absolute URL, but even most malformed-looking strings parse
+// successfully as a relative reference. Set only errors on inputs url.Parse
+// itself rejects, such as "://bad url with space" (empty scheme before "://"
+// combined with an unescaped space).
 func TestURL(t *testing.T) {
 	t.Run("String with nil URL", func(t *testing.T) {
 		u := URL{}

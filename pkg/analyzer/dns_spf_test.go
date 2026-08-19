@@ -27,6 +27,19 @@ import (
 	"time"
 )
 
+// TestValidateSPF exercises validateSPF (and the isValidSPFMechanism check
+// it applies to every token). A record is valid when: it starts with the
+// literal "v=spf1"; every subsequent whitespace-separated token, after
+// stripping an optional qualifier prefix (+, -, ~, ?), is either a known
+// standalone mechanism ("all", "a", "mx", "ptr"), a known mechanism with a
+// ":" or "/" value ("include:_spf.example.com", "ip4:192.0.2.0/24"), or a
+// known modifier ("redirect=...", "exp=...", "ra=/rp=/rr=..."); and — for the
+// main (non-included) record only — it ends in an "all" mechanism (e.g.
+// "-all", "~all") unless it has a "redirect=" modifier instead. It's invalid
+// for using an unrecognized mechanism/modifier name, for using "=" where a
+// mechanism expects ":" (e.g. "include=..." is flagged with a dedicated
+// error rather than "unknown mechanism"), or for a main record missing both
+// a trailing "all" and a "redirect=".
 func TestValidateSPF(t *testing.T) {
 	tests := []struct {
 		name        string

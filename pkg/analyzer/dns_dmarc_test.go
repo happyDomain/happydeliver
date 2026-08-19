@@ -221,6 +221,11 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
+// TestParseDMARCRecordPolicy exercises how parseDMARCRecord derives Policy
+// from the "p=" tag. Only "none", "quarantine", or "reject" are recognized
+// and passed through verbatim (e.g. "p=reject" -> Policy "reject"); any other
+// value, including a missing "p=" tag entirely ("v=DMARC1"), falls back to
+// "unknown" rather than an error.
 func TestParseDMARCRecordPolicy(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -437,6 +442,12 @@ func TestValidateDMARC(t *testing.T) {
 	}
 }
 
+// TestParseDMARCRecordAlignment exercises how parseDMARCRecord derives
+// SpfAlignment/DkimAlignment from the "aspf="/"adkim=" tags. Both default to
+// "relaxed" when their tag is absent or explicitly "r" (e.g.
+// "v=DMARC1; p=quarantine" or "aspf=r" both yield "relaxed"); only the exact
+// value "s" switches a given tag to "strict" ("aspf=s" -> SpfAlignment
+// "strict"). The two tags are independent, so any combination is valid.
 func TestParseDMARCRecordAlignment(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -491,6 +502,12 @@ func TestParseDMARCRecordAlignment(t *testing.T) {
 	}
 }
 
+// TestParseDMARCRecordSubdomainPolicy exercises how parseDMARCRecord derives
+// SubdomainPolicy ("sp=") and NonexistentSubdomainPolicy ("np=", DMARCbis).
+// Each tag is recognized independently and only for "none", "quarantine", or
+// "reject" (e.g. "sp=quarantine" -> SubdomainPolicy "quarantine"); an absent
+// tag leaves the corresponding field nil rather than inheriting the "p="
+// policy — there is no fallback performed at this layer.
 func TestParseDMARCRecordSubdomainPolicy(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -557,6 +574,12 @@ func TestParseDMARCRecordSubdomainPolicy(t *testing.T) {
 	}
 }
 
+// TestParseDMARCRecordPercentage exercises how parseDMARCRecord derives
+// Percentage from the "pct=" tag (deprecated in DMARCbis). A value is kept
+// only if it parses as an integer in [0, 100] (e.g. "pct=0" and "pct=100"
+// both round-trip); an out-of-range value ("pct=150") or a missing tag both
+// leave Percentage nil, so the two cases aren't distinguishable from this
+// field alone.
 func TestParseDMARCRecordPercentage(t *testing.T) {
 	tests := []struct {
 		name               string
