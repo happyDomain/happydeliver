@@ -41,16 +41,18 @@ func getHostname() string {
 
 // Config represents the application configuration
 type Config struct {
-	DevProxy        string
-	Bind            string
-	Database        DatabaseConfig
-	Email           EmailConfig
-	Analysis        AnalysisConfig
-	ReportRetention time.Duration // How long to keep reports. 0 = keep forever
-	RateLimit       uint          // API rate limit (requests per second per IP)
-	SurveyURL       url.URL       // URL for user feedback survey
-	CustomLogoURL   string        // URL for custom logo image in the web UI
-	DisableTestList bool          // Disable the public test listing endpoint
+	DevProxy         string
+	Bind             string
+	Database         DatabaseConfig
+	Email            EmailConfig
+	Analysis         AnalysisConfig
+	ReportRetention  time.Duration // How long to keep reports. 0 = keep forever
+	RateLimit        uint          // API rate limit (requests per second per IP)
+	SurveyURL        url.URL       // URL for user feedback survey
+	CustomLogoURL    string        // URL for custom logo image in the web UI
+	DisableTestList  bool          // Disable the public test listing endpoint
+	DisableEmlUpload bool          // Disable the EML file upload endpoint
+	MaxUploadSize    int64         // Maximum size in bytes of an uploaded EML file
 }
 
 // DatabaseConfig contains database connection settings
@@ -82,8 +84,9 @@ func DefaultConfig() *Config {
 	return &Config{
 		DevProxy:        "",
 		Bind:            ":8080",
-		ReportRetention: 0, // Keep reports forever by default
-		RateLimit:       1, // is in fact 2 requests per 2 seconds per IP (default)
+		ReportRetention: 0,        // Keep reports forever by default
+		RateLimit:       1,        // is in fact 2 requests per 2 seconds per IP (default)
+		MaxUploadSize:   10 << 20, // 10 MiB
 		Database: DatabaseConfig{
 			Type: "sqlite",
 			DSN:  "happydeliver.db",
