@@ -33,7 +33,7 @@
     </div>
     <div class="list-group list-group-flush">
         {#if dkimRecords && dkimRecords.length > 0}
-            {#each dkimRecords as dkim}
+            {#each dkimRecords as dkim (dkim.selector)}
                 <div class="list-group-item">
                     <div class="mb-2">
                         <strong>Selector:</strong> <code>{dkim.selector}</code>

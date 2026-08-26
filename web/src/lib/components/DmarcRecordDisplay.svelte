@@ -19,15 +19,6 @@
         const strength: Record<string, number> = { none: 0, quarantine: 1, reject: 2 };
         return strength[policy || "none"] || 0;
     };
-
-    // Effective policy after applying DMARCbis t=y downgrade
-    const effectivePolicy = $derived((): string => {
-        const p = dmarcRecord?.policy ?? "none";
-        if (!dmarcRecord?.test_mode) return p;
-        if (p === "reject") return "quarantine";
-        if (p === "quarantine") return "none";
-        return p;
-    });
 </script>
 
 {#if dmarcRecord}
@@ -81,9 +72,8 @@
                             the Public Suffix Domain <code>{dmarcRecord.domain}</code> via the DMARCbis
                             DNS Tree Walk (which obsoletes the RFC 9091 PSD DMARC experiment).
                         {:else}
-                            the organizational domain <code>{dmarcRecord.domain}</code> via the
-                            DMARCbis DNS Tree Walk (compatible with RFC 7489 organizational domain
-                            fallback).
+                            the organizational domain <code>{dmarcRecord.domain}</code> via the DMARCbis
+                            DNS Tree Walk (compatible with RFC 7489 organizational domain fallback).
                         {/if}
                     </div>
                 </div>
@@ -152,8 +142,8 @@
                         {:else}
                             <code>p=none</code> is unaffected by test mode.
                         {/if}
-                        Aggregate reports are still generated normally.
-                        This tag replaces the deprecated <code>pct=</code> for gradual rollout.
+                        Aggregate reports are still generated normally. This tag replaces the deprecated
+                        <code>pct=</code> for gradual rollout.
                     </div>
                 </div>
             {/if}
@@ -165,9 +155,9 @@
                     <span class="badge bg-info">psd=y</span>
                     <div class="alert alert-info mt-2 mb-0 small">
                         <i class="bi bi-info-circle me-1"></i>
-                        <strong>PSD declared</strong> — this domain is declared as a Public Suffix
-                        Domain. DMARCbis-compliant receivers will apply this policy to subdomains
-                        that have no DMARC record of their own when using the DNS Tree Walk algorithm.
+                        <strong>PSD declared</strong> — this domain is declared as a Public Suffix Domain.
+                        DMARCbis-compliant receivers will apply this policy to subdomains that have no
+                        DMARC record of their own when using the DNS Tree Walk algorithm.
                     </div>
                 </div>
             {:else if dmarcRecord.psd === "n"}
@@ -177,8 +167,8 @@
                     <div class="alert alert-info mt-2 mb-0 small">
                         <i class="bi bi-info-circle me-1"></i>
                         <strong>Org Domain declared</strong> — <code>psd=n</code> explicitly declares
-                        this as an Organizational Domain boundary. Subdomains with separate DNS
-                        delegation will use their own independent DMARCbis Tree Walk.
+                        this as an Organizational Domain boundary. Subdomains with separate DNS delegation
+                        will use their own independent DMARCbis Tree Walk.
                     </div>
                 </div>
             {/if}
@@ -228,7 +218,9 @@
 
             <!-- Non-Existent Subdomain Policy (np tag, DMARCbis) -->
             {#if dmarcRecord.nonexistent_subdomain_policy}
-                {@const effectiveSubStrength = policyStrength(dmarcRecord.subdomain_policy ?? dmarcRecord.policy)}
+                {@const effectiveSubStrength = policyStrength(
+                    dmarcRecord.subdomain_policy ?? dmarcRecord.policy,
+                )}
                 {@const npStrength = policyStrength(dmarcRecord.nonexistent_subdomain_policy)}
                 <div class="mb-3">
                     <strong>Non-Existent Subdomain Policy:</strong>
@@ -244,14 +236,16 @@
                     {#if npStrength >= effectiveSubStrength}
                         <div class="alert alert-success mt-2 mb-0 small">
                             <i class="bi bi-check-circle me-1"></i>
-                            <strong>Good configuration</strong> — non-existent subdomain policy is equal to or stricter
-                            than the effective subdomain policy.
+                            <strong>Good configuration</strong> — non-existent subdomain policy is equal
+                            to or stricter than the effective subdomain policy.
                         </div>
                     {:else}
                         <div class="alert alert-warning mt-2 mb-0 small">
                             <i class="bi bi-exclamation-triangle me-1"></i>
-                            <strong>Weaker protection for non-existent subdomains</strong> — consider setting
-                            <code>np={dmarcRecord.subdomain_policy ?? dmarcRecord.policy}</code> to match your subdomain policy.
+                            <strong>Weaker protection for non-existent subdomains</strong> —
+                            consider setting
+                            <code>np={dmarcRecord.subdomain_policy ?? dmarcRecord.policy}</code> to match
+                            your subdomain policy.
                         </div>
                     {/if}
                     <div class="alert alert-info mt-2 mb-0 small">
@@ -408,7 +402,9 @@
                         <code>ri=</code>.
                     {/if}
                     You can safely remove
-                    {dmarcRecord.deprecated_rf && dmarcRecord.deprecated_ri ? "these tags" : "this tag"}
+                    {dmarcRecord.deprecated_rf && dmarcRecord.deprecated_ri
+                        ? "these tags"
+                        : "this tag"}
                     from your DMARC record.
                 </div>
             {/if}

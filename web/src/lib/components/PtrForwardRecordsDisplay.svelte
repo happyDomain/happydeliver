@@ -59,7 +59,7 @@
                 <div class="list-group-item">
                     <div class="mb-2">
                         <strong>PTR Hostname(s):</strong>
-                        {#each ptrRecords as ptr}
+                        {#each ptrRecords as ptr, i (i)}
                             <div class="mt-1">
                                 <code>{ptr}</code>
                             </div>
@@ -67,7 +67,7 @@
                     </div>
                     <div class="mb-2">
                         <strong>Forward Resolution (A/AAAA):</strong>
-                        {#each ptrForwardRecords as ip}
+                        {#each ptrForwardRecords as ip, j (j)}
                             {#if ip === senderIp || !fcrDnsIsValid || showDifferent}
                                 <div class="d-flex gap-2 align-items-center mt-1">
                                     {#if senderIp && ip === senderIp}
@@ -88,7 +88,9 @@
                                     {#if showDifferent}
                                         Hide other IPs
                                     {:else}
-                                        Show {differentCount} other IP{differentCount > 1 ? 's' : ''} (not the sender)
+                                        Show {differentCount} other IP{differentCount > 1
+                                            ? "s"
+                                            : ""} (not the sender)
                                     {/if}
                                 </button>
                             </div>

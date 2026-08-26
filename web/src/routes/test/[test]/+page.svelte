@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import { resolve } from "$app/paths";
     import { onDestroy } from "svelte";
 
     import { getReport, getTest, reanalyzeReport } from "$lib/api";
@@ -259,6 +260,7 @@
                                             Reanalyze with Latest Version
                                         </button>
                                         <hr class="menu-divider" />
+                                        <!-- eslint-disable svelte/no-navigation-without-resolve -- API endpoint, not a SvelteKit route -->
                                         <a
                                             class="menu-item"
                                             href={`/api/report/${testId}/raw`}
@@ -268,6 +270,7 @@
                                             <i class="bi bi-file-earmark-text me-2"></i>
                                             View Raw Email
                                         </a>
+                                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     </div>
                                 {/if}
                             </div>
@@ -426,7 +429,7 @@
             <!-- Action Buttons -->
             <div class="row">
                 <div class="col-12 text-center">
-                    <a href="/test/" class="btn btn-primary btn-lg">
+                    <a href={resolve("/test")} class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-repeat me-2"></i>
                         Test Another Email
                     </a>

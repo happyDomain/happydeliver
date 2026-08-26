@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { resolve } from "$app/paths";
+
     interface Props {
         status: number;
         message?: string;
@@ -59,7 +61,6 @@
     }
 
     let defaultDescription = $derived(getErrorDescription(status));
-    let displayMessage = $derived(message || defaultDescription);
 </script>
 
 <div class="row justify-content-center">
@@ -89,7 +90,7 @@
         <!-- Action Buttons -->
         {#if showActions}
             <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-                <a href="/" class="btn btn-primary btn-lg px-4">
+                <a href={resolve("/")} class="btn btn-primary btn-lg px-4">
                     <i class="bi bi-house-door me-2"></i>
                     Go Home
                 </a>
@@ -108,8 +109,13 @@
             <div class="mt-5">
                 <p class="text-muted small mb-2">Looking for something specific?</p>
                 <div class="d-flex flex-wrap gap-2 justify-content-center">
-                    <a href="/" class="badge bg-light text-dark text-decoration-none">Home</a>
-                    <a href="/#features" class="badge bg-light text-dark text-decoration-none">
+                    <a href={resolve("/")} class="badge bg-light text-dark text-decoration-none">
+                        Home
+                    </a>
+                    <a
+                        href="{resolve('/')}#features"
+                        class="badge bg-light text-dark text-decoration-none"
+                    >
                         Features
                     </a>
                     <a

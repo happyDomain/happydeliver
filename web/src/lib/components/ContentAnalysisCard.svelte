@@ -73,7 +73,7 @@
                     <div class="mb-2">
                         <strong>Unsubscribe Methods:</strong>
                         <div class="mt-1">
-                            {#each contentAnalysis.unsubscribe_methods as method}
+                            {#each contentAnalysis.unsubscribe_methods as method (method)}
                                 <span class="badge bg-info me-1">{method}</span>
                             {/each}
                         </div>
@@ -85,7 +85,7 @@
         {#if contentAnalysis.html_issues && contentAnalysis.html_issues.length > 0}
             <div class="mt-3">
                 <h5>Content Issues</h5>
-                {#each contentAnalysis.html_issues as issue}
+                {#each contentAnalysis.html_issues as issue, i (i)}
                     <div
                         class="alert alert-{issue.severity === 'critical' ||
                         issue.severity === 'high'
@@ -128,7 +128,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each contentAnalysis.links as link}
+                            {#each contentAnalysis.links as link, i (i)}
                                 <tr>
                                     <td>
                                         <small class="text-break">{link.url}</small>
@@ -169,7 +169,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each contentAnalysis.images as image}
+                            {#each contentAnalysis.images as image, i (i)}
                                 <tr>
                                     <td><small class="text-break">{image.src || "-"}</small></td>
                                     <td>

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
 
     import { listTests, createTest as apiCreateTest } from "$lib/api";
     import type { TestSummary } from "$lib/api/types.gen";
@@ -55,7 +56,7 @@
         try {
             const response = await apiCreateTest();
             if (response.data) {
-                goto(`/test/${response.data.id}`);
+                goto(resolve("/test/[test]", { test: response.data.id }));
             }
         } catch (err) {
             error = err instanceof Error ? err.message : "Failed to create test";
@@ -80,16 +81,9 @@
                     <i class="bi bi-clock-history me-2"></i>
                     Test History
                 </h1>
-                <button
-                    class="btn btn-primary"
-                    onclick={createTest}
-                    disabled={creatingTest}
-                >
+                <button class="btn btn-primary" onclick={createTest} disabled={creatingTest}>
                     {#if creatingTest}
-                        <span
-                            class="spinner-border spinner-border-sm me-2"
-                            role="status"
-                        ></span>
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
                     {:else}
                         <i class="bi bi-plus-lg me-1"></i>
                     {/if}
@@ -115,13 +109,10 @@
                 </div>
             {:else if tests.length === 0}
                 <div class="text-center py-5">
-                    <i
-                        class="bi bi-inbox display-1 text-muted mb-3 d-block"
-                    ></i>
+                    <i class="bi bi-inbox display-1 text-muted mb-3 d-block"></i>
                     <h2 class="h4 text-muted mb-3">No tests yet</h2>
                     <p class="text-muted mb-4">
-                        Send a test email to get your first deliverability
-                        report.
+                        Send a test email to get your first deliverability report.
                     </p>
                     <button
                         class="btn btn-primary btn-lg"
@@ -139,22 +130,13 @@
                 {#if totalPages > 1}
                     <nav class="mt-4 d-flex justify-content-between align-items-center">
                         <small class="text-muted">
-                            Showing {offset + 1}-{Math.min(
-                                offset + limit,
-                                total,
-                            )} of {total} tests
+                            Showing {offset + 1}-{Math.min(offset + limit, total)} of {total} tests
                         </small>
                         <ul class="pagination mb-0">
-                            <li
-                                class="page-item"
-                                class:disabled={currentPage === 1}
-                            >
+                            <li class="page-item" class:disabled={currentPage === 1}>
                                 <button
                                     class="page-link"
-                                    onclick={() =>
-                                        goToPage(
-                                            Math.max(0, offset - limit),
-                                        )}
+                                    onclick={() => goToPage(Math.max(0, offset - limit))}
                                     disabled={currentPage === 1}
                                 >
                                     <i class="bi bi-chevron-left"></i>
@@ -166,14 +148,10 @@
                                     Page {currentPage} of {totalPages}
                                 </span>
                             </li>
-                            <li
-                                class="page-item"
-                                class:disabled={currentPage === totalPages}
-                            >
+                            <li class="page-item" class:disabled={currentPage === totalPages}>
                                 <button
                                     class="page-link"
-                                    onclick={() =>
-                                        goToPage(offset + limit)}
+                                    onclick={() => goToPage(offset + limit)}
                                     disabled={currentPage === totalPages}
                                 >
                                     Next

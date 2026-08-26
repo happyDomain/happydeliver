@@ -26,7 +26,7 @@
         </p>
 
         <div class="row row-cols-1 row-cols-lg-2 overflow-auto">
-            {#each Object.entries(whitelists) as [ip, checks]}
+            {#each Object.entries(whitelists) as [ip, checks] (ip)}
                 <div class="col mb-3">
                     <h5 class="text-muted">
                         <i class="bi bi-hdd-network me-1"></i>
@@ -34,7 +34,7 @@
                     </h5>
                     <table class="table table-sm table-striped table-hover mb-0">
                         <tbody>
-                            {#each checks as check}
+                            {#each checks as check (check.rbl)}
                                 <tr>
                                     <td title={check.response || "-"}>
                                         <span

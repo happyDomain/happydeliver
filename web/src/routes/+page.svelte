@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
 
     import { createTest as apiCreateTest, listTests, uploadEml } from "$lib/api";
     import type { TestSummary } from "$lib/api/types.gen";
@@ -36,7 +37,7 @@
         try {
             const response = await apiCreateTest();
             if (response.data) {
-                goto(`/test/${response.data.id}`);
+                goto(resolve("/test/[test]", { test: response.data.id }));
             }
         } catch (err) {
             error = err instanceof Error ? err.message : "Failed to create test";
@@ -51,7 +52,7 @@
         try {
             const response = await uploadEml({ body: { file } });
             if (response.data) {
-                goto(`/test/${response.data.id}`);
+                goto(resolve("/test/[test]", { test: response.data.id }));
                 return;
             }
             error = response.error?.message ?? "Failed to analyze this file";
@@ -306,7 +307,7 @@
                 <div class="col-lg-10 mx-auto">
                     <HistoryTable tests={recentTests} />
                     <div class="text-center mt-4">
-                        <a href="/history/" class="btn btn-outline-primary">
+                        <a href={resolve("/history")} class="btn btn-outline-primary">
                             <i class="bi bi-clock-history me-2"></i>
                             View All Tests
                         </a>
@@ -331,7 +332,7 @@
         </div>
 
         <div class="row g-4 justify-content-center">
-            {#each features as feature}
+            {#each features as feature (feature.title)}
                 <div class="col-md-6 col-lg-3">
                     <FeatureCard {...feature} />
                 </div>
@@ -353,7 +354,7 @@
         </div>
 
         <div class="row g-4">
-            {#each steps as stepData}
+            {#each steps as stepData (stepData.title)}
                 <div class="col-md-4">
                     <HowItWorksStep {...stepData} />
                 </div>
@@ -387,11 +388,11 @@
                     Analyze an .eml File
                 </button>
             {/if}
-            <a href="/domain" class="btn btn-secondary btn-lg me-2">
+            <a href={resolve("/domain")} class="btn btn-secondary btn-lg me-2">
                 <i class="bi bi-globe me-2"></i>
                 Test Domain Only
             </a>
-            <a href="/blacklist" class="btn btn-secondary btn-lg">
+            <a href={resolve("/blacklist")} class="btn btn-secondary btn-lg">
                 <i class="bi bi-shield-exclamation me-2"></i>
                 Check IP Blacklist
             </a>

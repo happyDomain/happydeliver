@@ -37,7 +37,7 @@
             </h4>
         </div>
         <div class="list-group list-group-flush">
-            {#each receivedChain as hop, i}
+            {#each receivedChain as hop, i (i)}
                 <div class="list-group-item">
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">

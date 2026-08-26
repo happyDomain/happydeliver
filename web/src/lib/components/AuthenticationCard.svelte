@@ -347,7 +347,7 @@
         <!-- DKIM (Required) -->
         <div class="list-group-item" id="authentication-dkim">
             {#if authentication.dkim && authentication.dkim.length > 0}
-                {#each authentication.dkim as dkim, i}
+                {#each authentication.dkim as dkim, i (i)}
                     <div class="d-flex align-items-start" class:mt-3={i > 0}>
                         <i
                             class="bi {getAuthResultIcon(dkim.result, true)} {getAuthResultClass(

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/stores";
+    import { resolve } from "$app/paths";
     import { onMount } from "svelte";
     import { checkBlacklist } from "$lib/api";
     import type { BlacklistCheckResponse } from "$lib/api/types.gen";
@@ -58,7 +59,7 @@
                         <i class="bi bi-shield-exclamation me-2"></i>
                         Blacklist Analysis
                     </h1>
-                    <a href="/blacklist" class="btn btn-outline-secondary">
+                    <a href={resolve("/blacklist")} class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left me-2"></i>
                         Check Another IP
                     </a>
@@ -225,7 +226,7 @@
                                 deliverability testing including DKIM verification, content
                                 analysis, spam scoring, and DNS configuration:
                             </p>
-                            <a href="/" class="btn btn-primary">
+                            <a href={resolve("/")} class="btn btn-primary">
                                 <i class="bi bi-envelope-plus me-2"></i>
                                 Send Test Email
                             </a>

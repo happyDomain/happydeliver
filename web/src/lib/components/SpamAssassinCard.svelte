@@ -58,7 +58,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each Object.entries(spamassassin.test_details) as [testName, detail]}
+                            {#each Object.entries(spamassassin.test_details) as [testName, detail] (testName)}
                                 <tr
                                     class={detail.score > 0
                                         ? "table-warning"
@@ -89,7 +89,7 @@
             <div class="mb-2">
                 <strong>Tests Triggered:</strong>
                 <div class="mt-2">
-                    {#each spamassassin.tests as test}
+                    {#each spamassassin.tests as test (test)}
                         <span
                             class="badge {$theme === 'light'
                                 ? 'bg-light text-dark'

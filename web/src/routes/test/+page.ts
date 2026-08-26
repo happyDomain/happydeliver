@@ -5,7 +5,7 @@ import { createTest as apiCreateTest } from "$lib/api";
 export const prerender = false;
 export const ssr = false;
 
-export const load: Load = async ({}) => {
+export const load: Load = async () => {
     let response;
     try {
         response = await apiCreateTest();

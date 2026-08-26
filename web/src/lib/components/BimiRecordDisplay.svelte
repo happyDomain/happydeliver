@@ -52,6 +52,7 @@
             {#if bimiRecord.logo_url}
                 <div class="mb-2">
                     <strong>Logo URL:</strong>
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
                     <a href={bimiRecord.logo_url} target="_blank" rel="noopener noreferrer"
                         >{bimiRecord.logo_url}</a
                     >
@@ -60,6 +61,7 @@
             {#if bimiRecord.vmc_url}
                 <div class="mb-2">
                     <strong>VMC URL:</strong>
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
                     <a href={bimiRecord.vmc_url} target="_blank" rel="noopener noreferrer"
                         >{bimiRecord.vmc_url}</a
                     >

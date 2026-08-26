@@ -64,7 +64,7 @@
                 <div class="alert alert-warning mb-3">
                     <strong>Errors:</strong>
                     <ul class="mb-0">
-                        {#each dnsResults.errors as error}
+                        {#each dnsResults.errors as error, i (i)}
                             <li>{error}</li>
                         {/each}
                     </ul>
@@ -154,7 +154,8 @@
                     </h4>
                     {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                         <span class="badge bg-danger ms-2">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain
+                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path
+                            domain
                         </span>
                     {/if}
                 </div>
@@ -182,7 +183,10 @@
             />
 
             <!-- BIMI Record -->
-            <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} dmarcRecord={dnsResults.dmarc_record} />
+            <BimiRecordDisplay
+                bimiRecord={dnsResults.bimi_record}
+                dmarcRecord={dnsResults.dmarc_record}
+            />
         {/if}
     </div>
 </div>

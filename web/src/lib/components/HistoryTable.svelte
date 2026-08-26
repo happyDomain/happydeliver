@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
 
     import type { TestSummary } from "$lib/api/types.gen";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -34,8 +35,11 @@
             </tr>
         </thead>
         <tbody>
-            {#each tests as test}
-                <tr class="cursor-pointer" onclick={() => goto(`/test/${test.test_id}`)}>
+            {#each tests as test (test.test_id)}
+                <tr
+                    class="cursor-pointer"
+                    onclick={() => goto(resolve("/test/[test]", { test: test.test_id }))}
+                >
                     <td class="ps-4">
                         <GradeDisplay grade={test.grade} size="small" />
                     </td>

@@ -38,7 +38,7 @@
             {/if}
         </div>
         <div class="list-group list-group-flush">
-            {#each ptrRecords as ptr}
+            {#each ptrRecords as ptr, i (i)}
                 <div class="list-group-item">
                     <div class="d-flex gap-2 align-items-center">
                         <span class="badge bg-success">Found</span>

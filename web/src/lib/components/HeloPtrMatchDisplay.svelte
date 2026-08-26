@@ -49,7 +49,7 @@
             {#if ptrRecords && ptrRecords.length > 0}
                 <div class="mt-1">
                     <strong>PTR Hostname(s):</strong>
-                    {#each ptrRecords as ptr}
+                    {#each ptrRecords as ptr, i (i)}
                         <div class="d-flex gap-2 align-items-center mt-1">
                             {#if normalize(heloHostname) === normalize(ptr)}
                                 <span class="badge bg-success">Match</span>
@@ -71,7 +71,7 @@
                         <code>{heloHostname}</code>
                         {#if ptrRecords && ptrRecords.length > 0}
                             does not match the sender's PTR record{ptrRecords.length > 1 ? "s" : ""}
-                            ({#each ptrRecords as ptr, i}<code>{ptr}</code>{i <
+                            ({#each ptrRecords as ptr, i (i)}<code>{ptr}</code>{i <
                                 ptrRecords.length - 1
                                     ? ", "
                                     : ""}{/each}).

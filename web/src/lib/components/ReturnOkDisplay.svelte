@@ -82,25 +82,25 @@
             {/each}
         </div>
         {#if hasFail || hasWarn}
-        <div class="list-group list-group-flush">
-            <div class="list-group-item">
-                {#if hasFail}
-                    <div class="alert alert-danger mb-0">
-                        <i class="bi bi-x-circle me-1"></i>
-                        <strong>Error:</strong> At least one sender domain has no MX and no A/AAAA record.
-                        Replies or bounce messages to that domain will be lost. Publish an MX record pointing
-                        to a mail server that accepts mail.
-                    </div>
-                {:else if hasWarn}
-                    <div class="alert alert-warning mb-0">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        <strong>Warning:</strong> A sender domain has no MX record and relies on its A/AAAA
-                        record (implicit MX). Mail is still deliverable, but publishing an explicit MX
-                        record is recommended.
-                    </div>
-                {/if}
+            <div class="list-group list-group-flush">
+                <div class="list-group-item">
+                    {#if hasFail}
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle me-1"></i>
+                            <strong>Error:</strong> At least one sender domain has no MX and no A/AAAA
+                            record. Replies or bounce messages to that domain will be lost. Publish an
+                            MX record pointing to a mail server that accepts mail.
+                        </div>
+                    {:else if hasWarn}
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Warning:</strong> A sender domain has no MX record and relies on
+                            its A/AAAA record (implicit MX). Mail is still deliverable, but publishing
+                            an explicit MX record is recommended.
+                        </div>
+                    {/if}
+                </div>
             </div>
-        </div>
         {/if}
     </div>
 {/if}

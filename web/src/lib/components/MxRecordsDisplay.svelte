@@ -35,7 +35,7 @@
         {/if}
     </div>
     <div class="list-group list-group-flush">
-        {#each mxRecords as mx}
+        {#each mxRecords as mx, i (i)}
             <div class="list-group-item">
                 <div class="d-flex gap-2 align-items-center">
                     {#if mx.valid}

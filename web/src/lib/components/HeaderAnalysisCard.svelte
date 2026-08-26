@@ -37,7 +37,7 @@
         {#if headerAnalysis.issues && headerAnalysis.issues.length > 0}
             <div class="mb-3">
                 <h5>Issues</h5>
-                {#each headerAnalysis.issues as issue}
+                {#each headerAnalysis.issues as issue, i (i)}
                     <div
                         class="alert alert-{issue.severity === 'critical' ||
                         issue.severity === 'high'
@@ -94,7 +94,7 @@
                     </p>
                     {#if headerAnalysis.domain_alignment.issues && headerAnalysis.domain_alignment.issues.length > 0}
                         <div class="mt-3">
-                            {#each headerAnalysis.domain_alignment.issues as issue}
+                            {#each headerAnalysis.domain_alignment.issues as issue, i (i)}
                                 <div
                                     class="alert alert-{headerAnalysis.domain_alignment
                                         .relaxed_aligned
@@ -222,7 +222,7 @@
                         </div>
                     </div>
 
-                    {#each headerAnalysis.domain_alignment.dkim_domains as dkim_domain}
+                    {#each headerAnalysis.domain_alignment.dkim_domains as dkim_domain (dkim_domain.domain)}
                         {@const dkim_aligned =
                             dkim_domain.domain === headerAnalysis.domain_alignment.from_domain}
                         {@const dkim_relaxed_aligned =
@@ -365,7 +365,7 @@
                                 const aImportance = importanceOrder[a[1].importance || "optional"];
                                 const bImportance = importanceOrder[b[1].importance || "optional"];
                                 return aImportance - bImportance;
-                            }) as [name, check]}
+                            }) as [name, check] (name)}
                                 <tr>
                                     <td>
                                         <code>{name}</code>
@@ -406,7 +406,7 @@
                                             >{check.value || "-"}</small
                                         >
                                         {#if check.issues && check.issues.length > 0}
-                                            {#each check.issues as issue}
+                                            {#each check.issues as issue, j (j)}
                                                 <div class="text-warning small">
                                                     <i class="bi bi-exclamation-triangle me-1"></i>
                                                     {issue}

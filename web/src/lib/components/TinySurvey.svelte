@@ -55,7 +55,7 @@
                 <p class="mb-1 small">Help us to design a better tool, rate this report!</p>
             {/if}
             <div class="btn-group" role="group" aria-label="Rate your level of happyness">
-                {#each [...Array(5).keys()] as i}
+                {#each [...Array(5).keys()] as i (i)}
                     <button
                         class="btn btn-lg px-1 pb-2 pt-1"
                         class:btn-outline-success={responses.stars <= i}

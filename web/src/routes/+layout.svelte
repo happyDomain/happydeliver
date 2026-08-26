@@ -4,6 +4,7 @@
     import "../app.css";
 
     import favicon from "$lib/assets/favicon.svg";
+    import { resolve } from "$app/paths";
 
     import Logo from "$lib/components/Logo.svelte";
     import { appConfig } from "$lib/stores/config";
@@ -32,7 +33,7 @@
 <div class="min-vh-100 d-flex flex-column">
     <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="/">
+            <a class="navbar-brand fw-bold" href={resolve("/")}>
                 {#if $appConfig.custom_logo_url}
                     <img src={$appConfig.custom_logo_url} alt="Logo" style="height: 25px;" />
                 {:else}
@@ -43,7 +44,7 @@
             {#if $appConfig.test_list_enabled}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/history/">
+                        <a class="nav-link" href={resolve("/history")}>
                             <i class="bi bi-clock-history me-1"></i>
                             History
                         </a>
@@ -74,7 +75,12 @@
         id="footer-classic"
         class="px-4 px-md-5 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
     >
-        <a class="footer-brand-link" href="https://happydeliver.org/" target="_blank" rel="noopener">
+        <a
+            class="footer-brand-link"
+            href="https://happydeliver.org/"
+            target="_blank"
+            rel="noopener"
+        >
             <i class="bi bi-envelope-check"></i>
             Powered by happyDeliver
         </a>
@@ -157,7 +163,7 @@
                 <div class="col">
                     <h4 class="footer-heading">Product</h4>
                     <ul class="footer-links">
-                        <li><a href="/#features">Features</a></li>
+                        <li><a href="{resolve('/')}#features">Features</a></li>
                         <li>
                             <a
                                 href="https://github.com/happyDomain/happydeliver/releases"
@@ -178,17 +184,29 @@
                     <h4 class="footer-heading">Our association</h4>
                     <ul class="footer-links">
                         <li>
-                            <a href="https://www.happydomain.org/en/who-we-are/" target="_blank" rel="noopener">
+                            <a
+                                href="https://www.happydomain.org/en/who-we-are/"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 About us
                             </a>
                         </li>
                         <li>
-                            <a href="https://www.happydomain.org/en/community/" target="_blank" rel="noopener">
+                            <a
+                                href="https://www.happydomain.org/en/community/"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 Contact
                             </a>
                         </li>
                         <li>
-                            <a href="https://www.happydomain.org/en/legal-notice/" target="_blank" rel="noopener">
+                            <a
+                                href="https://www.happydomain.org/en/legal-notice/"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 Legal notice
                             </a>
                         </li>
@@ -198,24 +216,38 @@
                     <h4 class="footer-heading">Resources</h4>
                     <ul class="footer-links">
                         <li>
-                            <a href="https://git.happydomain.org/happydeliver" target="_blank" rel="noopener">
+                            <a
+                                href="https://git.happydomain.org/happydeliver"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 Source code
                             </a>
                         </li>
                         <li>
-                            <a href="https://github.com/happyDomain/happydeliver/" target="_blank" rel="noopener">
+                            <a
+                                href="https://github.com/happyDomain/happydeliver/"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 GitHub
                             </a>
                         </li>
                         <li>
-                            <a href="https://feedback.happydeliver.org/" target="_blank" rel="noopener">
+                            <a
+                                href="https://feedback.happydeliver.org/"
+                                target="_blank"
+                                rel="noopener"
+                            >
                                 Feedback
                             </a>
                         </li>
                     </ul>
                 </div>
             </div>
-            <div class="footer-bottom pt-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div
+                class="footer-bottom pt-3 d-flex flex-wrap justify-content-between align-items-center gap-2"
+            >
                 <span class="footer-bottom-text">
                     © {new Date().getFullYear()} happyDomain — Powered by happyDeliver
                 </span>

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
 
     import { appConfig } from "$lib/stores/config";
 
@@ -26,7 +27,7 @@
         }
 
         // Navigate to the blacklist check page
-        goto(`/blacklist/${encodeURIComponent(ip.trim())}`);
+        goto(resolve("/blacklist/[ip]", { ip: ip.trim() }));
     }
 
     function handleKeyPress(event: KeyboardEvent) {
@@ -105,7 +106,7 @@
                                 What's Checked
                             </h3>
                             <ul class="list-unstyled mb-0 small">
-                                {#each $appConfig.rbls as rbl}
+                                {#each $appConfig.rbls as rbl (rbl)}
                                     <li class="mb-2">
                                         <i class="bi bi-arrow-right me-2"></i>{rbl}
                                     </li>
@@ -157,7 +158,7 @@
                     For comprehensive deliverability testing including DKIM verification, content
                     analysis, spam scoring, and more:
                 </p>
-                <a href="/" class="btn btn-sm btn-outline-primary">
+                <a href={resolve("/")} class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-envelope-plus me-1"></i>
                     Send Test Email
                 </a>

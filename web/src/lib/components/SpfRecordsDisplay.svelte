@@ -50,7 +50,7 @@
             </p>
         </div>
         <div class="list-group list-group-flush">
-            {#each spfRecords as spf, index}
+            {#each spfRecords as spf, index (index)}
                 <div class="list-group-item">
                     {#if spf.domain}
                         <div class="mb-2">

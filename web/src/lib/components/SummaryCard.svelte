@@ -275,8 +275,8 @@
         const dkimRecords = report.dns_results?.dkim_records;
         if (dkimRecords && Object.keys(dkimRecords).length > 0) {
             const invalidDkimKeys = Object.entries(dkimRecords)
-                .filter(([_, record]) => !record.valid && record.record)
-                .map(([key, _]) => key);
+                .filter(([, record]) => !record.valid && record.record)
+                .map(([key]) => key);
 
             if (invalidDkimKeys.length > 0) {
                 segments.push({ text: ". Your DKIM record" });
@@ -670,8 +670,9 @@
             class:mb-0={!children && !knownAge}
             style="line-height: 1.8;"
         >
-            {#each summarySegments as segment}
+            {#each summarySegments as segment, i (i)}
                 {#if segment.link}
+                    <!-- eslint-disable svelte/no-navigation-without-resolve -- always an in-page anchor fragment -->
                     <a
                         href={segment.link}
                         class="summary-link {segment.highlight
@@ -683,6 +684,7 @@
                     >
                         {segment.text}
                     </a>
+                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
                 {:else if segment.highlight}
                     <span
                         class="{getColorClass(segment.highlight.color)} {segment.highlight.bold

@@ -79,7 +79,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {#each Object.entries(rspamd.symbols).sort(([, a], [, b]) => b.score - a.score) as [symbolName, symbol]}
+                            {#each Object.entries(rspamd.symbols).sort(([, a], [, b]) => b.score - a.score) as [symbolName, symbol] (symbolName)}
                                 <tr
                                     class={symbol.score > 0
                                         ? "table-warning"
