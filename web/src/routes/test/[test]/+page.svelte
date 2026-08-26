@@ -93,6 +93,9 @@
                     if (reportResponse.data) {
                         report = reportResponse.data;
                         stopPolling();
+                    } else if (reportResponse.error) {
+                        handleApiError(reportResponse.error, "Failed to fetch report");
+                        stopPolling();
                     }
                 }
             } else if (testResponse.error) {
