@@ -245,6 +245,11 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 		appConfig["test_list_enabled"] = true
 	}
 
+	if !cfg.DisableEmlUpload {
+		appConfig["eml_upload_enabled"] = true
+		appConfig["max_upload_size"] = cfg.MaxUploadSize
+	}
+
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {
 		log.Println("Unable to generate JSON config to inject in web application")
 	} else {
