@@ -22,7 +22,9 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -40,7 +42,7 @@ import (
 // EmailAnalyzer defines the interface for email analysis
 // This interface breaks the circular dependency with pkg/analyzer
 type EmailAnalyzer interface {
-	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (reportJSON []byte, err error)
+	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
 	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, listedCount int, score int, grade string, err error)
 }
@@ -85,6 +87,94 @@ func (h *APIHandler) CreateTest(c *gin.Context) {
 		Email:   openapi_types.Email(email),
 		Status:  model.TestResponseStatusPending,
 		Message: utils.PtrTo("Send your test email to the given address"),
+	})
+}
+
+// reportSource reads back the provenance recorded in a stored report, defaulting to a
+// received message for reports generated before the field existed.
+func reportSource(reportJSON []byte) model.ReportSource {
+	var stored struct {
+		Source model.ReportSource `json:"source"`
+	}
+
+	if err := json.Unmarshal(reportJSON, &stored); err != nil || !stored.Source.Valid() {
+		return model.ReportSourceReceived
+	}
+
+	return stored.Source
+}
+
+// UploadEml analyzes an email message uploaded by the user
+// (POST /test/upload)
+func (h *APIHandler) UploadEml(c *gin.Context) {
+	if h.config.DisableEmlUpload {
+		c.JSON(http.StatusForbidden, model.Error{
+			Error:   "feature_disabled",
+			Message: "EML upload is disabled on this instance",
+		})
+		return
+	}
+
+	// Cap the request body before Gin buffers the multipart payload
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.config.MaxUploadSize)
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_request",
+			Message: fmt.Sprintf("Expected an email file in the \"file\" field, at most %d bytes", h.config.MaxUploadSize),
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	opened, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Error{
+			Error:   "internal_error",
+			Message: "Failed to read uploaded file",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+	defer opened.Close()
+
+	rawEmail, err := io.ReadAll(opened)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Error{
+			Error:   "internal_error",
+			Message: "Failed to read uploaded file",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	// An upload gets its own test ID, exactly like an address handed out by CreateTest
+	testID := uuid.New()
+
+	reportJSON, err := h.analyzer.AnalyzeEmailBytes(rawEmail, testID, model.ReportSourceUploaded)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "analysis_error",
+			Message: "Failed to analyze the uploaded file: is it a raw email message?",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	if _, err := h.storage.CreateReport(testID, rawEmail, reportJSON); err != nil {
+		c.JSON(http.StatusInternalServerError, model.Error{
+			Error:   "internal_error",
+			Message: "Failed to store report",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, model.EmlUploadResponse{
+		Id:     utils.UUIDToBase32(testID),
+		Status: model.EmlUploadResponseStatusAnalyzed,
+		Source: model.EmlUploadResponseSourceUploaded,
 	})
 }
 
@@ -218,8 +308,8 @@ func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
 		return
 	}
 
-	// Retrieve the existing report (mainly to get the raw email)
-	_, rawEmail, err := h.storage.GetReport(testUUID)
+	// Retrieve the existing report (for the raw email and the original provenance)
+	previousJSON, rawEmail, err := h.storage.GetReport(testUUID)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			c.JSON(http.StatusNotFound, model.Error{
@@ -236,8 +326,10 @@ func (h *APIHandler) ReanalyzeReport(c *gin.Context, id string) {
 		return
 	}
 
-	// Re-analyze the email using the current analyzer
-	reportJSON, err := h.analyzer.AnalyzeEmailBytes(rawEmail, testUUID)
+	// Re-analyze the email using the current analyzer, keeping the provenance recorded when
+	// the report was first generated: reanalyzing an upload as a received message would
+	// discard the authserv-id detected in the file.
+	reportJSON, err := h.analyzer.AnalyzeEmailBytes(rawEmail, testUUID, reportSource(previousJSON))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Error{
 			Error:   "analysis_error",
