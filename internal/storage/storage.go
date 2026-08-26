@@ -149,6 +149,7 @@ type reportSummaryRow struct {
 	Score      int
 	Grade      string
 	FromDomain string
+	Source     string
 	CreatedAt  time.Time
 }
 
@@ -170,12 +171,14 @@ func (s *DBStorage) ListReportSummaries(offset, limit int) ([]model.TestSummary,
 			`(convert_from(report_json, 'UTF8')::jsonb->>'score')::int as score, ` +
 			`convert_from(report_json, 'UTF8')::jsonb->>'grade' as grade, ` +
 			`convert_from(report_json, 'UTF8')::jsonb->'dns_results'->>'from_domain' as from_domain, ` +
+			`convert_from(report_json, 'UTF8')::jsonb->>'source' as source, ` +
 			`created_at`
 	case "sqlite":
 		selectExpr = `test_id, ` +
 			`json_extract(report_json, '$.score') as score, ` +
 			`json_extract(report_json, '$.grade') as grade, ` +
 			`json_extract(report_json, '$.dns_results.from_domain') as from_domain, ` +
+			`json_extract(report_json, '$.source') as source, ` +
 			`created_at`
 	default:
 		return nil, 0, fmt.Errorf("history tests list not implemented in this database dialect")
@@ -202,6 +205,12 @@ func (s *DBStorage) ListReportSummaries(offset, limit int) ([]model.TestSummary,
 		}
 		if r.FromDomain != "" {
 			s.FromDomain = utils.PtrTo(r.FromDomain)
+		}
+		// Reports predating the source field were all received by this instance's MTA
+		if source := model.TestSummarySource(r.Source); source.Valid() {
+			s.Source = utils.PtrTo(source)
+		} else {
+			s.Source = utils.PtrTo(model.TestSummarySourceReceived)
 		}
 		summaries = append(summaries, s)
 	}
