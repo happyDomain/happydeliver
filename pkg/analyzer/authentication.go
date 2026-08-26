@@ -37,19 +37,22 @@ func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer 
 	return &AuthenticationAnalyzer{receiverHostname: receiverHostname}
 }
 
-// AnalyzeAuthentication extracts and analyzes authentication results from email headers
-func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage) *model.AuthenticationResults {
+// AnalyzeAuthentication extracts and analyzes authentication results from email headers.
+//
+// Only the headers written by authservID are trusted; an empty authservID trusts every
+// Authentication-Results header found in the message.
+func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, authservID string) *model.AuthenticationResults {
 	results := &model.AuthenticationResults{}
 
 	// Parse Authentication-Results headers
-	authHeaders := email.GetAuthenticationResults(a.receiverHostname)
+	authHeaders := email.GetAuthenticationResults(authservID)
 	for _, header := range authHeaders {
 		a.parseAuthenticationResultsHeader(header, results)
 	}
 
 	// If no Authentication-Results headers, try to parse legacy headers
 	if results.Spf == nil {
-		results.Spf = a.parseLegacySPF(email)
+		results.Spf = a.parseLegacySPF(email, authservID)
 	}
 
 	// Parse ARC headers if not already parsed from Authentication-Results

@@ -58,17 +58,17 @@ func (a *AuthenticationAnalyzer) parseSPFResult(part string) *model.AuthResult {
 }
 
 // parseLegacySPF attempts to parse SPF from Received-SPF header
-func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage) *model.AuthResult {
+func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage, authservID string) *model.AuthResult {
 	receivedSPF := email.Header.Get("Received-SPF")
 	if receivedSPF == "" {
 		return nil
 	}
 
-	// Verify receiver matches our hostname
-	if a.receiverHostname != "" {
+	// Verify the header was written by the authority we trust
+	if authservID != "" {
 		receiverRe := regexp.MustCompile(`receiver=([^\s;]+)`)
 		if matches := receiverRe.FindStringSubmatch(receivedSPF); len(matches) > 1 {
-			if matches[1] != a.receiverHostname {
+			if !strings.EqualFold(matches[1], authservID) {
 				return nil
 			}
 		}

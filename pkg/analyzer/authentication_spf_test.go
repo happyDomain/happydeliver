@@ -174,7 +174,7 @@ func TestParseLegacySPF(t *testing.T) {
 				email.Header["Received-Spf"] = []string{tt.receivedSPF}
 			}
 
-			result := analyzer.parseLegacySPF(email)
+			result := analyzer.parseLegacySPF(email, "")
 
 			if tt.expectNil {
 				if result != nil {
