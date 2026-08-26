@@ -310,7 +310,7 @@ func serveOrReverse(forced_url string, cfg *config.Config) gin.HandlerFunc {
 				} else {
 					defer resp.Body.Close()
 
-					if u.Path != "/" || resp.StatusCode != 200 {
+					if forced_url != "/" || resp.StatusCode != 200 {
 						for key := range resp.Header {
 							c.Writer.Header().Add(key, resp.Header.Get(key))
 						}
