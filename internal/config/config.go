@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -67,6 +68,19 @@ type EmailConfig struct {
 	TestAddressPrefix string
 	LMTPAddr          string
 	ReceiverHostname  string
+
+	// RelayAddr enables the XFORWARD-to-XCLIENT relay front-end when
+	// non-empty. It lets happyDeliver sit behind an MTA that already owns
+	// port 25: that MTA relays test messages here with XFORWARD, and the
+	// relay replays them to the local Postfix with XCLIENT so the milters
+	// still see the original client IP and HELO.
+	RelayAddr string
+	// RelayUpstream is the local MTA the relay forwards to.
+	RelayUpstream string
+	// RelayTrustedNets lists the CIDRs (or bare IPs) allowed to use
+	// XFORWARD/XCLIENT. Anyone able to use them can forge an spf=pass, so
+	// the list must stay as narrow as possible.
+	RelayTrustedNets []string
 }
 
 // AnalysisConfig contains timeout and behavior settings for email analysis
@@ -96,6 +110,9 @@ func DefaultConfig() *Config {
 			TestAddressPrefix: "test-",
 			LMTPAddr:          "127.0.0.1:2525",
 			ReceiverHostname:  getHostname(),
+			RelayAddr:         "",
+			RelayUpstream:     "127.0.0.1:25",
+			RelayTrustedNets:  []string{},
 		},
 		Analysis: AnalysisConfig{
 			DNSTimeout:  5 * time.Second,
@@ -177,7 +194,54 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("database DSN cannot be empty")
 	}
 
+	if c.Email.RelayAddr != "" {
+		if c.Email.RelayUpstream == "" {
+			return fmt.Errorf("relay upstream cannot be empty when the relay is enabled")
+		}
+
+		if len(c.Email.RelayTrustedNets) == 0 {
+			return fmt.Errorf("relay enabled without any trusted network: set -relay-trusted-nets to the address(es) your MTA relays from, otherwise anyone could forge the client IP seen by the authentication milters")
+		}
+
+		if _, err := ParseTrustedNets(c.Email.RelayTrustedNets); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// ParseTrustedNets turns the -relay-trusted-nets values into networks. A bare
+// IP address is accepted and treated as a single-host network.
+func ParseTrustedNets(values []string) ([]*net.IPNet, error) {
+	nets := make([]*net.IPNet, 0, len(values))
+
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+
+		if _, n, err := net.ParseCIDR(value); err == nil {
+			nets = append(nets, n)
+			continue
+		}
+
+		ip := net.ParseIP(value)
+		if ip == nil {
+			return nil, fmt.Errorf("invalid relay trusted network %q: expected an IP address or a CIDR", value)
+		}
+
+		bits := 8 * net.IPv6len
+		if ip.To4() != nil {
+			ip = ip.To4()
+			bits = 8 * net.IPv4len
+		}
+
+		nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+
+	return nets, nil
 }
 
 // parseLine treats a config line and place the read value in the variable

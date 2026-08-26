@@ -33,6 +33,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/lmtp"
+	"git.happydns.org/happyDeliver/internal/relay"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 	"git.happydns.org/happyDeliver/web"
@@ -65,6 +66,16 @@ func RunServer(cfg *config.Config) error {
 			log.Fatalf("Failed to start LMTP server: %v", err)
 		}
 	}()
+
+	// Start the SMTP relay front-end when happyDeliver runs behind an MTA
+	// that already owns port 25
+	if cfg.Email.RelayAddr != "" {
+		go func() {
+			if err := relay.StartServer(cfg); err != nil {
+				log.Fatalf("Failed to start SMTP relay: %v", err)
+			}
+		}()
+	}
 
 	// Create analyzer adapter for API
 	analyzerAdapter := analyzer.NewAPIAdapter(cfg)

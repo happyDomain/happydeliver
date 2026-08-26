@@ -109,7 +109,7 @@ func TestDefaultConfig(t *testing.T) {
 func TestValidate(t *testing.T) {
 	valid := func() *Config {
 		return &Config{
-			Email:    EmailConfig{Domain: "example.com", TestAddressPrefix: "test-"},
+			Email:    EmailConfig{Domain: "example.com", TestAddressPrefix: "test-", RelayUpstream: "127.0.0.1:25"},
 			Database: DatabaseConfig{Type: "sqlite", DSN: "happydeliver.db"},
 		}
 	}
@@ -125,6 +125,29 @@ func TestValidate(t *testing.T) {
 		{"invalid domain", func(c *Config) { c.Email.Domain = "not a valid domain" }, true},
 		{"unsupported db type", func(c *Config) { c.Database.Type = "mysql" }, true},
 		{"empty dsn", func(c *Config) { c.Database.DSN = "" }, true},
+		{"relay disabled ignores trusted nets", func(c *Config) {
+			c.Email.RelayTrustedNets = nil
+		}, false},
+		{"relay enabled without trusted nets", func(c *Config) {
+			c.Email.RelayAddr = ":10025"
+		}, true},
+		{"relay enabled with trusted nets", func(c *Config) {
+			c.Email.RelayAddr = ":10025"
+			c.Email.RelayTrustedNets = []string{"127.0.0.0/8"}
+		}, false},
+		{"relay with bare IP as trusted net", func(c *Config) {
+			c.Email.RelayAddr = ":10025"
+			c.Email.RelayTrustedNets = []string{"192.0.2.10"}
+		}, false},
+		{"relay with invalid trusted net", func(c *Config) {
+			c.Email.RelayAddr = ":10025"
+			c.Email.RelayTrustedNets = []string{"not-a-cidr"}
+		}, true},
+		{"relay enabled without upstream", func(c *Config) {
+			c.Email.RelayAddr = ":10025"
+			c.Email.RelayTrustedNets = []string{"127.0.0.0/8"}
+			c.Email.RelayUpstream = ""
+		}, true},
 	}
 
 	for _, tc := range tests {
@@ -181,6 +204,31 @@ func TestParseLine(t *testing.T) {
 		}
 		if c.Email.Domain != "example.org" {
 			t.Errorf("Email.Domain = %q, want example.org", c.Email.Domain)
+		}
+	})
+
+	t.Run("relay flags are reachable from the environment", func(t *testing.T) {
+		c := DefaultConfig()
+		resetFlags(t, c)
+
+		if err := parseLine(c, "HAPPYDELIVER_RELAY_ADDR = :10025"); err != nil {
+			t.Fatalf("parseLine() error = %v", err)
+		}
+		if err := parseLine(c, "HAPPYDELIVER_RELAY_UPSTREAM = 127.0.0.1:2526"); err != nil {
+			t.Fatalf("parseLine() error = %v", err)
+		}
+		if err := parseLine(c, "HAPPYDELIVER_RELAY_TRUSTED_NETS = 192.0.2.0/24,203.0.113.7"); err != nil {
+			t.Fatalf("parseLine() error = %v", err)
+		}
+
+		if c.Email.RelayAddr != ":10025" {
+			t.Errorf("Email.RelayAddr = %q, want :10025", c.Email.RelayAddr)
+		}
+		if c.Email.RelayUpstream != "127.0.0.1:2526" {
+			t.Errorf("Email.RelayUpstream = %q, want 127.0.0.1:2526", c.Email.RelayUpstream)
+		}
+		if len(c.Email.RelayTrustedNets) != 2 {
+			t.Fatalf("Email.RelayTrustedNets = %v, want 2 entries", c.Email.RelayTrustedNets)
 		}
 	})
 
