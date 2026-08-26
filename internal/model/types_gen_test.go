@@ -62,10 +62,6 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			AuthResultResultPermerror.Valid, AuthResultResultSkipped.Valid, AuthResultResultSoftfail.Valid,
 			AuthResultResultTemperror.Valid,
 		}},
-		{"BIMICheckStatus", []func() bool{
-			BIMICheckStatusFail.Valid, BIMICheckStatusPass.Valid, BIMICheckStatusSkipped.Valid,
-			BIMICheckStatusWarning.Valid,
-		}},
 		{"BlacklistCheckResponseGrade", []func() bool{
 			BlacklistCheckResponseGradeA.Valid, BlacklistCheckResponseGradeA1.Valid, BlacklistCheckResponseGradeB.Valid,
 			BlacklistCheckResponseGradeC.Valid, BlacklistCheckResponseGradeD.Valid, BlacklistCheckResponseGradeE.Valid,
@@ -83,10 +79,6 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			ContentIssueTypeBrokenHtml.Valid, ContentIssueTypeDangerousHtml.Valid, ContentIssueTypeExcessiveImages.Valid,
 			ContentIssueTypeMissingAlt.Valid, ContentIssueTypeObfuscatedUrl.Valid, ContentIssueTypeSuspiciousLink.Valid,
 			ContentIssueTypeUnreplacedTemplate.Valid,
-		}},
-		{"DKIMCheckStatus", []func() bool{
-			DKIMCheckStatusFail.Valid, DKIMCheckStatusPass.Valid, DKIMCheckStatusSkipped.Valid,
-			DKIMCheckStatusWarning.Valid,
 		}},
 		{"DMARCRecordDkimAlignment", []func() bool{
 			DMARCRecordDkimAlignmentRelaxed.Valid, DMARCRecordDkimAlignmentStrict.Valid,
@@ -138,10 +130,6 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			RspamdResultDeliverabilityGradeA.Valid, RspamdResultDeliverabilityGradeA1.Valid, RspamdResultDeliverabilityGradeB.Valid,
 			RspamdResultDeliverabilityGradeC.Valid, RspamdResultDeliverabilityGradeD.Valid, RspamdResultDeliverabilityGradeE.Valid,
 			RspamdResultDeliverabilityGradeF.Valid,
-		}},
-		{"SPFCheckStatus", []func() bool{
-			SPFCheckStatusFail.Valid, SPFCheckStatusPass.Valid, SPFCheckStatusSkipped.Valid,
-			SPFCheckStatusWarning.Valid,
 		}},
 		{"SPFRecordAllQualifier", []func() bool{
 			SPFRecordAllQualifierEmpty.Valid, SPFRecordAllQualifierMinus.Valid, SPFRecordAllQualifierPlus.Valid,
@@ -225,12 +213,10 @@ func TestEnumValidRejectsUnknown(t *testing.T) {
 	rejects := []func() bool{
 		ARCResultResult(bogus).Valid,
 		AuthResultResult(bogus).Valid,
-		BIMICheckStatus(bogus).Valid,
 		BlacklistCheckResponseGrade(bogus).Valid,
 		ContentAnalysisUnsubscribeMethods(bogus).Valid,
 		ContentIssueSeverity(bogus).Valid,
 		ContentIssueType(bogus).Valid,
-		DKIMCheckStatus(bogus).Valid,
 		DMARCRecordDkimAlignment(bogus).Valid,
 		DMARCRecordNonexistentSubdomainPolicy(bogus).Valid,
 		DMARCRecordPolicy(bogus).Valid,
@@ -244,7 +230,6 @@ func TestEnumValidRejectsUnknown(t *testing.T) {
 		LinkCheckStatus(bogus).Valid,
 		ReportGrade(bogus).Valid,
 		RspamdResultDeliverabilityGrade(bogus).Valid,
-		SPFCheckStatus(bogus).Valid,
 		SPFRecordAllQualifier(bogus).Valid,
 		ScoreSummaryAuthenticationGrade(bogus).Valid,
 		ScoreSummaryBlacklistGrade(bogus).Valid,
