@@ -33,6 +33,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
@@ -91,7 +92,9 @@ func (r *EmailReceiver) ProcessEmailBytes(rawEmail []byte, recipientEmail string
 	log.Printf("Analyzing email for test %s", testID)
 
 	// Analyze the email using the shared analyzer
-	result, err := r.analyzer.AnalyzeEmailBytes(rawEmail, testID)
+	result, err := r.analyzer.AnalyzeEmailBytes(rawEmail, testID, analyzer.AnalysisOptions{
+		Source: model.ReportSourceReceived,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to analyze email: %w", err)
 	}

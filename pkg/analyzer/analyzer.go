@@ -63,7 +63,7 @@ type AnalysisResult struct {
 }
 
 // AnalyzeEmailBytes performs complete email analysis from raw bytes
-func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (*AnalysisResult, error) {
+func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, opts AnalysisOptions) (*AnalysisResult, error) {
 	// Parse the email
 	emailMsg, err := ParseEmail(bytes.NewReader(rawEmail))
 	if err != nil {
@@ -71,7 +71,7 @@ func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) (*A
 	}
 
 	// Analyze the email
-	results := a.generator.AnalyzeEmail(emailMsg)
+	results := a.generator.AnalyzeEmail(emailMsg, opts)
 
 	// Generate the report
 	report := a.generator.GenerateReport(testID, results)
@@ -97,8 +97,11 @@ func NewAPIAdapter(cfg *config.Config) *APIAdapter {
 }
 
 // AnalyzeEmailBytes performs analysis and returns JSON bytes directly
-func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID) ([]byte, error) {
-	result, err := a.analyzer.AnalyzeEmailBytes(rawEmail, testID)
+//
+// The source is taken as a plain model value rather than an AnalysisOptions so that the API
+// package does not have to depend on this one.
+func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) ([]byte, error) {
+	result, err := a.analyzer.AnalyzeEmailBytes(rawEmail, testID, AnalysisOptions{Source: source})
 	if err != nil {
 		return nil, err
 	}

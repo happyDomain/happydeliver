@@ -32,6 +32,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 )
 
@@ -40,8 +41,14 @@ func RunAnalyzer(cfg *config.Config, args []string, reader io.Reader, writer io.
 	// Parse command-line flags
 	fs := flag.NewFlagSet("analyze", flag.ExitOnError)
 	jsonOutput := fs.Bool("json", false, "Output results as JSON")
+	eml := fs.Bool("eml", false, "Treat the input as a user-supplied EML file rather than a message received by this instance: the authserv-id to trust is then detected from the file instead of being taken from -receiver-hostname")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	source := model.ReportSourceReceived
+	if *eml {
+		source = model.ReportSourceUploaded
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -60,7 +67,7 @@ func RunAnalyzer(cfg *config.Config, args []string, reader io.Reader, writer io.
 	emailAnalyzer := analyzer.NewEmailAnalyzer(cfg)
 
 	// Analyze the email (using a dummy test ID for standalone mode)
-	result, err := emailAnalyzer.AnalyzeEmailBytes(emailData, uuid.New())
+	result, err := emailAnalyzer.AnalyzeEmailBytes(emailData, uuid.New(), analyzer.AnalysisOptions{Source: source})
 	if err != nil {
 		return fmt.Errorf("failed to analyze email: %w", err)
 	}

@@ -63,9 +63,33 @@ func NewReportGenerator(
 	}
 }
 
+// AnalysisOptions describes where the message being analyzed comes from.
+//
+// It matters because every authentication verdict is read from Authentication-Results
+// headers: for a message received by this instance those headers were written by our own
+// milter, while for a message the user supplied they were written by whichever server
+// originally handled it.
+type AnalysisOptions struct {
+	// Source is where the message comes from. The zero value is treated as
+	// model.ReportSourceReceived.
+	Source model.ReportSource
+}
+
+// sourceOrDefault returns the source to record, defaulting to a received message.
+func (o AnalysisOptions) sourceOrDefault() model.ReportSource {
+	if o.Source == "" {
+		return model.ReportSourceReceived
+	}
+
+	return o.Source
+}
+
 // AnalysisResults contains all intermediate analysis results
 type AnalysisResults struct {
 	Email          *EmailMessage
+	Source         model.ReportSource
+	AuthservID     string
+	AuthservIDs    []string
 	Authentication *model.AuthenticationResults
 	Content        *ContentResults
 	DNS            *model.DNSResults
@@ -77,13 +101,24 @@ type AnalysisResults struct {
 }
 
 // AnalyzeEmail performs complete email analysis
-func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage) *AnalysisResults {
+func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions) *AnalysisResults {
 	results := &AnalysisResults{
-		Email: email,
+		Email:       email,
+		Source:      opts.sourceOrDefault(),
+		AuthservIDs: email.AuthservIDs(),
+	}
+
+	// A message we received ourselves is only trusted through our own authserv-id; for any
+	// other source, trust the topmost Authentication-Results header, written by the last
+	// server that handled the message.
+	if results.Source == model.ReportSourceReceived {
+		results.AuthservID = r.authAnalyzer.receiverHostname
+	} else if len(results.AuthservIDs) > 0 {
+		results.AuthservID = results.AuthservIDs[0]
 	}
 
 	// Run all analyzers
-	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email)
+	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email, results.AuthservID)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
 	// Fall back to the received chain's inbound TLS when no x-tls header was present.
 	if results.Authentication != nil && results.Headers != nil {
@@ -108,6 +143,16 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		Id:        utils.UUIDToBase32(reportID),
 		TestId:    utils.UUIDToBase32(testID),
 		CreatedAt: now,
+	}
+
+	// Record where the message came from, and which authority produced the authentication
+	// verdicts, so consumers can tell a sender problem from an unavailable measurement.
+	report.Source = utils.PtrTo(results.Source)
+	if results.AuthservID != "" {
+		report.AuthservId = utils.PtrTo(results.AuthservID)
+	}
+	if len(results.AuthservIDs) > 0 {
+		report.AuthservIdsFound = utils.PtrTo(results.AuthservIDs)
 	}
 
 	// Calculate scores directly from analyzers (no more checks array)

@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 )
@@ -59,7 +60,7 @@ func TestAnalyzeEmail(t *testing.T) {
 
 	email := createTestEmail()
 
-	results := gen.AnalyzeEmail(email)
+	results := gen.AnalyzeEmail(email, AnalysisOptions{})
 
 	if results == nil {
 		t.Fatal("Expected analysis results, got nil")
@@ -79,7 +80,7 @@ func TestGenerateReport(t *testing.T) {
 	testID := uuid.New()
 
 	email := createTestEmail()
-	results := gen.AnalyzeEmail(email)
+	results := gen.AnalyzeEmail(email, AnalysisOptions{})
 
 	report := gen.GenerateReport(testID, results)
 
@@ -134,7 +135,7 @@ func TestGenerateReportWithSpamAssassin(t *testing.T) {
 	testID := uuid.New()
 
 	email := createTestEmailWithSpamAssassin()
-	results := gen.AnalyzeEmail(email)
+	results := gen.AnalyzeEmail(email, AnalysisOptions{})
 
 	report := gen.GenerateReport(testID, results)
 
@@ -225,4 +226,103 @@ func createTestEmailWithSpamAssassin() *EmailMessage {
 	email.Header[textproto.CanonicalMIMEHeaderKey("X-Spam-Score")] = []string{"2.3"}
 	email.Header[textproto.CanonicalMIMEHeaderKey("X-Spam-Flag")] = []string{"NO"}
 	return email
+}
+
+// TestAnalyzeEmailSourceSelectsAuthservID checks which authority is trusted depending on
+// where the message comes from: our own receiver hostname for a message we received, the
+// topmost Authentication-Results header for a file the user supplied.
+func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
+	newEmail := func() *EmailMessage {
+		email := createTestEmail()
+		email.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")] = []string{
+			"mx.example.org; spf=pass smtp.mailfrom=sender@example.com",
+			"relay.example.net; spf=fail smtp.mailfrom=sender@example.com",
+		}
+		return email
+	}
+
+	t.Run("received message trusts the configured receiver hostname", func(t *testing.T) {
+		gen := NewReportGenerator("mx.example.org", time.Second, time.Second, nil, nil, false, "")
+
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceReceived})
+
+		if results.Source != model.ReportSourceReceived {
+			t.Errorf("Source = %q, expected %q", results.Source, model.ReportSourceReceived)
+		}
+		if results.AuthservID != "mx.example.org" {
+			t.Errorf("AuthservID = %q, expected mx.example.org", results.AuthservID)
+		}
+	})
+
+	t.Run("received message ignores a foreign authority", func(t *testing.T) {
+		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "")
+
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceReceived})
+
+		if results.Authentication.Spf != nil {
+			t.Errorf("Expected no SPF result from a foreign authority, got %+v", results.Authentication.Spf)
+		}
+	})
+
+	t.Run("uploaded message trusts the topmost header", func(t *testing.T) {
+		// The configured hostname appears nowhere in the file, yet the verdicts of the
+		// server that actually received the message must still be read.
+		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "")
+
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceUploaded})
+
+		if results.Source != model.ReportSourceUploaded {
+			t.Errorf("Source = %q, expected %q", results.Source, model.ReportSourceUploaded)
+		}
+		if results.AuthservID != "mx.example.org" {
+			t.Errorf("AuthservID = %q, expected mx.example.org", results.AuthservID)
+		}
+		if results.Authentication.Spf == nil {
+			t.Fatal("Expected the SPF result from mx.example.org, got none")
+		}
+		// The topmost header wins: pass, not the relay's fail
+		if results.Authentication.Spf.Result != model.AuthResultResultPass {
+			t.Errorf("Spf.Result = %q, expected pass", results.Authentication.Spf.Result)
+		}
+
+		report := gen.GenerateReport(uuid.New(), results)
+		if report.Source == nil || *report.Source != model.ReportSourceUploaded {
+			t.Errorf("report.Source = %v, expected %q", report.Source, model.ReportSourceUploaded)
+		}
+		if report.AuthservId == nil || *report.AuthservId != "mx.example.org" {
+			t.Errorf("report.AuthservId = %v, expected mx.example.org", report.AuthservId)
+		}
+		if report.AuthservIdsFound == nil || len(*report.AuthservIdsFound) != 2 {
+			t.Errorf("report.AuthservIdsFound = %v, expected both authorities", report.AuthservIdsFound)
+		}
+	})
+
+	t.Run("uploaded message without any authentication header", func(t *testing.T) {
+		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "")
+
+		results := gen.AnalyzeEmail(createTestEmail(), AnalysisOptions{Source: model.ReportSourceUploaded})
+
+		if results.AuthservID != "" {
+			t.Errorf("AuthservID = %q, expected empty", results.AuthservID)
+		}
+
+		report := gen.GenerateReport(uuid.New(), results)
+		if report.AuthservId != nil {
+			t.Errorf("report.AuthservId = %v, expected nil", report.AuthservId)
+		}
+		if report.AuthservIdsFound != nil {
+			t.Errorf("report.AuthservIdsFound = %v, expected nil", report.AuthservIdsFound)
+		}
+	})
+
+	t.Run("default options record a received message", func(t *testing.T) {
+		gen := NewReportGenerator("mx.example.org", time.Second, time.Second, nil, nil, false, "")
+
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{})
+
+		report := gen.GenerateReport(uuid.New(), results)
+		if report.Source == nil || *report.Source != model.ReportSourceReceived {
+			t.Errorf("report.Source = %v, expected %q", report.Source, model.ReportSourceReceived)
+		}
+	})
 }
