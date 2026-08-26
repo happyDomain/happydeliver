@@ -25,10 +25,20 @@ services:
     environment:
       # Set your domain
       HAPPYDELIVER_DOMAIN: happydeliver.local
+      # If port 25 is already taken on the host by your own MTA, comment out
+      # the "25:25" mapping below, uncomment "10025:10025", and enable the
+      # relay front-end: your MTA then relays test messages here with
+      # XFORWARD, and the relay replays them to the bundled Postfix with
+      # XCLIENT so the milters still see the original sender.
+      # See "Running behind an MTA that already owns port 25" in the README.
+      #HAPPYDELIVER_RELAY_ADDR: ":10025"
+      #HAPPYDELIVER_RELAY_TRUSTED_NETS: "172.28.0.1"
 
     ports:
       # SMTP port
       - "25:25"
+      # Relay port, when your own MTA owns port 25
+      #- "10025:10025"
       # API port
       - "8080:8080"
 

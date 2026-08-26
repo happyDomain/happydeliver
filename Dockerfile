@@ -179,7 +179,8 @@ RUN chmod +x /entrypoint.sh
 # Expose ports
 # 25 - SMTP
 # 8080 - API server
-EXPOSE 25 8080
+# 10025 - XFORWARD-to-XCLIENT relay, when a front MTA already owns port 25
+EXPOSE 25 8080 10025
 
 # Default configuration
 ENV HAPPYDELIVER_DATABASE_TYPE=sqlite \

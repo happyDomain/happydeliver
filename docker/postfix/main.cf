@@ -31,6 +31,11 @@ milter_protocol = 6
 smtpd_milters = unix:/var/spool/postfix/authentication_milter/authentication_milter.sock unix:/var/spool/postfix/spamassassin/spamass-milter.sock unix:/var/spool/postfix/rspamd/rspamd-milter.sock
 non_smtpd_milters = $smtpd_milters
 
+# Allow the happyDeliver relay front-end (running in this container) to
+# restate the original client with XCLIENT, so the milters above keep seeing
+# the real sender when a front MTA owns port 25 on the host.
+smtpd_authorized_xclient_hosts = 127.0.0.0/8 [::1]/128
+
 # SPF policy checking
 smtpd_recipient_restrictions =
     permit_mynetworks,
