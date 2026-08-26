@@ -47,6 +47,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /test/upload:
+    post:
+      tags:
+        - tests
+      summary: Analyze an uploaded EML file
+      description: >
+        Analyzes a raw email message (.eml) provided by the user instead of one delivered to
+        this instance's MTA. Authentication results are read from the Authentication-Results
+        headers already present in the file, using an auto-detected authserv-id. The resulting
+        report is stored like any other and is immediately available.
+      operationId: uploadEml
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The raw email message to analyze
+      responses:
+        '201':
+          description: File analyzed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmlUploadResponse'
+        '400':
+          description: Missing, oversized or unparsable file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: EML upload is disabled on this instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /test/{id}:
     get:
       tags:
@@ -299,6 +349,8 @@ components:
       $ref: './schemas.yaml#/components/schemas/Test'
     TestResponse:
       $ref: './schemas.yaml#/components/schemas/TestResponse'
+    EmlUploadResponse:
+      $ref: './schemas.yaml#/components/schemas/EmlUploadResponse'
     Report:
       $ref: './schemas.yaml#/components/schemas/Report'
     ScoreSummary:

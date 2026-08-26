@@ -126,6 +126,30 @@ components:
         raw_headers:
           type: string
           description: Raw email headers
+        source:
+          type: string
+          enum: [received, uploaded]
+          description: >
+            Where the analyzed message comes from. `received` means it was delivered to this
+            instance's MTA, which produced the Authentication-Results headers itself. `uploaded`
+            means the user provided an .eml file: authentication verdicts then come from
+            whichever server originally handled the message, and missing verdicts do not
+            indicate a misconfiguration of this instance. Absent on reports generated before
+            this field existed, which are all `received`.
+          example: "received"
+        authserv_id:
+          type: string
+          description: >
+            authserv-id of the Authentication-Results headers that were trusted for this
+            report. For `received` reports this is the configured receiver hostname; for
+            `uploaded` reports it is auto-detected from the file.
+          example: "mx.example.com"
+        authserv_ids_found:
+          type: array
+          items:
+            type: string
+          description: Every authserv-id found in the message's Authentication-Results headers, most recent first (informational)
+          example: ["mx.example.com", "relay.example.net"]
         created_at:
           type: string
           format: date-time
@@ -1292,9 +1316,35 @@ components:
         from_domain:
           type: string
           description: Sender domain extracted from the report
+        source:
+          type: string
+          enum: [received, uploaded]
+          description: Where the analyzed message came from (absent on reports predating this field, which are all `received`)
         created_at:
           type: string
           format: date-time
+
+    EmlUploadResponse:
+      type: object
+      required:
+        - id
+        - status
+        - source
+      properties:
+        id:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: Identifier of the test created for this upload (base32-encoded with hyphens)
+          example: "krfwg4z-amrqw4z-zmorsw2-djmfzgk-3a"
+        status:
+          type: string
+          enum: [analyzed]
+          description: Uploads are analyzed synchronously, so the report is immediately available
+          example: "analyzed"
+        source:
+          type: string
+          enum: [uploaded]
+          example: "uploaded"
 
     TestListResponse:
       type: object
