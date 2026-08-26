@@ -185,6 +185,8 @@ HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com ./happyDeliver server
 
 If the value is misconfigured, happyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
 
+This setting only applies to messages delivered to happyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.
@@ -247,6 +249,23 @@ Response:
 
 Send a test email to the address provided (you'll need to configure your MTA to route emails to the analyzer - see MTA Integration below).
 
+Alternatively, upload a message you already received elsewhere (no test address needed!), the report is produced immediately:
+
+```bash
+curl -F "file=@message.eml" http://localhost:8080/api/test/upload
+```
+
+Only what the file already carries can be reported: SPF, DKIM, DMARC, ARC, BIMI, reverse DNS, transport encryption and the spam filters' verdicts are all produced by the server that receives a message, so an uploaded file only has them if that server wrote them. The report records `"source": "uploaded"` so a missing verdict is not mistaken for a misconfiguration of your instance.
+
+Two settings control this endpoint:
+
+| Flag | Environment variable | Default | Description |
+|------|----------------------|---------|-------------|
+| `-disable-eml-upload` | `HAPPYDELIVER_DISABLE_EML_UPLOAD` | *enabled* | Turn the upload endpoint off (it also hides the widget in the web UI) |
+| `-max-upload-size` | `HAPPYDELIVER_MAX_UPLOAD_SIZE` | `10485760` (10 MiB) | Maximum size in bytes of an uploaded file |
+
+Note that an uploaded message is stored and listed like any other report; disable the upload endpoint, or the public listing with `-disable-test-list`, if that does not suit your instance.
+
 #### 6. Get Report
 
 ```bash
@@ -258,6 +277,7 @@ curl http://localhost:8080/api/report/550e8400-e29b-41d4-a716-446655440000
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/test` | POST | Create a new deliverability test |
+| `/api/test/upload` | POST | Analyze an uploaded `.eml` file (multipart, field `file`) |
 | `/api/test/{id}` | GET | Get test metadata and status |
 | `/api/report/{id}` | GET | Get detailed analysis report |
 | `/api/report/{id}/raw` | GET | Get raw annotated email |
@@ -275,6 +295,12 @@ Or specify recipient explicitly:
 
 ```bash
 cat email.eml | ./happyDeliver analyze -recipient test-uuid@yourdomain.com
+```
+
+For a message received by *another* server (an archive, a mail from your inbox), add `-eml` so the authserv-id is taken from the file instead of `-receiver-hostname`:
+
+```bash
+cat inbox-message.eml | ./happyDeliver analyze -eml -json
 ```
 
 **Note:** In production, emails are delivered via LMTP (see integration instructions above).
