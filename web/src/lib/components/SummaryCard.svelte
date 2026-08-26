@@ -1,6 +1,8 @@
 <script lang="ts">
+    import { resolve } from "$app/paths";
+
     import type { Report } from "$lib/api/types.gen";
-    import { hasNoAuthenticationResults } from "$lib/authentication";
+    import { hasNoAuthenticationResults, isUploadedMessage } from "$lib/authentication";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface TextSegment {
@@ -22,6 +24,7 @@
     let { children, report }: Props = $props();
 
     const authenticationUnavailable = $derived(hasNoAuthenticationResults(report.authentication));
+    const uploaded = $derived(isUploadedMessage(report.source));
 
     function buildSummary(): TextSegment[] {
         const segments: TextSegment[] = [];
@@ -90,7 +93,11 @@
                 highlight: { color: "warning", bold: true },
                 link: "#authentication-details",
             });
-            segments.push({ text: " (this server did not verify SPF, DKIM nor DMARC)" });
+            segments.push({
+                text: uploaded
+                    ? " (the uploaded file carries no SPF, DKIM nor DMARC verdict)"
+                    : " (this server did not verify SPF, DKIM nor DMARC)",
+            });
         } else if (spfResult === "pass" || dmarcResult === "pass") {
             segments.push({
                 text: "authenticated",
@@ -597,21 +604,57 @@
             <i class="bi bi-card-text me-2"></i>
             Summary
         </h5>
+        {#if isUploadedMessage(report.source)}
+            <div class="alert alert-info mb-3 small" role="alert">
+                <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                <strong>This report comes from an uploaded file.</strong>
+                <p class="mb-0 mt-1">
+                    The message was not delivered to this instance, so everything the receiving mail
+                    server normally measures (SPF, DKIM, DMARC, ARC, BIMI, reverse DNS, transport
+                    encryption, and the spam filters' verdicts) is only reported <strong>
+                        if the file already carried it.
+                    </strong>
+                    {#if report.authserv_id}
+                        Authentication results were read from
+                        <code>{report.authserv_id}</code>, the server that originally received it.
+                    {/if}
+                    Anything missing reflects that message's own path, not a misconfiguration of this
+                    instance. <a href={resolve("/test")}>Send the message to a test address</a> to have
+                    it checked here instead.
+                </p>
+            </div>
+        {/if}
+
         {#if authenticationUnavailable}
             <div class="alert alert-warning py-2 px-3 mb-3 small" id="authentication-unavailable">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                <strong
-                    >Authentication could not be checked: this is a server-side issue.</strong
-                >
-                <span class="d-block mt-1">
-                    This HappyDeliver instance did not add an <code>Authentication-Results</code>
-                    header to the received message, so SPF, DKIM and DMARC results are unknown and reported
-                    as <strong>N/A</strong> instead of a grade. Nothing in the summary below
-                    reflects a problem with your email on this point; the
-                    <strong>administrator of this instance</strong> should configure the receiving
-                    mail server to verify authentication (or fix the
-                    <code>--receiver-hostname</code> setting).
-                </span>
+                {#if uploaded}
+                    <strong>
+                        Authentication could not be checked: it is missing from the file.
+                    </strong>
+                    <span class="d-block mt-1">
+                        The uploaded message carries no usable <code>Authentication-Results</code>
+                        header, so SPF, DKIM and DMARC results are unknown and reported as
+                        <strong>N/A</strong> instead of a grade. This depends on the server that originally
+                        received the message, and reflects neither a problem with the email nor the configuration
+                        of this instance. To have them verified here, send the message to a test address
+                        instead.
+                    </span>
+                {:else}
+                    <strong>
+                        Authentication could not be checked: this is a server-side issue.
+                    </strong>
+                    <span class="d-block mt-1">
+                        This HappyDeliver instance did not add an <code>Authentication-Results</code
+                        >
+                        header to the received message, so SPF, DKIM and DMARC results are unknown and
+                        reported as <strong>N/A</strong> instead of a grade. Nothing in the summary
+                        below reflects a problem with your email on this point; the
+                        <strong>administrator of this instance</strong> should configure the
+                        receiving mail server to verify authentication (or fix the
+                        <code>--receiver-hostname</code> setting).
+                    </span>
+                {/if}
             </div>
         {/if}
         {#if staleness}

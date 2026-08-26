@@ -4,6 +4,7 @@
 
     import { getReport, getTest, reanalyzeReport } from "$lib/api";
     import type { BlacklistCheck, Report, Test } from "$lib/api/types.gen";
+    import { isUploadedMessage } from "$lib/authentication";
     import {
         AuthenticationCard,
         BlacklistCard,
@@ -277,6 +278,7 @@
                         score={report.score}
                         summary={report.summary}
                         authentication={report.authentication}
+                        source={report.source}
                         {reanalyzing}
                     />
                 </div>
@@ -329,6 +331,8 @@
                             authenticationGrade={report.summary?.authentication_grade}
                             authenticationScore={report.summary?.authentication_score}
                             dnsResults={report.dns_results}
+                            source={report.source}
+                            authservId={report.authserv_id}
                         />
                     </div>
                 </div>

@@ -27,6 +27,8 @@ interface AppConfig {
     custom_logo_url?: string;
     rbls?: string[];
     test_list_enabled?: boolean;
+    eml_upload_enabled?: boolean;
+    max_upload_size?: number;
 }
 
 const defaultConfig: AppConfig = {

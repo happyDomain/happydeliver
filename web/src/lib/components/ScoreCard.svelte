@@ -1,6 +1,10 @@
 <script lang="ts">
     import type { AuthenticationResults, ScoreSummary } from "$lib/api/types.gen";
-    import { hasNoAuthenticationResults } from "$lib/authentication";
+    import {
+        hasNoAuthenticationResults,
+        noAuthResultsTitle,
+        type MessageSource,
+    } from "$lib/authentication";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
 
@@ -10,12 +14,14 @@
         reanalyzing?: boolean;
         summary?: ScoreSummary;
         authentication?: AuthenticationResults;
+        source?: MessageSource;
     }
 
-    let { grade, score, reanalyzing, summary, authentication }: Props = $props();
+    let { grade, score, reanalyzing, summary, authentication, source }: Props = $props();
 
-    // Without an Authentication-Results header there is nothing to grade: the
-    // computed F reflects our own configuration, not the sender's.
+    // Without an Authentication-Results header there is nothing to grade: the computed F
+    // reflects the configuration of whichever server was supposed to produce it, not the
+    // sender's.
     let authenticationUnavailable = $derived(hasNoAuthenticationResults(authentication));
 
     function getScoreLabel(grade: string): string {
@@ -79,7 +85,7 @@
                             class:bg-light={$theme === "light"}
                             class:bg-secondary={$theme !== "light"}
                             title={authenticationUnavailable
-                                ? "This server did not report any authentication result, so no grade can be computed. Contact the administrator of this instance."
+                                ? noAuthResultsTitle(source)
                                 : undefined}
                         >
                             {#if authenticationUnavailable}

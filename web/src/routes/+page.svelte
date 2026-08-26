@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
 
-    import { createTest as apiCreateTest, listTests } from "$lib/api";
+    import { createTest as apiCreateTest, listTests, uploadEml } from "$lib/api";
     import type { TestSummary } from "$lib/api/types.gen";
     import { FeatureCard, HowItWorksStep, HistoryTable } from "$lib/components";
     import { appConfig } from "$lib/stores/config";
@@ -9,6 +9,9 @@
     let loading = $state(false);
     let error = $state<string | null>(null);
     let recentTests = $state<TestSummary[]>([]);
+
+    let fileInput = $state<HTMLInputElement | null>(null);
+    let dragging = $state(false);
 
     async function loadRecentTests() {
         if (!$appConfig.test_list_enabled) return;
@@ -18,7 +21,7 @@
                 recentTests = response.data.tests;
             }
         } catch {
-            // Silently ignore — this is a non-critical section
+            // Silently ignore: this is a non-critical section
         }
     }
 
@@ -39,6 +42,50 @@
             error = err instanceof Error ? err.message : "Failed to create test";
             loading = false;
         }
+    }
+
+    async function analyzeFile(file: File) {
+        loading = true;
+        error = null;
+
+        try {
+            const response = await uploadEml({ body: { file } });
+            if (response.data) {
+                goto(`/test/${response.data.id}`);
+                return;
+            }
+            error = response.error?.message ?? "Failed to analyze this file";
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Failed to analyze this file";
+        }
+
+        loading = false;
+    }
+
+    function onFileSelected(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files?.[0];
+
+        // Reset the input so selecting the same file twice fires a new analysis
+        input.value = "";
+
+        if (file) analyzeFile(file);
+    }
+
+    function onDrop(event: DragEvent) {
+        dragging = false;
+
+        if (!$appConfig.eml_upload_enabled || loading) return;
+
+        const file = event.dataTransfer?.files?.[0];
+        if (file) analyzeFile(file);
+    }
+
+    function getMaxUploadSizeText(): string {
+        const bytes = $appConfig.max_upload_size;
+        if (!bytes) return "";
+
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
     }
 
     function getRetentionTimeText(): string {
@@ -129,6 +176,13 @@
             variant: "primary" as const,
         },
         {
+            icon: "bi-file-earmark-arrow-up",
+            title: "EML Upload",
+            description:
+                "Analyze a message you already received elsewhere: authentication results are read from the server that handled it.",
+            variant: "info" as const,
+        },
+        {
             icon: "bi-lock",
             title: "Privacy First",
             description: `Self-hosted solution, your data never leaves your infrastructure. Reports retained for ${getRetentionTimeText()}.`,
@@ -145,7 +199,8 @@
         {
             step: 2,
             title: "Send Email",
-            description: "Send a test email from your mail server to the provided address.",
+            description:
+                "Send a test email from your mail server to the provided address, or upload an .eml file you already received.",
         },
         {
             step: 3,
@@ -160,12 +215,26 @@
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="hero py-5" id="hero">
+<section
+    class="hero py-5"
+    class:dragging
+    id="hero"
+    ondragover={(e) => {
+        if (!$appConfig.eml_upload_enabled) return;
+        e.preventDefault();
+        dragging = true;
+    }}
+    ondragleave={() => (dragging = false)}
+    ondrop={(e) => {
+        e.preventDefault();
+        onDrop(e);
+    }}
+>
     <div class="container py-5">
         <div class="row align-items-center">
             <div class="col-lg-8 mx-auto text-center fade-in">
                 <h1 class="display-3 fw-bold mb-4">Test Your Email Deliverability</h1>
-                <p class="lead mb-4 opacity-90">
+                <p class="lead mb-4 opacity-90" style="text-wrap: balance;">
                     Get detailed insights into your email configuration, authentication, spam score,
                     and more. Open-source, self-hosted, and privacy-focused.
                 </p>
@@ -176,12 +245,40 @@
                 >
                     {#if loading}
                         <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        Creating Test...
+                        Working...
                     {:else}
                         <i class="bi bi-envelope-plus me-2"></i>
                         Start Free Test
                     {/if}
                 </button>
+
+                {#if $appConfig.eml_upload_enabled}
+                    <div class="mt-4">
+                        <p class="mb-2 opacity-90" style="text-wrap: balance;">
+                            Already received the message elsewhere?
+                        </p>
+                        <input
+                            type="file"
+                            accept=".eml,message/rfc822,text/plain"
+                            class="d-none"
+                            bind:this={fileInput}
+                            onchange={onFileSelected}
+                        />
+                        <button
+                            class="btn btn-outline-light btn-lg px-4"
+                            onclick={() => fileInput?.click()}
+                            disabled={loading}
+                        >
+                            <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                            Analyze an .eml file
+                        </button>
+                        <p class="small mt-2 mb-0 opacity-90" style="text-wrap: balance;">
+                            Drop the raw file here{#if getMaxUploadSizeText()}&nbsp;({getMaxUploadSizeText()}
+                                max){/if}. Authentication results are then read from the server that
+                            actually received it.
+                        </p>
+                    </div>
+                {/if}
 
                 {#if error}
                     <div class="alert alert-danger mt-4 d-inline-block" role="alert">
@@ -280,6 +377,16 @@
         </div>
 
         <div class="text-center mt-4">
+            {#if $appConfig.eml_upload_enabled}
+                <button
+                    class="btn btn-secondary btn-lg me-2"
+                    onclick={() => fileInput?.click()}
+                    disabled={loading}
+                >
+                    <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                    Analyze an .eml File
+                </button>
+            {/if}
             <a href="/domain" class="btn btn-secondary btn-lg me-2">
                 <i class="bi bi-globe me-2"></i>
                 Test Domain Only
@@ -306,6 +413,11 @@
     .hero h1,
     .hero p {
         text-shadow: black 0 0 1px;
+    }
+
+    .hero.dragging {
+        outline: 3px dashed rgba(255, 255, 255, 0.9);
+        outline-offset: -1rem;
     }
 
     /* Dark mode hero adjustments */

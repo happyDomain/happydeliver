@@ -1,6 +1,10 @@
 <script lang="ts">
     import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
-    import { hasNoAuthenticationResults } from "$lib/authentication";
+    import {
+        hasNoAuthenticationResults,
+        isUploadedMessage,
+        type MessageSource,
+    } from "$lib/authentication";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -10,11 +14,21 @@
         authenticationGrade?: string;
         authenticationScore?: number;
         dnsResults?: DnsResults;
+        source?: MessageSource;
+        authservId?: string;
     }
 
-    let { authentication, authenticationGrade, authenticationScore, dnsResults }: Props = $props();
+    let {
+        authentication,
+        authenticationGrade,
+        authenticationScore,
+        dnsResults,
+        source,
+        authservId,
+    }: Props = $props();
 
     let allRequiredMissing = $derived(hasNoAuthenticationResults(authentication));
+    let uploaded = $derived(isUploadedMessage(source));
 
     function getAuthResultClass(result: string, noneIsFail: boolean): string {
         switch (result) {
@@ -110,24 +124,43 @@
             <div class="alert alert-warning mb-0">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 <strong>No authentication results found.</strong>
-                <p class="mb-0 mt-1">
-                    This is not a problem with the analysed email: this server could not evaluate
-                    SPF, DKIM and DMARC, so the authentication grade is reported as
-                    <strong>N/A</strong>. The administrator of this HappyDeliver instance should
-                    look at it, as it usually means either:
-                </p>
-                <ul class="mb-0 mt-1">
-                    <li>
-                        The receiving mail server is not configured to verify email authentication
-                        (no <code>Authentication-Results</code> header was found in the message).
-                    </li>
-                    <li>
-                        The <code>Authentication-Results</code> header exists but the receiver
-                        hostname does not match the configured
-                        <code>--receiver-hostname</code> value.
-                    </li>
-                </ul>
+                {#if uploaded}
+                    <p class="mb-0 mt-1">
+                        The uploaded file carries no usable <code>Authentication-Results</code>
+                        header, so SPF, DKIM and DMARC could not be evaluated and the authentication grade
+                        is reported as <strong>N/A</strong>. Whether those verdicts exist depends on
+                        the server that originally received the message. Send the message to a test
+                        address to have them verified here.
+                    </p>
+                {:else}
+                    <p class="mb-0 mt-1">
+                        This is not a problem with the analysed email: this server could not
+                        evaluate SPF, DKIM and DMARC, so the authentication grade is reported as
+                        <strong>N/A</strong>. The administrator of this HappyDeliver instance should
+                        look at it, as it usually means either:
+                    </p>
+                    <ul class="mb-0 mt-1">
+                        <li>
+                            The receiving mail server is not configured to verify email
+                            authentication (no <code>Authentication-Results</code> header was found in
+                            the message).
+                        </li>
+                        <li>
+                            The <code>Authentication-Results</code> header exists but the receiver
+                            hostname does not match the configured
+                            <code>--receiver-hostname</code> value.
+                        </li>
+                    </ul>
+                {/if}
             </div>
+        </div>
+    {:else if uploaded && authservId}
+        <div class="card-body border-bottom py-2">
+            <p class="mb-0 small text-muted">
+                <i class="bi bi-info-circle me-2"></i>
+                These verdicts were produced by <code>{authservId}</code>, the server that received
+                the uploaded message, not by this instance.
+            </p>
         </div>
     {/if}
     <div class="list-group list-group-flush">
