@@ -210,8 +210,57 @@ func buildRawHeaders(header mail.Header) string {
 	return sb.String()
 }
 
+// parseAuthservID extracts the authserv-id from an Authentication-Results header value.
+//
+// Per RFC 8601 section 2.2 the value opens with the authserv-id, optionally followed by a
+// version number, then the results separated by semicolons. CFWS comments may appear
+// anywhere, so they are stripped before the identifier is isolated.
+func parseAuthservID(value string) string {
+	var head strings.Builder
+	depth := 0
+	inQuotes := false
+
+scan:
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case inQuotes:
+			if c == '\\' && i+1 < len(value) {
+				i++
+				head.WriteByte(value[i])
+			} else if c == '"' {
+				inQuotes = false
+			} else {
+				head.WriteByte(c)
+			}
+		case c == '(':
+			depth++
+		case c == ')':
+			if depth > 0 {
+				depth--
+			}
+		case depth > 0:
+			// Inside a comment: ignored.
+		case c == '"':
+			inQuotes = true
+		case c == ';':
+			break scan
+		default:
+			head.WriteByte(c)
+		}
+	}
+
+	// What remains is "authserv-id [version]": keep the first token.
+	fields := strings.Fields(head.String())
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return fields[0]
+}
+
 // GetAuthenticationResults extracts Authentication-Results headers
-// If receiverHostname is provided, only returns headers that begin with that hostname
+// If receiverHostname is provided, only returns headers whose authserv-id is that hostname
 func (e *EmailMessage) GetAuthenticationResults(receiverHostname string) []string {
 	allResults := e.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")]
 
@@ -220,18 +269,44 @@ func (e *EmailMessage) GetAuthenticationResults(receiverHostname string) []strin
 		return allResults
 	}
 
-	// Filter results that begin with the specified hostname
+	// Filter results whose authserv-id matches the specified hostname
 	var filtered []string
-	prefix := receiverHostname + ";"
 	for _, result := range allResults {
-		// Trim whitespace and check if it starts with hostname;
-		trimmed := strings.TrimSpace(result)
-		if strings.HasPrefix(trimmed, prefix) {
+		if strings.EqualFold(parseAuthservID(result), receiverHostname) {
 			filtered = append(filtered, result)
 		}
 	}
 
 	return filtered
+}
+
+// AuthservIDs lists the authserv-id of every Authentication-Results header found in the
+// message, most recent (topmost) first and without duplicates.
+//
+// This is how the authority to trust is picked for messages this instance did not receive
+// itself, such as an uploaded EML file: the topmost header was written by the last server
+// that handled the message, usually the recipient's own MTA.
+func (e *EmailMessage) AuthservIDs() []string {
+	allResults := e.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")]
+
+	var ids []string
+	seen := make(map[string]bool, len(allResults))
+	for _, result := range allResults {
+		id := parseAuthservID(result)
+		if id == "" {
+			continue
+		}
+
+		key := strings.ToLower(id)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		ids = append(ids, id)
+	}
+
+	return ids
 }
 
 // GetSpamAssassinHeaders extracts SpamAssassin-related headers

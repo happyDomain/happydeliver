@@ -174,3 +174,140 @@ Body content.
 		t.Error("Expected List-Unsubscribe header to not exist")
 	}
 }
+
+func TestParseAuthservID(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{
+			name:     "bare authserv-id",
+			value:    "mx.example.com; spf=pass smtp.mailfrom=sender@example.net",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "version token is not part of the identifier",
+			value:    "mx.example.com 1; dkim=pass header.d=example.net",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "whitespace before the first result",
+			value:    "  mx.example.com ; dmarc=pass header.from=example.net",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "CFWS comment after the identifier",
+			value:    "mx.example.com (happyDeliver); spf=pass",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "CFWS comment before the identifier",
+			value:    "(added by) mx.example.com; spf=pass",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "quoted identifier",
+			value:    `"mx.example.com"; spf=pass`,
+			expected: "mx.example.com",
+		},
+		{
+			name:     "semicolon inside a comment does not end the identifier",
+			value:    "mx.example.com (a; b); spf=pass",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "no result at all",
+			value:    "mx.example.com; none",
+			expected: "mx.example.com",
+		},
+		{
+			name:     "empty value",
+			value:    "",
+			expected: "",
+		},
+		{
+			name:     "comment only",
+			value:    "(nothing here)",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseAuthservID(tt.value); got != tt.expected {
+				t.Errorf("parseAuthservID(%q) = %q, expected %q", tt.value, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAuthservIDs(t *testing.T) {
+	rawEmail := `From: sender@example.net
+To: recipient@example.com
+Subject: Test
+Authentication-Results: mx.example.com; spf=pass smtp.mailfrom=sender@example.net
+Authentication-Results: MX.EXAMPLE.COM; dkim=pass header.d=example.net
+Authentication-Results: relay.example.org 1; dmarc=fail header.from=example.net
+
+Body
+`
+
+	email, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	// Topmost header first, and the case-insensitive duplicate is dropped
+	expected := []string{"mx.example.com", "relay.example.org"}
+
+	ids := email.AuthservIDs()
+	if len(ids) != len(expected) {
+		t.Fatalf("AuthservIDs() = %v, expected %v", ids, expected)
+	}
+	for i, want := range expected {
+		if ids[i] != want {
+			t.Errorf("AuthservIDs()[%d] = %q, expected %q", i, ids[i], want)
+		}
+	}
+}
+
+func TestGetAuthenticationResultsFiltersOnAuthservID(t *testing.T) {
+	rawEmail := `From: sender@example.net
+To: recipient@example.com
+Subject: Test
+Authentication-Results: mx.example.com 1 ; spf=pass smtp.mailfrom=sender@example.net
+Authentication-Results: relay.example.org; spf=fail smtp.mailfrom=sender@example.net
+
+Body
+`
+
+	email, err := ParseEmail(strings.NewReader(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	// The version token and the space before the semicolon must not defeat the match
+	results := email.GetAuthenticationResults("mx.example.com")
+	if len(results) != 1 {
+		t.Fatalf("GetAuthenticationResults(mx.example.com) returned %d headers, expected 1: %v", len(results), results)
+	}
+	if !strings.Contains(results[0], "spf=pass") {
+		t.Errorf("Expected the mx.example.com header, got %q", results[0])
+	}
+
+	// Matching is case-insensitive
+	if got := email.GetAuthenticationResults("MX.Example.Com"); len(got) != 1 {
+		t.Errorf("GetAuthenticationResults is case-sensitive: returned %d headers, expected 1", len(got))
+	}
+
+	// An unknown authority yields nothing
+	if got := email.GetAuthenticationResults("other.example.net"); len(got) != 0 {
+		t.Errorf("GetAuthenticationResults(other.example.net) returned %d headers, expected 0", len(got))
+	}
+
+	// No authority means everything is returned
+	if got := email.GetAuthenticationResults(""); len(got) != 2 {
+		t.Errorf("GetAuthenticationResults(\"\") returned %d headers, expected 2", len(got))
+	}
+}
