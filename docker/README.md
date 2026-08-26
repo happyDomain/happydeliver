@@ -7,10 +7,10 @@ This directory contains all configuration files for the all-in-one Docker contai
 The Docker container integrates multiple components:
 
 - **Postfix**: Mail Transfer Agent (MTA) that receives emails on port 25
-- **OpenDKIM**: DKIM signature verification
-- **OpenDMARC**: DMARC policy validation
-- **SpamAssassin**: Spam scoring and content analysis
-- **happyDeliver**: Go application (API server + email analyzer)
+- **authentication_milter**: SPF, DKIM, DMARC, ARC, BIMI, IPRev, PTR and TLS verification
+- **SpamAssassin**: Spam scoring and content analysis, through `spamass-milter`
+- **rspamd**: Second spam filter, through its milter proxy worker
+- **happyDeliver**: Go application (API server + LMTP receiver + email analyzer)
 - **Supervisor**: Process manager that runs all services
 
 ## Directory Structure
@@ -21,16 +21,16 @@ docker/
 │   ├── main.cf              # Postfix main configuration
 │   ├── master.cf            # Postfix service definitions
 │   └── transport_maps       # Email routing rules
-├── opendkim/
-│   └── opendkim.conf        # DKIM verification config
-├── opendmarc/
-│   └── opendmarc.conf       # DMARC validation config
+├── authentication_milter/
+│   ├── authentication_milter.json  # Handlers and authserv-id
+│   └── mail-dmarc.ini              # Mail::DMARC settings
+├── rspamd/
+│   └── local.d/             # Milter proxy worker, actions, headers
 ├── spamassassin/
 │   └── local.cf             # SpamAssassin rules and scoring
 ├── supervisor/
 │   └── supervisord.conf     # Supervisor service definitions
-├── entrypoint.sh            # Container initialization script
-└── config.docker.yaml       # happyDeliver default config
+└── entrypoint.sh            # Container initialization script
 ```
 
 ## Configuration Details
@@ -39,36 +39,27 @@ docker/
 
 **main.cf**: Core Postfix settings
 - Configures hostname, domain, and network interfaces
-- Sets up milter integration for OpenDKIM and OpenDMARC
-- Configures SPF policy checking
-- Routes emails through SpamAssassin content filter
+- Chains the three milters: authentication_milter, spamass-milter, rspamd
+- Authorizes `XCLIENT` from loopback, for the relay front-end (see Ports below)
 - Uses transport_maps to route test emails to happyDeliver
 
 **master.cf**: Service definitions
-- Defines SMTP service with content filtering
-- Sets up SPF policy service (postfix-policyd-spf-perl)
-- Configures SpamAssassin content filter
-- Defines happydeliver pipe for email analysis
+- Defines the SMTP service and the standard Postfix helper services
 
 **transport_maps**: PCRE-based routing
 - Matches test-UUID@domain emails
-- Routes them to the happydeliver pipe
+- Routes them to the happyDeliver LMTP server on `127.0.0.1:2525`
 
-### OpenDKIM (opendkim/)
+### authentication_milter (authentication_milter/)
 
-**opendkim.conf**: DKIM verification settings
-- Operates in verification-only mode
-- Adds Authentication-Results headers
-- Socket communication with Postfix via milter
-- 5-second DNS timeout
+**authentication_milter.json**: the only component that authenticates mail
+- Handlers: SPF, DKIM, DMARC, ARC, BIMI, IPRev, PTR, TLS, SenderID, Auth, AlignedFrom
+- Writes the `Authentication-Results` headers happyDeliver later parses
+- `authserv_id` is the container hostname, which is what happyDeliver trusts
+- The `Sanitize` handler strips inbound headers claiming that same authserv-id
+- Set `MILTER_DEBUG=1` to turn on verbose tracing
 
-### OpenDMARC (opendmarc/)
-
-**opendmarc.conf**: DMARC validation settings
-- Validates DMARC policies
-- Adds results to Authentication-Results headers
-- Does not reject emails (analysis mode only)
-- Socket communication with Postfix via milter
+**mail-dmarc.ini**: Mail::DMARC settings used by the DMARC handler (reporting disabled)
 
 ### SpamAssassin (spamassassin/)
 
@@ -83,7 +74,7 @@ docker/
 
 **supervisord.conf**: Service orchestration
 - Runs all services as daemons
-- Start order: OpenDKIM → OpenDMARC → SpamAssassin → Postfix → API
+- Start order: milters → rspamd → spamd → Postfix → API
 - Automatic restart on failure
 - Centralized logging
 
@@ -96,14 +87,12 @@ Initialization script that:
 4. Updates SpamAssassin rules
 5. Starts Supervisor to launch all services
 
-### happyDeliver Config (config.docker.yaml)
+### happyDeliver Configuration
 
-Default configuration for the Docker environment:
-- API server on 0.0.0.0:8080
-- SQLite database at /var/lib/happydeliver/happydeliver.db
-- Configurable domain for test emails
-- RBL servers for blacklist checking
-- Timeouts for DNS and HTTP checks
+Defaults for the Docker environment are set as `HAPPYDELIVER_*` environment variables in the
+`Dockerfile`: API server on `:8080`, SQLite database at
+`/var/lib/happydeliver/happydeliver.db`, `test-` address prefix, and the DNS/HTTP timeouts.
+Every command-line flag can be overridden the same way (`_` becomes `-`, lowercased).
 
 ## Environment Variables
 
@@ -112,6 +101,9 @@ The container accepts these environment variables:
 - `HAPPYDELIVER_DOMAIN`: Email domain for test addresses (default: happydeliver.local)
 - `HAPPYDELIVER_RECEIVER_HOSTNAME`: Hostname used to filter `Authentication-Results` headers (see below)
 - `POSTFIX_CERT_FILE` / `POSTFIX_KEY_FILE`: TLS certificate and key paths for Postfix SMTP
+- `MILTER_DEBUG`: set to `1` for verbose authentication_milter logging
+- `HAPPYDELIVER_RELAY_ADDR` / `HAPPYDELIVER_RELAY_TRUSTED_NETS`: enable the relay front-end
+  when the host's port 25 belongs to another MTA (see Ports below)
 
 ### Receiver Hostname
 
@@ -155,35 +147,39 @@ docker run -e HAPPYDELIVER_DOMAIN=example.com -e HAPPYDELIVER_RECEIVER_HOSTNAME=
 
 - **25**: SMTP (Postfix)
 - **8080**: HTTP API (happyDeliver)
+- **10025**: XFORWARD-to-XCLIENT relay, disabled unless `HAPPYDELIVER_RELAY_ADDR` is set
+
+Internal only: **2525** (happyDeliver LMTP) and **11334** (rspamd HTTP).
+
+The relay exists for hosts whose port 25 already belongs to another MTA. That MTA relays test
+messages to port 10025 with `XFORWARD`; the relay replays them to the container's Postfix with
+`XCLIENT`, so the milters keep evaluating SPF, IPRev, PTR and DMARC against the original
+sender rather than against the front MTA. Only peers listed in
+`HAPPYDELIVER_RELAY_TRUSTED_NETS` may restate the client identity — anyone who can do so can
+forge an `spf=pass`. See the main README for the host-side Postfix configuration.
 
 ## Service Startup Order
 
 Supervisor ensures services start in the correct order:
 
-1. **OpenDKIM** (priority 10): DKIM verification milter
-2. **OpenDMARC** (priority 11): DMARC validation milter
-3. **SpamAssassin** (priority 12): Spam scoring daemon
-4. **Postfix** (priority 20): MTA that uses the above services
-5. **happyDeliver API** (priority 30): REST API server
+1. **syslogd** (priority 9): collects the mail logs
+2. **spamass-milter** (priority 7) and **authentication_milter** (priority 10)
+3. **rspamd** (priority 11) and **spamd** (priority 12)
+4. **Postfix** (priority 20): MTA that uses the above milters
+5. **happyDeliver API** (priority 30): REST API and LMTP server
 
 ## Email Processing Flow
 
-1. Email arrives at Postfix on port 25
-2. Postfix sends to OpenDKIM milter
-   - Verifies DKIM signature
-   - Adds `Authentication-Results: ... dkim=pass/fail`
-3. Postfix sends to OpenDMARC milter
-   - Validates DMARC policy
-   - Adds `Authentication-Results: ... dmarc=pass/fail`
-4. Postfix routes through SpamAssassin content filter
-   - Checks SPF record
-   - Scores email for spam
-   - Adds `X-Spam-Status` and `X-Spam-Report` headers
-5. Postfix checks transport_maps
-   - If recipient matches test-UUID pattern, route to happydeliver pipe
-6. happyDeliver analyzer receives email
-   - Extracts test ID from recipient
-   - Parses all headers added by filters
+1. Email arrives at Postfix on port 25 (or through the relay on 10025)
+2. Postfix runs the milter chain, in order:
+   - **authentication_milter** adds the `Authentication-Results` headers
+     (`spf=`, `dkim=`, `dmarc=`, `arc=`, `bimi=`, `iprev=`, `x-ptr=`, `x-tls=`, …)
+   - **spamass-milter** adds `X-Spam-Status`, `X-Spam-Level` and `X-Spam-Report`
+   - **rspamd** adds `X-Spamd-Result`
+3. Postfix checks transport_maps
+   - If the recipient matches the test-UUID pattern, deliver over LMTP to `127.0.0.1:2525`
+4. happyDeliver receives the email
+   - Extracts the test ID from the recipient
+   - Parses the headers added above, trusting only the expected authserv-id
    - Performs additional analysis (DNS, RBL, content)
-   - Generates deliverability score
-   - Stores report in database
+   - Generates a deliverability score and stores the report

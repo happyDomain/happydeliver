@@ -143,6 +143,78 @@ Replace `yourdomain.com` with the value you set for `HAPPYDELIVER_DOMAIN` and IP
 
 There is no need for an MX record here since the same host will serve both HTTP and SMTP.
 
+##### Running behind an MTA that already owns port 25
+
+If the host already runs its own MTA on port 25, the simplest option is to give the container a
+dedicated address, so that nothing has to be shared:
+
+```yaml
+    ports:
+      - "203.0.113.9:25:25"
+```
+
+When that is not possible, the container can sit **behind** your MTA. The catch is that
+`authentication_milter` derives SPF, IPRev, PTR and DMARC from the *connection* (client IP,
+HELO, MAIL FROM), not from the `Received:` headers: relaying the message naively would make
+every one of those verdicts describe your own MTA instead of the sender under test. Rewriting
+headers would not help — the connection has to be restated, which is what Postfix's `XCLIENT`
+command does.
+
+Your Postfix knows how to send `XFORWARD` (which only fixes logging) but not `XCLIENT` (which
+also fixes what the milters see), so happyDeliver ships a small relay that translates one into
+the other:
+
+```
+Internet :25 → your Postfix  ──XFORWARD──→  happyDeliver relay :10025
+                                    ──XCLIENT──→  bundled Postfix → milters → analysis
+```
+
+1. Enable the relay on the container, and publish port 10025 instead of 25:
+
+  ```yaml
+    environment:
+      HAPPYDELIVER_RELAY_ADDR: ":10025"
+      # Address(es) your MTA connects from. Anyone listed here can restate the
+      # client identity, and therefore forge an "spf=pass": keep it narrow.
+      HAPPYDELIVER_RELAY_TRUSTED_NETS: "172.28.0.1"
+
+    ports:
+      - "10025:10025"
+      - "8080:8080"
+  ```
+
+2. On the host MTA, accept the happyDeliver domain and route it to the relay over a **dedicated
+   transport**, so that `XFORWARD` is only ever sent there:
+
+  ```
+  # main.cf
+  relay_domains = $relay_domains, yourdomain.com
+  transport_maps = texthash:/etc/postfix/transport_happydeliver
+  ```
+
+  ```
+  # /etc/postfix/transport_happydeliver
+  yourdomain.com    happydeliver:[127.0.0.1]:10025
+  ```
+
+  ```
+  # master.cf
+  happydeliver unix - - n - - smtp
+    -o smtp_send_xforward_command=yes
+    -o smtp_tls_security_level=none
+    -o disable_dns_lookups=yes
+  ```
+
+3. Point the MX of `yourdomain.com` at that host, and reload Postfix.
+
+A front-end that speaks `XCLIENT` natively (an nginx mail proxy, for instance) can talk to the
+relay directly: its `XCLIENT` command is passed through untouched.
+
+Two consequences worth knowing: the extra hop through your MTA legitimately shows up in the
+`Received` chain of the reports, and if the bundled Postfix ever refuses the impersonation the
+relay answers `421` rather than delivering a message whose authentication results would be
+wrong.
+
 
 ### Manual Build
 
