@@ -33,10 +33,12 @@
     let errorStatus = $state<number>(500);
     let reanalyzing = $state(false);
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let reportRetryTimeout: ReturnType<typeof setTimeout> | null = null;
     let nextfetch = $state(23);
     let nbfetch = $state(0);
     let menuOpen = $state(false);
     let fetching = $state(false);
+    let reportRateLimited = $state(false);
 
     // Helper function to handle API errors
     function handleApiError(apiError: unknown, defaultMessage: string) {
@@ -68,6 +70,39 @@
         }
     }
 
+    function isRateLimited(apiError: unknown): boolean {
+        return (
+            !!apiError &&
+            typeof apiError === "object" &&
+            "error" in apiError &&
+            apiError.error === "rate_limit_exceeded"
+        );
+    }
+
+    async function fetchReport() {
+        if (!testId) return;
+
+        try {
+            const reportResponse = await getReport({ path: { id: testId } });
+            if (reportResponse.data) {
+                reportRateLimited = false;
+                report = reportResponse.data;
+                stopPolling();
+            } else if (reportResponse.error) {
+                if (isRateLimited(reportResponse.error)) {
+                    reportRateLimited = true;
+                    reportRetryTimeout = setTimeout(fetchReport, 2000);
+                } else {
+                    handleApiError(reportResponse.error, "Failed to fetch report");
+                    stopPolling();
+                }
+            }
+        } catch (err) {
+            handleApiError(err, "Failed to fetch report");
+            stopPolling();
+        }
+    }
+
     async function fetchTest() {
         if (!testId) return;
 
@@ -88,15 +123,8 @@
             if (testResponse.data) {
                 test = testResponse.data;
 
-                if (test.status === "analyzed") {
-                    const reportResponse = await getReport({ path: { id: testId } });
-                    if (reportResponse.data) {
-                        report = reportResponse.data;
-                        stopPolling();
-                    } else if (reportResponse.error) {
-                        handleApiError(reportResponse.error, "Failed to fetch report");
-                        stopPolling();
-                    }
+                if (test.status === "analyzed" && !reportRetryTimeout) {
+                    await fetchReport();
                 }
             } else if (testResponse.error) {
                 handleApiError(testResponse.error, "Failed to fetch test");
@@ -140,6 +168,10 @@
         if (pollInterval) {
             clearInterval(pollInterval);
             pollInterval = null;
+        }
+        if (reportRetryTimeout) {
+            clearTimeout(reportRetryTimeout);
+            reportRetryTimeout = null;
         }
     }
 
@@ -231,6 +263,17 @@
             {fetching}
             on:force-inbox-check={() => fetchTest()}
         />
+    {:else if reportRateLimited}
+        <div class="text-center py-5">
+            <div
+                class="spinner-border text-primary"
+                role="status"
+                style="width: 3rem; height: 3rem;"
+            >
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Rate limited, retrying in a moment...</p>
+        </div>
     {:else if report}
         <!-- Results State -->
         <div class="fade-in">
