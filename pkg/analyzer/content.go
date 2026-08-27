@@ -853,12 +853,25 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 
 	// Add suspicious URL issues
 	for _, suspURL := range results.SuspiciousURLs {
+		reason := "URL appears suspicious (obfuscated, shortened, or unusual)"
+		for _, link := range results.Links {
+			if link.URL == suspURL && link.Warning != "" {
+				reason = link.Warning
+				break
+			}
+		}
+
+		advice := "Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"
+		if strings.Contains(reason, "phishing") {
+			advice = "Ensure link text matches the actual destination domain to avoid appearing as a phishing attempt"
+		}
+
 		htmlIssues = append(htmlIssues, model.ContentIssue{
 			Type:     model.ContentIssueTypeSuspiciousLink,
 			Severity: model.ContentIssueSeverityHigh,
-			Message:  "Suspicious URL detected",
+			Message:  fmt.Sprintf("Suspicious URL detected: %s", reason),
 			Location: &suspURL,
-			Advice:   utils.PtrTo("Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"),
+			Advice:   utils.PtrTo(advice),
 		})
 	}
 
