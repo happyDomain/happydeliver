@@ -222,7 +222,7 @@
                         </div>
                     </div>
 
-                    {#each headerAnalysis.domain_alignment.dkim_domains as dkim_domain (dkim_domain.domain)}
+                    {#each headerAnalysis.domain_alignment.dkim_domains as dkim_domain, i (i)}
                         {@const dkim_aligned =
                             dkim_domain.domain === headerAnalysis.domain_alignment.from_domain}
                         {@const dkim_relaxed_aligned =
