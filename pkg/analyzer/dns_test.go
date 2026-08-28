@@ -24,6 +24,9 @@ package analyzer
 import (
 	"testing"
 	"time"
+
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestNewDNSAnalyzer(t *testing.T) {
@@ -54,5 +57,64 @@ func TestNewDNSAnalyzer(t *testing.T) {
 				t.Error("Resolver should not be nil")
 			}
 		})
+	}
+}
+
+// TestCalculateDNSScoreExcludesPTRWithoutSenderIP checks that the PTR/FCrDNS check
+// is left out of the weighted average (instead of counted as a 0/20 failure) when no
+// sender IP could be recovered from the Received chain, e.g. for an uploaded EML.
+func TestCalculateDNSScoreExcludesPTRWithoutSenderIP(t *testing.T) {
+	analyzer := NewDNSAnalyzer(10 * time.Second)
+
+	results := &model.DNSResults{
+		FromDomain: "example.com",
+		FromMxRecords: &[]model.MXRecord{
+			{Host: "mx.example.com.", Priority: 10, Valid: true},
+		},
+		RpMxRecords: &[]model.MXRecord{
+			{Host: "mx.example.com.", Priority: 10, Valid: true},
+		},
+		SpfRecords: &[]model.SPFRecord{
+			{
+				Domain:       utils.PtrTo("example.com"),
+				Record:       utils.PtrTo("v=spf1 ip4:203.0.113.1 -all"),
+				Valid:        true,
+				AllQualifier: (*model.SPFRecordAllQualifier)(utils.PtrTo("-")),
+			},
+		},
+		DkimRecords: &[]model.DKIMRecord{
+			{
+				Domain:           "example.com",
+				Selector:         "s1",
+				Valid:            true,
+				KeyType:          utils.PtrTo("rsa"),
+				KeySize:          utils.PtrTo(2048),
+				SigningAlgorithm: utils.PtrTo("rsa-sha256"),
+			},
+		},
+		DmarcRecord: &model.DMARCRecord{
+			Valid:         true,
+			Policy:        (*model.DMARCRecordPolicy)(utils.PtrTo("quarantine")),
+			SpfAlignment:  (*model.DMARCRecordSpfAlignment)(utils.PtrTo("relaxed")),
+			DkimAlignment: (*model.DMARCRecordDkimAlignment)(utils.PtrTo("relaxed")),
+		},
+	}
+
+	scoreWithoutIP, gradeWithoutIP := analyzer.CalculateDNSScore(results, "")
+	if scoreWithoutIP != 95 {
+		t.Errorf("score without sender IP = %d, want 95 (PTR excluded from average)", scoreWithoutIP)
+	}
+	if gradeWithoutIP != "A" {
+		t.Errorf("grade without sender IP = %q, want %q", gradeWithoutIP, "A")
+	}
+
+	// With a sender IP but no PTR record resolved, PTR genuinely failed and must
+	// still count as a 0/20 in the average.
+	scoreWithIP, gradeWithIP := analyzer.CalculateDNSScore(results, "203.0.113.1")
+	if scoreWithIP >= scoreWithoutIP {
+		t.Errorf("score with sender IP and no PTR record = %d, want less than %d (unexcused PTR failure)", scoreWithIP, scoreWithoutIP)
+	}
+	if gradeWithIP != "C" {
+		t.Errorf("grade with sender IP and no PTR record = %q, want %q", gradeWithIP, "C")
 	}
 }

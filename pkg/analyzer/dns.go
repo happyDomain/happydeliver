@@ -224,22 +224,23 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		return 0, ""
 	}
 
-	score := 0
+	// Each check is weighted equally at 20 points. PTR/FCrDNS can only be
+	// verified when a sender IP was recovered from the Received chain (e.g.
+	// unavailable for uploaded EMLs): when there's no IP to check, exclude it
+	// from the average instead of counting it as a 0/20 failure for
+	// something that was never actually testable.
+	weightedScore := 20 * d.calculateMXScore(results)
+	weightedScore += 20 * d.calculateSPFScore(results)
+	weightedScore += 20 * d.calculateDKIMScore(results)
+	weightedScore += 20 * d.calculateDMARCScore(results)
+	totalWeight := 80
 
-	// PTR and Forward DNS: 20 points
-	score += 20 * d.calculatePTRScore(results, senderIP) / 100
+	if senderIP != "" {
+		weightedScore += 20 * d.calculatePTRScore(results, senderIP)
+		totalWeight += 20
+	}
 
-	// MX Records: 20 points (10 for From domain, 10 for Return-Path domain)
-	score += 20 * d.calculateMXScore(results) / 100
-
-	// SPF Records: 20 points
-	score += 20 * d.calculateSPFScore(results) / 100
-
-	// DKIM Records: 20 points
-	score += 20 * d.calculateDKIMScore(results) / 100
-
-	// DMARC Record: 20 points
-	score += 20 * d.calculateDMARCScore(results) / 100
+	score := weightedScore / totalWeight
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
