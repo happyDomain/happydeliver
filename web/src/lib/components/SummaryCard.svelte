@@ -3,6 +3,7 @@
 
     import type { Report } from "$lib/api/types.gen";
     import { hasNoAuthenticationResults, isUploadedMessage } from "$lib/authentication";
+    import { hasNoSpamResults } from "$lib/spam";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface TextSegment {
@@ -24,6 +25,7 @@
     let { children, report }: Props = $props();
 
     const authenticationUnavailable = $derived(hasNoAuthenticationResults(report.authentication));
+    const spamUnavailable = $derived(hasNoSpamResults(report));
     const uploaded = $derived(isUploadedMessage(report.source));
 
     function buildSummary(): TextSegment[] {
@@ -493,14 +495,14 @@
                 highlight: { color: "warning", bold: true },
                 link: "#content-details",
             });
-        } else if (contentScore >= 100 && spamScore >= 100) {
+        } else if (contentScore >= 100 && (spamUnavailable || spamScore >= 100)) {
             segments.push({ text: "Content " });
             segments.push({
                 text: "looks great",
                 highlight: { color: "good", bold: true },
                 link: "#content-details",
             });
-        } else if (spamScore < 50) {
+        } else if (!spamUnavailable && spamScore < 50) {
             segments.push({ text: "Your " });
             segments.push({
                 text: "spam score",
@@ -514,7 +516,7 @@
                     highlight: { bold: true },
                 });
             }
-        } else if (spamScore < 90) {
+        } else if (!spamUnavailable && spamScore < 90) {
             segments.push({ text: "Pay attention to your " });
             segments.push({
                 text: "spam score",

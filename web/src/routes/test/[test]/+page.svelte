@@ -328,6 +328,7 @@
                         summary={report.summary}
                         authentication={report.authentication}
                         source={report.source}
+                        spamFilters={report}
                         {reanalyzing}
                     />
                 </div>

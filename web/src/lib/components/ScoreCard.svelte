@@ -1,11 +1,12 @@
 <script lang="ts">
     import type { Tooltip } from "bootstrap";
-    import type { AuthenticationResults, ScoreSummary } from "$lib/api/types.gen";
+    import type { AuthenticationResults, Report, ScoreSummary } from "$lib/api/types.gen";
     import {
         hasNoAuthenticationResults,
         noAuthResultsTitle,
         type MessageSource,
     } from "$lib/authentication";
+    import { hasNoSpamResults, noSpamResultsTitle } from "$lib/spam";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
 
@@ -16,14 +17,20 @@
         summary?: ScoreSummary;
         authentication?: AuthenticationResults;
         source?: MessageSource;
+        spamFilters?: Pick<Report, "spamassassin" | "rspamd">;
     }
 
-    let { grade, score, reanalyzing, summary, authentication, source }: Props = $props();
+    let { grade, score, reanalyzing, summary, authentication, source, spamFilters }: Props =
+        $props();
 
     // Without an Authentication-Results header there is nothing to grade: the computed F
     // reflects the configuration of whichever server was supposed to produce it, not the
     // sender's.
     let authenticationUnavailable = $derived(hasNoAuthenticationResults(authentication));
+
+    // Some receivers (Gmail, for instance) never run SpamAssassin/rspamd directly, so there is
+    // nothing to grade either.
+    let spamUnavailable = $derived(hasNoSpamResults(spamFilters));
 
     interface TooltipParams {
         enabled: boolean;
@@ -161,6 +168,8 @@
                     "Spam Score",
                     summary.spam_grade,
                     summary.spam_score,
+                    spamUnavailable,
+                    noSpamResultsTitle(),
                 )}
                 {@render scoreLink(
                     "#content-details",
