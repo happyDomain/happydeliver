@@ -444,20 +444,37 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	var checks []Check
 	allPassed := true
 
+	var logoContent []byte
+
 	if rec.LogoURL == "" {
 		checks = append(checks,
 			newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
 				"No logo URL published (declination record)"))
 	} else {
-		_, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
+		content, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
 		if len(problems) > 0 {
 			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail, problems...))
 			allPassed = false
-		} else if contentType != "image/svg+xml" {
-			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusWarning,
-				fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
 		} else {
-			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusPass))
+			logoContent = content
+			if contentType != "image/svg+xml" {
+				checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusWarning,
+					fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
+			} else {
+				checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusPass))
+			}
+		}
+
+		if logoContent == nil {
+			checks = append(checks,
+				newCheck("logo_xml", "Logo XML well-formedness", StatusSkipped,
+					"Skipped: the logo could not be retrieved"))
+		} else {
+			xmlCheck := CheckLogoXML(logoContent)
+			checks = append(checks, xmlCheck)
+			if xmlCheck.Status == StatusFail {
+				allPassed = false
+			}
 		}
 	}
 
