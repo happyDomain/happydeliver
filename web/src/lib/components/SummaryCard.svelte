@@ -604,6 +604,21 @@
             <i class="bi bi-card-text me-2"></i>
             Summary
         </h5>
+        {#if authenticationUnavailable && !uploaded}
+            <div class="alert alert-warning py-2 px-3 mb-3 small" id="authentication-unavailable">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Authentication could not be checked: this is a server-side issue.</strong>
+                <span class="d-block mt-1">
+                    This HappyDeliver instance did not add an <code>Authentication-Results</code>
+                    header to the received message, so SPF, DKIM and DMARC results are unknown and reported
+                    as <strong>N/A</strong> instead of a grade. Nothing in the summary below
+                    reflects a problem with your email on this point; the
+                    <strong>administrator of this instance</strong> should configure the receiving
+                    mail server to verify authentication (or fix the
+                    <code>--receiver-hostname</code> setting).
+                </span>
+            </div>
+        {/if}
         {#if isUploadedMessage(report.source)}
             <div class="alert alert-info mb-3 small" role="alert">
                 <i class="bi bi-file-earmark-arrow-up me-2"></i>
@@ -625,38 +640,6 @@
             </div>
         {/if}
 
-        {#if authenticationUnavailable}
-            <div class="alert alert-warning py-2 px-3 mb-3 small" id="authentication-unavailable">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                {#if uploaded}
-                    <strong>
-                        Authentication could not be checked: it is missing from the file.
-                    </strong>
-                    <span class="d-block mt-1">
-                        The uploaded message carries no usable <code>Authentication-Results</code>
-                        header, so SPF, DKIM and DMARC results are unknown and reported as
-                        <strong>N/A</strong> instead of a grade. This depends on the server that originally
-                        received the message, and reflects neither a problem with the email nor the configuration
-                        of this instance. To have them verified here, send the message to a test address
-                        instead.
-                    </span>
-                {:else}
-                    <strong>
-                        Authentication could not be checked: this is a server-side issue.
-                    </strong>
-                    <span class="d-block mt-1">
-                        This HappyDeliver instance did not add an <code>Authentication-Results</code
-                        >
-                        header to the received message, so SPF, DKIM and DMARC results are unknown and
-                        reported as <strong>N/A</strong> instead of a grade. Nothing in the summary
-                        below reflects a problem with your email on this point; the
-                        <strong>administrator of this instance</strong> should configure the
-                        receiving mail server to verify authentication (or fix the
-                        <code>--receiver-hostname</code> setting).
-                    </span>
-                {/if}
-            </div>
-        {/if}
         {#if staleness}
             <div class="alert alert-{staleness} py-2 px-3 mb-3 small">
                 <i class="bi bi-clock-history me-2"></i>

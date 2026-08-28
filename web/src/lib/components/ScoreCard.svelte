@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { Tooltip } from "bootstrap";
     import type { AuthenticationResults, ScoreSummary } from "$lib/api/types.gen";
     import {
         hasNoAuthenticationResults,
@@ -23,6 +24,41 @@
     // reflects the configuration of whichever server was supposed to produce it, not the
     // sender's.
     let authenticationUnavailable = $derived(hasNoAuthenticationResults(authentication));
+
+    interface TooltipParams {
+        enabled: boolean;
+        title: string;
+    }
+
+    function unavailableTooltip(node: HTMLElement, params: TooltipParams) {
+        let instance: Tooltip | undefined;
+        let destroyed = false;
+
+        async function sync({ enabled, title }: TooltipParams) {
+            instance?.dispose();
+            instance = undefined;
+
+            if (enabled) {
+                const { Tooltip } = await import("bootstrap");
+                if (destroyed) return;
+                instance = new Tooltip(node, {
+                    title,
+                    trigger: "click hover focus",
+                    customClass: "score-tooltip",
+                });
+            }
+        }
+
+        sync(params);
+
+        return {
+            update: sync,
+            destroy: () => {
+                destroyed = true;
+                instance?.dispose();
+            },
+        };
+    }
 
     function getScoreLabel(grade: string): string {
         switch (grade) {
@@ -64,99 +100,74 @@
         </h3>
         <p class="text-muted mb-4">Overall Deliverability Score</p>
 
+        {#snippet scoreLink(
+            href: string,
+            label: string,
+            grade: string | undefined,
+            score: number | undefined,
+            unavailable?: boolean,
+            tooltipTitle?: string,
+        )}
+            <div class="col-sm-6 col-md-4 col-lg">
+                <a
+                    {href}
+                    class="text-decoration-none"
+                    onclick={(e) => {
+                        if (unavailable) e.preventDefault();
+                    }}
+                    use:unavailableTooltip={{ enabled: !!unavailable, title: tooltipTitle ?? "" }}
+                >
+                    <div
+                        class="p-2 rounded text-center summary-card"
+                        class:bg-light={$theme === "light"}
+                        class:bg-secondary={$theme !== "light"}
+                    >
+                        {#if unavailable}
+                            <GradeDisplay grade="N/A" />
+                        {:else}
+                            <GradeDisplay {grade} {score} />
+                        {/if}
+                        <small class="text-muted d-block">{label}</small>
+                    </div>
+                </a>
+            </div>
+        {/snippet}
+
         {#if summary}
             <div class="row g-3 text-start">
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#dns-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                        >
-                            <GradeDisplay grade={summary.dns_grade} score={summary.dns_score} />
-                            <small class="text-muted d-block">DNS</small>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#authentication-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                            title={authenticationUnavailable
-                                ? noAuthResultsTitle(source)
-                                : undefined}
-                        >
-                            {#if authenticationUnavailable}
-                                <GradeDisplay grade="N/A" />
-                            {:else}
-                                <GradeDisplay
-                                    grade={summary.authentication_grade}
-                                    score={summary.authentication_score}
-                                />
-                            {/if}
-                            <small class="text-muted d-block">Authentication</small>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#rbl-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                        >
-                            <GradeDisplay
-                                grade={summary.blacklist_grade}
-                                score={summary.blacklist_score}
-                            />
-                            <small class="text-muted d-block">Blacklists</small>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#header-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                        >
-                            <GradeDisplay
-                                grade={summary.header_grade}
-                                score={summary.header_score}
-                            />
-                            <small class="text-muted d-block">Headers</small>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#spam-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                        >
-                            <GradeDisplay grade={summary.spam_grade} score={summary.spam_score} />
-                            <small class="text-muted d-block">Spam Score</small>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg">
-                    <a href="#content-details" class="text-decoration-none">
-                        <div
-                            class="p-2 rounded text-center summary-card"
-                            class:bg-light={$theme === "light"}
-                            class:bg-secondary={$theme !== "light"}
-                        >
-                            <GradeDisplay
-                                grade={summary.content_grade}
-                                score={summary.content_score}
-                            />
-                            <small class="text-muted d-block">Content</small>
-                        </div>
-                    </a>
-                </div>
+                {@render scoreLink("#dns-details", "DNS", summary.dns_grade, summary.dns_score)}
+                {@render scoreLink(
+                    "#authentication-details",
+                    "Authentication",
+                    summary.authentication_grade,
+                    summary.authentication_score,
+                    authenticationUnavailable,
+                    noAuthResultsTitle(source),
+                )}
+                {@render scoreLink(
+                    "#rbl-details",
+                    "Blacklists",
+                    summary.blacklist_grade,
+                    summary.blacklist_score,
+                )}
+                {@render scoreLink(
+                    "#header-details",
+                    "Headers",
+                    summary.header_grade,
+                    summary.header_score,
+                )}
+                {@render scoreLink(
+                    "#spam-details",
+                    "Spam Score",
+                    summary.spam_grade,
+                    summary.spam_score,
+                )}
+                {@render scoreLink(
+                    "#content-details",
+                    "Content",
+                    summary.content_grade,
+                    summary.content_score,
+                )}
             </div>
         {/if}
     </div>
@@ -177,5 +188,10 @@
     :global([data-bs-theme="dark"]) .summary-card:hover {
         background-color: #495057 !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    :global(.score-tooltip .tooltip-inner) {
+        max-width: 16rem;
+        text-align: left;
     }
 </style>
