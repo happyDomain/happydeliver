@@ -46,7 +46,7 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.CustomLogoURL, "custom-logo-url", o.CustomLogoURL, "URL for custom logo image in the web UI")
 	flag.BoolVar(&o.DisableTestList, "disable-test-list", o.DisableTestList, "Disable the public test listing endpoint")
 	flag.BoolVar(&o.DisableEmlUpload, "disable-eml-upload", o.DisableEmlUpload, "Disable the EML file upload endpoint")
-	flag.Int64Var(&o.MaxUploadSize, "max-upload-size", o.MaxUploadSize, "Maximum size in bytes of an uploaded EML file")
+	flag.Int64Var(&o.MaxMessageSize, "max-message-size", o.MaxMessageSize, "Maximum size in bytes of a message, received over LMTP or uploaded as EML")
 
 	// Others flags are declared in some other files likes sources, storages, ... when they need specials configurations
 }

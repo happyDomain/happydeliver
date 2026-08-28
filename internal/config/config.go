@@ -52,7 +52,7 @@ type Config struct {
 	CustomLogoURL    string        // URL for custom logo image in the web UI
 	DisableTestList  bool          // Disable the public test listing endpoint
 	DisableEmlUpload bool          // Disable the EML file upload endpoint
-	MaxUploadSize    int64         // Maximum size in bytes of an uploaded EML file
+	MaxMessageSize   int64         // Maximum size in bytes of a message, whether received over LMTP or uploaded as EML
 }
 
 // DatabaseConfig contains database connection settings
@@ -86,7 +86,7 @@ func DefaultConfig() *Config {
 		Bind:            ":8080",
 		ReportRetention: 0,        // Keep reports forever by default
 		RateLimit:       1,        // is in fact 2 requests per 2 seconds per IP (default)
-		MaxUploadSize:   10 << 20, // 10 MiB
+		MaxMessageSize:  50 << 20, // 50 MiB, matching the largest message Gmail accepts
 		Database: DatabaseConfig{
 			Type: "sqlite",
 			DSN:  "happydeliver.db",

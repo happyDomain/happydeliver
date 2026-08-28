@@ -82,8 +82,8 @@
         if (file) analyzeFile(file);
     }
 
-    function getMaxUploadSizeText(): string {
-        const bytes = $appConfig.max_upload_size;
+    function getMaxMessageSizeText(): string {
+        const bytes = $appConfig.max_message_size;
         if (!bytes) return "";
 
         return `${Math.round(bytes / (1024 * 1024))} MB`;
@@ -274,7 +274,7 @@
                             Analyze an .eml file
                         </button>
                         <p class="small mt-2 mb-0 opacity-90" style="text-wrap: balance;">
-                            Drop the raw file here{#if getMaxUploadSizeText()}&nbsp;({getMaxUploadSizeText()}
+                            Drop the raw file here{#if getMaxMessageSizeText()}&nbsp;({getMaxMessageSizeText()}
                                 max){/if}. Authentication results are then read from the server that
                             actually received it.
                         </p>

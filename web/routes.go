@@ -247,7 +247,7 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 
 	if !cfg.DisableEmlUpload {
 		appConfig["eml_upload_enabled"] = true
-		appConfig["max_upload_size"] = cfg.MaxUploadSize
+		appConfig["max_message_size"] = cfg.MaxMessageSize
 	}
 
 	if appcfg, err := json.MarshalIndent(appConfig, "", "  "); err != nil {

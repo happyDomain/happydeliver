@@ -240,7 +240,7 @@ func TestUploadEml(t *testing.T) {
 
 	t.Run("rejects a file over the limit", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.MaxUploadSize = 64
+		cfg.MaxMessageSize = 64
 
 		handler, store, _ := newTestHandler(t, cfg)
 

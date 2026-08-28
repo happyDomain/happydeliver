@@ -28,7 +28,7 @@ interface AppConfig {
     rbls?: string[];
     test_list_enabled?: boolean;
     eml_upload_enabled?: boolean;
-    max_upload_size?: number;
+    max_message_size?: number;
 }
 
 const defaultConfig: AppConfig = {

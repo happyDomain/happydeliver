@@ -262,7 +262,7 @@ Two settings control this endpoint:
 | Flag | Environment variable | Default | Description |
 |------|----------------------|---------|-------------|
 | `-disable-eml-upload` | `HAPPYDELIVER_DISABLE_EML_UPLOAD` | *enabled* | Turn the upload endpoint off (it also hides the widget in the web UI) |
-| `-max-upload-size` | `HAPPYDELIVER_MAX_UPLOAD_SIZE` | `10485760` (10 MiB) | Maximum size in bytes of an uploaded file |
+| `-max-message-size` | `HAPPYDELIVER_MAX_MESSAGE_SIZE` | `52428800` (50 MiB) | Maximum size in bytes of a message, matching the largest message Gmail accepts. It caps uploaded files, and is also announced as the SMTP `SIZE` limit by the LMTP receiver |
 
 Note that an uploaded message is stored and listed like any other report; disable the upload endpoint, or the public listing with `-disable-test-list`, if that does not suit your instance.
 

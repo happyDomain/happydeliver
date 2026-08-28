@@ -116,13 +116,13 @@ func (h *APIHandler) UploadEml(c *gin.Context) {
 	}
 
 	// Cap the request body before Gin buffers the multipart payload
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.config.MaxUploadSize)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.config.MaxMessageSize)
 
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_request",
-			Message: fmt.Sprintf("Expected an email file in the \"file\" field, at most %d bytes", h.config.MaxUploadSize),
+			Message: fmt.Sprintf("Expected an email file in the \"file\" field, at most %d bytes", h.config.MaxMessageSize),
 			Details: utils.PtrTo(err.Error()),
 		})
 		return

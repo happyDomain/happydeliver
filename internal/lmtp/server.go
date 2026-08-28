@@ -131,6 +131,10 @@ func StartServer(addr string, store storage.Storage, cfg *config.Config) error {
 	server.Domain = cfg.Email.Domain
 	server.AllowInsecureAuth = true
 	server.LMTP = true // Enable LMTP mode
+	// Without this, Session.Data reads whatever the peer sends into memory.
+	// Set, go-smtp advertises SIZE and rejects an oversized message at MAIL
+	// FROM, before its bytes reach us.
+	server.MaxMessageBytes = cfg.MaxMessageSize
 
 	log.Printf("Starting LMTP server on %s", addr)
 
