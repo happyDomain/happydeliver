@@ -18,6 +18,7 @@
     );
 
     let checksOpen = $state(false);
+    let vmcOpen = $state(false);
 
     type Status = BimiCheck["status"];
 
@@ -31,57 +32,54 @@
         })),
     );
 
-    function dotColor(status: Status): string {
-        switch (status) {
-            case "pass":
-                return "bg-success";
-            case "fail":
-                return "bg-danger";
-            case "warning":
-                return "bg-warning";
-            default:
-                return "bg-secondary";
+    /* Optional booleans are left unset when the criterion could not be
+       evaluated (e.g. the certificate could not be downloaded or parsed);
+       that is not the same as the criterion being absent. */
+    function triState(value: boolean | undefined): Status {
+        if (value === undefined) return "skipped";
+        return value ? "pass" : "fail";
+    }
+
+    const vmcDots: Dot[] = $derived.by(() => {
+        const vmc = bimiRecord?.vmc;
+        if (!vmc) return [];
+
+        const dots: Dot[] = [
+            { status: triState(vmc.has_bimi_eku), label: "BIMI Extended Key Usage" },
+            { status: triState(vmc.has_logotype), label: "Embedded logo" },
+        ];
+        if (vmc.logo_matches !== undefined) {
+            dots.push({
+                status: vmc.logo_matches ? "pass" : "fail",
+                label: "Embedded logo matches published logo",
+            });
         }
-    }
 
-    function checkIcon(status: BimiCheck["status"]): string {
-        switch (status) {
-            case "pass":
-                return "bi-check-circle-fill text-success";
-            case "fail":
-                return "bi-x-circle-fill text-danger";
-            case "warning":
-                return "bi-exclamation-triangle-fill text-warning";
-            default:
-                return "bi-dash-circle text-muted";
-        }
-    }
+        return dots;
+    });
 
-    // The severity the backend gives a message from its check's status alone;
-    // mirrors newCheck() in pkg/bimi.
-    function severityForStatus(checkStatus: Status): SchemasBimiCheckMessage["severity"] {
-        if (checkStatus === "fail") return "error";
-        if (checkStatus === "warning") return "warning";
-        return "info";
-    }
+    /* How each status is painted, in one place: the dots, the icons and the
+       badges all read it, so a status cannot end up a different colour
+       depending on which of the three renders it. */
+    const STATUS: Record<Status, { badge: string; icon: string; text: string }> = {
+        pass: { badge: "bg-success", icon: "bi-check-circle-fill", text: "text-success" },
+        fail: { badge: "bg-danger", icon: "bi-x-circle-fill", text: "text-danger" },
+        warning: {
+            badge: "bg-warning text-dark",
+            icon: "bi-exclamation-triangle-fill",
+            text: "text-warning",
+        },
+        skipped: { badge: "bg-secondary", icon: "bi-dash-circle", text: "text-muted" },
+    };
 
-    // Reports stored before messages carried a severity serialize `messages`
-    // as plain strings; normalize those so old reports still render.
-    function normalizeMessage(
-        message: SchemasBimiCheckMessage | string,
-        checkStatus: Status,
-    ): SchemasBimiCheckMessage {
-        if (typeof message === "string") {
-            return { text: message, severity: severityForStatus(checkStatus) };
-        }
-        return message;
-    }
-
-    function messageColor(message: SchemasBimiCheckMessage, checkStatus: Status): string {
-        // Reports stored before "info" existed tag skipped-check messages as
-        // errors; the check's own status still says they are not failures.
-        if (checkStatus === "skipped" || message.severity === "info") return "text-muted";
+    function messageColor(message: SchemasBimiCheckMessage): string {
+        if (message.severity === "info") return "text-muted";
         return message.severity === "warning" ? "text-warning" : "text-danger";
+    }
+
+    function formatDate(date?: string): string {
+        if (!date) return "";
+        return new Date(date).toLocaleDateString();
     }
 </script>
 
@@ -91,11 +89,51 @@
     >
         {#each dots as dot, i (i)}
             <span
-                class="status-dot rounded-circle {dotColor(dot.status)}"
+                class="status-dot rounded-circle {STATUS[dot.status].badge}"
                 title="{dot.label}: {dot.status}"
             ></span>
         {/each}
     </span>
+{/snippet}
+
+<!-- The three states an optional criterion has: unevaluated is not failed, so
+     it must never render as a failure. -->
+{#snippet presenceBadge(
+    value: boolean | undefined,
+    passLabel: string = "present",
+    failLabel: string = "missing",
+)}
+    {#if value === undefined}
+        <span class="badge bg-secondary">not evaluated</span>
+    {:else if value}
+        <span class="badge bg-success">{passLabel}</span>
+    {:else}
+        <span class="badge bg-danger">{failLabel}</span>
+    {/if}
+{/snippet}
+
+<!-- The disclosure header both collapsible sections share: a chevron, a
+     heading, and the collapsed section's verdicts folded into dots. -->
+{#snippet collapseHeader(
+    open: boolean,
+    controls: string,
+    title: string,
+    dots: Dot[],
+    toggle: () => void,
+)}
+    <button
+        type="button"
+        class="btn btn-link p-0 text-decoration-none text-muted d-flex align-items-center w-100"
+        aria-expanded={open}
+        aria-controls={controls}
+        onclick={toggle}
+    >
+        <i class="bi me-1" class:bi-chevron-right={!open} class:bi-chevron-down={open}></i>
+        <h6 class="mb-0 me-2">{title}</h6>
+        {#if !open}
+            {@render statusDots(dots)}
+        {/if}
+    </button>
 {/snippet}
 
 {#if bimiRecord}
@@ -166,23 +204,13 @@
             {/if}
             {#if bimiRecord.checks && bimiRecord.checks.length > 0}
                 <hr />
-                <button
-                    type="button"
-                    class="btn btn-link p-0 text-decoration-none text-muted d-flex align-items-center w-100"
-                    aria-expanded={checksOpen}
-                    aria-controls="bimi-detailed-checks"
-                    onclick={() => (checksOpen = !checksOpen)}
-                >
-                    <i
-                        class="bi me-1"
-                        class:bi-chevron-right={!checksOpen}
-                        class:bi-chevron-down={checksOpen}
-                    ></i>
-                    <h6 class="mb-0 me-2">Detailed checks</h6>
-                    {#if !checksOpen}
-                        {@render statusDots(checksDots)}
-                    {/if}
-                </button>
+                {@render collapseHeader(
+                    checksOpen,
+                    "bimi-detailed-checks",
+                    "Detailed checks",
+                    checksDots,
+                    () => (checksOpen = !checksOpen),
+                )}
                 <ul
                     id="bimi-detailed-checks"
                     class="list-group list-group-flush mt-2"
@@ -190,23 +218,18 @@
                 >
                     {#each bimiRecord.checks as check (check.name)}
                         <li class="list-group-item px-0">
-                            <i class="bi {checkIcon(check.status)} me-1"></i>
+                            <i
+                                class="bi {STATUS[check.status].icon} {STATUS[check.status]
+                                    .text} me-1"
+                            ></i>
                             <strong>{check.description}</strong>
-                            <span
-                                class="badge ms-2"
-                                class:bg-success={check.status === "pass"}
-                                class:bg-danger={check.status === "fail"}
-                                class:bg-warning={check.status === "warning"}
-                                class:text-dark={check.status === "warning"}
-                                class:bg-secondary={check.status === "skipped"}
-                            >
+                            <span class="badge ms-2 {STATUS[check.status].badge}">
                                 {check.status}
                             </span>
                             {#if check.messages && check.messages.length > 0}
                                 <ul class="small mb-0 mt-1">
-                                    {#each check.messages as raw, i (i)}
-                                        {@const message = normalizeMessage(raw, check.status)}
-                                        <li class={messageColor(message, check.status)}>
+                                    {#each check.messages as message, i (i)}
+                                        <li class={messageColor(message)}>
                                             {#if message.severity === "warning" && check.status === "fail"}
                                                 <i
                                                     class="bi bi-exclamation-triangle-fill me-1"
@@ -221,6 +244,66 @@
                         </li>
                     {/each}
                 </ul>
+            {/if}
+            {#if bimiRecord.vmc}
+                <hr />
+                {@render collapseHeader(
+                    vmcOpen,
+                    "bimi-vmc-details",
+                    "Verified Mark Certificate",
+                    vmcDots,
+                    () => (vmcOpen = !vmcOpen),
+                )}
+                <div id="bimi-vmc-details" class="small mt-2" class:d-none={!vmcOpen}>
+                    {#if bimiRecord.vmc.error}
+                        <div class="alert alert-danger py-1 px-2 mb-2 small">
+                            {bimiRecord.vmc.error}
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.subject}
+                        <div class="mb-1 text-truncate">
+                            <strong>Subject:</strong>
+                            <code class="text-break" title={bimiRecord.vmc.subject}>
+                                {bimiRecord.vmc.subject}
+                            </code>
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.issuer}
+                        <div class="mb-1 text-truncate">
+                            <strong>Issuer:</strong>
+                            <code class="text-break" title={bimiRecord.vmc.issuer}>
+                                {bimiRecord.vmc.issuer}
+                            </code>
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.not_before && bimiRecord.vmc.not_after}
+                        <div class="mb-1">
+                            <strong>Validity:</strong>
+                            {formatDate(bimiRecord.vmc.not_before)} &rarr; {formatDate(
+                                bimiRecord.vmc.not_after,
+                            )}
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.san_domains && bimiRecord.vmc.san_domains.length > 0}
+                        <div class="mb-1">
+                            <strong>Covered domains:</strong>
+                            {#each bimiRecord.vmc.san_domains as san (san)}
+                                <code class="me-1">{san}</code>
+                            {/each}
+                        </div>
+                    {/if}
+                    <div class="mb-1">
+                        <strong>BIMI Extended Key Usage:</strong>
+                        {@render presenceBadge(bimiRecord.vmc.has_bimi_eku)}
+                        <strong class="ms-3">Embedded logo:</strong>
+                        {@render presenceBadge(bimiRecord.vmc.has_logotype)}
+                        {#if bimiRecord.vmc.logo_matches === true}
+                            <span class="badge bg-success ms-1">matches published logo</span>
+                        {:else if bimiRecord.vmc.logo_matches === false}
+                            <span class="badge bg-danger ms-1">differs from published logo</span>
+                        {/if}
+                    </div>
+                </div>
             {/if}
             {#if !bimiRecord.valid && dmarcEnforced}
                 <div class="alert alert-info mt-3 mb-0">

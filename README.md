@@ -316,15 +316,22 @@ own resolver or HTTP client).
 
 ### `pkg/bimi`: BIMI validation
 
-Validate [BIMI](https://bimigroup.org/) records.
+Validate [BIMI](https://bimigroup.org/) records and the assets they reference
+(the SVG Tiny Portable/Secure logo and the Verified Mark Certificate, or VMC),
+and get back, for each record, the detailed evidence explaining *why* it is
+valid or not (rather than a bare yes/no).
 
 ```go
 import "git.happydns.org/happyDeliver/pkg/bimi"
 
 v := bimi.NewValidator()
-rec, err := v.Lookup(ctx, "example.com", "default")
-// rec.Valid, rec.Error
+rec, err := v.Analyze(ctx, "example.com", "default")
+// rec.Valid, rec.Error, rec.Checks (per-asset evidence) and rec.VMC
 ```
+
+You can also call the individual checks directly when you already hold the
+inputs: `ParseRecord` (a record string), `CheckLogoXML` / `CheckLogoSVGTinyPS`
+(an SVG document), or `AnalyzeVMC` (a PEM certificate chain).
 
 More checks (SPF, DKIM, DMARC, ...) will be made available as libraries here
 over time.

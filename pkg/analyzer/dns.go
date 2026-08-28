@@ -34,6 +34,9 @@ type DNSAnalyzer struct {
 	resolver DNSResolver
 	// bimiHTTPClient fetches BIMI logo/VMC assets (see newBIMIHTTPClient).
 	bimiHTTPClient *http.Client
+	// BIMIAssetsTimeout caps the total time the BIMI asset downloads may add to
+	// an analysis. Zero means DefaultBIMIAssetsTimeout.
+	BIMIAssetsTimeout time.Duration
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer with configurable timeout

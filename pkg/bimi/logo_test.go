@@ -22,10 +22,100 @@
 package bimi
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"strings"
 	"testing"
 )
+
+// gzipBytes compresses payload the way an SVGZ file is built: an octet stream
+// of the SVG, run through gzip (RFC 6170 section 5.2).
+func gzipBytes(t *testing.T, payload []byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestDecodeLogo(t *testing.T) {
+	t.Run("Plain SVG is returned untouched", func(t *testing.T) {
+		svg, compressed, err := DecodeLogo([]byte(validTinyPSSVG))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if compressed {
+			t.Error("compressed = true, want false: the file is not gzip")
+		}
+		if string(svg) != validTinyPSSVG {
+			t.Errorf("svg = %q, want the input unchanged", svg)
+		}
+	})
+
+	t.Run("SVGZ is inflated", func(t *testing.T) {
+		svgz := gzipBytes(t, []byte(validTinyPSSVG))
+
+		svg, compressed, err := DecodeLogo(svgz)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !compressed {
+			t.Error("compressed = false, want true: the file is an SVGZ")
+		}
+		if string(svg) != validTinyPSSVG {
+			t.Errorf("svg = %q, want the inflated document", svg)
+		}
+	})
+
+	t.Run("Truncated gzip stream is an error, not the compressed bytes", func(t *testing.T) {
+		svgz := gzipBytes(t, []byte(validTinyPSSVG))
+		truncated := svgz[:len(svgz)-5]
+
+		svg, compressed, err := DecodeLogo(truncated)
+		if err == nil {
+			t.Fatalf("err = nil, want a gzip error (got %q)", svg)
+		}
+		if !compressed {
+			t.Error("compressed = false, want true: the file announced itself as gzip")
+		}
+		if svg != nil {
+			t.Errorf("svg = %q, want nil: handing back the compressed bytes would be reported as malformed XML", svg)
+		}
+	})
+
+	t.Run("Decompression bomb is capped and named as such", func(t *testing.T) {
+		// Compresses to a few hundred bytes, so only the inflated size can
+		// catch it: the transfer limit never sees it coming.
+		bomb := gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxLogoSize)+1))
+
+		svg, _, err := DecodeLogo(bomb)
+		if err == nil {
+			t.Fatalf("err = nil, want a size error (got %d bytes)", len(svg))
+		}
+		if !strings.Contains(err.Error(), "decompressed") {
+			t.Errorf("err = %v, want an error naming the decompressed size, so it is not read as the transfer limit", err)
+		}
+	})
+
+	t.Run("A document at the limit still decodes", func(t *testing.T) {
+		// The cap is a maximum, not a strict bound: MaxLogoSize bytes is
+		// still an acceptable document.
+		svg, _, err := DecodeLogo(gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxLogoSize))))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int64(len(svg)) != MaxLogoSize {
+			t.Errorf("len(svg) = %d, want %d", len(svg), MaxLogoSize)
+		}
+	})
+}
 
 // validTinyPSSVG is a fully compliant logo. It paints in two colours because
 // the profile requires at least two.

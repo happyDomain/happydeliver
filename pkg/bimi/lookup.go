@@ -30,7 +30,8 @@ import (
 
 // Lookup resolves and parses the BIMI record published at
 // selector._bimi.domain. It returns ErrNoRecord when the name holds no TXT
-// record at all, or the resolver error when the DNS query fails.
+// record at all, or the resolver error when the DNS query fails. Assets are
+// not validated; call ValidateAssets or use Analyze for that.
 //
 // A name can hold several TXT records, of which only those starting with the
 // BIMI version tag are BIMI records; publishing more than one of those is an

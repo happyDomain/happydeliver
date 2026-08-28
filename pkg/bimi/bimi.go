@@ -20,7 +20,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package bimi validates Brand Indicators for Message Identification (BIMI)
-// records and the assets they reference.
+// records and the assets they reference: the SVG Tiny Portable/Secure logo
+// and the Verified Mark Certificate (VMC).
 //
 // The package is self-contained and has no dependency on the rest of
 // happyDeliver, so it can be reused as a standalone BIMI validation library.
@@ -33,7 +34,12 @@
 //	v := bimi.NewValidator()
 //	rec, err := v.Analyze(ctx, "example.com", "default")
 //
-// The returned Record fully describes validity (Valid, Error, Checks).
+// The returned Record fully describes validity (Valid, Error, Checks, VMC).
+// The building blocks (ParseRecord, DecodeLogo, CheckLogoXML,
+// CheckLogoSVGTinyPS, AnalyzeVMC) are also exported for callers that already
+// hold the record text or the assets. Decoding is a step of its own: a logo
+// published as an SVGZ has to go through DecodeLogo before either of the logo
+// checks can say anything about it.
 //
 // Conformance of the logo to the SVG Tiny Portable/Secure profile is decided by
 // the [git.happydns.org/happyDeliver/pkg/bimi/svgps] sub-package, which is
@@ -136,6 +142,9 @@ type Record struct {
 	// Checks holds the per-asset evidence checks (nil until ValidateAssets
 	// runs).
 	Checks []Check
+	// VMC holds the analysis of the Verified Mark Certificate, when one is
+	// published.
+	VMC *VMCInfo
 }
 
 // Resolver looks up DNS TXT records. *net.Resolver satisfies it.

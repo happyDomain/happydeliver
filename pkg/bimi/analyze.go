@@ -41,10 +41,11 @@ func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Reco
 	return rec, nil
 }
 
-// ValidateAssets performs the evidence checks for a syntactically valid
-// record, filling rec.Checks. When a mandatory check fails it sets
-// rec.Valid to false and rec.Error. A BIMI record only leads to a displayed
-// logo if its assets are compliant.
+// ValidateAssets performs the evidence checks (logo download, XML
+// well-formedness, SVG Tiny P/S profile, VMC analysis) for a syntactically
+// valid record, filling rec.Checks and rec.VMC. When a mandatory check fails
+// it sets rec.Valid to false and rec.Error. A BIMI record only leads to a
+// displayed logo if its assets are compliant.
 func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	var checks []Check
 	allPassed := true
@@ -52,9 +53,20 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	var logoContent []byte
 
 	if rec.LogoURL == "" {
-		checks = append(checks,
-			newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
-				"No logo URL published (declination record)"))
+		// An empty l= is only meaningful as a Declination to Publish,
+		// which requires a= to be empty too. With a VMC published but no
+		// Indicator location, Indicator Discovery has failed: no logo can
+		// ever be displayed.
+		if rec.VMCURL != "" {
+			checks = append(checks,
+				newCheck("logo_fetch", "Logo file retrieval", StatusFail,
+					"The l= tag is empty while a VMC is published in a=: with no logo URL, no Indicator can be displayed"))
+			allPassed = false
+		} else {
+			checks = append(checks,
+				newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
+					"No logo URL published (declination record)"))
+		}
 	} else {
 		content, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
 		if len(problems) > 0 {
@@ -88,6 +100,19 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 			if svgCheck.Status == StatusFail {
 				allPassed = false
 			}
+		}
+	}
+
+	if rec.VMCURL == "" {
+		checks = append(checks,
+			newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
+				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
+	} else {
+		vmcCheck, vmcInfo := v.analyzeVMCURL(ctx, rec.VMCURL, rec.Domain, logoContent)
+		checks = append(checks, vmcCheck)
+		rec.VMC = vmcInfo
+		if vmcCheck.Status == StatusFail {
+			allPassed = false
 		}
 	}
 

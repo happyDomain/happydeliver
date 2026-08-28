@@ -23,6 +23,7 @@ package bimi
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -34,6 +35,42 @@ import (
 // errNotUTF8 stops the walk of a document that is not encoded in UTF-8. Its
 // text is never reported: the check names the encoding instead.
 var errNotUTF8 = errors.New("not encoded in UTF-8")
+
+// DecodeLogo returns the SVG document carried by content, inflating it when the
+// file is an SVGZ. RFC 6170 section 5.2 defines SVGZ as an image/svg+xml octet
+// stream compressed with gzip, and BIMI accepts SVG and SVGZ alike for the l=
+// tag, so the published file has to be decoded before anything can be said
+// about the document it carries.
+//
+// The file is recognised by its gzip header, not by its URL suffix nor by its
+// Content-Type: RFC 6170 requires image/svg+xml to be announced for an SVGZ
+// too, so the media type carries no signal.
+//
+// compressed reports whether content was an SVGZ. The inflated size is capped
+// at MaxLogoSize, both because the profile evaluates that limit on the
+// uncompressed document and to stop a decompression bomb.
+func DecodeLogo(content []byte) (svg []byte, compressed bool, err error) {
+	reader, err := gzip.NewReader(bytes.NewReader(content))
+	if err != nil {
+		// Not a gzip stream: the bytes are the document itself. A logo
+		// published as plain SVG is the common case, and the certificate
+		// profile that also goes through here tolerates one as well.
+		return content, false, nil
+	}
+
+	// The payload announces itself as gzip, so a read failure means a corrupt
+	// stream, not a raw SVG: reporting it beats handing the still-compressed
+	// bytes back as if they were the logo.
+	inflated, err := io.ReadAll(io.LimitReader(reader, MaxLogoSize+1))
+	if err != nil {
+		return nil, true, fmt.Errorf("the file announces itself as gzip but the stream is corrupt: %w", err)
+	}
+	if int64(len(inflated)) > MaxLogoSize {
+		return nil, true, fmt.Errorf("the decompressed document exceeds the maximum allowed size of %d bytes", MaxLogoSize)
+	}
+
+	return inflated, true, nil
+}
 
 // CheckLogoXML performs an xmllint-like well-formedness check on the SVG
 // document, reporting the position of the first syntax error.

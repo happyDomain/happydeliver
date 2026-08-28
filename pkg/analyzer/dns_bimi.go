@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
@@ -41,6 +42,20 @@ func newBIMIHTTPClient() *http.Client {
 	return bimi.NewHTTPClient(0)
 }
 
+// DefaultBIMIAssetsTimeout caps the wall time the logo and VMC downloads may
+// together add to a report. Each fetch keeps its own budget
+// (bimi.DefaultFetchTimeout), but the report is generated synchronously on the
+// delivery path: without an overall ceiling, two dead URLs published in a
+// single TXT record stall a delivery for the sum of the per-fetch timeouts.
+const DefaultBIMIAssetsTimeout = 45 * time.Second
+
+func (d *DNSAnalyzer) bimiAssetsTimeout() time.Duration {
+	if d.BIMIAssetsTimeout > 0 {
+		return d.BIMIAssetsTimeout
+	}
+	return DefaultBIMIAssetsTimeout
+}
+
 // checkBIMIRecord looks up and validates the BIMI record for a domain and
 // selector. The actual validation lives in the reusable pkg/bimi package;
 // this method adapts its result to the API model.
@@ -50,10 +65,10 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 		Resolver:   d.resolver,
 	}
 
-	// Bound only the DNS lookup by d.Timeout. Asset validation runs with a
-	// deadline-free context so each logo download gets its own independent
-	// budget from d.bimiHTTPClient.Timeout, rather than sharing a single deadline
-	// with the DNS lookup.
+	// Bound the DNS lookup by d.Timeout, and the asset downloads by their own,
+	// larger budget: pulling a file from a slow host is not the same wait as a
+	// TXT query, and sharing a single deadline would fail a slow-but-valid VMC
+	// once the logo download consumed most of it.
 	lookupCtx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
@@ -72,7 +87,9 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 	}
 
 	if rec.Valid {
-		validator.ValidateAssets(context.Background(), rec)
+		assetsCtx, cancelAssets := context.WithTimeout(context.Background(), d.bimiAssetsTimeout())
+		defer cancelAssets()
+		validator.ValidateAssets(assetsCtx, rec)
 	}
 
 	return bimiRecordToModel(rec)
@@ -95,6 +112,9 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 	}
 	if len(r.Checks) > 0 {
 		m.Checks = utils.PtrTo(bimiChecksToModel(r.Checks))
+	}
+	if r.VMC != nil {
+		m.Vmc = bimiVMCToModel(r.VMC)
 	}
 	return m
 }
@@ -119,4 +139,38 @@ func bimiChecksToModel(checks []bimi.Check) []model.BIMICheck {
 		}
 	}
 	return out
+}
+
+func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
+	m := &model.VMCInfo{
+		Valid:       v.Valid,
+		HasBimiEku:  v.HasBimiEku,
+		HasLogotype: v.HasLogotype,
+		LogoMatches: v.LogoMatches,
+	}
+	if v.Issuer != "" {
+		m.Issuer = utils.PtrTo(v.Issuer)
+	}
+	if v.Subject != "" {
+		m.Subject = utils.PtrTo(v.Subject)
+	}
+	if v.SerialNumber != "" {
+		m.SerialNumber = utils.PtrTo(v.SerialNumber)
+	}
+	if !v.NotBefore.IsZero() {
+		m.NotBefore = utils.PtrTo(v.NotBefore)
+	}
+	if !v.NotAfter.IsZero() {
+		m.NotAfter = utils.PtrTo(v.NotAfter)
+	}
+	if v.ChainLength > 0 {
+		m.ChainLength = utils.PtrTo(v.ChainLength)
+	}
+	if len(v.SanDomains) > 0 {
+		m.SanDomains = utils.PtrTo(v.SanDomains)
+	}
+	if v.Error != "" {
+		m.Error = utils.PtrTo(v.Error)
+	}
+	return m
 }
