@@ -309,7 +309,7 @@
                                         <!-- eslint-disable svelte/no-navigation-without-resolve -- API endpoint, not a SvelteKit route -->
                                         <a
                                             class="menu-item"
-                                            href={`/api/report/${testId}/raw`}
+                                            href={`/api/report/${testId}/raw.eml`}
                                             target="_blank"
                                             onclick={() => (menuOpen = false)}
                                         >

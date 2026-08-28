@@ -261,7 +261,7 @@ func (h *APIHandler) GetReport(c *gin.Context, id string) {
 }
 
 // GetRawEmail retrieves the raw annotated email
-// (GET /report/{id}/raw)
+// (GET /report/{id}/raw.eml)
 func (h *APIHandler) GetRawEmail(c *gin.Context, id string) {
 	// Convert base32 ID to UUID
 	testUUID, err := utils.Base32ToUUID(id)

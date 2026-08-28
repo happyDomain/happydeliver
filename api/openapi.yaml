@@ -198,7 +198,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /report/{id}/raw:
+  /report/{id}/raw.eml:
     get:
       tags:
         - reports
