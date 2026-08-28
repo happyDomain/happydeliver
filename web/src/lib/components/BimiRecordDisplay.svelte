@@ -1,5 +1,10 @@
 <script lang="ts">
-    import type { BimiRecord, DmarcRecord } from "$lib/api/types.gen";
+    import type {
+        BimiCheck,
+        BimiRecord,
+        DmarcRecord,
+        SchemasBimiCheckMessage,
+    } from "$lib/api/types.gen";
 
     interface Props {
         bimiRecord?: BimiRecord;
@@ -11,7 +16,77 @@
     const dmarcEnforced = $derived(
         dmarcRecord?.policy === "quarantine" || dmarcRecord?.policy === "reject",
     );
+
+    let checksOpen = $state(false);
+
+    type Status = BimiCheck["status"];
+
+    type Dot = { status: Status; label: string };
+
+    /* Dots in the same order as the entries of the expanded view. */
+    const checksDots: Dot[] = $derived(
+        (bimiRecord?.checks ?? []).map((c) => ({
+            status: c.status,
+            label: c.description ?? c.name,
+        })),
+    );
+
+    function dotColor(status: Status): string {
+        switch (status) {
+            case "pass":
+                return "bg-success";
+            case "fail":
+                return "bg-danger";
+            case "warning":
+                return "bg-warning";
+            default:
+                return "bg-secondary";
+        }
+    }
+
+    function checkIcon(status: BimiCheck["status"]): string {
+        switch (status) {
+            case "pass":
+                return "bi-check-circle-fill text-success";
+            case "fail":
+                return "bi-x-circle-fill text-danger";
+            case "warning":
+                return "bi-exclamation-triangle-fill text-warning";
+            default:
+                return "bi-dash-circle text-muted";
+        }
+    }
+
+    // Reports stored before messages carried a severity serialize `messages`
+    // as plain strings; normalize those so old reports still render.
+    function normalizeMessage(
+        message: SchemasBimiCheckMessage | string,
+        checkStatus: Status,
+    ): SchemasBimiCheckMessage {
+        if (typeof message === "string") {
+            return { text: message, severity: checkStatus === "warning" ? "warning" : "error" };
+        }
+        return message;
+    }
+
+    function messageColor(message: SchemasBimiCheckMessage, checkStatus: Status): string {
+        if (checkStatus === "skipped") return "text-muted";
+        return message.severity === "warning" ? "text-warning" : "text-danger";
+    }
 </script>
+
+{#snippet statusDots(dots: Dot[])}
+    <span
+        class="badge bg-light border rounded-pill d-inline-flex align-items-center gap-1 py-1 px-2"
+    >
+        {#each dots as dot, i (i)}
+            <span
+                class="status-dot rounded-circle {dotColor(dot.status)}"
+                title="{dot.label}: {dot.status}"
+            ></span>
+        {/each}
+    </span>
+{/snippet}
 
 {#if bimiRecord}
     <div class="card mb-4" id="dns-bimi">
@@ -79,6 +154,64 @@
                     {bimiRecord.error}
                 </div>
             {/if}
+            {#if bimiRecord.checks && bimiRecord.checks.length > 0}
+                <hr />
+                <button
+                    type="button"
+                    class="btn btn-link p-0 text-decoration-none text-muted d-flex align-items-center w-100"
+                    aria-expanded={checksOpen}
+                    aria-controls="bimi-detailed-checks"
+                    onclick={() => (checksOpen = !checksOpen)}
+                >
+                    <i
+                        class="bi me-1"
+                        class:bi-chevron-right={!checksOpen}
+                        class:bi-chevron-down={checksOpen}
+                    ></i>
+                    <h6 class="mb-0 me-2">Detailed checks</h6>
+                    {#if !checksOpen}
+                        {@render statusDots(checksDots)}
+                    {/if}
+                </button>
+                <ul
+                    id="bimi-detailed-checks"
+                    class="list-group list-group-flush mt-2"
+                    class:d-none={!checksOpen}
+                >
+                    {#each bimiRecord.checks as check (check.name)}
+                        <li class="list-group-item px-0">
+                            <i class="bi {checkIcon(check.status)} me-1"></i>
+                            <strong>{check.description}</strong>
+                            <span
+                                class="badge ms-2"
+                                class:bg-success={check.status === "pass"}
+                                class:bg-danger={check.status === "fail"}
+                                class:bg-warning={check.status === "warning"}
+                                class:text-dark={check.status === "warning"}
+                                class:bg-secondary={check.status === "skipped"}
+                            >
+                                {check.status}
+                            </span>
+                            {#if check.messages && check.messages.length > 0}
+                                <ul class="small mb-0 mt-1">
+                                    {#each check.messages as raw, i (i)}
+                                        {@const message = normalizeMessage(raw, check.status)}
+                                        <li class={messageColor(message, check.status)}>
+                                            {#if message.severity === "warning" && check.status === "fail"}
+                                                <i
+                                                    class="bi bi-exclamation-triangle-fill me-1"
+                                                    title="Warning (does not cause the failure)"
+                                                ></i>
+                                            {/if}
+                                            {message.text}
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
             {#if !bimiRecord.valid && dmarcEnforced}
                 <div class="alert alert-info mt-3 mb-0">
                     <h6 class="alert-heading">
@@ -102,3 +235,11 @@
         </div>
     </div>
 {/if}
+
+<style>
+    .status-dot {
+        display: inline-block;
+        width: 0.5rem;
+        height: 0.5rem;
+    }
+</style>

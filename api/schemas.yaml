@@ -1174,6 +1174,53 @@ components:
           type: string
           description: Error message if validation failed
           example: "No BIMI record found"
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/BIMICheck'
+          description: Detailed validation checks performed on the BIMI assets (logo and certificate)
+
+    BIMICheck:
+      type: object
+      required:
+        - name
+        - description
+        - status
+      properties:
+        name:
+          type: string
+          description: Machine-readable check identifier
+          example: "logo_fetch"
+        description:
+          type: string
+          description: Human-readable check title
+          example: "Logo file retrieval"
+        status:
+          type: string
+          enum: [pass, fail, warning, skipped]
+          description: Check outcome
+          example: "pass"
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/BIMICheckMessage'
+          description: Reasons explaining a failure or warning, each tagged with its own severity
+
+    BIMICheckMessage:
+      type: object
+      required:
+        - text
+        - severity
+      properties:
+        text:
+          type: string
+          description: Human-readable explanation
+          example: "Logo must be served over HTTPS"
+        severity:
+          type: string
+          enum: [error, warning]
+          description: Severity of this specific message. A "fail" check can carry both error and warning messages; only the error ones caused the failure.
+          example: "error"
 
     BlacklistCheck:
       type: object

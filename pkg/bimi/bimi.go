@@ -20,37 +20,103 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package bimi validates Brand Indicators for Message Identification (BIMI)
-// records.
+// records and the assets they reference.
 //
 // The package is self-contained and has no dependency on the rest of
 // happyDeliver, so it can be reused as a standalone BIMI validation library.
+// It reports, for every record, why it is considered valid or invalid
+// through a list of per-check evidence (Check values) instead of a bare
+// boolean.
 //
 // A minimal use looks like:
 //
 //	v := bimi.NewValidator()
-//	rec, err := v.Lookup(ctx, "example.com", "default")
+//	rec, err := v.Analyze(ctx, "example.com", "default")
 //
-// The returned Record describes whether the record is syntactically valid
-// (Valid, Error). Evidence checks on the assets it references (the logo and
-// the Verified Mark Certificate) are added by later validators built on top
-// of this package.
+// The returned Record fully describes validity (Valid, Error, Checks).
 package bimi
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 )
 
-// ErrNoRecord is returned by Lookup when the domain publishes no BIMI record
-// for the requested selector.
+const (
+	// MaxLogoSize is the maximum size allowed for a BIMI SVG logo (BIMI
+	// group recommendation: 32 kilobytes).
+	MaxLogoSize int64 = 32 * 1024
+
+	// MaxFileSize is a hard cap on any file downloaded during BIMI
+	// evidence collection (VMC chains are larger than logos).
+	MaxFileSize int64 = 512 * 1024
+)
+
+// ErrNoRecord is returned by Lookup and Analyze when the domain publishes no
+// BIMI record for the requested selector.
 var ErrNoRecord = errors.New("no BIMI record found")
 
-// Record is a parsed BIMI record.
+// CheckStatus is the outcome of an individual evidence check.
+type CheckStatus string
+
+const (
+	StatusPass    CheckStatus = "pass"
+	StatusFail    CheckStatus = "fail"
+	StatusWarning CheckStatus = "warning"
+	StatusSkipped CheckStatus = "skipped"
+)
+
+// MessageSeverity distinguishes a hard failure reason from an accompanying
+// warning within a single Check's Messages. A "fail" Check can carry both:
+// only the error messages are the reason the check failed.
+type MessageSeverity string
+
+const (
+	SeverityError   MessageSeverity = "error"
+	SeverityWarning MessageSeverity = "warning"
+)
+
+// CheckMessage is one explanation attached to a Check, tagged with its own
+// severity so a UI can distinguish a hard failure reason from a mere warning
+// even within a "fail" status check.
+type CheckMessage struct {
+	// Text is the human-readable explanation.
+	Text string
+	// Severity is this message's own severity.
+	Severity MessageSeverity
+}
+
+// Check is one evidence check performed on a BIMI record's assets.
+type Check struct {
+	// Name is a machine-readable identifier (e.g. "logo_fetch").
+	Name string
+	// Description is a human-readable title.
+	Description string
+	// Status is the check outcome.
+	Status CheckStatus
+	// Messages explains a failure or warning; empty when the check passed.
+	Messages []CheckMessage
+}
+
+// MessageTexts returns the text of every message, discarding severity.
+func (c Check) MessageTexts() []string {
+	texts := make([]string, len(c.Messages))
+	for i, m := range c.Messages {
+		texts[i] = m.Text
+	}
+	return texts
+}
+
+// Record is a parsed BIMI record together with the evidence gathered about
+// the assets it references.
 type Record struct {
 	// Selector is the BIMI selector queried (e.g. "default").
 	Selector string
@@ -62,10 +128,13 @@ type Record struct {
 	LogoURL string
 	// VMCURL is the value of the a= tag (empty when no VMC is published).
 	VMCURL string
-	// Valid reports whether the record is syntactically compliant.
+	// Valid reports whether the record and its assets are compliant.
 	Valid bool
 	// Error, when set, explains why the record is invalid.
 	Error string
+	// Checks holds the per-asset evidence checks (nil until ValidateAssets
+	// runs).
+	Checks []Check
 }
 
 // Resolver looks up DNS TXT records. *net.Resolver satisfies it.
@@ -73,24 +142,127 @@ type Resolver interface {
 	LookupTXT(ctx context.Context, name string) ([]string, error)
 }
 
-// Validator gathers the dependencies needed to look up and validate BIMI
-// records. The zero value is not usable: Resolver is required for Lookup.
+// Validator gathers the dependencies needed to fetch and validate BIMI
+// assets. The zero value is not usable: Resolver is required for Lookup and
+// Analyze. HTTPClient defaults to http.DefaultClient and Now to time.Now.
 type Validator struct {
+	// HTTPClient fetches the logo and VMC files. It carries the protections
+	// against the URLs being attacker-controlled, so a caller setting it must
+	// build it with NewHTTPClient (or install the same guards): anything else,
+	// http.DefaultClient included, will happily connect to a loopback address
+	// and follow a redirect off HTTPS. Defaults to http.DefaultClient, which
+	// only suits a caller feeding the validator URLs it trusts, such as a test
+	// pointing at its own server.
+	HTTPClient *http.Client
 	// Resolver performs the DNS TXT lookup.
 	Resolver Resolver
-	// Now returns the reference time for time-sensitive checks. Defaults to
-	// time.Now.
+	// Now returns the reference time for certificate validity checks.
+	// Defaults to time.Now.
 	Now func() time.Time
 }
 
-// NewValidator returns a Validator ready to use, backed by the system DNS
-// resolver. Callers that need a custom resolver or reference time can set
-// the corresponding fields on the returned Validator, or build the struct
-// literal directly.
+// NewValidator returns a Validator ready to use, backed by a default HTTP
+// client with a sane timeout and the system DNS resolver. Callers that need
+// custom transport, DNS or reference time can set the corresponding fields on
+// the returned Validator, or build the struct literal directly.
 func NewValidator() *Validator {
 	return &Validator{
-		Resolver: &net.Resolver{},
+		HTTPClient: NewHTTPClient(0),
+		Resolver:   &net.Resolver{},
 	}
+}
+
+// DefaultFetchTimeout bounds a single asset download. It is deliberately
+// unrelated to the DNS lookup budget: pulling a file from a slow host is not
+// the same wait as a TXT query.
+const DefaultFetchTimeout = 30 * time.Second
+
+// NewHTTPClient returns the HTTP client BIMI assets must be fetched with. The
+// URLs come from the l= and a= tags of a TXT record the analysed domain
+// controls, so the client refuses to connect to a non-public address and to
+// follow a redirect away from HTTPS. A timeout of zero or less means
+// DefaultFetchTimeout.
+//
+// It is exported because Validator.HTTPClient is: a caller that needs its own
+// transport settings should start from this client rather than from a bare one,
+// which would leave the fetches unguarded.
+func NewHTTPClient(timeout time.Duration) *http.Client {
+	if timeout <= 0 {
+		timeout = DefaultFetchTimeout
+	}
+
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: safeDialContext,
+		},
+		CheckRedirect: rejectInsecureRedirect,
+	}
+}
+
+// isPublicIP reports whether ip is routable on the public Internet, i.e. not
+// private, loopback, link-local or unspecified.
+func isPublicIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() && !ip.IsUnspecified()
+}
+
+// safeDialContext is used as the Transport's DialContext for BIMI asset
+// fetches. The URLs fetched (l= and a= tags) are attacker-controlled via DNS,
+// so every resolved address is checked against isPublicIP before connecting,
+// preventing SSRF against internal/link-local/loopback services. The check is
+// done at dial time, on the addresses actually connected to, so it also
+// covers redirect targets and is not subject to a DNS-rebinding TOCTOU gap.
+func safeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+
+	var dialer net.Dialer
+	var lastErr error
+	for _, ip := range ips {
+		if !isPublicIP(ip.IP) {
+			lastErr = fmt.Errorf("refusing to connect to non-public address %s", ip.IP)
+			continue
+		}
+		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.IP.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no addresses found for %s", host)
+	}
+	return nil, lastErr
+}
+
+// rejectInsecureRedirect stops the HTTP client from following a redirect to
+// a non-HTTPS URL. fetchFile only checks the scheme of the initial URL; the
+// client otherwise follows redirects transparently, which would let a
+// malicious https:// URL bounce the request to a plain http:// (or
+// internal-only) target.
+func rejectInsecureRedirect(req *http.Request, via []*http.Request) error {
+	if !strings.EqualFold(req.URL.Scheme, "https") {
+		return fmt.Errorf("refusing to follow redirect to non-HTTPS URL %q", req.URL)
+	}
+	return nil
+}
+
+func (v *Validator) httpClient() *http.Client {
+	if v.HTTPClient != nil {
+		return v.HTTPClient
+	}
+	return http.DefaultClient
 }
 
 func (v *Validator) now() time.Time {
@@ -98,6 +270,32 @@ func (v *Validator) now() time.Time {
 		return v.Now()
 	}
 	return time.Now()
+}
+
+// newCheck builds a Check value.
+func newCheck(name, description string, status CheckStatus, messages ...string) Check {
+	severity := SeverityError
+	if status == StatusWarning {
+		severity = SeverityWarning
+	}
+	c := Check{Name: name, Description: description, Status: status}
+	for _, m := range messages {
+		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: severity})
+	}
+	return c
+}
+
+// newCheckWithSeverities builds a Check whose Messages mix hard failure
+// reasons (errors) and accompanying warnings under a single status.
+func newCheckWithSeverities(name, description string, status CheckStatus, errors, warnings []string) Check {
+	c := Check{Name: name, Description: description, Status: status}
+	for _, m := range errors {
+		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: SeverityError})
+	}
+	for _, m := range warnings {
+		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: SeverityWarning})
+	}
+	return c
 }
 
 // BIMI tag matchers. A tag must appear at the start of the record or right
@@ -221,4 +419,102 @@ func (v *Validator) Lookup(ctx context.Context, domain, selector string) (*Recor
 
 	// BIMI records can be split across several TXT strings.
 	return ParseRecord(domain, selector, strings.Join(txtRecords, "")), nil
+}
+
+// Analyze looks up the BIMI record for domain/selector, parses it and, when
+// it is syntactically valid, runs the asset evidence checks. The returned
+// Record fully describes validity. A non-nil error is returned only when the
+// DNS lookup fails or no record exists (ErrNoRecord).
+func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Record, error) {
+	rec, err := v.Lookup(ctx, domain, selector)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Valid {
+		v.ValidateAssets(ctx, rec)
+	}
+	return rec, nil
+}
+
+// ValidateAssets performs the evidence checks for a syntactically valid
+// record, filling rec.Checks. When a mandatory check fails it sets
+// rec.Valid to false and rec.Error. A BIMI record only leads to a displayed
+// logo if its assets are compliant.
+func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
+	var checks []Check
+	allPassed := true
+
+	if rec.LogoURL == "" {
+		checks = append(checks,
+			newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
+				"No logo URL published (declination record)"))
+	} else {
+		_, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
+		if len(problems) > 0 {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail, problems...))
+			allPassed = false
+		} else if contentType != "image/svg+xml" {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusWarning,
+				fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
+		} else {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusPass))
+		}
+	}
+
+	rec.Checks = checks
+	if !allPassed {
+		rec.Valid = false
+		rec.Error = "BIMI assets failed validation, see detailed checks below"
+	}
+}
+
+// fetchFile downloads a file referenced by a BIMI record and validates
+// transport requirements (HTTPS, reachability, size). It returns the file
+// content, the media type announced by the server and the list of problems
+// encountered (empty when the fetch is acceptable).
+func (v *Validator) fetchFile(ctx context.Context, fileURL string, maxSize int64) (content []byte, contentType string, problems []string) {
+	u, err := url.Parse(fileURL)
+	if err != nil {
+		return nil, "", []string{fmt.Sprintf("Invalid URL: %s", err)}
+	}
+
+	if !strings.EqualFold(u.Scheme, "https") {
+		problems = append(problems, fmt.Sprintf("URL uses %q scheme: BIMI requires files to be served over HTTPS", u.Scheme))
+		return nil, "", problems
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+	if err != nil {
+		return nil, "", []string{fmt.Sprintf("Invalid URL: %s", err)}
+	}
+
+	resp, err := v.httpClient().Do(req)
+	if err != nil {
+		problems = append(problems, fmt.Sprintf("Unable to retrieve file: %s", err))
+		return nil, "", problems
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		problems = append(problems, fmt.Sprintf("Server responded with HTTP status %d instead of 200", resp.StatusCode))
+		return nil, "", problems
+	}
+
+	content, err = io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
+	if err != nil {
+		problems = append(problems, fmt.Sprintf("Error while downloading file: %s", err))
+		return nil, "", problems
+	}
+
+	if int64(len(content)) > maxSize {
+		problems = append(problems, fmt.Sprintf("File exceeds the maximum allowed size of %d bytes", maxSize))
+		return nil, "", problems
+	}
+
+	contentType = resp.Header.Get("Content-Type")
+	if mt, _, err := mime.ParseMediaType(contentType); err == nil {
+		contentType = mt
+	}
+
+	return content, contentType, nil
 }
