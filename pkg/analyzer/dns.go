@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"net/http"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -31,6 +32,8 @@ import (
 type DNSAnalyzer struct {
 	Timeout  time.Duration
 	resolver DNSResolver
+	// bimiHTTPClient fetches BIMI logo/VMC assets (see newBIMIHTTPClient).
+	bimiHTTPClient *http.Client
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer with configurable timeout
@@ -48,8 +51,9 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 		resolver = NewStandardDNSResolver()
 	}
 	return &DNSAnalyzer{
-		Timeout:  timeout,
-		resolver: resolver,
+		Timeout:        timeout,
+		resolver:       resolver,
+		bimiHTTPClient: newBIMIHTTPClient(),
 	}
 }
 

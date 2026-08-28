@@ -1,0 +1,74 @@
+// This file is part of the happyDeliver (R) project.
+// Copyright (c) 2025-2026 happyDomain
+// Authors: Pierre-Olivier Mercier, et al.
+//
+// This program is offered under a commercial and under the AGPL license.
+// For commercial licensing, contact us at <contact@happydomain.org>.
+//
+// For AGPL licensing:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package bimi
+
+import (
+	"context"
+	"fmt"
+)
+
+// Analyze looks up the BIMI record for domain/selector, parses it and, when
+// it is syntactically valid, runs the asset evidence checks. The returned
+// Record fully describes validity. A non-nil error is returned only when the
+// DNS lookup fails or no record exists (ErrNoRecord).
+func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Record, error) {
+	rec, err := v.Lookup(ctx, domain, selector)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Valid {
+		v.ValidateAssets(ctx, rec)
+	}
+	return rec, nil
+}
+
+// ValidateAssets performs the evidence checks for a syntactically valid
+// record, filling rec.Checks. When a mandatory check fails it sets
+// rec.Valid to false and rec.Error. A BIMI record only leads to a displayed
+// logo if its assets are compliant.
+func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
+	var checks []Check
+	allPassed := true
+
+	if rec.LogoURL == "" {
+		checks = append(checks,
+			newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
+				"No logo URL published (declination record)"))
+	} else {
+		_, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
+		if len(problems) > 0 {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail, problems...))
+			allPassed = false
+		} else if contentType != "image/svg+xml" {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusWarning,
+				fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
+		} else {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusPass))
+		}
+	}
+
+	rec.Checks = checks
+	if !allPassed {
+		rec.Valid = false
+		rec.Error = "BIMI assets failed validation, see detailed checks below"
+	}
+}

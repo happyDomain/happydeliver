@@ -23,6 +23,7 @@ package bimi
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -42,14 +43,23 @@ func TestNewValidator(t *testing.T) {
 	if v == nil {
 		t.Fatal("NewValidator returned nil")
 	}
+	if v.HTTPClient == nil {
+		t.Error("HTTPClient should be set")
+	} else if v.HTTPClient.Timeout != 30*time.Second {
+		t.Errorf("HTTPClient.Timeout = %s, want 30s", v.HTTPClient.Timeout)
+	}
 	if v.Resolver == nil {
 		t.Error("Resolver should be set")
 	}
 }
 
 func TestValidatorDefaults(t *testing.T) {
-	// With no Now set, now() falls back to time.Now (a recent timestamp).
+	// With no HTTPClient set, httpClient() falls back to http.DefaultClient.
 	v := &Validator{}
+	if v.httpClient() != http.DefaultClient {
+		t.Error("httpClient() should default to http.DefaultClient")
+	}
+	// With no Now set, now() falls back to time.Now (a recent timestamp).
 	before := time.Now().Add(-time.Minute)
 	if got := v.now(); got.Before(before) {
 		t.Errorf("now() = %s, expected a recent time", got)

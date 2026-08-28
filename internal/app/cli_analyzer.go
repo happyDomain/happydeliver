@@ -266,6 +266,29 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			if dns.BimiRecord.Error != nil {
 				fmt.Fprintf(writer, "      ERROR: %s\n", *dns.BimiRecord.Error)
 			}
+			if dns.BimiRecord.Checks != nil {
+				for _, check := range *dns.BimiRecord.Checks {
+					mark := "✓"
+					switch check.Status {
+					case model.BIMICheckStatusFail:
+						mark = "✗"
+					case model.BIMICheckStatusWarning:
+						mark = "!"
+					case model.BIMICheckStatusSkipped:
+						mark = "-"
+					}
+					fmt.Fprintf(writer, "      %s %s: %s\n", mark, check.Description, check.Status)
+					if check.Messages != nil {
+						for _, msg := range *check.Messages {
+							if msg.Severity == model.BIMICheckMessageSeverityWarning {
+								fmt.Fprintf(writer, "          [warning] %s\n", msg.Text)
+							} else {
+								fmt.Fprintf(writer, "          %s\n", msg.Text)
+							}
+						}
+					}
+				}
+			}
 		}
 
 		// PTR Records

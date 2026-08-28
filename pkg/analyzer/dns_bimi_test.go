@@ -22,13 +22,16 @@
 package analyzer
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-// Record parsing is covered by the reusable pkg/bimi package. These tests
-// exercise the analyzer adapter: DNS lookup wiring and the mapping of
-// *bimi.Record onto the API *model.BIMIRecord.
+// Record parsing and asset validation are covered by the reusable pkg/bimi
+// package. These tests exercise the analyzer adapter: DNS lookup wiring and
+// the mapping of *bimi.Record onto the API *model.BIMIRecord.
 
 func TestCheckBIMIRecordLookup(t *testing.T) {
 	tests := []struct {
@@ -96,5 +99,20 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestDNSAnalyzerHTTPClientIsGuarded pins the wiring rather than the guard
+// itself (pkg/bimi covers that): the BIMI logo and VMC are downloaded from URLs
+// the analysed domain publishes, so the analyzer must fetch them through
+// bimi.NewHTTPClient and never through a bare client, which would let a crafted
+// record reach a service on the instance's own network.
+func TestDNSAnalyzerHTTPClientIsGuarded(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer server.Close()
+
+	_, err := NewDNSAnalyzer(5 * time.Second).bimiHTTPClient.Get(server.URL)
+	if err == nil || !strings.Contains(err.Error(), "non-public address") {
+		t.Errorf("the analyzer's HTTP client reached a loopback address, err = %v", err)
 	}
 }
