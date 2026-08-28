@@ -92,11 +92,12 @@ type ContentResults struct {
 //   - square bracket tags: [unsubscribe]
 //   - URL-encoded curly braces: %7Bunsubscribe%7D
 //
-// The percent-tag alternative requires the body to contain at least one non-hex
-// character ([g-z_.-]). Percent-encoded octets (e.g. "%C3%A9", "%E2%80%A6") only
-// ever place hex digits between "%" signs, so this distinguishes real merge tags
-// from ordinary percent-encoding and avoids flagging internationalized URLs.
-var templatePlaceholderRegex = regexp.MustCompile(`(?i)\{\{?[^{}]*\}?\}|\$\{[^}]*\}|\*\|[^|]*\|\*|%{1,2}[\w.\-]*[g-z_.\-][\w.\-]*%{1,2}|\[[a-z][\w.\-]*\]|%7b[^%]*%7d`)
+// The percent-tag alternative requires a non-hex character in the body (to tell
+// "%unsubscribe%" apart from percent-encoded octets like "%C3%A9") and requires
+// the "%" delimiters to sit on a URL boundary (start, end, or "?&=/#;,"), so text
+// sitting between two unrelated "%XX" octets in a doubly-encoded URL (e.g. a
+// redirect link with an encoded URL as its query value) isn't mistaken for a tag.
+var templatePlaceholderRegex = regexp.MustCompile(`(?i)\{\{?[^{}]*\}?\}|\$\{[^}]*\}|\*\|[^|]*\|\*|(?:^|[?&=/#;,])%{1,2}[\w.\-]*[g-z_.\-][\w.\-]*%{1,2}(?:$|[?&=/#;,])|\[[a-z][\w.\-]*\]|%7b[^%]*%7d`)
 
 // isTemplatePlaceholderURL reports whether a URL still contains an unreplaced
 // templating placeholder, meaning the merge field was never substituted.
