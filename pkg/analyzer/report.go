@@ -120,8 +120,11 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email, results.AuthservID)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
-	// Fall back to the received chain's inbound TLS when no x-tls header was present.
-	if results.Authentication != nil && results.Headers != nil {
+	// Fall back to the received chain's inbound TLS when no x-tls header was present. Only valid
+	// for a message we received ourselves: for an uploaded .eml, the topmost Received header
+	// could be an internal hop of the original provider, not the arrival at the recipient's
+	// server.
+	if results.Source == model.ReportSourceReceived && results.Authentication != nil && results.Headers != nil {
 		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
 	}
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
