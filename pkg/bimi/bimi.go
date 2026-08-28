@@ -468,11 +468,19 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 		if logoContent == nil {
 			checks = append(checks,
 				newCheck("logo_xml", "Logo XML well-formedness", StatusSkipped,
+					"Skipped: the logo could not be retrieved"),
+				newCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", StatusSkipped,
 					"Skipped: the logo could not be retrieved"))
 		} else {
 			xmlCheck := CheckLogoXML(logoContent)
 			checks = append(checks, xmlCheck)
 			if xmlCheck.Status == StatusFail {
+				allPassed = false
+			}
+
+			svgCheck := CheckLogoSVGTinyPS(logoContent)
+			checks = append(checks, svgCheck)
+			if svgCheck.Status == StatusFail {
 				allPassed = false
 			}
 		}

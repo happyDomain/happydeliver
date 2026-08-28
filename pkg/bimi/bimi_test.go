@@ -290,12 +290,16 @@ func TestFetchFile(t *testing.T) {
 }
 
 func TestValidateAssets(t *testing.T) {
-	const logoContent = `<svg xmlns="http://www.w3.org/2000/svg"><title>Example Corp</title></svg>`
+	const logoContent = validTinyPSSVG
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(logoContent))
+	})
+	mux.HandleFunc("/bad.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write([]byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`))
 	})
 	server := httptest.NewTLSServer(mux)
 	defer server.Close()
@@ -313,6 +317,19 @@ func TestValidateAssets(t *testing.T) {
 		v.ValidateAssets(ctx, rec)
 		if !rec.Valid {
 			t.Errorf("expected checks to pass, got checks: %+v", rec.Checks)
+		}
+	})
+
+	t.Run("Non-compliant logo fails", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/bad.svg",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec)
+		if rec.Valid {
+			t.Errorf("expected checks to fail for non-compliant logo")
 		}
 	})
 
@@ -348,7 +365,7 @@ func TestValidateAssets(t *testing.T) {
 }
 
 func TestAnalyze(t *testing.T) {
-	const logoContent = `<svg xmlns="http://www.w3.org/2000/svg"><title>Example Corp</title></svg>`
+	const logoContent = validTinyPSSVG
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {

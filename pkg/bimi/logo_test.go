@@ -77,3 +77,136 @@ func TestCheckLogoXML(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckLogoSVGTinyPS(t *testing.T) {
+	tests := []struct {
+		name           string
+		content        string
+		expectedStatus CheckStatus
+		expectedInMsg  string
+	}{
+		{
+			name:           "Valid SVG Tiny P/S",
+			content:        validTinyPSSVG,
+			expectedStatus: StatusPass,
+		},
+		{
+			name: "Missing baseProfile",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2">
+  <title>Example Corp</title>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "baseProfile",
+		},
+		{
+			name: "Wrong baseProfile",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny">
+  <title>Example Corp</title>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  `baseProfile="tiny-ps"`,
+		},
+		{
+			name: "Missing version",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  `version="1.2"`,
+		},
+		{
+			name: "Missing title",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <circle cx="50" cy="50" r="40"/>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "<title>",
+		},
+		{
+			name: "Script element",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <script>alert(1)</script>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "scripting",
+		},
+		{
+			name: "Animation element",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <circle cx="50" cy="50" r="40"><animate attributeName="r" from="40" to="10" dur="1s"/></circle>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "animation",
+		},
+		{
+			name: "Image element",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <image href="https://example.com/photo.png" width="10" height="10"/>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "image",
+		},
+		{
+			name: "Event attribute",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <circle cx="50" cy="50" r="40" onclick="alert(1)"/>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "onclick",
+		},
+		{
+			name: "External reference",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <use xlink:href="https://example.com/shape.svg#circle"/>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "External reference",
+		},
+		{
+			name: "Local reference is allowed",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+  <defs><circle id="c" cx="50" cy="50" r="40"/></defs>
+  <use xlink:href="#c"/>
+</svg>`,
+			expectedStatus: StatusPass,
+		},
+		{
+			name: "x/y on root element",
+			content: `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" x="10" y="10">
+  <title>Example Corp</title>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "must not have",
+		},
+		{
+			name: "DOCTYPE declaration",
+			content: `<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps">
+  <title>Example Corp</title>
+</svg>`,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "DOCTYPE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check := CheckLogoSVGTinyPS([]byte(tt.content))
+			if check.Status != tt.expectedStatus {
+				t.Errorf("status = %s, want %s (messages: %v)", check.Status, tt.expectedStatus, check.Messages)
+			}
+			if tt.expectedInMsg != "" {
+				if !strings.Contains(strings.Join(check.MessageTexts(), " "), tt.expectedInMsg) {
+					t.Errorf("messages %v do not contain %q", check.Messages, tt.expectedInMsg)
+				}
+			}
+		})
+	}
+}
