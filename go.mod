@@ -3,7 +3,7 @@ module git.happydns.org/happyDeliver
 go 1.25.0
 
 require (
-	github.com/JGLTechnologies/gin-rate-limit v1.5.8
+	github.com/JGLTechnologies/gin-rate-limit v1.5.9
 	github.com/emersion/go-smtp v0.25.0
 	github.com/getkin/kin-openapi v0.147.0
 	github.com/gin-gonic/gin v1.12.0
