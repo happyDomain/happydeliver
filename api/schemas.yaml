@@ -1166,9 +1166,13 @@ components:
           format: uri
           description: URL to Verified Mark Certificate (optional)
           example: "https://example.com/vmc.pem"
+        record_valid:
+          type: boolean
+          description: Whether the DNS TXT record itself is syntactically valid (well-formed BIMI record). This can be true even when `valid` is false because the referenced assets (logo, VMC) failed validation.
+          example: true
         valid:
           type: boolean
-          description: Whether the BIMI record is valid
+          description: Whether the BIMI record and its referenced assets (logo, VMC) are fully compliant
           example: true
         error:
           type: string

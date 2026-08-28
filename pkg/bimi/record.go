@@ -117,6 +117,7 @@ func ParseRecord(domain, selector, txt string) *Record {
 	case !seen["l"]:
 		rec.Error = "BIMI record is missing the l= (logo URL) tag"
 	default:
+		rec.RecordValid = true
 		rec.Valid = true
 	}
 
