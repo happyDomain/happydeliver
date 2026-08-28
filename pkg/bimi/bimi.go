@@ -132,6 +132,10 @@ type Record struct {
 	LogoURL string
 	// VMCURL is the value of the a= tag (empty when no VMC is published).
 	VMCURL string
+	// RecordValid reports whether the DNS TXT record itself is
+	// syntactically valid. Unlike Valid, this does not reflect the outcome
+	// of asset validation (logo/VMC checks).
+	RecordValid bool
 	// Valid reports whether the record and its assets are compliant.
 	Valid bool
 	// Error, when set, explains why the record is invalid.
@@ -344,6 +348,7 @@ func ParseRecord(domain, selector, txt string) *Record {
 	case !bimiHasLogo.MatchString(txt):
 		rec.Error = "BIMI record is missing the l= (logo URL) tag"
 	default:
+		rec.RecordValid = true
 		rec.Valid = true
 	}
 

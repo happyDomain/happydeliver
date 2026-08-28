@@ -120,8 +120,11 @@
                     class="bi"
                     class:bi-check-circle-fill={bimiRecord.valid}
                     class:text-success={bimiRecord.valid}
-                    class:bi-x-circle-fill={!bimiRecord.valid}
-                    class:text-danger={!bimiRecord.valid}
+                    class:bi-exclamation-triangle-fill={bimiRecord.record_valid &&
+                        !bimiRecord.valid}
+                    class:text-warning={bimiRecord.record_valid && !bimiRecord.valid}
+                    class:bi-x-circle-fill={!bimiRecord.record_valid}
+                    class:text-danger={!bimiRecord.record_valid}
                 ></i>
                 Brand Indicators for Message Identification
             </h5>
@@ -141,13 +144,25 @@
                 <strong class="ms-3">Domain:</strong> <code>{bimiRecord.domain}</code>
             </div>
             <div class="mb-2">
-                <strong>Status:</strong>
-                {#if bimiRecord.valid}
+                <strong>DNS record:</strong>
+                {#if bimiRecord.record_valid}
                     <span class="badge bg-success">Valid</span>
                 {:else}
                     <span class="badge bg-danger">Invalid</span>
                 {/if}
             </div>
+            {#if bimiRecord.record}
+                <div class="mb-2">
+                    <strong>Record:</strong><br />
+                    <code class="d-block mt-1 text-break">{bimiRecord.record}</code>
+                </div>
+            {/if}
+            {#if bimiRecord.error}
+                <div class="text-danger">
+                    <strong>Error:</strong>
+                    {bimiRecord.error}
+                </div>
+            {/if}
             {#if bimiRecord.logo_url}
                 <div class="mb-2">
                     <strong>Logo URL:</strong>
@@ -166,16 +181,14 @@
                     >
                 </div>
             {/if}
-            {#if bimiRecord.record}
+            {#if bimiRecord.record_valid}
                 <div class="mb-2">
-                    <strong>Record:</strong><br />
-                    <code class="d-block mt-1 text-break">{bimiRecord.record}</code>
-                </div>
-            {/if}
-            {#if bimiRecord.error}
-                <div class="text-danger">
-                    <strong>Error:</strong>
-                    {bimiRecord.error}
+                    <strong>Assets (logo, VMC):</strong>
+                    {#if bimiRecord.valid}
+                        <span class="badge bg-success">Compliant</span>
+                    {:else}
+                        <span class="badge bg-danger">Failed validation</span>
+                    {/if}
                 </div>
             {/if}
             {#if bimiRecord.checks && bimiRecord.checks.length > 0}
@@ -310,7 +323,7 @@
                     </div>
                 </div>
             {/if}
-            {#if !bimiRecord.valid && dmarcEnforced}
+            {#if !bimiRecord.record && dmarcEnforced}
                 <div class="alert alert-info mt-3 mb-0">
                     <h6 class="alert-heading">
                         <i class="bi bi-lightbulb me-1"></i>

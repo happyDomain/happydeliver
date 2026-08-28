@@ -82,11 +82,12 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 // bimiRecordToModel converts a *bimi.Record into the API *model.BIMIRecord.
 func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 	m := &model.BIMIRecord{
-		Selector: r.Selector,
-		Domain:   r.Domain,
-		Valid:    r.Valid,
-		LogoUrl:  utils.PtrTo(r.LogoURL),
-		VmcUrl:   utils.PtrTo(r.VMCURL),
+		Selector:    r.Selector,
+		Domain:      r.Domain,
+		RecordValid: utils.PtrTo(r.RecordValid),
+		Valid:       r.Valid,
+		LogoUrl:     utils.PtrTo(r.LogoURL),
+		VmcUrl:      utils.PtrTo(r.VMCURL),
 	}
 	if r.Record != "" {
 		m.Record = utils.PtrTo(r.Record)
