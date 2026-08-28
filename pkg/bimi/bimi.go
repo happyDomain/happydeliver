@@ -34,6 +34,10 @@
 //	rec, err := v.Analyze(ctx, "example.com", "default")
 //
 // The returned Record fully describes validity (Valid, Error, Checks).
+//
+// Conformance of the logo to the SVG Tiny Portable/Secure profile is decided by
+// the [git.happydns.org/happyDeliver/pkg/bimi/svgps] sub-package, which is
+// driven by the profile schema itself and can also be used on its own.
 package bimi
 
 import (

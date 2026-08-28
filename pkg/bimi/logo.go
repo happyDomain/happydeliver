@@ -27,6 +27,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"git.happydns.org/happyDeliver/pkg/bimi/svgps"
 )
 
 // errNotUTF8 stops the walk of a document that is not encoded in UTF-8. Its
@@ -81,4 +83,78 @@ func CheckLogoXML(content []byte) Check {
 	}
 
 	return newCheck("logo_xml", "Logo XML well-formedness", StatusPass)
+}
+
+// maxLogoProblems caps how many distinct profile problems a single check
+// reports. A logo exported by a general-purpose editor can break dozens of
+// distinct rules; past a couple of dozen the list stops informing the reader
+// and the remainder is summarised instead.
+const maxLogoProblems = 25
+
+// CheckLogoSVGTinyPS validates the SVG document against the SVG Tiny
+// Portable/Secure profile required by BIMI. Requirements the profile states as
+// MUST make the check fail; those it states as SHOULD are reported as warnings,
+// which leave the logo compliant.
+func CheckLogoSVGTinyPS(content []byte) Check {
+	const (
+		name        = "logo_svg_tiny_ps"
+		description = "Logo SVG Tiny Portable/Secure profile"
+	)
+
+	problems, err := svgps.Validate(content)
+	if err != nil {
+		// Well-formedness is reported by the dedicated XML check, whose
+		// diagnostic is more precise.
+		return newCheck(name, description, StatusSkipped,
+			"Skipped: the file could not be parsed as XML")
+	}
+
+	var errors, warnings []string
+	droppedErrors := 0
+
+	for i, problem := range problems {
+		if i >= maxLogoProblems {
+			if problem.Severity == svgps.SeverityError {
+				droppedErrors++
+			}
+			continue
+		}
+		if problem.Severity == svgps.SeverityWarning {
+			warnings = append(warnings, formatLogoProblem(problem))
+		} else {
+			errors = append(errors, formatLogoProblem(problem))
+		}
+	}
+
+	if dropped := len(problems) - maxLogoProblems; dropped > 0 {
+		summary := fmt.Sprintf("%d further problems are not listed", dropped)
+		if droppedErrors > 0 {
+			errors = append(errors, summary)
+		} else {
+			warnings = append(warnings, summary)
+		}
+	}
+
+	status := StatusPass
+	switch {
+	case len(errors) > 0:
+		status = StatusFail
+	case len(warnings) > 0:
+		status = StatusWarning
+	}
+
+	return newCheckWithSeverities(name, description, status, errors, warnings)
+}
+
+// formatLogoProblem renders a profile problem, locating it in the file and
+// folding the repeats of a rule broken throughout the document into one line.
+func formatLogoProblem(problem svgps.Problem) string {
+	text := problem.Text
+	if problem.Line > 0 {
+		text = fmt.Sprintf("line %d: %s", problem.Line, text)
+	}
+	if problem.Count > 1 {
+		text = fmt.Sprintf("%s (%d occurrences)", text, problem.Count)
+	}
+	return text
 }
