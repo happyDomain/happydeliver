@@ -6,6 +6,7 @@
         noAuthResultsTitle,
         type MessageSource,
     } from "$lib/authentication";
+    import { hasNoBlacklistResults, noBlacklistResultsTitle } from "$lib/blacklist";
     import { hasNoSpamResults, noSpamResultsTitle } from "$lib/spam";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -18,10 +19,19 @@
         authentication?: AuthenticationResults;
         source?: MessageSource;
         spamFilters?: Pick<Report, "spamassassin" | "rspamd">;
+        blacklists?: Pick<Report, "blacklists">;
     }
 
-    let { grade, score, reanalyzing, summary, authentication, source, spamFilters }: Props =
-        $props();
+    let {
+        grade,
+        score,
+        reanalyzing,
+        summary,
+        authentication,
+        source,
+        spamFilters,
+        blacklists,
+    }: Props = $props();
 
     // Without an Authentication-Results header there is nothing to grade: the computed F
     // reflects the configuration of whichever server was supposed to produce it, not the
@@ -31,6 +41,9 @@
     // Some receivers (Gmail, for instance) never run SpamAssassin/rspamd directly, so there is
     // nothing to grade either.
     let spamUnavailable = $derived(hasNoSpamResults(spamFilters));
+
+    // No IP could be extracted from the message to check against DNS blacklists.
+    let blacklistUnavailable = $derived(hasNoBlacklistResults(blacklists));
 
     interface TooltipParams {
         enabled: boolean;
@@ -156,6 +169,8 @@
                     "Blacklists",
                     summary.blacklist_grade,
                     summary.blacklist_score,
+                    blacklistUnavailable,
+                    noBlacklistResultsTitle(),
                 )}
                 {@render scoreLink(
                     "#header-details",

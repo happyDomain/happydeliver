@@ -329,6 +329,7 @@
                         authentication={report.authentication}
                         source={report.source}
                         spamFilters={report}
+                        blacklists={report}
                         {reanalyzing}
                     />
                 </div>
