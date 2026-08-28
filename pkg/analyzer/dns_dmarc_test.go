@@ -364,10 +364,10 @@ func TestParseDMARCRecordPSD(t *testing.T) {
 
 func TestParseDMARCRecordDeprecatedTags(t *testing.T) {
 	tests := []struct {
-		name      string
-		record    string
-		wantRf    bool
-		wantRi    bool
+		name   string
+		record string
+		wantRf bool
+		wantRi bool
 	}{
 		{name: "rf tag present", record: "v=DMARC1; p=none; rf=afrf", wantRf: true, wantRi: false},
 		{name: "ri tag present", record: "v=DMARC1; p=none; ri=86400", wantRf: false, wantRi: true},
@@ -450,10 +450,10 @@ func TestValidateDMARC(t *testing.T) {
 // "strict"). The two tags are independent, so any combination is valid.
 func TestParseDMARCRecordAlignment(t *testing.T) {
 	tests := []struct {
-		name           string
-		record         string
-		expectedSPF    string
-		expectedDKIM   string
+		name         string
+		record       string
+		expectedSPF  string
+		expectedDKIM string
 	}{
 		{
 			name:         "SPF strict, DKIM relaxed",
@@ -510,10 +510,10 @@ func TestParseDMARCRecordAlignment(t *testing.T) {
 // policy — there is no fallback performed at this layer.
 func TestParseDMARCRecordSubdomainPolicy(t *testing.T) {
 	tests := []struct {
-		name           string
-		record         string
-		expectedSP     *string
-		expectedNP     *string
+		name       string
+		record     string
+		expectedSP *string
+		expectedNP *string
 	}{
 		{
 			name:       "sp=none, no np",
