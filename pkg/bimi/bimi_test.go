@@ -290,16 +290,20 @@ func TestFetchFile(t *testing.T) {
 }
 
 func TestValidateAssets(t *testing.T) {
-	const logoContent = validTinyPSSVG
+	logoPEM := generateTestVMC(t, "example.com", []byte(validTinyPSSVG), true, true, time.Now().Add(365*24*time.Hour))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
-		w.Write([]byte(logoContent))
+		w.Write([]byte(validTinyPSSVG))
 	})
 	mux.HandleFunc("/bad.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`))
+	})
+	mux.HandleFunc("/vmc.pem", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pem-certificate-chain")
+		w.Write(logoPEM)
 	})
 	server := httptest.NewTLSServer(mux)
 	defer server.Close()
@@ -307,16 +311,20 @@ func TestValidateAssets(t *testing.T) {
 	v := &Validator{HTTPClient: server.Client()}
 	ctx := context.Background()
 
-	t.Run("Fetchable logo passes", func(t *testing.T) {
+	t.Run("All checks pass", func(t *testing.T) {
 		rec := &Record{
 			Selector: "default",
 			Domain:   "example.com",
 			LogoURL:  server.URL + "/logo.svg",
+			VMCURL:   server.URL + "/vmc.pem",
 			Valid:    true,
 		}
 		v.ValidateAssets(ctx, rec)
 		if !rec.Valid {
-			t.Errorf("expected checks to pass, got checks: %+v", rec.Checks)
+			t.Errorf("expected all checks to pass, got checks: %+v", rec.Checks)
+		}
+		if rec.VMC == nil || !rec.VMC.Valid {
+			t.Errorf("expected valid VMC info, got %+v", rec.VMC)
 		}
 	})
 
@@ -365,12 +373,16 @@ func TestValidateAssets(t *testing.T) {
 }
 
 func TestAnalyze(t *testing.T) {
-	const logoContent = validTinyPSSVG
+	logoPEM := generateTestVMC(t, "example.com", []byte(validTinyPSSVG), true, true, time.Now().Add(365*24*time.Hour))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
-		w.Write([]byte(logoContent))
+		w.Write([]byte(validTinyPSSVG))
+	})
+	mux.HandleFunc("/vmc.pem", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pem-certificate-chain")
+		w.Write(logoPEM)
 	})
 	server := httptest.NewTLSServer(mux)
 	defer server.Close()
@@ -378,7 +390,7 @@ func TestAnalyze(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Valid record runs asset checks", func(t *testing.T) {
-		txt := "v=BIMI1; l=" + server.URL + "/logo.svg"
+		txt := "v=BIMI1; l=" + server.URL + "/logo.svg; a=" + server.URL + "/vmc.pem"
 		v := &Validator{HTTPClient: server.Client(), Resolver: stubResolver{txt: []string{txt}}}
 
 		rec, err := v.Analyze(ctx, "example.com", "default")
@@ -390,6 +402,9 @@ func TestAnalyze(t *testing.T) {
 		}
 		if len(rec.Checks) == 0 {
 			t.Error("expected asset checks to be populated")
+		}
+		if rec.VMC == nil || !rec.VMC.Valid {
+			t.Errorf("expected a valid VMC, got %+v", rec.VMC)
 		}
 	})
 

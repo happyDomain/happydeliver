@@ -289,6 +289,18 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 					}
 				}
 			}
+			if dns.BimiRecord.Vmc != nil {
+				vmc := dns.BimiRecord.Vmc
+				if vmc.Subject != nil {
+					fmt.Fprintf(writer, "      VMC Subject: %s\n", *vmc.Subject)
+				}
+				if vmc.Issuer != nil {
+					fmt.Fprintf(writer, "      VMC Issuer: %s\n", *vmc.Issuer)
+				}
+				if vmc.NotAfter != nil {
+					fmt.Fprintf(writer, "      VMC Expires: %s\n", vmc.NotAfter.Format("2006-01-02"))
+				}
+			}
 		}
 
 		// PTR Records

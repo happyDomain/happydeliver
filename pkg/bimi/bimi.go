@@ -20,7 +20,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package bimi validates Brand Indicators for Message Identification (BIMI)
-// records and the assets they reference.
+// records and the assets they reference: the SVG Tiny Portable/Secure logo
+// and the Verified Mark Certificate (VMC).
 //
 // The package is self-contained and has no dependency on the rest of
 // happyDeliver, so it can be reused as a standalone BIMI validation library.
@@ -33,7 +34,10 @@
 //	v := bimi.NewValidator()
 //	rec, err := v.Analyze(ctx, "example.com", "default")
 //
-// The returned Record fully describes validity (Valid, Error, Checks).
+// The returned Record fully describes validity (Valid, Error, Checks, VMC).
+// The building blocks (ParseRecord, CheckLogoXML, CheckLogoSVGTinyPS,
+// AnalyzeVMC) are also exported for callers that already hold the record
+// text or the assets.
 package bimi
 
 import (
@@ -135,6 +139,9 @@ type Record struct {
 	// Checks holds the per-asset evidence checks (nil until ValidateAssets
 	// runs).
 	Checks []Check
+	// VMC holds the analysis of the Verified Mark Certificate, when one is
+	// published.
+	VMC *VMCInfo
 }
 
 // Resolver looks up DNS TXT records. *net.Resolver satisfies it.
@@ -402,7 +409,8 @@ func describeMisplacedRecord(version, ownFamily string) string {
 
 // Lookup resolves and parses the BIMI record published at
 // selector._bimi.domain. It returns ErrNoRecord when no record exists, or the
-// resolver error when the DNS query fails.
+// resolver error when the DNS query fails. Assets are not validated; call
+// ValidateAssets or use Analyze for that.
 func (v *Validator) Lookup(ctx context.Context, domain, selector string) (*Record, error) {
 	if v.Resolver == nil {
 		return nil, errors.New("bimi: Validator.Resolver is nil")
@@ -436,10 +444,11 @@ func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Reco
 	return rec, nil
 }
 
-// ValidateAssets performs the evidence checks for a syntactically valid
-// record, filling rec.Checks. When a mandatory check fails it sets
-// rec.Valid to false and rec.Error. A BIMI record only leads to a displayed
-// logo if its assets are compliant.
+// ValidateAssets performs the evidence checks (logo download, XML
+// well-formedness, SVG Tiny P/S profile, VMC analysis) for a syntactically
+// valid record, filling rec.Checks and rec.VMC. When a mandatory check fails
+// it sets rec.Valid to false and rec.Error. A BIMI record only leads to a
+// displayed logo if its assets are compliant.
 func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	var checks []Check
 	allPassed := true
@@ -483,6 +492,19 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 			if svgCheck.Status == StatusFail {
 				allPassed = false
 			}
+		}
+	}
+
+	if rec.VMCURL == "" {
+		checks = append(checks,
+			newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
+				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
+	} else {
+		vmcCheck, vmcInfo := v.analyzeVMCURL(ctx, rec.VMCURL, rec.Domain, logoContent)
+		checks = append(checks, vmcCheck)
+		rec.VMC = vmcInfo
+		if vmcCheck.Status == StatusFail {
+			allPassed = false
 		}
 	}
 

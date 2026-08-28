@@ -403,6 +403,8 @@ components:
       $ref: './schemas.yaml#/components/schemas/BIMIRecord'
     BIMICheck:
       $ref: './schemas.yaml#/components/schemas/BIMICheck'
+    VMCInfo:
+      $ref: './schemas.yaml#/components/schemas/VMCInfo'
     BlacklistCheck:
       $ref: './schemas.yaml#/components/schemas/BlacklistCheck'
     Status:

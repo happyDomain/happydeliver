@@ -67,6 +67,7 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 			txt: map[string][]string{
 				"default._bimi.example.com": {"v=BIMI1; l=;"},
 			},
+			// No assets to fetch: all checks skipped, record stays valid.
 			wantValid: true,
 		},
 	}

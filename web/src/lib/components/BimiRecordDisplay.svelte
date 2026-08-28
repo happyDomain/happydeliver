@@ -18,6 +18,7 @@
     );
 
     let checksOpen = $state(false);
+    let vmcOpen = $state(false);
 
     type Status = BimiCheck["status"];
 
@@ -30,6 +31,24 @@
             label: c.description ?? c.name,
         })),
     );
+
+    const vmcDots: Dot[] = $derived.by(() => {
+        const vmc = bimiRecord?.vmc;
+        if (!vmc) return [];
+
+        const dots: Dot[] = [
+            { status: vmc.has_bimi_eku ? "pass" : "fail", label: "BIMI Extended Key Usage" },
+            { status: vmc.has_logotype ? "pass" : "fail", label: "Embedded logo" },
+        ];
+        if (vmc.logo_matches !== undefined) {
+            dots.push({
+                status: vmc.logo_matches ? "pass" : "fail",
+                label: "Embedded logo matches published logo",
+            });
+        }
+
+        return dots;
+    });
 
     function dotColor(status: Status): string {
         switch (status) {
@@ -72,6 +91,11 @@
     function messageColor(message: SchemasBimiCheckMessage, checkStatus: Status): string {
         if (checkStatus === "skipped") return "text-muted";
         return message.severity === "warning" ? "text-warning" : "text-danger";
+    }
+
+    function formatDate(date?: string): string {
+        if (!date) return "";
+        return new Date(date).toLocaleDateString();
     }
 </script>
 
@@ -211,6 +235,80 @@
                         </li>
                     {/each}
                 </ul>
+            {/if}
+            {#if bimiRecord.vmc}
+                <hr />
+                <button
+                    type="button"
+                    class="btn btn-link p-0 text-decoration-none text-muted d-flex align-items-center w-100"
+                    aria-expanded={vmcOpen}
+                    aria-controls="bimi-vmc-details"
+                    onclick={() => (vmcOpen = !vmcOpen)}
+                >
+                    <i
+                        class="bi me-1"
+                        class:bi-chevron-right={!vmcOpen}
+                        class:bi-chevron-down={vmcOpen}
+                    ></i>
+                    <h6 class="mb-0 me-2">Verified Mark Certificate</h6>
+                    {#if !vmcOpen}
+                        {@render statusDots(vmcDots)}
+                    {/if}
+                </button>
+                <div id="bimi-vmc-details" class="small mt-2" class:d-none={!vmcOpen}>
+                    {#if bimiRecord.vmc.subject}
+                        <div class="mb-1 text-truncate">
+                            <strong>Subject:</strong>
+                            <code class="text-break" title={bimiRecord.vmc.subject}>
+                                {bimiRecord.vmc.subject}
+                            </code>
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.issuer}
+                        <div class="mb-1 text-truncate">
+                            <strong>Issuer:</strong>
+                            <code class="text-break" title={bimiRecord.vmc.issuer}>
+                                {bimiRecord.vmc.issuer}
+                            </code>
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.not_before && bimiRecord.vmc.not_after}
+                        <div class="mb-1">
+                            <strong>Validity:</strong>
+                            {formatDate(bimiRecord.vmc.not_before)} &rarr; {formatDate(
+                                bimiRecord.vmc.not_after,
+                            )}
+                        </div>
+                    {/if}
+                    {#if bimiRecord.vmc.san_domains && bimiRecord.vmc.san_domains.length > 0}
+                        <div class="mb-1">
+                            <strong>Covered domains:</strong>
+                            {#each bimiRecord.vmc.san_domains as san (san)}
+                                <code class="me-1">{san}</code>
+                            {/each}
+                        </div>
+                    {/if}
+                    <div class="mb-1">
+                        <strong>BIMI Extended Key Usage:</strong>
+                        {#if bimiRecord.vmc.has_bimi_eku}
+                            <span class="badge bg-success">present</span>
+                        {:else}
+                            <span class="badge bg-danger">missing</span>
+                        {/if}
+                        <strong class="ms-3">Embedded logo:</strong>
+                        {#if bimiRecord.vmc.has_logotype}
+                            <span class="badge bg-success">present</span>
+                            {#if bimiRecord.vmc.logo_matches === true}
+                                <span class="badge bg-success ms-1">matches published logo</span>
+                            {:else if bimiRecord.vmc.logo_matches === false}
+                                <span class="badge bg-danger ms-1">differs from published logo</span
+                                >
+                            {/if}
+                        {:else}
+                            <span class="badge bg-danger">missing</span>
+                        {/if}
+                    </div>
+                </div>
             {/if}
             {#if !bimiRecord.valid && dmarcEnforced}
                 <div class="alert alert-info mt-3 mb-0">

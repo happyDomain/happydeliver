@@ -51,9 +51,10 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 	}
 
 	// Bound only the DNS lookup by d.Timeout. Asset validation runs with a
-	// deadline-free context so each logo download gets its own independent
+	// deadline-free context so each logo/VMC download gets its own independent
 	// budget from d.bimiHTTPClient.Timeout, rather than sharing a single deadline
-	// with the DNS lookup.
+	// across the DNS lookup and both fetches (a slow-but-valid VMC would
+	// otherwise fail once the logo download consumed most of the budget).
 	lookupCtx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
@@ -96,6 +97,9 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 	if len(r.Checks) > 0 {
 		m.Checks = utils.PtrTo(bimiChecksToModel(r.Checks))
 	}
+	if r.VMC != nil {
+		m.Vmc = bimiVMCToModel(r.VMC)
+	}
 	return m
 }
 
@@ -119,4 +123,38 @@ func bimiChecksToModel(checks []bimi.Check) []model.BIMICheck {
 		}
 	}
 	return out
+}
+
+func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
+	m := &model.VMCInfo{
+		Valid:       v.Valid,
+		HasBimiEku:  v.HasBimiEku,
+		HasLogotype: v.HasLogotype,
+		LogoMatches: v.LogoMatches,
+	}
+	if v.Issuer != "" {
+		m.Issuer = utils.PtrTo(v.Issuer)
+	}
+	if v.Subject != "" {
+		m.Subject = utils.PtrTo(v.Subject)
+	}
+	if v.SerialNumber != "" {
+		m.SerialNumber = utils.PtrTo(v.SerialNumber)
+	}
+	if !v.NotBefore.IsZero() {
+		m.NotBefore = utils.PtrTo(v.NotBefore)
+	}
+	if !v.NotAfter.IsZero() {
+		m.NotAfter = utils.PtrTo(v.NotAfter)
+	}
+	if v.ChainLength > 0 {
+		m.ChainLength = utils.PtrTo(v.ChainLength)
+	}
+	if len(v.SanDomains) > 0 {
+		m.SanDomains = utils.PtrTo(v.SanDomains)
+	}
+	if v.Error != "" {
+		m.Error = utils.PtrTo(v.Error)
+	}
+	return m
 }
