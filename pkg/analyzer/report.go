@@ -284,21 +284,33 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		report.RawHeaders = &results.Email.RawHeaders
 	}
 
-	// Calculate overall score as mean of all category scores
-	categoryScores := []int{
-		report.Summary.DnsScore,
-		report.Summary.AuthenticationScore,
-		report.Summary.BlacklistScore,
-		report.Summary.ContentScore,
-		report.Summary.HeaderScore,
-		report.Summary.SpamScore,
+	// Calculate overall score as mean of the category scores that actually
+	// ran. A category reports an empty (or NUL, for the header rune-based
+	// grade) grade when it did not run at all, in which case its score is
+	// just a placeholder 0 that must not be averaged in as if it were the
+	// worst possible result.
+	categoryResults := []struct {
+		score int
+		grade string
+	}{
+		{report.Summary.DnsScore, string(report.Summary.DnsGrade)},
+		{report.Summary.AuthenticationScore, string(report.Summary.AuthenticationGrade)},
+		{report.Summary.BlacklistScore, string(report.Summary.BlacklistGrade)},
+		{report.Summary.ContentScore, string(report.Summary.ContentGrade)},
+		{report.Summary.HeaderScore, string(report.Summary.HeaderGrade)},
+		{report.Summary.SpamScore, string(report.Summary.SpamGrade)},
 	}
 
 	var totalScore int
 	var categoryCount int
-	for _, score := range categoryScores {
-		totalScore += score
+	var categoryGrades []string
+	for _, c := range categoryResults {
+		if c.grade == "" || c.grade[0] == 0 {
+			continue
+		}
+		totalScore += c.score
 		categoryCount++
+		categoryGrades = append(categoryGrades, c.grade)
 	}
 
 	if categoryCount > 0 {
@@ -308,19 +320,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	}
 
 	report.Grade = ScoreToReportGrade(report.Score)
-	categoryGrades := []string{
-		string(report.Summary.DnsGrade),
-		string(report.Summary.AuthenticationGrade),
-		string(report.Summary.BlacklistGrade),
-		string(report.Summary.ContentGrade),
-		string(report.Summary.HeaderGrade),
-		string(report.Summary.SpamGrade),
-	}
 	if report.Score >= 100 {
 		hasLessThanA := false
 
 		for _, grade := range categoryGrades {
-			if len(grade) < 1 || grade[0] != 'A' {
+			if grade[0] != 'A' {
 				hasLessThanA = true
 			}
 		}
@@ -331,17 +335,12 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	} else {
 		var minusGrade byte = 0
 		for _, grade := range categoryGrades {
-			if len(grade) == 0 {
-				minusGrade = 255
-				break
-			} else if grade[0]-'A' > minusGrade {
+			if grade[0]-'A' > minusGrade {
 				minusGrade = grade[0] - 'A'
 			}
 		}
 
-		if minusGrade < 255 {
-			report.Grade = model.ReportGrade(string([]byte{'A' + minusGrade}))
-		}
+		report.Grade = model.ReportGrade(string([]byte{'A' + minusGrade}))
 	}
 
 	return report

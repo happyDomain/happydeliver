@@ -150,6 +150,53 @@ func TestGenerateReportWithSpamAssassin(t *testing.T) {
 	}
 }
 
+// TestGenerateReportExcludesCategoriesThatDidNotRun checks that a category with no
+// grade (blacklist: no IPs to check because the test email has no Received headers;
+// spam: no SpamAssassin/rspamd result) is left out of both the overall score average
+// and the overall grade, instead of being averaged in as if it scored 0.
+func TestGenerateReportExcludesCategoriesThatDidNotRun(t *testing.T) {
+	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
+	testID := uuid.New()
+
+	email := createTestEmail()
+	results := gen.AnalyzeEmail(email, AnalysisOptions{})
+
+	report := gen.GenerateReport(testID, results)
+
+	if report.Summary == nil {
+		t.Fatal("Summary should not be nil")
+	}
+
+	if report.Summary.BlacklistGrade != "" {
+		t.Fatalf("expected blacklist to have no grade (no IPs to check), got %q", report.Summary.BlacklistGrade)
+	}
+	if report.Summary.SpamGrade != "" {
+		t.Fatalf("expected spam to have no grade (no filter ran), got %q", report.Summary.SpamGrade)
+	}
+
+	var totalScore, categoryCount int
+	for _, s := range []struct {
+		score int
+		grade string
+	}{
+		{report.Summary.DnsScore, string(report.Summary.DnsGrade)},
+		{report.Summary.AuthenticationScore, string(report.Summary.AuthenticationGrade)},
+		{report.Summary.ContentScore, string(report.Summary.ContentGrade)},
+		{report.Summary.HeaderScore, string(report.Summary.HeaderGrade)},
+	} {
+		if s.grade == "" {
+			continue
+		}
+		totalScore += s.score
+		categoryCount++
+	}
+	expectedScore := totalScore / categoryCount
+
+	if report.Score != expectedScore {
+		t.Errorf("Score = %v, want %v (average of categories that ran, excluding blacklist and spam)", report.Score, expectedScore)
+	}
+}
+
 func TestGenerateRawEmail(t *testing.T) {
 	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
 
