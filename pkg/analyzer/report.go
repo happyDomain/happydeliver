@@ -52,7 +52,7 @@ func NewReportGenerator(
 	rspamdAPIURL string,
 ) *ReportGenerator {
 	return &ReportGenerator{
-		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
+		authAnalyzer:    NewAuthenticationAnalyzerWithResolver(receiverHostname, dnsTimeout, NewStandardDNSResolver()),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
 		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),

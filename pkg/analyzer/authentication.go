@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"strings"
+	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
 )
@@ -30,11 +31,29 @@ import (
 // AuthenticationAnalyzer analyzes email authentication results
 type AuthenticationAnalyzer struct {
 	receiverHostname string
+
+	// dkimVerifier computes a first-hand DKIM verdict when the message carries
+	// none. A nil verifier limits the analyzer to what other servers reported.
+	dkimVerifier *DKIMVerifier
 }
 
-// NewAuthenticationAnalyzer creates a new authentication analyzer
+// NewAuthenticationAnalyzer creates a new authentication analyzer.
+//
+// The analyzer only reports the verdicts other servers recorded in
+// Authentication-Results headers; use NewAuthenticationAnalyzerWithResolver to
+// also verify DKIM signatures first-hand.
 func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer {
 	return &AuthenticationAnalyzer{receiverHostname: receiverHostname}
+}
+
+// NewAuthenticationAnalyzerWithResolver creates an analyzer that verifies DKIM
+// signatures itself, through resolver, when no trusted Authentication-Results
+// header covers them. A nil resolver disables that verification.
+func NewAuthenticationAnalyzerWithResolver(receiverHostname string, timeout time.Duration, resolver DNSResolver) *AuthenticationAnalyzer {
+	return &AuthenticationAnalyzer{
+		receiverHostname: receiverHostname,
+		dkimVerifier:     NewDKIMVerifier(resolver, timeout),
+	}
 }
 
 // AnalyzeAuthentication extracts and analyzes authentication results from email headers.
@@ -53,6 +72,16 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, auth
 	// If no Authentication-Results headers, try to parse legacy headers
 	if results.Spf == nil {
 		results.Spf = a.parseLegacySPF(email, authservID)
+	}
+
+	// No trusted Authentication-Results said anything about DKIM: verify the
+	// signatures ourselves instead of leaving the message unjudged. This only
+	// ever fills a gap — a dkim= we do trust is that receiver's own measurement,
+	// taken on the message as it stood there, and is never overwritten.
+	if results.Dkim == nil || len(*results.Dkim) == 0 {
+		if verified := a.dkimVerifier.VerifyDKIM(email.Raw); len(verified) > 0 {
+			results.Dkim = &verified
+		}
 	}
 
 	// Parse ARC headers if not already parsed from Authentication-Results
