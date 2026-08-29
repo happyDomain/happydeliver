@@ -59,7 +59,6 @@ type EmailMessage struct {
 	// unparsed: the original order, folding, casing and line endings are all
 	// preserved, because it is shown as-is in the report.
 	RawHeaders string
-	RawBody    string
 
 	// Raw is the message exactly as it was received, octet for octet. DKIM and
 	// ARC sign those octets, so signature verification can only ever work from
