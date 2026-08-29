@@ -390,21 +390,58 @@ func TestParseEmail_CharsetISO88591(t *testing.T) {
 	}
 }
 
-func TestDecodeBody_Passthrough(t *testing.T) {
-	body := []byte("plain <a href=3D\"x\"> stays literal only if not QP")
+// singlePartEmail builds a one-part message with the given encoding, charset
+// and body, so a decoding behaviour can be asserted through ParseEmail rather
+// than against an internal helper.
+func singlePartEmail(t *testing.T, encoding, charset, body string) MessagePart {
+	t.Helper()
+
+	contentType := "text/plain"
+	if charset != "" {
+		contentType += "; charset=\"" + charset + "\""
+	}
+
+	raw := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: Encoding Test\r\n" +
+		"Content-Type: " + contentType + "\r\n" +
+		"Content-Transfer-Encoding: " + encoding + "\r\n" +
+		"\r\n" + body
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+
+	return email.Parts[0]
+}
+
+func TestParseEmail_EncodingPassthrough(t *testing.T) {
+	body := "plain <a href=3D\"x\"> stays literal only if not QP"
 	for _, enc := range []string{"7bit", "8bit", "binary", ""} {
-		if got := decodeBody(body, enc, ""); got != string(body) {
+		if got := singlePartEmail(t, enc, "", body).Content; got != body {
 			t.Errorf("encoding %q: expected passthrough, got: %q", enc, got)
 		}
 	}
 }
 
-func TestDecodeBody_QuotedPrintablePartialDecodeOnError(t *testing.T) {
+func TestParseEmail_UnknownEncodingPassthrough(t *testing.T) {
+	// An encoding no library knows must not abort the parse: the payload is
+	// handed over untouched so the rest of the report is still produced.
+	body := "NOT-DECODED-RAW-PAYLOAD"
+	if got := singlePartEmail(t, "x-nonsense", "", body).Content; !strings.Contains(got, body) {
+		t.Errorf("expected raw payload %q to survive, got: %q", body, got)
+	}
+}
+
+func TestParseEmail_QuotedPrintablePartialDecodeOnError(t *testing.T) {
 	// "=3D" decodes to "=" cleanly; "=ZZ" is an invalid hex escape that
 	// makes the reader error. The valid prefix must still come out decoded
 	// rather than the whole part reverting to its raw encoded form.
-	body := []byte("hello=3Dworld=ZZ")
-	got := decodeBody(body, "quoted-printable", "")
+	got := singlePartEmail(t, "quoted-printable", "", "hello=3Dworld=ZZ").Content
 	if !strings.HasPrefix(got, "hello=world") {
 		t.Errorf("expected decoded prefix %q, got: %q", "hello=world", got)
 	}
@@ -413,28 +450,234 @@ func TestDecodeBody_QuotedPrintablePartialDecodeOnError(t *testing.T) {
 	}
 }
 
-func TestDecodeBody_Base64Whitespace(t *testing.T) {
+func TestParseEmail_Base64Whitespace(t *testing.T) {
 	// MIME line breaks are ignored by the decoder itself, but some encoders
 	// also indent continuation lines: both must decode to the same thing as
-	// the unbroken payload, which takes the copy-free fast path.
+	// the unbroken payload.
 	encoded := base64.StdEncoding.EncodeToString([]byte("hello whitespace world"))
 	for name, body := range map[string]string{
 		"plain":    encoded,
 		"crlf":     encoded[:8] + "\r\n" + encoded[8:],
 		"indented": encoded[:8] + "\r\n\t " + encoded[8:],
 	} {
-		if got := decodeBody([]byte(body), "base64", ""); got != "hello whitespace world" {
+		if got := singlePartEmail(t, "base64", "", body).Content; got != "hello whitespace world" {
 			t.Errorf("%s: expected %q, got %q", name, "hello whitespace world", got)
 		}
 	}
 }
 
-func TestDecodeBody_Base64PartialDecodeOnError(t *testing.T) {
+func TestParseEmail_Base64PartialDecodeOnError(t *testing.T) {
 	// A valid base64-encoded "hello" followed by characters outside the
 	// base64 alphabet, which makes the decoder error partway through.
-	body := []byte(base64.StdEncoding.EncodeToString([]byte("hello")) + "!!!!")
-	got := decodeBody(body, "base64", "")
+	body := base64.StdEncoding.EncodeToString([]byte("hello")) + "!!!!"
+	got := singlePartEmail(t, "base64", "", body).Content
 	if !strings.HasPrefix(got, "hello") {
 		t.Errorf("expected decoded prefix %q, got: %q", "hello", got)
+	}
+}
+
+func TestParseEmail_DecodesEncodedWords(t *testing.T) {
+	// RFC 2047 encoded words in Subject and in a From display name must reach
+	// the report as the text a mail client would show.
+	raw := "From: =?UTF-8?Q?Caf=C3=A9_Cr=C3=A8me?= <sender@example.com>\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: =?ISO-8859-1?Q?Re=3A_d=E9j=E0_vu?=\r\n" +
+		"\r\n" +
+		"body\r\n"
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if want := "Re: déjà vu"; email.Subject != want {
+		t.Errorf("Expected decoded subject %q, got: %q", want, email.Subject)
+	}
+	if email.From == nil {
+		t.Fatal("Expected a From address")
+	}
+	if want := "Café Crème"; email.From.Name != want {
+		t.Errorf("Expected decoded display name %q, got: %q", want, email.From.Name)
+	}
+	if email.From.Address != "sender@example.com" {
+		t.Errorf("Expected From address sender@example.com, got: %s", email.From.Address)
+	}
+}
+
+func TestParseEmail_RawHeadersKeepWireForm(t *testing.T) {
+	// The header block is shown as-is in the report, so it must keep the
+	// original order, casing and folding rather than being rebuilt from the
+	// parsed map.
+	raw := "Received: from a.example.com (a.example.com [192.0.2.1])\r\n" +
+		"\tby b.example.com with ESMTP id 42\r\n" +
+		"from: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"\r\n" +
+		"body\r\n"
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	wantHeaders := strings.TrimSuffix(raw, "body\r\n")
+	wantHeaders = strings.TrimSuffix(wantHeaders, "\r\n")
+	if email.RawHeaders != wantHeaders {
+		t.Errorf("RawHeaders lost the wire form:\n got: %q\nwant: %q", email.RawHeaders, wantHeaders)
+	}
+	if string(email.Raw) != raw {
+		t.Errorf("Raw is not the received octets: %q", email.Raw)
+	}
+}
+
+func TestParseEmail_TruncatedMultipart(t *testing.T) {
+	// A message cut short by a size-capped relay never gets its closing
+	// "--boundary--" delimiter. The parts that did arrive still say plenty
+	// about deliverability, so they must survive rather than take the whole
+	// report down with them.
+	raw := `From: sender@example.com
+To: recipient@example.com
+Subject: Truncated
+Content-Type: multipart/mixed; boundary="boundary123"
+
+--boundary123
+Content-Type: text/plain; charset=utf-8
+
+This part arrived in full.
+
+--boundary123
+Content-Type: text/plain; charset=utf-8
+
+This one was cut off half`
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if len(email.Parts) != 2 {
+		t.Fatalf("Expected the 2 parts read before the truncation, got: %d", len(email.Parts))
+	}
+	if !strings.Contains(email.Parts[0].Content, "arrived in full") {
+		t.Errorf("First part lost its content: %q", email.Parts[0].Content)
+	}
+	if !strings.Contains(email.Parts[1].Content, "cut off half") {
+		t.Errorf("Truncated part lost what had been read: %q", email.Parts[1].Content)
+	}
+	if !email.BodyIncomplete {
+		t.Error("A body stopping before its closing delimiter must be reported as incomplete")
+	}
+}
+
+func TestParseEmail_BoundaryNeverAppears(t *testing.T) {
+	// A Content-Type announcing a boundary the body never uses yields no part at
+	// all. That looks exactly like a message carrying no content, so the report
+	// would silently claim there was nothing to analyse: the parser has to say
+	// that the body was unreadable instead.
+	raw := `From: sender@example.com
+To: recipient@example.com
+Subject: Boundary lost in transit
+Content-Type: multipart/mixed; boundary="boundary123"
+
+This body was never split along the boundary declared above.
+`
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if len(email.Parts) != 0 {
+		t.Fatalf("Expected no part to be read, got: %d", len(email.Parts))
+	}
+	if !email.BodyIncomplete {
+		t.Error("A body whose declared boundary never appears must be reported as incomplete")
+	}
+}
+
+func TestParseEmail_WellFormedBodyIsComplete(t *testing.T) {
+	// The counterpart of the two tests above: a body closing on its delimiter,
+	// nested multipart included, must never be flagged.
+	raw := `From: sender@example.com
+To: recipient@example.com
+Subject: Well formed
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+--inner
+Content-Type: text/plain; charset=utf-8
+
+Plain text.
+--inner
+Content-Type: text/html; charset=utf-8
+
+<p>HTML</p>
+--inner--
+
+--outer--
+`
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if email.BodyIncomplete {
+		t.Error("A body closing on its delimiter must not be reported as incomplete")
+	}
+	if len(email.Parts) != 1 || len(email.Parts[0].Parts) != 2 {
+		t.Fatalf("Expected 1 part holding 2 nested ones, got: %#v", email.Parts)
+	}
+}
+
+func TestParseEmail_NestedBoundaryNeverAppears(t *testing.T) {
+	// The flag has to climb back out of the recursion: only the inner body is
+	// broken here, and the outer one closes perfectly well.
+	raw := `From: sender@example.com
+To: recipient@example.com
+Subject: Inner boundary lost
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+The inner boundary is nowhere to be seen.
+--outer--
+`
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if !email.BodyIncomplete {
+		t.Error("A broken nested body must be reported as incomplete too")
+	}
+}
+
+func TestParseEmail_UnparsableContentTypeIsNotText(t *testing.T) {
+	// An unquoted filename with a space defeats mime.ParseMediaType, which
+	// then hands back the whole header value: "contexte" must not make the
+	// attachment look like text/*.
+	raw := `From: sender@example.com
+To: recipient@example.com
+Subject: Attachment
+Content-Type: application/pdf; name=Rapport contexte.pdf
+
+%PDF-1.4 binary payload
+`
+
+	email, err := ParseEmail(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail returned error: %v", err)
+	}
+
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+	if email.Parts[0].IsText || email.Parts[0].IsHTML {
+		t.Errorf("PDF attachment reported as text=%v html=%v", email.Parts[0].IsText, email.Parts[0].IsHTML)
 	}
 }

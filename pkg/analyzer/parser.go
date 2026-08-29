@@ -23,19 +23,18 @@ package analyzer
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
-	"mime/quotedprintable"
 	"net/mail"
 	"net/textproto"
 	"strings"
 
-	"golang.org/x/text/encoding/htmlindex"
-
-	"git.happydns.org/happyDeliver/pkg/uuencode"
+	"github.com/emersion/go-message"
+	// Importing the charset package registers a decoder covering the IANA
+	// charset registry, so a part announcing e.g. ISO-8859-15 or Shift_JIS is
+	// converted to UTF-8 rather than read as if it were ASCII.
+	_ "github.com/emersion/go-message/charset"
+	gomail "github.com/emersion/go-message/mail"
 )
 
 // EmailMessage represents a parsed email message
@@ -48,8 +47,24 @@ type EmailMessage struct {
 	Date       string
 	ReturnPath string
 	Parts      []MessagePart
+
+	// BodyIncomplete reports that the MIME body could not be read through to its
+	// end: a multipart body cut short before its closing delimiter, or one whose
+	// declared boundary never appears at all. Parts still holds everything that
+	// did arrive, but it is not the whole message, so the absence of something
+	// there says nothing about the message that was sent.
+	BodyIncomplete bool
+
+	// RawHeaders is the message's header block as it appeared on the wire,
+	// unparsed: the original order, folding, casing and line endings are all
+	// preserved, because it is shown as-is in the report.
 	RawHeaders string
 	RawBody    string
+
+	// Raw is the message exactly as it was received, octet for octet. DKIM and
+	// ARC sign those octets, so signature verification can only ever work from
+	// this field.
+	Raw []byte
 }
 
 // MessagePart represents a MIME part of an email
@@ -63,225 +78,189 @@ type MessagePart struct {
 	Parts       []MessagePart // For nested multipart messages
 }
 
-// ParseEmail parses an email message from a reader
+// ParseEmail parses an email message from a reader.
+//
+// Transfer encodings and charsets are decoded by go-message, so every text part
+// comes out as UTF-8 whatever the wire format was. A part announcing an encoding
+// or a charset the library does not know is not an error: its payload is left
+// untouched and the rest of the message is still analysed.
 func ParseEmail(r io.Reader) (*EmailMessage, error) {
-	msg, err := mail.ReadMessage(r)
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read email message: %w", err)
 	}
 
+	return ParseEmailBytes(raw)
+}
+
+// ParseEmailBytes parses an email message already held in memory, which is how
+// every caller but a test has it: reading it back out of a reader would leave
+// two copies of the whole message in memory for as long as the analysis runs.
+//
+// The slice becomes the message's Raw field rather than being copied, so callers
+// must not modify it afterwards.
+func ParseEmailBytes(raw []byte) (*EmailMessage, error) {
+	entity, err := message.Read(bytes.NewReader(raw))
+	if err != nil && !isDecodeError(err) {
+		return nil, fmt.Errorf("failed to parse email message: %w", err)
+	}
+
 	email := &EmailMessage{
-		Header:     msg.Header,
-		Subject:    msg.Header.Get("Subject"),
-		MessageID:  msg.Header.Get("Message-ID"),
-		Date:       msg.Header.Get("Date"),
-		ReturnPath: msg.Header.Get("Return-Path"),
+		Raw:        raw,
+		Header:     mail.Header(entity.Header.Map()),
+		MessageID:  entity.Header.Get("Message-ID"),
+		Date:       entity.Header.Get("Date"),
+		ReturnPath: entity.Header.Get("Return-Path"),
+		RawHeaders: rawHeaderBlock(raw),
 	}
 
-	// Parse From address
-	if fromStr := msg.Header.Get("From"); fromStr != "" {
-		from, err := mail.ParseAddress(fromStr)
-		if err == nil {
-			email.From = from
-		}
+	// Subject and the display names of From/To may be RFC 2047 encoded words:
+	// go-message decodes them, so what lands in the report is the text a human
+	// would see in their client rather than "=?UTF-8?B?...?=".
+	//
+	// A malformed value comes back unchanged alongside an error, which is
+	// exactly the degradation wanted here, so the errors are deliberately not
+	// propagated.
+	mailHeader := gomail.Header{Header: entity.Header}
+	email.Subject, _ = mailHeader.Subject()
+	if from, err := mailHeader.AddressList("From"); err == nil && len(from) > 0 {
+		email.From = from[0]
+	}
+	if to, err := mailHeader.AddressList("To"); err == nil {
+		email.To = to
 	}
 
-	// Parse To addresses
-	if toStr := msg.Header.Get("To"); toStr != "" {
-		toAddrs, err := mail.ParseAddressList(toStr)
-		if err == nil {
-			email.To = toAddrs
-		}
-	}
-
-	// Build raw headers string
-	email.RawHeaders = buildRawHeaders(msg.Header)
-
-	// Parse MIME parts
-	contentType := msg.Header.Get("Content-Type")
-	if contentType == "" {
-		// Plain text email without MIME
-		body, err := io.ReadAll(msg.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read email body: %w", err)
-		}
-		email.RawBody = string(body)
-		encoding := msg.Header.Get("Content-Transfer-Encoding")
-		email.Parts = []MessagePart{
-			{
-				ContentType: "text/plain",
-				Encoding:    encoding,
-				Content:     decodeBody(body, encoding, ""),
-				IsText:      true,
-			},
-		}
-	} else {
-		// Parse MIME message
-		parts, err := parseMIMEParts(msg.Body, contentType, msg.Header.Get("Content-Transfer-Encoding"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse MIME parts: %w", err)
-		}
-		email.Parts = parts
-	}
+	email.Parts, email.BodyIncomplete = messageParts(entity)
 
 	return email, nil
 }
 
-// parseMIMEParts recursively parses MIME parts. encoding is the
-// Content-Transfer-Encoding from the enclosing header, used only for
-// single-part (non-multipart) bodies whose encoding lives in the message
-// header rather than a part header.
-func parseMIMEParts(body io.Reader, contentType, encoding string) ([]MessagePart, error) {
-	mediaType, params, err := mime.ParseMediaType(contentType)
+// isDecodeError reports whether err merely says that a transfer encoding or a
+// charset is unknown. go-message returns those alongside a perfectly usable
+// entity whose payload is left in its original form, so they must not abort the
+// analysis of the rest of the message.
+func isDecodeError(err error) bool {
+	return message.IsUnknownEncoding(err) || message.IsUnknownCharset(err)
+}
+
+// messageParts returns the parts of a whole message: the children of the root
+// entity when it is multipart, or the message itself as a single part. The
+// second result is EmailMessage.BodyIncomplete.
+func messageParts(e *message.Entity) ([]MessagePart, bool) {
+	// MultipartReader consumes the body, so it must be called exactly once per
+	// entity: the value is threaded through rather than asked for twice.
+	if mr := e.MultipartReader(); mr != nil {
+		return readMultipart(mr)
+	}
+
+	part := describePart(e)
+	readContent(e, &part)
+
+	return []MessagePart{part}, false
+}
+
+// readMultipart turns every part of a multipart body into a MessagePart,
+// recursing into the ones that are themselves multipart. A malformed body is
+// reported as far as it could be read: a message truncated before its closing
+// delimiter, as a size-capped relay leaves it, still says plenty about
+// deliverability through the parts that did arrive.
+//
+// It also says whether the body ended where it should have, because "no parts
+// were found" and "the body was unreadable" must not look alike to the report:
+// a message announcing a boundary that never appears in its body yields no part
+// at all, and would otherwise be indistinguishable from one that genuinely
+// carries no content.
+func readMultipart(mr message.MultipartReader) (parts []MessagePart, incomplete bool) {
+	for {
+		child, err := mr.NextPart()
+		if err != nil && !isDecodeError(err) {
+			// mime/multipart returns io.EOF itself, unwrapped, only once it has
+			// read a well-formed closing delimiter; every other failure — a body
+			// cut short, a boundary that never shows up — comes back inside a
+			// "multipart: NextPart" error. Hence the identity comparison rather
+			// than errors.Is: only the bare value means the body really ended.
+			// NextPart hands back no entity in either case, so what was read so
+			// far is all there is.
+			return parts, incomplete || err != io.EOF
+		}
+
+		part := describePart(child)
+		if nestedReader := child.MultipartReader(); nestedReader != nil {
+			var nestedIncomplete bool
+			part.Parts, nestedIncomplete = readMultipart(nestedReader)
+			incomplete = incomplete || nestedIncomplete
+		} else {
+			readContent(child, &part)
+		}
+
+		parts = append(parts, part)
+	}
+}
+
+// describePart fills in everything about a part that can be told from its
+// header alone.
+func describePart(e *message.Entity) MessagePart {
+	contentType := e.Header.Get("Content-Type")
+	if contentType == "" {
+		// A part without a Content-Type is text/plain per RFC 2045 section 5.2.
+		contentType = "text/plain"
+	}
+
+	// ContentType reports the media type alone and falls back to text/plain
+	// when the header is absent. A header it cannot parse comes back verbatim,
+	// parameters included, so keep only what precedes the first parameter:
+	// otherwise an unquoted filename such as "Rapport contexte.pdf" would make
+	// the attachment look like text. Casing is not normalised either, hence the
+	// fold.
+	mediaType, _, err := e.Header.ContentType()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse media type: %w", err)
+		mediaType, _, _ = strings.Cut(mediaType, ";")
 	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
 
-	var parts []MessagePart
-
-	if strings.HasPrefix(mediaType, "multipart/") {
-		// Handle multipart messages
-		boundary := params["boundary"]
-		if boundary == "" {
-			return nil, fmt.Errorf("multipart message missing boundary")
-		}
-
-		mr := multipart.NewReader(body, boundary)
-		for {
-			part, err := mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to read multipart part: %w", err)
-			}
-
-			partContentType := part.Header.Get("Content-Type")
-			if partContentType == "" {
-				partContentType = "text/plain"
-			}
-
-			// Check if this part is also multipart
-			partMediaType, partParams, _ := mime.ParseMediaType(partContentType)
-			partEncoding := part.Header.Get("Content-Transfer-Encoding")
-			if strings.HasPrefix(partMediaType, "multipart/") {
-				// Recursively parse nested multipart
-				nestedParts, err := parseMIMEParts(part, partContentType, partEncoding)
-				if err != nil {
-					return nil, err
-				}
-				parts = append(parts, MessagePart{
-					ContentType: partContentType,
-					Encoding:    partEncoding,
-					Parts:       nestedParts,
-				})
-			} else {
-				messagePart := MessagePart{
-					ContentType: partContentType,
-					Encoding:    partEncoding,
-					IsHTML:      strings.Contains(strings.ToLower(partMediaType), "html"),
-					IsText:      strings.Contains(strings.ToLower(partMediaType), "text"),
-				}
-
-				// Only text parts are ever read back, by GetTextParts and
-				// GetHTMLParts: decoding an attachment would allocate and
-				// then throw away its whole payload. NextPart() skips over
-				// whatever we leave unconsumed.
-				if messagePart.IsText || messagePart.IsHTML {
-					content, err := io.ReadAll(part)
-					if err != nil {
-						return nil, fmt.Errorf("failed to read part content: %w", err)
-					}
-					messagePart.Content = decodeBody(content, partEncoding, partParams["charset"])
-				}
-
-				parts = append(parts, messagePart)
-			}
-		}
-	} else {
-		// Single part message
-		part := MessagePart{
-			ContentType: contentType,
-			Encoding:    encoding,
-			IsHTML:      strings.Contains(strings.ToLower(mediaType), "html"),
-			IsText:      strings.Contains(strings.ToLower(mediaType), "text"),
-		}
-
-		// Same reasoning as above: a non-text body is never consulted, so
-		// reading and decoding it would be wasted work.
-		if part.IsText || part.IsHTML {
-			content, err := io.ReadAll(body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read body content: %w", err)
-			}
-			part.Content = decodeBody(content, encoding, params["charset"])
-		}
-
-		parts = []MessagePart{part}
+	return MessagePart{
+		ContentType: contentType,
+		Encoding:    e.Header.Get("Content-Transfer-Encoding"),
+		IsHTML:      strings.Contains(mediaType, "html"),
+		IsText:      strings.Contains(mediaType, "text"),
 	}
-
-	return parts, nil
 }
 
-// decodeBody applies the Content-Transfer-Encoding then converts the charset to
-// UTF-8. It is best-effort: on a decode error it keeps whatever prefix was
-// successfully decoded before the error, so a malformed part never breaks the
-// whole report.
-func decodeBody(content []byte, encoding, charset string) string {
-	switch strings.ToLower(strings.TrimSpace(encoding)) {
-	case "quoted-printable":
-		// ReadAll returns the bytes decoded so far alongside any error, so
-		// a malformed byte partway through the part must not discard the
-		// valid prefix that decoded fine.
-		if decoded, err := io.ReadAll(quotedprintable.NewReader(bytes.NewReader(content))); err == nil || len(decoded) > 0 {
-			content = decoded
-		}
-	case "base64":
-		// Decode already ignores the \r\n line breaks MIME inserts, but not
-		// the spaces/tabs a few encoders use to indent continuation lines:
-		// pay for a copy only when one is actually present.
-		cleaned := content
-		if bytes.ContainsAny(cleaned, " \t") {
-			cleaned = bytes.Map(func(r rune) rune {
-				if r == ' ' || r == '\t' {
-					return -1
-				}
-				return r
-			}, cleaned)
-		}
-		// AppendDecode returns the bytes decoded so far alongside any error,
-		// so a malformed byte partway through the part must not discard the
-		// valid prefix that decoded fine.
-		if decoded, err := base64.StdEncoding.AppendDecode(nil, cleaned); err == nil || len(decoded) > 0 {
-			content = decoded
-		}
-	case "uuencode", "x-uuencode", "uue":
-		content = uuencode.Decode(content)
+// readContent decodes a leaf part's body into part.Content.
+//
+// Only text parts are ever read back, by GetTextParts and GetHTMLParts:
+// decoding an attachment would allocate and then throw away its whole payload.
+// NextPart() skips over whatever is left unconsumed.
+//
+// Reading is best-effort: ReadAll returns the bytes decoded so far alongside any
+// error, so a part that is malformed partway through still contributes the
+// prefix that decoded fine instead of breaking the whole report.
+func readContent(e *message.Entity, part *MessagePart) {
+	if !part.IsText && !part.IsHTML {
+		return
 	}
 
-	switch strings.ToLower(strings.TrimSpace(charset)) {
-	case "", "utf-8", "utf8", "us-ascii", "ascii":
-		// already UTF-8 compatible
-	default:
-		if enc, err := htmlindex.Get(charset); err == nil {
-			if decoded, err := enc.NewDecoder().Bytes(content); err == nil {
-				content = decoded
-			}
-		}
-	}
-
-	return string(content)
+	content, _ := io.ReadAll(e.Body)
+	part.Content = string(content)
 }
 
-// buildRawHeaders reconstructs the raw header string
-func buildRawHeaders(header mail.Header) string {
-	var sb strings.Builder
-	for key, values := range header {
-		for _, value := range values {
-			sb.WriteString(fmt.Sprintf("%s: %s\n", key, value))
-		}
+// rawHeaderBlock returns the header block of a raw message, stopping before the
+// empty line that separates it from the body. Both line ending conventions are
+// accepted, and whichever separator appears first wins: a message using bare LF
+// must not be cut at the first CRLF pair that happens to occur in its body.
+func rawHeaderBlock(raw []byte) string {
+	end := len(raw)
+
+	if i := bytes.Index(raw, []byte("\r\n\r\n")); i >= 0 {
+		end = i + len("\r\n")
 	}
-	return sb.String()
+	// Only what precedes the CRLF separator can still hold an earlier LF one, so
+	// the second scan stops there rather than running over the whole body.
+	if i := bytes.Index(raw[:end], []byte("\n\n")); i >= 0 {
+		end = i + len("\n")
+	}
+
+	return string(raw[:end])
 }
 
 // parseAuthservID extracts the authserv-id from an Authentication-Results header value.
