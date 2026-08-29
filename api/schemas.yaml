@@ -862,6 +862,10 @@ components:
           $ref: '#/components/schemas/DMARCRecord'
         bimi_record:
           $ref: '#/components/schemas/BIMIRecord'
+        sender_ip:
+          type: string
+          description: Sender IP address used for PTR/FCrDNS verification (from the inbound Received hop, which for an uploaded EML may sit below the recipient's internal hops)
+          example: "192.0.2.10"
         ptr_records:
           type: array
           items:
@@ -876,7 +880,7 @@ components:
           example: ["192.0.2.1", "2001:db8::1"]
         helo_hostname:
           type: string
-          description: HELO/EHLO hostname announced by the sending server (from the first Received hop)
+          description: HELO/EHLO hostname announced by the sending server (from the inbound Received hop)
           example: "mail.example.com"
         helo_ptr_match:
           type: boolean

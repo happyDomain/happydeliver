@@ -353,7 +353,10 @@
             {#if report.header_analysis?.received_chain && report.header_analysis.received_chain.length > 0}
                 <div class="row mb-4" id="received-chain">
                     <div class="col-12">
-                        <EmailPathCard receivedChain={report.header_analysis.received_chain} />
+                        <EmailPathCard
+                            receivedChain={report.header_analysis.received_chain}
+                            senderIp={report.dns_results?.sender_ip}
+                        />
                     </div>
                 </div>
             {/if}

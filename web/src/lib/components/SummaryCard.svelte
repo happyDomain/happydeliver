@@ -64,12 +64,23 @@
             highlight: { emphasis: true },
         });
 
-        // Server information and hops
+        // Server information and hops. The inbound hop (as picked by the backend's
+        // InboundHop) may sit below the recipient's own internal hops for an
+        // uploaded EML, so locate it in the chain by its IP instead of assuming
+        // it's the topmost one.
         const receivedChain = report.header_analysis?.received_chain;
         if (receivedChain && receivedChain.length > 0) {
-            const firstHop = receivedChain[0];
-            const serverName = firstHop.from || firstHop.ip || "an unknown server";
-            const hopCount = receivedChain.length;
+            const senderIp = report.dns_results?.sender_ip;
+            const entryIndex = senderIp
+                ? receivedChain.findIndex((hop) => hop.ip === senderIp)
+                : -1;
+            const inboundHop = entryIndex >= 0 ? receivedChain[entryIndex] : receivedChain[0];
+            const serverName =
+                report.dns_results?.helo_hostname ||
+                inboundHop.from ||
+                inboundHop.ip ||
+                "an unknown server";
+            const hopCount = receivedChain.length - Math.max(entryIndex, 0);
             segments.push({ text: ", sent by " });
             segments.push({
                 text: serverName,

@@ -262,6 +262,21 @@ func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
 
 // isPublicIP checks if an IP address is public (not private, loopback, or reserved)
 func (r *DNSListChecker) isPublicIP(ipStr string) bool {
+	return isPublicIPAddr(ipStr)
+}
+
+// cgnatRange is the RFC 6598 shared address space. Carrier-grade NAT addresses
+// never identify a sending MTA out on the Internet, and no DNS list carries
+// them, so they are treated like any other non-routable address.
+var cgnatRange = net.IPNet{
+	IP:   net.IPv4(100, 64, 0, 0),
+	Mask: net.CIDRMask(10, 32),
+}
+
+// isPublicIPAddr reports whether ipStr is a routable address, i.e. neither
+// private, loopback, link-local, unspecified, nor carrier-grade NAT. IPv6
+// unique-local addresses (fc00::/7) are covered by net.IP.IsPrivate.
+func isPublicIPAddr(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return false
@@ -272,6 +287,10 @@ func (r *DNSListChecker) isPublicIP(ipStr string) bool {
 	}
 
 	if ip.IsUnspecified() {
+		return false
+	}
+
+	if cgnatRange.Contains(ip) {
 		return false
 	}
 

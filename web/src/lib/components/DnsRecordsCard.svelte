@@ -18,6 +18,8 @@
         dnsResults?: DnsResults;
         dnsGrade?: string;
         dnsScore?: number;
+        // Only used as a fallback for reports stored before dns_results.sender_ip
+        // and helo_hostname existed; new reports carry both.
         receivedChain?: ReceivedHop[];
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
     }
@@ -31,10 +33,15 @@
         domainOnly = false,
     }: Props = $props();
 
-    // Extract sender IP from first hop
-    const senderIp = $derived(
-        receivedChain && receivedChain.length > 0 ? receivedChain[0].ip : undefined,
-    );
+    // The sender IP is the inbound Received hop picked by the backend, which
+    // for an uploaded EML may sit below the recipient's own internal hops.
+    // Reports stored before sender_ip existed keep the historical topmost hop,
+    // otherwise their FCrDNS card would flip to a failure the stored score
+    // never recorded.
+    const senderIp = $derived(dnsResults?.sender_ip ?? receivedChain?.[0]?.ip);
+
+    // Same fallback for the announced HELO name.
+    const heloHostname = $derived(dnsResults?.helo_hostname ?? receivedChain?.[0]?.from);
 </script>
 
 <div class="card shadow-sm" id="dns-details">
@@ -73,12 +80,11 @@
 
             {#if !domainOnly}
                 <!-- Reverse IP Section -->
-                {#if receivedChain && receivedChain.length > 0}
+                {#if senderIp}
                     <div class="mb-3 d-flex align-items-center gap-2">
                         <h4 class="mb-0 text-truncate">
                             Received from: <code
-                                >{receivedChain[0].from} ({receivedChain[0].reverse || "Unknown"} [{receivedChain[0]
-                                    .ip}])</code
+                                >{heloHostname} ({dnsResults.ptr_records?.[0] || "Unknown"} [{senderIp}])</code
                             >
                         </h4>
                     </div>
@@ -96,7 +102,7 @@
 
                 <!-- HELO / PTR Consistency -->
                 <HeloPtrMatchDisplay
-                    heloHostname={dnsResults.helo_hostname ?? receivedChain?.[0]?.from}
+                    {heloHostname}
                     ptrRecords={dnsResults.ptr_records}
                     heloPtrMatch={dnsResults.helo_ptr_match}
                 />

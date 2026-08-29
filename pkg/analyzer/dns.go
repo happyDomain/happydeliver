@@ -53,8 +53,13 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 	}
 }
 
-// AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis) *model.DNSResults {
+// AnalyzeDNS performs DNS validation for the email's domain.
+//
+// inboundHop is the received hop the message entered the recipient's
+// infrastructure through, as picked by InboundHop; it provides the sender IP
+// used for PTR/FCrDNS verification and the announced HELO name. It may be nil
+// when the message carries no usable Received chain.
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis, inboundHop *model.ReceivedHop) *model.DNSResults {
 	// Extract domain from From address
 	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
 		return &model.DNSResults{
@@ -76,27 +81,24 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	}
 
 	// Store sender IP for later use in scoring
-	var senderIP string
-	if headersResults.ReceivedChain != nil && len(*headersResults.ReceivedChain) > 0 {
-		firstHop := (*headersResults.ReceivedChain)[0]
-		if firstHop.Ip != nil && *firstHop.Ip != "" {
-			senderIP = *firstHop.Ip
-			ptrRecords, forwardRecords := d.checkPTRAndForward(senderIP)
-			if len(ptrRecords) > 0 {
-				results.PtrRecords = &ptrRecords
-			}
-			if len(forwardRecords) > 0 {
-				results.PtrForwardRecords = &forwardRecords
-			}
+	if inboundHop != nil && inboundHop.Ip != nil && *inboundHop.Ip != "" {
+		senderIP := *inboundHop.Ip
+		results.SenderIp = &senderIP
+		ptrRecords, forwardRecords := d.checkPTRAndForward(senderIP)
+		if len(ptrRecords) > 0 {
+			results.PtrRecords = &ptrRecords
+		}
+		if len(forwardRecords) > 0 {
+			results.PtrForwardRecords = &forwardRecords
+		}
 
-			// Record the announced HELO name and whether it matches the PTR record
-			if firstHop.From != nil && *firstHop.From != "" {
-				helo := *firstHop.From
-				results.HeloHostname = &helo
-				if len(ptrRecords) > 0 {
-					match := checkHeloPtrMatch(helo, ptrRecords)
-					results.HeloPtrMatch = &match
-				}
+		// Record the announced HELO name and whether it matches the PTR record
+		if inboundHop.From != nil && *inboundHop.From != "" {
+			helo := *inboundHop.From
+			results.HeloHostname = &helo
+			if len(ptrRecords) > 0 {
+				match := checkHeloPtrMatch(helo, ptrRecords)
+				results.HeloPtrMatch = &match
 			}
 		}
 	}

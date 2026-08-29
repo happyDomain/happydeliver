@@ -171,6 +171,11 @@ func TestIsPublicIP(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "Carrier-grade NAT",
+			ip:       "100.64.0.1",
+			expected: false,
+		},
+		{
 			name:     "Invalid IP",
 			ip:       "not-an-ip",
 			expected: false,

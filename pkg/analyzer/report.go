@@ -98,6 +98,10 @@ type AnalysisResults struct {
 	DNSWL          *DNSListResults
 	SpamAssassin   *model.SpamAssassinResult
 	Rspamd         *model.RspamdResult
+
+	// InboundHop is the received hop the message entered the recipient's
+	// infrastructure through. See the InboundHop function for how it is picked.
+	InboundHop *model.ReceivedHop
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -120,6 +124,9 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email, results.AuthservID)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
+	if results.Headers != nil && results.Headers.ReceivedChain != nil {
+		results.InboundHop = InboundHop(*results.Headers.ReceivedChain, results.Source)
+	}
 	// Fall back to the received chain's inbound TLS when no x-tls header was present. Only valid
 	// for a message we received ourselves: for an uploaded .eml, the topmost Received header
 	// could be an internal hop of the original provider, not the arrival at the recipient's
@@ -127,7 +134,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	if results.Source == model.ReportSourceReceived && results.Authentication != nil && results.Headers != nil {
 		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
 	}
-	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
+	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers, results.InboundHop)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
@@ -162,13 +169,12 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	dnsScore := 0
 	var dnsGrade string
 	if results.DNS != nil {
-		// Extract sender IP from received chain for FCrDNS verification
+		// Sender IP used for FCrDNS verification: the one AnalyzeDNS actually
+		// looked up (from the inbound hop), so the score and the reported
+		// sender_ip can never describe different addresses.
 		var senderIP string
-		if results.Headers != nil && results.Headers.ReceivedChain != nil && len(*results.Headers.ReceivedChain) > 0 {
-			firstHop := (*results.Headers.ReceivedChain)[0]
-			if firstHop.Ip != nil {
-				senderIP = *firstHop.Ip
-			}
+		if results.DNS.SenderIp != nil {
+			senderIP = *results.DNS.SenderIp
 		}
 		dnsScore, dnsGrade = r.dnsAnalyzer.CalculateDNSScore(results.DNS, senderIP)
 	}

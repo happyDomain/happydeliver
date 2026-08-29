@@ -4,9 +4,19 @@
 
     interface Props {
         receivedChain: ReceivedHop[];
+        // The sender IP the backend picked as the message's point of entry (see
+        // InboundHop). Hops above it in the chain are the recipient's own
+        // internal hops, not part of the sender's path.
+        senderIp?: string;
     }
 
-    let { receivedChain }: Props = $props();
+    let { receivedChain, senderIp }: Props = $props();
+
+    // Index of the inbound hop in the chain, or -1 if it's the topmost one (or
+    // unknown): nothing above it to flag as internal in that case.
+    const entryIndex = $derived(
+        senderIp ? receivedChain.findIndex((hop) => hop.ip === senderIp) : -1,
+    );
 
     // Mirror of the backend protocolIndicatesTLS (RFC 3848): the transport keyword
     // gains a trailing "S" when TLS was used (ESMTPS, ESMTPSA, SMTPS, LMTPS, LMTPSA...).
@@ -38,10 +48,17 @@
         </div>
         <div class="list-group list-group-flush">
             {#each receivedChain as hop, i (i)}
-                <div class="list-group-item">
+                <div
+                    class="list-group-item"
+                    class:bg-light={entryIndex > 0 && i < entryIndex && $theme === "light"}
+                    class:bg-secondary={entryIndex > 0 && i < entryIndex && $theme !== "light"}
+                >
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">
                             <span class="badge bg-primary me-2">{receivedChain.length - i}</span>
+                            {#if entryIndex > 0 && i < entryIndex}
+                                <span class="badge bg-secondary me-2">Internal</span>
+                            {/if}
                             {hop.reverse || "-"}
                             {#if hop.ip}<span class="text-muted">({hop.ip})</span>{/if} → {hop.by ||
                                 "Unknown"}
