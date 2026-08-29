@@ -64,6 +64,10 @@ func main() {
 		if err := app.RunRestore(cfg, inputFile); err != nil {
 			log.Fatalf("Restore error: %v", err)
 		}
+	case "licenses":
+		if err := app.RunLicenses(os.Stdout); err != nil {
+			log.Fatalf("Licenses error: %v", err)
+		}
 	case "version":
 		fmt.Println(version.Version)
 	default:
@@ -80,6 +84,7 @@ func printUsage() {
 	fmt.Println("  happyDeliver backup            - Backup database to stdout as JSON")
 	fmt.Println("  happyDeliver restore [file]    - Restore database from JSON file or stdin")
 	fmt.Println("  happyDeliver version           - Print version information")
+	fmt.Println("  happyDeliver licenses          - Print third-party attribution and license notices")
 	fmt.Println("")
 	flag.Usage()
 }

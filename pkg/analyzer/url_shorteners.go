@@ -35,6 +35,34 @@ import (
 //go:embed data/url-shorteners.list
 var shortenersList string
 
+// shortenersLicense is the CC-BY-SA-4.0 license text shipped alongside the
+// list, so that binary-only recipients of happyDeliver (a release artifact, a
+// container image) get the notices the license requires along with the data.
+//
+//go:embed data/url-shorteners.LICENSE
+var shortenersLicense string
+
+// shortenersAttribution is the credit CC-BY-SA-4.0 section 3(a)(1) asks for.
+const shortenersAttribution = `URL shortener domain list
+-------------------------
+
+Copyright (c) PeterDave Hello and contributors
+Source:  https://github.com/PeterDaveHello/url-shorteners
+License: Creative Commons Attribution-ShareAlike 4.0 International
+         (CC-BY-SA-4.0), https://creativecommons.org/licenses/by-sa/4.0/
+Changes: none, the list is embedded exactly as published upstream. The
+         services happyDeliver adds to it, and the branded short links it
+         leaves out, live in its own source code, not in this list.
+
+This material is provided as-is, without warranties, as stated in sections 5
+and 6 of the license reproduced below.`
+
+// ThirdPartyNotices returns the attribution and license notices for the
+// third-party data embedded in this package.
+func ThirdPartyNotices() string {
+	return shortenersAttribution + "\n\n" + shortenersLicense
+}
+
 // extraShorteners are shortening services missing from the embedded list.
 var extraShorteners = []string{
 	"gg.gg",     // shortening service, widely reported as abused for phishing
