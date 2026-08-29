@@ -66,12 +66,21 @@
             highlight: { emphasis: true },
         });
 
-        // Server information and hops
+        // Server information and hops. Only the hops from the inbound one down
+        // are the sender's; the ones above belong to the recipient.
         const receivedChain = report.header_analysis?.received_chain;
         if (receivedChain && receivedChain.length > 0) {
-            const firstHop = receivedChain[0];
-            const serverName = firstHop.from || firstHop.ip || "an unknown server";
-            const hopCount = receivedChain.length;
+            const entryIndex = Math.max(
+                receivedChain.findIndex((hop) => hop.inbound),
+                0,
+            );
+            const entryHop = receivedChain[entryIndex];
+            const serverName =
+                report.dns_results?.helo_hostname ||
+                entryHop.from ||
+                entryHop.ip ||
+                "an unknown server";
+            const hopCount = receivedChain.length - entryIndex;
             segments.push({ text: ", sent by " });
             segments.push({
                 text: serverName,

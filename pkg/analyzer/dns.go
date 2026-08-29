@@ -53,13 +53,49 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 	}
 }
 
-// AnalyzeDNS performs DNS validation for the email's domain
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis) *model.DNSResults {
+// populateInboundHopResults stores the sender IP, its PTR/forward records and
+// the announced HELO name from inboundHop into results. It does not depend on
+// the From domain, so it must run on every path through AnalyzeDNS.
+func (d *DNSAnalyzer) populateInboundHopResults(results *model.DNSResults, inboundHop *model.ReceivedHop) {
+	if inboundHop == nil || inboundHop.Ip == nil || *inboundHop.Ip == "" {
+		return
+	}
+
+	senderIP := *inboundHop.Ip
+	results.SenderIp = &senderIP
+	ptrRecords, forwardRecords := d.checkPTRAndForward(senderIP)
+	if len(ptrRecords) > 0 {
+		results.PtrRecords = &ptrRecords
+	}
+	if len(forwardRecords) > 0 {
+		results.PtrForwardRecords = &forwardRecords
+	}
+
+	// Record the announced HELO name and whether it matches the PTR record
+	if inboundHop.From != nil && *inboundHop.From != "" {
+		helo := *inboundHop.From
+		results.HeloHostname = &helo
+		if len(ptrRecords) > 0 {
+			match := checkHeloPtrMatch(helo, ptrRecords)
+			results.HeloPtrMatch = &match
+		}
+	}
+}
+
+// AnalyzeDNS performs DNS validation for the email's domain.
+//
+// inboundHop, as picked by InboundHop, provides the sender IP used for
+// PTR/FCrDNS verification and the announced HELO name. It may be nil.
+func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis, inboundHop *model.ReceivedHop) *model.DNSResults {
 	// Extract domain from From address
 	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
-		return &model.DNSResults{
+		results := &model.DNSResults{
 			Errors: &[]string{"Unable to extract domain from email"},
 		}
+		// Populate it even when the rest of the analysis cannot run, so its
+		// absence isn't mistaken for a report predating this feature.
+		d.populateInboundHopResults(results, inboundHop)
+		return results
 	}
 	fromDomain := *headersResults.DomainAlignment.FromDomain
 
@@ -75,31 +111,7 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 		spfDomain = *results.RpDomain
 	}
 
-	// Store sender IP for later use in scoring
-	var senderIP string
-	if headersResults.ReceivedChain != nil && len(*headersResults.ReceivedChain) > 0 {
-		firstHop := (*headersResults.ReceivedChain)[0]
-		if firstHop.Ip != nil && *firstHop.Ip != "" {
-			senderIP = *firstHop.Ip
-			ptrRecords, forwardRecords := d.checkPTRAndForward(senderIP)
-			if len(ptrRecords) > 0 {
-				results.PtrRecords = &ptrRecords
-			}
-			if len(forwardRecords) > 0 {
-				results.PtrForwardRecords = &forwardRecords
-			}
-
-			// Record the announced HELO name and whether it matches the PTR record
-			if firstHop.From != nil && *firstHop.From != "" {
-				helo := *firstHop.From
-				results.HeloHostname = &helo
-				if len(ptrRecords) > 0 {
-					match := checkHeloPtrMatch(helo, ptrRecords)
-					results.HeloPtrMatch = &match
-				}
-			}
-		}
-	}
+	d.populateInboundHopResults(results, inboundHop)
 
 	// Check MX records for From domain (where replies would go)
 	results.FromMxRecords = d.checkMXRecords(fromDomain)

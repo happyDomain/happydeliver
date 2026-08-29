@@ -124,7 +124,7 @@ func TestReverseIP(t *testing.T) {
 	}
 }
 
-// TestIsPublicIP exercises isPublicIP. An address is public if it parses
+// TestIsPublicIP exercises isPublicIPAddr. An address is public if it parses
 // (via net.ParseIP) and is none of: private-range, loopback, link-local
 // unicast/multicast, or unspecified ("0.0.0.0"/"::") — e.g. "8.8.8.8" is
 // public but "10.0.0.1", "127.0.0.1", and "169.254.1.1" are not. An
@@ -171,19 +171,22 @@ func TestIsPublicIP(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "Carrier-grade NAT",
+			ip:       "100.64.0.1",
+			expected: false,
+		},
+		{
 			name:     "Invalid IP",
 			ip:       "not-an-ip",
 			expected: false,
 		},
 	}
 
-	checker := NewRBLChecker(5*time.Second, nil, false)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := checker.isPublicIP(tt.ip)
+			result := isPublicIPAddr(tt.ip)
 			if result != tt.expected {
-				t.Errorf("isPublicIP(%q) = %v, want %v", tt.ip, result, tt.expected)
+				t.Errorf("isPublicIPAddr(%q) = %v, want %v", tt.ip, result, tt.expected)
 			}
 		})
 	}

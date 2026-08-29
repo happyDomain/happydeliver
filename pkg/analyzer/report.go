@@ -120,6 +120,17 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	// Run all analyzers
 	results.Authentication = r.authAnalyzer.AnalyzeAuthentication(email, results.AuthservID)
 	results.Headers = r.headerAnalyzer.GenerateHeaderAnalysis(email, results.Authentication)
+	// The hop the DNS analysis takes the sender IP and HELO name from, flagged
+	// in the published chain so clients read the selection instead of
+	// reconstructing it.
+	var inboundHop *model.ReceivedHop
+	if results.Headers != nil && results.Headers.ReceivedChain != nil {
+		chain := *results.Headers.ReceivedChain
+		if i := InboundHopIndex(chain, results.Source); i >= 0 {
+			chain[i].Inbound = utils.PtrTo(true)
+			inboundHop = &chain[i]
+		}
+	}
 	// Fall back to the received chain's inbound TLS when no x-tls header was present. Only valid
 	// for a message we received ourselves: for an uploaded .eml, the topmost Received header
 	// could be an internal hop of the original provider, not the arrival at the recipient's
@@ -127,7 +138,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	if results.Source == model.ReportSourceReceived && results.Authentication != nil && results.Headers != nil {
 		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
 	}
-	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
+	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers, inboundHop)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 
@@ -165,13 +176,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	dnsScore := 0
 	var dnsGrade string
 	if results.DNS != nil {
-		// Extract sender IP from received chain for FCrDNS verification
+		// Sender IP used for FCrDNS verification: the one AnalyzeDNS actually
+		// looked up, so the score and the reported sender_ip cannot diverge.
 		var senderIP string
-		if results.Headers != nil && results.Headers.ReceivedChain != nil && len(*results.Headers.ReceivedChain) > 0 {
-			firstHop := (*results.Headers.ReceivedChain)[0]
-			if firstHop.Ip != nil {
-				senderIP = *firstHop.Ip
-			}
+		if results.DNS.SenderIp != nil {
+			senderIP = *results.DNS.SenderIp
 		}
 		dnsScore, dnsGrade = r.dnsAnalyzer.CalculateDNSScore(results.DNS, senderIP)
 	}

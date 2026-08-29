@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DnsResults, DomainAlignment, ReceivedHop } from "$lib/api/types.gen";
+    import type { DnsResults, DomainAlignment } from "$lib/api/types.gen";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
@@ -19,23 +19,14 @@
         dnsResults?: DnsResults;
         dnsGrade?: string;
         dnsScore?: number;
-        receivedChain?: ReceivedHop[];
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
     }
 
-    let {
-        domainAlignment,
-        dnsResults,
-        dnsGrade,
-        dnsScore,
-        receivedChain,
-        domainOnly = false,
-    }: Props = $props();
+    let { domainAlignment, dnsResults, dnsGrade, dnsScore, domainOnly = false }: Props = $props();
 
-    // Extract sender IP from first hop
-    const senderIp = $derived(
-        receivedChain && receivedChain.length > 0 ? receivedChain[0].ip : undefined,
-    );
+    // Both come from the hop the backend marked as inbound.
+    const senderIp = $derived(dnsResults?.sender_ip);
+    const heloHostname = $derived(dnsResults?.helo_hostname);
 </script>
 
 <div class="card shadow-sm" id="dns-details">
@@ -74,12 +65,11 @@
 
             {#if !domainOnly}
                 <!-- Reverse IP Section -->
-                {#if receivedChain && receivedChain.length > 0}
+                {#if senderIp}
                     <div class="mb-3 d-flex align-items-center gap-2">
                         <h4 class="mb-0 text-truncate">
                             Received from: <code
-                                >{receivedChain[0].from} ({receivedChain[0].reverse || "Unknown"} [{receivedChain[0]
-                                    .ip}])</code
+                                >{heloHostname} ({dnsResults.ptr_records?.[0] || "Unknown"} [{senderIp}])</code
                             >
                         </h4>
                     </div>
@@ -97,7 +87,7 @@
 
                 <!-- HELO / PTR Consistency -->
                 <HeloPtrMatchDisplay
-                    heloHostname={dnsResults.helo_hostname ?? receivedChain?.[0]?.from}
+                    {heloHostname}
                     ptrRecords={dnsResults.ptr_records}
                     heloPtrMatch={dnsResults.helo_ptr_match}
                 />

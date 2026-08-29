@@ -8,6 +8,10 @@
 
     let { receivedChain }: Props = $props();
 
+    // Hops above the inbound one are the recipient's own. -1 when the backend
+    // flagged none, which marks nothing.
+    const entryIndex = $derived(receivedChain.findIndex((hop) => hop.inbound));
+
     // Mirror of the backend protocolIndicatesTLS (RFC 3848): the transport keyword
     // gains a trailing "S" when TLS was used (ESMTPS, ESMTPSA, SMTPS, LMTPS, LMTPSA...).
     function protocolIndicatesTLS(withProto: string | undefined | null): boolean {
@@ -38,10 +42,17 @@
         </div>
         <div class="list-group list-group-flush">
             {#each receivedChain as hop, i (i)}
-                <div class="list-group-item">
+                <div
+                    class="list-group-item"
+                    class:bg-light={i < entryIndex && $theme === "light"}
+                    class:bg-secondary={i < entryIndex && $theme !== "light"}
+                >
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">
                             <span class="badge bg-primary me-2">{receivedChain.length - i}</span>
+                            {#if i < entryIndex}
+                                <span class="badge bg-secondary me-2">Internal</span>
+                            {/if}
                             {hop.reverse || "-"}
                             {#if hop.ip}<span class="text-muted">({hop.ip})</span>{/if} → {hop.by ||
                                 "Unknown"}
