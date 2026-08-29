@@ -31,10 +31,12 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"golang.org/x/net/html"
+	"golang.org/x/net/publicsuffix"
 )
 
 // ContentAnalyzer analyzes email content (HTML, links, images)
@@ -513,92 +515,50 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 		} else {
 			return false // Invalid mailto
 		}
-	case "http":
-	case "https":
+	case "http", "https":
 		// Check if URL has a host
 		if parsedURL.Host == "" {
 			return false
 		}
 
-		// Extract the actual URL's domain (remove port if present)
-		actualDomain = parsedURL.Host
-		if idx := strings.LastIndex(actualDomain, ":"); idx != -1 {
-			actualDomain = actualDomain[:idx]
-		}
-		actualDomain = strings.ToLower(actualDomain)
+		// Hostname() drops the port and the brackets of an IPv6 literal, which
+		// a manual cut at the last colon would slice in half.
+		actualDomain = strings.TrimSuffix(parsedURL.Hostname(), ".")
 	default:
 		// Skip checks for other URL schemes (tel, etc.)
 		return false
 	}
 
-	// Normalize link text
+	// Capitalisation is kept: isMissingSpace needs it to tell a domain apart
+	// from a full stop with no space after it ("maintenant.Il").
 	linkText = strings.TrimSpace(linkText)
-	linkText = strings.ToLower(linkText)
 
 	// Skip if link text is empty, too short, or just generic text like "click here"
 	if linkText == "" || len(linkText) < 4 {
 		return false
 	}
 
+	if slices.Contains(genericLinkTexts, strings.ToLower(linkText)) {
+		return false
+	}
+
 	// Replace email addresses with just their domain part to avoid false positives
 	// e.g. "john.doe@example.com" → "example.com" so local-part dots don't look like domains
-	emailAddrRegex := regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@([a-z0-9.\-]+\.[a-z]{2,})`)
 	linkText = emailAddrRegex.ReplaceAllString(linkText, "$1")
 
-	// Common generic link texts that shouldn't trigger warnings
-	genericTexts := []string{
-		"click here", "read more", "learn more", "download", "subscribe",
-		"unsubscribe", "view online", "view in browser", "click", "here",
-		"update", "verify", "confirm", "continue", "get started",
-		// mailto-specific generic texts
-		"email us", "contact us", "send email", "get in touch", "reach out",
-		"contact", "email", "write to us",
-	}
-	if slices.Contains(genericTexts, linkText) {
+	textDomains := advertisedDomains(linkText)
+	if len(textDomains) == 0 {
 		return false
 	}
 
-	// Extract domain-like patterns from link text using regex
-	// Matches patterns like "example.com", "www.example.com", "http://example.com"
-	domainRegex := regexp.MustCompile(`(?i)(?:https?://)?(?:www\.)?([a-z0-9][-a-z0-9]*\.)+[a-z]{2,}`)
-	matches := domainRegex.FindAllString(linkText, -1)
-
-	if len(matches) == 0 {
-		return false
-	}
+	// Compare on registrable domains ("example.co.uk", not "co.uk"), so that any
+	// subdomain of the advertised domain is accepted.
+	actualRegistrable := getOrganizationalDomain(actualDomain)
 
 	// Check each domain-like pattern found in the text
-	for _, textDomain := range matches {
-		// Normalize the text domain
-		textDomain = strings.ToLower(textDomain)
-		textDomain = strings.TrimPrefix(textDomain, "http://")
-		textDomain = strings.TrimPrefix(textDomain, "https://")
-		textDomain = strings.TrimPrefix(textDomain, "www.")
-
-		// Remove trailing slashes and paths
-		if idx := strings.Index(textDomain, "/"); idx != -1 {
-			textDomain = textDomain[:idx]
-		}
-
-		// Compare domains - they should match or the actual URL should be a subdomain of the text domain
-		if textDomain != actualDomain {
-			// Check if actual domain is a subdomain of text domain
-			if !strings.HasSuffix(actualDomain, "."+textDomain) && !strings.HasSuffix(actualDomain, textDomain) {
-				// Check if they share the same base domain (last 2 parts)
-				textParts := strings.Split(textDomain, ".")
-				actualParts := strings.Split(actualDomain, ".")
-
-				if len(textParts) >= 2 && len(actualParts) >= 2 {
-					textBase := strings.Join(textParts[len(textParts)-2:], ".")
-					actualBase := strings.Join(actualParts[len(actualParts)-2:], ".")
-
-					if textBase != actualBase {
-						return true // Domain mismatch detected!
-					}
-				} else {
-					return true // Domain mismatch detected!
-				}
-			}
+	for _, textDomain := range textDomains {
+		if getOrganizationalDomain(textDomain) != actualRegistrable {
+			return true // Domain mismatch detected!
 		}
 	}
 
@@ -672,6 +632,82 @@ func (c *ContentAnalyzer) isIPAddress(host string) bool {
 	}
 
 	return false
+}
+
+// genericLinkTexts describe the action rather than the destination, and so
+// never advertise a domain to compare the href against.
+var genericLinkTexts = []string{
+	"click here", "read more", "learn more", "download", "subscribe",
+	"unsubscribe", "view online", "view in browser", "click", "here",
+	"update", "verify", "confirm", "continue", "get started",
+	// mailto-specific generic texts
+	"email us", "contact us", "send email", "get in touch", "reach out",
+	"contact", "email", "write to us",
+}
+
+// textDomainRegex matches a domain-like token inside a link text, preceded by a
+// delimiter so a token glued to a longer word is not extracted. Group 1 is the
+// scheme or "www." prefix, if any; group 2 the token itself.
+var textDomainRegex = regexp.MustCompile(`(?i)(?:^|[^\w.\-])((?:https?://)?(?:www\.)?)((?:[a-z0-9](?:[-a-z0-9]*[a-z0-9])?\.)+[a-z][a-z0-9\-]*)`)
+
+// emailAddrRegex matches an email address; the captured group is its domain,
+// which replaces the whole address so the local part's dots are not read as one.
+var emailAddrRegex = regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@([a-z0-9.\-]+\.[a-z]{2,})`)
+
+// fileExtensionLabels are valid TLDs that, mid-sentence, far more likely end a
+// file name ("report.zip") than name a domain.
+var fileExtensionLabels = []string{"zip", "mov", "md", "sh", "ai", "ps", "pl", "py", "rs", "so", "cc"}
+
+// advertisedDomains extracts, from the visible text of a link, the domains that
+// text claims to lead to. A token only counts as a domain when it sits under a
+// suffix the public suffix list knows: this is what tells "example.com" apart
+// from a file name ("facture.pdf") or a missing space after a full stop
+// ("maintenant.Livraison").
+func advertisedDomains(linkText string) []string {
+	matches := textDomainRegex.FindAllStringSubmatch(linkText, -1)
+	domains := make([]string, 0, len(matches))
+
+	for _, match := range matches {
+		// A scheme or "www." prefix announces a URL; only bare tokens can still
+		// turn out to be prose, so they alone go through the heuristics below.
+		bare := match[1] == ""
+		domain := strings.ToLower(match[2])
+
+		if bare && isMissingSpace(match[2]) {
+			continue
+		}
+
+		// A multi-label suffix ("github.io", "s3.amazonaws.com") comes from the
+		// list's private section, which no prose lands on: accept it even
+		// though PublicSuffix reports it as not ICANN-managed.
+		suffix, icann := publicsuffix.PublicSuffix(domain)
+		if !icann && !strings.Contains(suffix, ".") {
+			continue
+		}
+		if bare && slices.Contains(fileExtensionLabels, suffix) {
+			continue
+		}
+
+		domains = append(domains, domain)
+	}
+
+	return domains
+}
+
+// isMissingSpace reports whether a domain-like token is in fact two sentences
+// glued together by a full stop with no space after it ("maintenant.Il"): the
+// label after the dot starts with a capital while the one before it does not.
+// Only meaningful on a bare token.
+func isMissingSpace(token string) bool {
+	labels := strings.Split(token, ".")
+	if len(labels) < 2 {
+		return false
+	}
+
+	previous, _ := utf8.DecodeRuneInString(labels[len(labels)-2])
+	last, _ := utf8.DecodeRuneInString(labels[len(labels)-1])
+
+	return unicode.IsUpper(last) && !unicode.IsUpper(previous)
 }
 
 // extractTextFromHTML extracts plain text from HTML

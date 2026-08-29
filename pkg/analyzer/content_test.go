@@ -961,6 +961,82 @@ func TestHasDomainMisalignment(t *testing.T) {
 			reason:   "No domain mentioned in text",
 		},
 
+		// Prose that merely looks like a domain: a file name, or a full stop
+		// with no space after it, must never be read as an advertised domain.
+		{
+			name:     "File name in link text",
+			href:     "https://t.example-mail.com/abc",
+			linkText: "Télécharger la facture.pdf",
+			expected: false,
+			reason:   "'.pdf' is not a TLD: the text advertises no domain at all",
+		},
+		{
+			name:     "Archive file name in link text",
+			href:     "https://t.example-mail.com/abc",
+			linkText: "Votre rapport annuel 2024.zip",
+			expected: false,
+			reason:   "'.zip' is a TLD but ends a file name here",
+		},
+		{
+			name:     "Missing space after full stop",
+			href:     "https://t.example-mail.com/abc",
+			linkText: "Commandez maintenant.Livraison offerte",
+			expected: false,
+			reason:   "'.livraison' is not a TLD: this is a typo, not a domain",
+		},
+		{
+			name:     "Missing space before a word that is a ccTLD",
+			href:     "https://t.example-mail.com/abc",
+			linkText: "Commandez maintenant.Il ne reste que 2 jours",
+			expected: false,
+			reason:   "'.il' is a real ccTLD, but the capital says this is a full stop",
+		},
+		{
+			name:     "Domain glued to a longer word",
+			href:     "https://t.example-mail.com/abc",
+			linkText: "voir photo1example.com2 ici",
+			expected: false,
+			reason:   "The token is not delimited, so it advertises nothing",
+		},
+
+		// Look-alikes that share a suffix with the real domain: comparing
+		// anything but the registrable domain lets them through.
+		{
+			name:     "Text domain is a suffix of the destination",
+			href:     "https://fakeexample.com/login",
+			linkText: "Log in on example.com",
+			expected: true,
+			reason:   "'fakeexample.com' merely ends with 'example.com', it is another domain",
+		},
+		{
+			name:     "Different domains under a multi-level suffix",
+			href:     "https://evil.co.uk/login",
+			linkText: "Log in on example.co.uk",
+			expected: true,
+			reason:   "Sharing 'co.uk' does not make two domains the same party",
+		},
+		{
+			name:     "Subdomain under a multi-level suffix",
+			href:     "https://links.example.co.uk/x",
+			linkText: "Visit example.co.uk",
+			expected: false,
+			reason:   "Same registrable domain 'example.co.uk'",
+		},
+		{
+			name:     "Text domain under a private suffix",
+			href:     "https://evil.example.net/login",
+			linkText: "Read the guide on docs.example.github.io",
+			expected: true,
+			reason:   "A host under a private suffix is still an advertised domain",
+		},
+		{
+			name:     "Sibling hosts under a private suffix",
+			href:     "https://evil.github.io/login",
+			linkText: "Read the guide on docs.github.io",
+			expected: true,
+			reason:   "'github.io' is a suffix: two names under it are two parties",
+		},
+
 		// Edge cases
 		{
 			name:     "Domain-like text but not valid domain",
