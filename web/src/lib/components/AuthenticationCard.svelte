@@ -2,6 +2,7 @@
     import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
     import {
         hasNoAuthenticationResults,
+        hasPartialAuthenticationResults,
         isUploadedMessage,
         type MessageSource,
     } from "$lib/authentication";
@@ -28,6 +29,7 @@
     }: Props = $props();
 
     let allRequiredMissing = $derived(hasNoAuthenticationResults(authentication));
+    let partialResults = $derived(hasPartialAuthenticationResults(authentication));
     let uploaded = $derived(isUploadedMessage(source));
 
     function getAuthResultClass(result: string, noneIsFail: boolean): string {
@@ -88,7 +90,7 @@
     function getAuthResultText(result: string): string {
         switch (result) {
             case "missing":
-                return "Not configured";
+                return "Not tested";
             default:
                 return result;
         }
@@ -152,6 +154,24 @@
                         </li>
                     </ul>
                 {/if}
+            </div>
+        </div>
+    {:else if partialResults}
+        <div class="card-body border-bottom">
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Some authentication results are missing.</strong>
+                <p class="mb-0 mt-1">
+                    The results shown here were produced by
+                    {#if uploaded && authservId}
+                        <code>{authservId}</code>, the server that received
+                    {:else}
+                        the infrastructure of your mail provider that received
+                    {/if}
+                    this message before it reached happyDeliver. happyDeliver does not recompute this
+                    part. Mechanisms marked <strong>Not tested</strong> were not evaluated by that infrastructure.
+                    Send a test message directly to happyDeliver to have them verified here.
+                </p>
             </div>
         </div>
     {:else if uploaded && authservId}

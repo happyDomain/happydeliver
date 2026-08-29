@@ -49,3 +49,23 @@ export function hasNoAuthenticationResults(authentication?: AuthenticationResult
         !authentication.dmarc
     );
 }
+
+/**
+ * True when some, but not all, of the required authentication mechanisms were reported.
+ *
+ * The verdicts that are present were produced by whichever infrastructure received the
+ * message before it reached happyDeliver (the sender's own instance, or the server that
+ * received an uploaded file) — happyDeliver does not recompute them. The missing ones show up
+ * as "Not tested" and can only be filled in by sending a test message directly to happyDeliver.
+ */
+export function hasPartialAuthenticationResults(authentication?: AuthenticationResults): boolean {
+    if (!authentication) return false;
+    if (hasNoAuthenticationResults(authentication)) return false;
+
+    return (
+        !authentication.spf ||
+        !authentication.dkim ||
+        authentication.dkim.length === 0 ||
+        !authentication.dmarc
+    );
+}
