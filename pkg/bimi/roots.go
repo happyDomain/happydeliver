@@ -38,6 +38,26 @@ import (
 //go:embed roots/vmc-roots.pem
 var embeddedVMCRoots []byte
 
+// RootsAttribution is the credit for the root certificates carried in the
+// binary.
+//
+// It ships no license text, because none accompanies the material: an authority
+// publishes its root precisely so that it can be carried in the trust stores
+// that check the certificates it issues. What a recipient of a binary is owed
+// here is not a license they must abide by, but the means to tell where four
+// trust anchors they did not choose came from.
+const RootsAttribution = `Mark Verifying Authority root certificates
+-----------------------------------------
+
+Copyright (c) DigiCert, Inc., GlobalSign nv-sa and SSL Corporation
+Source:  https://bimigroup.org/vmc-issuers/ lists the authorities; each root
+         is fetched from the one that publishes it, by roots/update.sh
+Terms:   redistributed as published, no license text accompanies them
+Changes: none, each certificate is embedded exactly as its authority issued
+         it. Which authorities are recognised follows the BIMI Group's list,
+         and what happyDeliver makes of a chain that leads to one of them
+         lives in its own source code.`
+
 // DisableVMCRoots is the sentinel LoadVMCRoots understands as "do not anchor
 // the chain at all". Which authorities to recognise is receiver policy, and
 // recognising none of them is a policy too: it leaves the issuer unexamined
