@@ -353,3 +353,7 @@ This project is funded through [NGI Zero Core](https://nlnet.nl/core), a fund es
 ## License
 
 GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
+
+One embedded data file, the URL shortener domain list in
+`pkg/analyzer/data/url-shorteners.list`, is third-party material used verbatim
+under CC-BY-SA-4.0. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
