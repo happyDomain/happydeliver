@@ -461,6 +461,14 @@ components:
         tls:
           $ref: '#/components/schemas/TLSInfo'
           description: TLS details of the connection for this hop, if encrypted
+        inbound:
+          type: boolean
+          description: >-
+            Whether the message entered the recipient's infrastructure through
+            this hop, the one the sender IP, the HELO name and the PTR check are
+            taken from. Set on at most one hop; the hops above it are the
+            recipient's own, not the sender's.
+          example: true
 
     TLSInfo:
       type: object
@@ -884,6 +892,10 @@ components:
           $ref: '#/components/schemas/DMARCRecord'
         bimi_record:
           $ref: '#/components/schemas/BIMIRecord'
+        sender_ip:
+          type: string
+          description: Sender IP address used for PTR/FCrDNS verification, taken from the hop the received chain marks as inbound
+          example: "192.0.2.10"
         ptr_records:
           type: array
           items:
@@ -898,7 +910,7 @@ components:
           example: ["192.0.2.1", "2001:db8::1"]
         helo_hostname:
           type: string
-          description: HELO/EHLO hostname announced by the sending server (from the first Received hop)
+          description: HELO/EHLO hostname announced by the sending server (from the inbound Received hop)
           example: "mail.example.com"
         helo_ptr_match:
           type: boolean

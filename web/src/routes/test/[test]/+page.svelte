@@ -367,7 +367,6 @@
                             dnsResults={report.dns_results}
                             dnsGrade={report.summary?.dns_grade}
                             dnsScore={report.summary?.dns_score}
-                            receivedChain={report.header_analysis?.received_chain}
                         />
                     </div>
                 </div>
