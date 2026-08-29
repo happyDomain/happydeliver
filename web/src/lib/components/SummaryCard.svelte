@@ -35,10 +35,12 @@
         const mailFrom = report.header_analysis?.headers?.from?.value || "an unknown sender";
         const hasDkim =
             report.dns_results?.dkim_records && report.dns_results?.dkim_records?.length > 0;
-        const dkimPassed =
-            report.authentication?.dkim &&
-            report.authentication?.dkim.length > 0 &&
-            report.authentication?.dkim?.some((d) => d.result === "pass");
+        // Without any DKIM verdict (typically an uploaded file whose Authentication-Results
+        // header is missing), the signature is neither valid nor invalid: say nothing about
+        // it here, the "unknown authentication status" clause below explains the situation.
+        const dkimVerdicts = report.authentication?.dkim;
+        const dkimChecked = !!dkimVerdicts && dkimVerdicts.length > 0;
+        const dkimPassed = dkimChecked && dkimVerdicts.some((d) => d.result === "pass");
 
         segments.push({ text: "Received a " });
         segments.push({
@@ -50,7 +52,7 @@
             link: hasDkim && dkimPassed ? "#authentication-dkim" : "#dns-details",
         });
         segments.push({ text: " email" });
-        if (hasDkim && !dkimPassed) {
+        if (hasDkim && dkimChecked && !dkimPassed) {
             segments.push({ text: " with " });
             segments.push({
                 text: "an invalid signature",
