@@ -24,7 +24,6 @@ package analyzer
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -81,7 +80,6 @@ type ContentResults struct {
 	HTMLContent      string
 	TextPlainRatio   float32 // Ratio of plain text to HTML consistency
 	ImageTextRatio   float32 // Ratio of images to text
-	SuspiciousURLs   []string
 	ContentIssues    []string
 	HarmfullIssues   []string
 
@@ -128,6 +126,9 @@ type LinkCheck struct {
 	IsSafe     bool
 	Warning    string
 	IsTemplate bool // URL still contains an unreplaced templating placeholder (e.g. "{unsubscribe}")
+	// Suspicions lists the concrete reasons this URL was flagged, if any.
+	// IsSafe is simply "no suspicion was found".
+	Suspicions []URLSuspicion
 }
 
 // ImageCheck represents an image validation result
@@ -215,13 +216,7 @@ func (c *ContentAnalyzer) analyzeTextLinks(textContent string, results *ContentR
 
 		// Only validate if not already checked
 		if !exists {
-			linkCheck := c.validateLink(urlStr)
-			results.Links = append(results.Links, linkCheck)
-
-			// Check for suspicious URLs
-			if !linkCheck.IsSafe {
-				results.SuspiciousURLs = append(results.SuspiciousURLs, urlStr)
-			}
+			results.Links = append(results.Links, c.validateLink(urlStr))
 		}
 	}
 }
@@ -271,22 +266,18 @@ func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
 				linkCheck := c.validateLink(href)
 
 				// Check for domain misalignment (phishing detection)
-				linkText := c.getNodeText(n)
+				linkText := strings.TrimSpace(c.getNodeText(n))
 				if c.hasDomainMisalignment(href, linkText) {
+					linkCheck.Suspicions = append(linkCheck.Suspicions, URLSuspicion{
+						Kind:     URLSuspicionDomainMisalignment,
+						Severity: model.ContentIssueSeverityHigh,
+						Message:  fmt.Sprintf("Link text advertises a domain that is not the destination: %q leads to %q", linkText, href),
+						Advice:   "Make the visible text match the destination domain: a mismatch is the defining pattern of a phishing link and is scored as such by filters",
+					})
 					linkCheck.IsSafe = false
-					if linkCheck.Warning == "" {
-						linkCheck.Warning = "Link text domain does not match actual URL domain (possible phishing)"
-					} else {
-						linkCheck.Warning += "; Link text domain does not match actual URL domain (possible phishing)"
-					}
 				}
 
 				results.Links = append(results.Links, linkCheck)
-
-				// Check for suspicious URLs
-				if !linkCheck.IsSafe {
-					results.SuspiciousURLs = append(results.SuspiciousURLs, href)
-				}
 			}
 
 		case "img":
@@ -441,18 +432,16 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 		return check
 	}
 
+	// Collect every concrete reason this URL is suspicious.
+	check.Suspicions = analyzeURLSuspicions(urlStr)
+	check.IsSafe = len(check.Suspicions) == 0
+
 	// Parse URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		check.Valid = false
 		check.Error = fmt.Sprintf("Invalid URL: %v", err)
 		return check
-	}
-
-	// Check URL safety
-	if c.isSuspiciousURL(urlStr, parsedURL) {
-		check.IsSafe = false
-		check.Warning = "URL appears suspicious (obfuscated, shortened, or unusual)"
 	}
 
 	// Only check HTTP/HTTPS links
@@ -576,60 +565,6 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 	}
 
 	return false
-}
-
-// isSuspiciousURL checks if a URL looks suspicious
-func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) bool {
-	// Skip checks for mailto: URLs
-	if parsedURL.Scheme == "mailto" {
-		return false
-	}
-
-	// Check for IP address instead of domain
-	if c.isIPAddress(parsedURL.Hostname()) {
-		return true
-	}
-
-	// Check for URL shorteners (common ones)
-	shorteners := []string{
-		"bit.ly", "tinyurl.com", "goo.gl", "ow.ly", "t.co",
-		"buff.ly", "is.gd", "bl.ink", "short.io",
-	}
-	if slices.Contains(shorteners, strings.ToLower(parsedURL.Host)) {
-		return true
-	}
-
-	// Check for excessive subdomains (possible obfuscation)
-	parts := strings.Split(parsedURL.Host, ".")
-	if len(parts) > 4 {
-		return true
-	}
-
-	// Check for URL obfuscation techniques
-	if strings.Count(urlStr, "@") > 0 { // @ in URL (possible phishing)
-		return true
-	}
-
-	// Check for suspicious characters in domain
-	if strings.ContainsAny(parsedURL.Host, "[]()<>") {
-		return true
-	}
-
-	return false
-}
-
-// isIPAddress reports whether a URL host names an IP address literally rather
-// than through a domain. It accepts a raw Host, port and IPv6 brackets included,
-// as well as a Hostname().
-func (c *ContentAnalyzer) isIPAddress(host string) bool {
-	if hostname, _, err := net.SplitHostPort(host); err == nil {
-		host = hostname
-	}
-
-	// An IPv6 literal keeps its brackets in a URL host, but never in an address.
-	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
-
-	return net.ParseIP(host) != nil
 }
 
 // genericLinkTexts describe the action rather than the destination, and so
@@ -898,27 +833,16 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	}
 
 	// Add suspicious URL issues
-	for _, suspURL := range results.SuspiciousURLs {
-		reason := "URL appears suspicious (obfuscated, shortened, or unusual)"
-		for _, link := range results.Links {
-			if link.URL == suspURL && link.Warning != "" {
-				reason = link.Warning
-				break
-			}
+	for _, link := range results.Links {
+		for _, suspicion := range link.Suspicions {
+			htmlIssues = append(htmlIssues, model.ContentIssue{
+				Type:     model.ContentIssueTypeSuspiciousLink,
+				Severity: suspicion.Severity,
+				Message:  suspicion.Message,
+				Location: &link.URL,
+				Advice:   utils.PtrTo(suspicion.Advice),
+			})
 		}
-
-		advice := "Avoid URL shorteners, IP addresses, and obfuscated URLs in emails"
-		if strings.Contains(reason, "phishing") {
-			advice = "Ensure link text matches the actual destination domain to avoid appearing as a phishing attempt"
-		}
-
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeSuspiciousLink,
-			Severity: model.ContentIssueSeverityHigh,
-			Message:  fmt.Sprintf("Suspicious URL detected: %s", reason),
-			Location: &suspURL,
-			Advice:   utils.PtrTo(advice),
-		})
 	}
 
 	// Add harmful HTML tag issues
@@ -971,11 +895,9 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 			}
 
 			// Check if it's a URL shortener
-			parsedURL, err := url.Parse(link.URL)
-			if err == nil {
-				isShortened := c.isSuspiciousURL(link.URL, parsedURL)
-				apiLink.IsShortened = utils.PtrTo(isShortened)
-			}
+			apiLink.IsShortened = utils.PtrTo(slices.ContainsFunc(link.Suspicions, func(s URLSuspicion) bool {
+				return s.Kind == URLSuspicionShortener
+			}))
 
 			links = append(links, apiLink)
 		}
@@ -1100,10 +1022,21 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		score = score * 100 / attainable
 	}
 
-	// Penalize suspicious URLs (deduct up to 5 points)
-	if len(results.SuspiciousURLs) > 0 {
-		score -= min(len(results.SuspiciousURLs), 5)
+	// Penalize suspicious links, weighted by how serious each finding is
+	suspicionPenalty := 0
+	for _, link := range results.Links {
+		for _, suspicion := range link.Suspicions {
+			switch suspicion.Severity {
+			case model.ContentIssueSeverityCritical, model.ContentIssueSeverityHigh:
+				suspicionPenalty += 3
+			case model.ContentIssueSeverityMedium:
+				suspicionPenalty += 2
+			default:
+				suspicionPenalty++
+			}
+		}
 	}
+	score -= min(suspicionPenalty, 10)
 
 	// Penalize harmful HTML tags (deduct 20 points per harmful tag, max 40 points)
 	if len(results.HarmfullIssues) > 0 {
