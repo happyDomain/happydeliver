@@ -47,10 +47,28 @@ export function noAuthResultsTitle(source?: MessageSource): string {
 export function hasNoAuthenticationResults(authentication?: AuthenticationResults): boolean {
     if (!authentication) return true;
 
-    return (
-        !authentication.spf &&
-        !authentication.spf_helo &&
-        (!authentication.dkim || authentication.dkim.length === 0) &&
-        !authentication.dmarc
-    );
+    return reportedMechanisms(authentication).every((reported) => !reported);
+}
+
+/** Whether each of the required authentication mechanisms was reported, in a fixed order. */
+function reportedMechanisms(authentication: AuthenticationResults): boolean[] {
+    return [
+        !!authentication.spf || !!authentication.spf_helo,
+        !!authentication.dkim?.length,
+        !!authentication.dmarc,
+    ];
+}
+
+/**
+ * True when some, but not all, of the required authentication mechanisms were reported.
+ *
+ * The verdicts present come from the infrastructure that received the message before
+ * happyDeliver, which does not recompute them; the missing ones show as "Not tested".
+ */
+export function hasPartialAuthenticationResults(authentication?: AuthenticationResults): boolean {
+    if (!authentication) return false;
+
+    const reported = reportedMechanisms(authentication);
+
+    return reported.some((ok) => ok) && !reported.every((ok) => ok);
 }
