@@ -1196,3 +1196,81 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 		t.Errorf("expected an unreplaced_template content issue, got %v", analysis.HtmlIssues)
 	}
 }
+
+// A body that could not be read through to its end must not be credited with a
+// perfect plain-text/HTML consistency: its parts are the ones that arrived, not
+// the ones that were sent. Here the announced boundary never appears, so no part
+// is found at all, which used to look exactly like a plain single-part message.
+func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
+	raw := "From: sender@example.com\r\n" +
+		"To: recipient@example.org\r\n" +
+		"Subject: Test\r\n" +
+		"Content-Type: multipart/alternative; boundary=\"never-appears\"\r\n" +
+		"\r\n" +
+		"<html><body>Hello</body></html>\r\n"
+
+	email, err := ParseEmail([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseEmail() error = %v", err)
+	}
+	if !email.BodyIncomplete {
+		t.Fatalf("BodyIncomplete = false, want true for a boundary that never appears")
+	}
+
+	analyzer := NewContentAnalyzer(0)
+	results := analyzer.AnalyzeContent(email)
+	if results.TextPlainRatio != 0 {
+		t.Errorf("TextPlainRatio = %v, want 0 for an unreadable body", results.TextPlainRatio)
+	}
+	if !results.BodyTruncated {
+		t.Errorf("BodyTruncated = false, want true so the ratio reads as unknown rather than as a failure")
+	}
+
+	// The truncation must be told, not silently folded into the score.
+	analysis := analyzer.GenerateContentAnalysis(results)
+	found := false
+	if analysis.HtmlIssues != nil {
+		for _, issue := range *analysis.HtmlIssues {
+			if issue.Type == model.ContentIssueTypeTruncatedBody {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected a truncated_body content issue, got %v", analysis.HtmlIssues)
+	}
+}
+
+// The consistency criterion a truncated body cannot answer is dropped from the
+// total rather than failed: the message loses no point for bytes that went
+// missing on their way to us.
+func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
+	analyzer := NewContentAnalyzer(0)
+
+	complete := ContentResults{
+		HTMLValid:      true,
+		TextContent:    "Hello",
+		HTMLContent:    "<html><body>Hello</body></html>",
+		TextPlainRatio: 1.0,
+	}
+	want, _ := analyzer.CalculateContentScore(&complete)
+
+	// The same message, read from a body that stopped short: no counterpart to
+	// compare the HTML against, hence no ratio.
+	truncated := complete
+	truncated.TextPlainRatio = 0
+	truncated.BodyTruncated = true
+	got, _ := analyzer.CalculateContentScore(&truncated)
+
+	if got != want {
+		t.Errorf("CalculateContentScore() = %d for a truncated body, want %d, the score of the same message read whole", got, want)
+	}
+
+	// A message that did arrive whole and genuinely lacks consistency still
+	// loses those points: the exemption is about what we could not read.
+	inconsistent := complete
+	inconsistent.TextPlainRatio = 0
+	if score, _ := analyzer.CalculateContentScore(&inconsistent); score >= want {
+		t.Errorf("CalculateContentScore() = %d for a complete body with no consistency, want less than %d", score, want)
+	}
+}

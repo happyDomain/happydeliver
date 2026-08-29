@@ -23,7 +23,6 @@ package analyzer
 
 import (
 	"net/mail"
-	"strings"
 	"testing"
 )
 
@@ -182,7 +181,7 @@ X-Spam-Flag: NO
 Body content.
 `
 
-	email, err := ParseEmail(strings.NewReader(rawEmail))
+	email, err := ParseEmail([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}

@@ -197,47 +197,6 @@ func TestGenerateReportExcludesCategoriesThatDidNotRun(t *testing.T) {
 	}
 }
 
-func TestGenerateRawEmail(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "")
-
-	tests := []struct {
-		name     string
-		email    *EmailMessage
-		expected string
-	}{
-		{
-			name:     "Nil email",
-			email:    nil,
-			expected: "",
-		},
-		{
-			name: "Email with headers only",
-			email: &EmailMessage{
-				RawHeaders: "From: sender@example.com\nTo: recipient@example.com\n",
-				RawBody:    "",
-			},
-			expected: "From: sender@example.com\nTo: recipient@example.com\n",
-		},
-		{
-			name: "Email with headers and body",
-			email: &EmailMessage{
-				RawHeaders: "From: sender@example.com\n",
-				RawBody:    "This is the email body",
-			},
-			expected: "From: sender@example.com\n\nThis is the email body",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			raw := gen.GenerateRawEmail(tt.email)
-			if raw != tt.expected {
-				t.Errorf("GenerateRawEmail() = %q, want %q", raw, tt.expected)
-			}
-		})
-	}
-}
-
 // Helper functions
 
 func createTestEmail() *EmailMessage {
@@ -263,7 +222,6 @@ func createTestEmail() *EmailMessage {
 			},
 		},
 		RawHeaders: "From: sender@example.com\nTo: recipient@example.com\nSubject: Test Email\nDate: Mon, 01 Jan 2024 12:00:00 +0000\nMessage-ID: <test123@example.com>\n",
-		RawBody:    "This is a test email",
 	}
 }
 

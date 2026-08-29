@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -247,7 +246,7 @@ func TestInboundHopIndexFromParsedChain(t *testing.T) {
 		"\r\n" +
 		"body\r\n"
 
-	email, err := ParseEmail(strings.NewReader(rawEmail))
+	email, err := ParseEmail([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("ParseEmail() error = %v", err)
 	}

@@ -357,17 +357,3 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	return report
 }
-
-// GenerateRawEmail returns the raw email message as a string
-func (r *ReportGenerator) GenerateRawEmail(email *EmailMessage) string {
-	if email == nil {
-		return ""
-	}
-
-	raw := email.RawHeaders
-	if email.RawBody != "" {
-		raw += "\n" + email.RawBody
-	}
-
-	return raw
-}

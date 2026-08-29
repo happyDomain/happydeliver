@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"bytes"
 	"net/mail"
 	"strings"
 	"testing"
@@ -362,7 +361,7 @@ BODY`
 // TestAnalyzeRealEmailExample tests the analyzer with the real example email file
 func TestAnalyzeRealEmailExample(t *testing.T) {
 	// Parse the email using the standard net/mail package
-	email, err := ParseEmail(bytes.NewBufferString(sampleEmailWithSpamassassinHeader))
+	email, err := ParseEmail([]byte(sampleEmailWithSpamassassinHeader))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}

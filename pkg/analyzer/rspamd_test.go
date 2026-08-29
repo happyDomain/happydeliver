@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"bytes"
 	"net/mail"
 	"testing"
 
@@ -398,7 +397,7 @@ Content-Type: text/plain
 Hello world`
 
 func TestAnalyzeRspamdRealEmail(t *testing.T) {
-	email, err := ParseEmail(bytes.NewBufferString(sampleEmailWithRspamdHeaders))
+	email, err := ParseEmail([]byte(sampleEmailWithRspamdHeaders))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
