@@ -68,3 +68,29 @@ func TestNormalizeHost(t *testing.T) {
 		}
 	}
 }
+
+// TestNoticeCarriesWhatTheLicenseAsks checks that the notice shipped in the
+// binary carries everything CC-BY-SA-4.0 section 3(a)(1) asks for: the
+// creators, a link to the licensed material, the license itself, and whether it
+// was modified. Binary-only recipients get attribution through this text alone.
+func TestNoticeCarriesWhatTheLicenseAsks(t *testing.T) {
+	for _, want := range []string{
+		"PeterDave Hello",
+		"https://github.com/PeterDaveHello/url-shorteners",
+		"CC-BY-SA-4.0",
+		"https://creativecommons.org/licenses/by-sa/4.0/",
+		"Changes:",
+	} {
+		if !strings.Contains(Attribution, want) {
+			t.Errorf("the attribution is missing %q", want)
+		}
+	}
+
+	// The full license text, not just a link to it.
+	if !strings.Contains(License, "Attribution-ShareAlike 4.0 International") {
+		t.Error("the license text does not read as CC-BY-SA-4.0")
+	}
+	if len(License) < 5000 {
+		t.Errorf("the license text is only %d bytes long, it looks truncated", len(License))
+	}
+}

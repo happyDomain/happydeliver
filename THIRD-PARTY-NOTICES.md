@@ -26,3 +26,27 @@ service.
 ```sh
 go generate -tags refresh_shorteners ./pkg/emaildata/shorteners/
 ```
+
+## Mark Verifying Authority root certificates
+
+- **File**: `pkg/bimi/roots/vmc-roots.pem`
+- **Upstream**: the authorities the [BIMI Group](https://bimigroup.org/vmc-issuers/)
+  recognises, each root fetched from its own publisher by
+  `pkg/bimi/roots/update.sh`: DigiCert, GlobalSign, SSL.com
+- **License**: none accompanies the certificates. An authority publishes its
+  root precisely so that it can be carried in the trust stores that check the
+  certificates it issues.
+- **Modified**: no (each certificate is embedded exactly as issued; which
+  authorities are recognised follows the BIMI Group's list, and what
+  happyDeliver makes of a chain that leads to one of them lives as Go code in
+  `pkg/bimi/`)
+
+Used to anchor the certificate chain of a BIMI Verified Mark Certificate, which
+no system trust store holds.
+
+**To refresh the bundle**, re-fetch each root and check the printed
+fingerprints against the authority's own repository before committing:
+
+```sh
+./pkg/bimi/roots/update.sh
+```

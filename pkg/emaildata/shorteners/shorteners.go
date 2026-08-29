@@ -42,6 +42,28 @@ import (
 //go:embed data/url-shorteners.list
 var list string
 
+// License is the CC-BY-SA-4.0 license text shipped alongside the list, so that
+// binary-only recipients of happyDeliver (a release artifact, a container
+// image) get the notices the license requires along with the data.
+//
+//go:embed data/url-shorteners.LICENSE
+var License string
+
+// Attribution is the credit CC-BY-SA-4.0 section 3(a)(1) asks for.
+const Attribution = `URL shortener domain list
+-------------------------
+
+Copyright (c) PeterDave Hello and contributors
+Source:  https://github.com/PeterDaveHello/url-shorteners
+License: Creative Commons Attribution-ShareAlike 4.0 International
+         (CC-BY-SA-4.0), https://creativecommons.org/licenses/by-sa/4.0/
+Changes: none, the list is embedded exactly as published upstream. The
+         services happyDeliver adds to it, and the branded short links it
+         leaves out, live in its own source code, not in this list.
+
+This material is provided as-is, without warranties, as stated in sections 5
+and 6 of the license reproduced below.`
+
 // Hosts is the set of shortening services the upstream list holds, every entry
 // normalised the way NormalizeHost reads a host, and nothing added to or taken
 // from what upstream published.
