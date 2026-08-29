@@ -791,7 +791,6 @@ components:
       type: object
       required:
         - score
-        - threshold
         - is_spam
         - symbols
       properties:
@@ -814,7 +813,12 @@ components:
         threshold:
           type: number
           format: float
-          description: Score threshold for spam classification
+          description: >-
+            Score at which the instance rejects a message, as rspamd reported it
+            for this one. Absent when rspamd reported none: is_spam is then
+            computed against rspamd's own default, which a client is not
+            expected to know. Also absent on reports stored before this field
+            existed.
           example: 15.0
         action:
           type: string

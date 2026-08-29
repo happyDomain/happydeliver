@@ -383,54 +383,14 @@ func (e *EmailMessage) AuthservIDs() []string {
 	return ids
 }
 
-// GetSpamAssassinHeaders extracts SpamAssassin-related headers
+// GetSpamAssassinHeaders returns the headers written by SpamAssassin.
 func (e *EmailMessage) GetSpamAssassinHeaders() map[string]string {
-	headers := make(map[string]string)
-
-	// Common SpamAssassin headers
-	saHeaders := []string{
-		"X-Spam-Status",
-		"X-Spam-Score",
-		"X-Spam-Flag",
-		"X-Spam-Level",
-		"X-Spam-Report",
-		"X-Spam-Checker-Version",
-	}
-
-	for _, headerName := range saHeaders {
-		if values, ok := e.Header[headerName]; ok && len(values) > 0 {
-			for _, value := range values {
-				if strings.TrimSpace(value) != "" {
-					headers[headerName] = value
-					break
-				}
-			}
-		} else if value := e.Header.Get(headerName); value != "" {
-			headers[headerName] = value
-		}
-	}
-
-	return headers
+	return e.SpamScannerHeaders().SpamAssassin
 }
 
-// GetRspamdHeaders extracts rspamd-related headers
+// GetRspamdHeaders returns the headers written by rspamd.
 func (e *EmailMessage) GetRspamdHeaders() map[string]string {
-	headers := make(map[string]string)
-
-	rspamdHeaders := []string{
-		"X-Spamd-Result",
-		"X-Rspamd-Score",
-		"X-Rspamd-Action",
-		"X-Rspamd-Server",
-	}
-
-	for _, headerName := range rspamdHeaders {
-		if value := e.Header.Get(headerName); value != "" {
-			headers[headerName] = value
-		}
-	}
-
-	return headers
+	return e.SpamScannerHeaders().Rspamd
 }
 
 // GetTextParts returns all text/plain parts

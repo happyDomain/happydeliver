@@ -10,13 +10,19 @@
 
     let { rspamd }: Props = $props();
 
-    // Derive effective action from score vs known rspamd default thresholds.
-    // The action header is unreliable in milter setups (always "no action").
+    // rspamd's built-in action ladder, used to derive the action the message
+    // would have triggered: the action header is unreliable in milter setups
+    // (always "no action").
     const RSPAMD_GREYLIST_THRESHOLD = 4;
     const RSPAMD_ADD_HEADER_THRESHOLD = 6;
+    const RSPAMD_DEFAULT_REJECT_THRESHOLD = 15;
+
+    // The reported threshold is the score at which that instance rejects, so
+    // prefer it: hardcoding rspamd's default would mislabel an instance that
+    // rejects elsewhere.
+    const rejectThreshold = $derived(rspamd.threshold ?? RSPAMD_DEFAULT_REJECT_THRESHOLD);
 
     const effectiveAction = $derived.by(() => {
-        const rejectThreshold = rspamd.threshold > 0 ? rspamd.threshold : 15;
         if (rspamd.score >= rejectThreshold) return { label: "Reject", cls: "bg-danger" };
         if (rspamd.score >= RSPAMD_ADD_HEADER_THRESHOLD)
             return { label: "Add header", cls: "bg-warning text-dark" };
@@ -49,8 +55,11 @@
         <div class="row mb-3">
             <div class="col-md-4">
                 <strong>Score:</strong>
+                <!-- Absent when rspamd reported no threshold: show the score alone
+                     rather than a boundary this instance may not apply. -->
                 <span class={rspamd.is_spam ? "text-danger" : "text-success"}>
-                    {rspamd.score.toFixed(2)} / {rspamd.threshold.toFixed(1)}
+                    {rspamd.score.toFixed(2)}{#if rspamd.threshold !== undefined}
+                        / {rspamd.threshold.toFixed(1)}{/if}
                 </span>
             </div>
             <div class="col-md-4">
