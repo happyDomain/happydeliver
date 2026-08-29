@@ -485,7 +485,7 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 }
 
 // hasDomainMisalignment checks if the link text contains a different domain than the actual URL
-// This is a common phishing technique (e.g., text shows "paypal.com" but links to "evil.com")
+// This is a common phishing technique (e.g., text shows "bank.example.com" but links to "evil.example.net")
 func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 	// Parse the actual URL
 	parsedURL, err := url.Parse(href)
@@ -499,7 +499,7 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 	switch parsedURL.Scheme {
 	case "mailto":
 		// Extract email address from mailto: URL
-		// Format can be: mailto:user@domain.com or mailto:user@domain.com?subject=...
+		// Format can be: mailto:user@example.com or mailto:user@example.com?subject=...
 		mailtoAddr := parsedURL.Opaque
 
 		// Remove query parameters if present
