@@ -343,6 +343,12 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 				valid = false
 				headerIssues = append(headerIssues, fmt.Sprintf("Invalid date format: %v", err))
 			}
+		case "Subject":
+			// Report the text a mail client would show rather than the raw
+			// "=?UTF-8?B?...?=" encoded words.
+			if email.Subject != "" {
+				check.Value = &email.Subject
+			}
 		case "MIME-Version":
 			if value != "1.0" {
 				valid = false
@@ -590,7 +596,12 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []model.HeaderIss
 	}
 
 	// Check for fake reply/forward: Subject has Re:/Fwd: prefix but no thread headers
-	subject := email.GetHeaderValue("Subject")
+	// email.Subject is the RFC 2047 decoded form: a "Re:" written inside an
+	// encoded word is invisible in the raw header value.
+	subject := email.Subject
+	if subject == "" {
+		subject = email.GetHeaderValue("Subject")
+	}
 	if h.hasReplyPrefix(subject) && !email.HasHeader("References") && !email.HasHeader("In-Reply-To") {
 		issues = append(issues, model.HeaderIssue{
 			Header:   "Subject",

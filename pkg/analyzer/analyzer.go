@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -65,7 +64,7 @@ type AnalysisResult struct {
 // AnalyzeEmailBytes performs complete email analysis from raw bytes
 func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, opts AnalysisOptions) (*AnalysisResult, error) {
 	// Parse the email
-	emailMsg, err := ParseEmail(bytes.NewReader(rawEmail))
+	emailMsg, err := ParseEmail(rawEmail)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse email: %w", err)
 	}

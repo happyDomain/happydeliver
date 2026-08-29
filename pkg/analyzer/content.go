@@ -83,6 +83,12 @@ type ContentResults struct {
 	SuspiciousURLs   []string
 	ContentIssues    []string
 	HarmfullIssues   []string
+
+	// BodyTruncated reports that the MIME body stopped short of its end, so the
+	// parts analysed above are only the ones that arrived. What is missing from
+	// them says nothing about the message that was sent, hence the criteria it
+	// would have decided are dropped rather than failed.
+	BodyTruncated bool
 }
 
 // templatePlaceholderRegex matches unreplaced templating tokens that remain when a
@@ -135,7 +141,7 @@ type ImageCheck struct {
 
 // AnalyzeContent performs content analysis on email message
 func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
-	results := &ContentResults{}
+	results := &ContentResults{BodyTruncated: email.BodyIncomplete}
 
 	results.IsMultipart = len(email.Parts) > 1
 
@@ -166,11 +172,17 @@ func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
 		c.analyzeTextLinks(results.TextContent, results)
 	}
 
-	// Check plain text/HTML consistency
-	if len(htmlParts) > 0 && len(textParts) > 0 {
-		results.TextPlainRatio = c.calculateTextPlainConsistency(results.TextContent, results.HTMLContent)
-	} else if !results.IsMultipart {
-		results.TextPlainRatio = 1.0
+	// Check plain text/HTML consistency. A truncated body may look single-part
+	// while it is not: a perfect ratio would then score the parts that never
+	// arrived rather than the message that was sent. It is left at zero, which
+	// CalculateContentScore and GenerateContentAnalysis read as "unknown" rather
+	// than as a failure, BodyTruncated telling the two apart.
+	if !results.BodyTruncated {
+		if len(htmlParts) > 0 && len(textParts) > 0 {
+			results.TextPlainRatio = c.calculateTextPlainConsistency(results.TextContent, results.HTMLContent)
+		} else if !results.IsMultipart {
+			results.TextPlainRatio = 1.0
+		}
 	}
 
 	return results
@@ -833,6 +845,17 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	// Build HTML issues
 	htmlIssues := []model.ContentIssue{}
 
+	// Report a truncated body first: it qualifies everything the analysis below
+	// says about the content, which only ever saw the parts that arrived.
+	if results.BodyTruncated {
+		htmlIssues = append(htmlIssues, model.ContentIssue{
+			Type:     model.ContentIssueTypeTruncatedBody,
+			Severity: model.ContentIssueSeverityMedium,
+			Message:  "The message body stops before its end: it was cut short in transit, or its MIME structure announces a part that never follows. Only the parts that arrived were analysed.",
+			Advice:   utils.PtrTo("Check the message size against the limits of the relays it goes through, and that the MIME boundaries it declares are all closed"),
+		})
+	}
+
 	// Add HTML parsing errors
 	if !results.HTMLValid && len(results.HTMLErrors) > 0 {
 		for _, errMsg := range results.HTMLErrors {
@@ -1022,6 +1045,11 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 
 	var score int = 10
 
+	// The points a flawless message can reach. A criterion the received bytes
+	// cannot answer is subtracted from it instead of being refused, so that a
+	// body cut short on its way does not cost the sender a grade.
+	attainable := 100
+
 	// HTML validity or text alone (10 points)
 	if results.HTMLValid || (!results.IsMultipart && results.HasPlaintext()) {
 		score += 10
@@ -1064,8 +1092,12 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		score += 15
 	}
 
-	// Text consistency (15 points)
-	if results.TextPlainRatio >= 0.3 {
+	// Text consistency (15 points). A truncated body cannot be judged on it: the
+	// plain text counterpart of the HTML may simply never have arrived. Drop the
+	// criterion rather than award or refuse its points.
+	if results.BodyTruncated {
+		attainable -= 15
+	} else if results.TextPlainRatio >= 0.3 {
 		score += 15
 	}
 
@@ -1074,6 +1106,12 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		score += 15
 	} else if results.ImageTextRatio <= 10.0 {
 		score += 7
+	}
+
+	// Bring the criteria that could be judged back onto the 0-100 scale, before
+	// the penalties below, which are expressed in points of that scale.
+	if attainable != 100 {
+		score = score * 100 / attainable
 	}
 
 	// Penalize suspicious URLs (deduct up to 5 points)
