@@ -398,19 +398,35 @@ func (e *EmailMessage) GetSpamAssassinHeaders() map[string]string {
 	}
 
 	for _, headerName := range saHeaders {
-		if values, ok := e.Header[headerName]; ok && len(values) > 0 {
-			for _, value := range values {
-				if strings.TrimSpace(value) != "" {
-					headers[headerName] = value
-					break
-				}
+		values := e.Header[headerName]
+		if len(values) == 0 {
+			if value := e.Header.Get(headerName); value != "" {
+				values = []string{value}
 			}
-		} else if value := e.Header.Get(headerName); value != "" {
+		}
+
+		for _, value := range values {
+			if strings.TrimSpace(value) == "" {
+				continue
+			}
+			// Leave rspamd's own X-Spam-Status to GetRspamdHeaders: reading it here
+			// would report rspamd's verdict as a SpamAssassin one.
+			if headerName == "X-Spam-Status" && spamStatusIsRspamd(value) {
+				continue
+			}
 			headers[headerName] = value
+			break
 		}
 	}
 
 	return headers
+}
+
+// spamStatusIsRspamd reports whether an X-Spam-Status value was written by rspamd
+// rather than by SpamAssassin. Hosts running both milters emit one X-Spam-Status
+// header each; rspamd's variant carries its score as "rspamdscore=".
+func spamStatusIsRspamd(value string) bool {
+	return strings.Contains(strings.ToLower(value), "rspamdscore=")
 }
 
 // GetRspamdHeaders extracts rspamd-related headers
@@ -427,6 +443,15 @@ func (e *EmailMessage) GetRspamdHeaders() map[string]string {
 	for _, headerName := range rspamdHeaders {
 		if value := e.Header.Get(headerName); value != "" {
 			headers[headerName] = value
+		}
+	}
+
+	// rspamd also emits a SpamAssassin-shaped status header when it runs alongside
+	// one, e.g. "No, rspamdscore=-4.78, required=10.00".
+	for _, value := range e.Header["X-Spam-Status"] {
+		if spamStatusIsRspamd(value) {
+			headers["X-Spam-Status"] = value
+			break
 		}
 	}
 

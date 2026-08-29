@@ -477,3 +477,76 @@ func stringSliceEqual(a, b []string) bool {
 	}
 	return true
 }
+
+// TestAnalyzeSpamAssassinIgnoresRspamdStatus checks that a message scanned by both
+// rspamd and SpamAssassin, each emitting its own X-Spam-Status, reports SpamAssassin's
+// verdict and not rspamd's.
+func TestAnalyzeSpamAssassinIgnoresRspamdStatus(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{
+		"No, rspamdscore=-4.78, required=10.00",
+		"No, score=0.00, required=95.00",
+	}
+
+	result := NewSpamAssassinAnalyzer().AnalyzeSpamAssassin(email)
+	if result == nil {
+		t.Fatal("Expected SpamAssassin result, got nil")
+	}
+
+	if result.Score != 0 {
+		t.Errorf("Score = %v, want 0 (rspamd's score leaked in)", result.Score)
+	}
+	if result.RequiredScore != 95 {
+		t.Errorf("RequiredScore = %v, want 95", result.RequiredScore)
+	}
+}
+
+// TestAnalyzeSpamAssassinRspamdStatusOnly checks that rspamd's X-Spam-Status alone
+// does not produce a SpamAssassin report.
+func TestAnalyzeSpamAssassinRspamdStatusOnly(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=-4.78, required=10.00"}
+
+	if result := NewSpamAssassinAnalyzer().AnalyzeSpamAssassin(email); result != nil {
+		t.Errorf("Expected nil result for an rspamd-only X-Spam-Status, got %+v", result)
+	}
+}
+
+// TestAnalyzeSpamAssassinIgnoresRspamdScore checks that X-Spam-Score, which carries
+// no marker identifying its author, is only consulted when SpamAssassin's own
+// X-Spam-Status did not already provide a score. Otherwise a score of exactly 0.00
+// lets the rspamd-written X-Spam-Score take its place.
+func TestAnalyzeSpamAssassinIgnoresRspamdScore(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{
+		"No, rspamdscore=-4.78, required=10.00",
+		"No, score=0.00, required=95.00",
+	}
+	email.Header["X-Spam-Score"] = []string{"-4.78", "0.00"}
+
+	result := NewSpamAssassinAnalyzer().AnalyzeSpamAssassin(email)
+	if result == nil {
+		t.Fatal("Expected SpamAssassin result, got nil")
+	}
+
+	if result.Score != 0 {
+		t.Errorf("Score = %v, want 0 (rspamd's X-Spam-Score leaked in)", result.Score)
+	}
+}
+
+// TestAnalyzeSpamAssassinStatusVerdictWinsOverFlag checks that X-Spam-Flag, which is
+// likewise unattributable, does not overwrite the verdict X-Spam-Status stated.
+func TestAnalyzeSpamAssassinStatusVerdictWinsOverFlag(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{"Yes, score=9.00, required=5.00"}
+	email.Header["X-Spam-Flag"] = []string{"NO"}
+
+	result := NewSpamAssassinAnalyzer().AnalyzeSpamAssassin(email)
+	if result == nil {
+		t.Fatal("Expected SpamAssassin result, got nil")
+	}
+
+	if !result.IsSpam {
+		t.Error("IsSpam should be true: X-Spam-Status said Yes, X-Spam-Flag must not override it")
+	}
+}

@@ -31,6 +31,16 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
+// SpamAssassin's X-Spam-Status header, e.g.
+// "Yes, score=5.5 required=5.0 tests=TEST1,TEST2,TEST3 autolearn=no". The
+// leading boundary keeps another scanner's prefixed score, such as rspamd's
+// "rspamdscore=", from being read as SpamAssassin's.
+var (
+	spamAssassinStatusScoreRe    = regexp.MustCompile(`(?:^|[^\w-])score=(-?\d+\.?\d*)`)
+	spamAssassinStatusRequiredRe = regexp.MustCompile(`(?:^|[^\w-])required=(-?\d+\.?\d*)`)
+	spamAssassinStatusTestsRe    = regexp.MustCompile(`tests=([^=]+)(?:\s|$)`)
+)
+
 // SpamAssassinAnalyzer analyzes SpamAssassin results from email headers
 type SpamAssassinAnalyzer struct{}
 
@@ -58,21 +68,25 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *model.S
 		TestDetails: make(map[string]model.SpamTestDetail),
 	}
 
-	// Parse X-Spam-Status header
+	// Parse X-Spam-Status header. It is the authoritative source: X-Spam-Score and
+	// X-Spam-Flag carry no marker identifying their author, so on a host running
+	// several milters they may well be another scanner's, and must only be consulted
+	// for what X-Spam-Status did not already provide.
+	var statusHasScore, statusHasVerdict bool
 	if statusHeader, ok := headers["X-Spam-Status"]; ok && statusHeader != "" {
-		a.parseSpamStatus(statusHeader, result)
+		statusHasScore, statusHasVerdict = a.parseSpamStatus(statusHeader, result)
 	}
 
 	// Parse X-Spam-Score header (as fallback if not in X-Spam-Status)
-	if scoreHeader, ok := headers["X-Spam-Score"]; ok && result.Score == 0 {
+	if scoreHeader, ok := headers["X-Spam-Score"]; ok && !statusHasScore {
 		if score, err := strconv.ParseFloat(strings.TrimSpace(scoreHeader), 64); err == nil {
 			result.Score = float32(score)
 		}
 	}
 
 	// Parse X-Spam-Flag header (as fallback)
-	if flagHeader, ok := headers["X-Spam-Flag"]; ok {
-		result.IsSpam = strings.TrimSpace(strings.ToUpper(flagHeader)) == "YES"
+	if flagHeader, ok := headers["X-Spam-Flag"]; ok && !statusHasVerdict {
+		result.IsSpam = strings.EqualFold(strings.TrimSpace(flagHeader), "YES")
 	}
 
 	// Parse X-Spam-Report header for detailed test results
@@ -91,33 +105,30 @@ func (a *SpamAssassinAnalyzer) AnalyzeSpamAssassin(email *EmailMessage) *model.S
 
 // parseSpamStatus parses the X-Spam-Status header
 // Format: Yes/No, score=5.5 required=5.0 tests=TEST1,TEST2,TEST3 autolearn=no
-func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *model.SpamAssassinResult) {
+//
+// It reports whether the header actually carried a score and a Yes/No verdict, so
+// that the caller only falls back to X-Spam-Score and X-Spam-Flag for what is
+// missing here.
+func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *model.SpamAssassinResult) (hasScore, hasVerdict bool) {
 	// Check if spam (first word)
-	parts := strings.SplitN(header, ",", 2)
-	if len(parts) > 0 {
-		firstPart := strings.TrimSpace(parts[0])
-		result.IsSpam = strings.EqualFold(firstPart, "yes")
+	verdict, _, _ := strings.Cut(header, ",")
+	verdict = strings.TrimSpace(verdict)
+	if strings.EqualFold(verdict, "yes") || strings.EqualFold(verdict, "no") {
+		result.IsSpam = strings.EqualFold(verdict, "yes")
+		hasVerdict = true
 	}
 
-	// Extract score
-	scoreRe := regexp.MustCompile(`score=(-?\d+\.?\d*)`)
-	if matches := scoreRe.FindStringSubmatch(header); len(matches) > 1 {
-		if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			result.Score = float32(score)
-		}
+	// Extract score and required score
+	if score, ok := extractFloatField(header, spamAssassinStatusScoreRe); ok {
+		result.Score = score
+		hasScore = true
 	}
-
-	// Extract required score
-	requiredRe := regexp.MustCompile(`required=(-?\d+\.?\d*)`)
-	if matches := requiredRe.FindStringSubmatch(header); len(matches) > 1 {
-		if required, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			result.RequiredScore = float32(required)
-		}
+	if required, ok := extractFloatField(header, spamAssassinStatusRequiredRe); ok {
+		result.RequiredScore = required
 	}
 
 	// Extract tests
-	testsRe := regexp.MustCompile(`tests=([^=]+)(?:\s|$)`)
-	if matches := testsRe.FindStringSubmatch(header); len(matches) > 1 {
+	if matches := spamAssassinStatusTestsRe.FindStringSubmatch(header); len(matches) > 1 {
 		testsStr := matches[1]
 		// Tests can be comma or space separated
 		tests := strings.FieldsFunc(testsStr, func(r rune) bool {
@@ -125,6 +136,8 @@ func (a *SpamAssassinAnalyzer) parseSpamStatus(header string, result *model.Spam
 		})
 		result.Tests = &tests
 	}
+
+	return hasScore, hasVerdict
 }
 
 // parseSpamReport parses the X-Spam-Report header to extract test details

@@ -339,6 +339,16 @@ func TestCalculateRspamdScore(t *testing.T) {
 			expectedScore: 0,
 			expectedGrade: "F",
 		},
+		{
+			name: "Zero threshold falls back to the add-header default of 6",
+			result: &model.RspamdResult{
+				Score:     3,
+				Threshold: 0,
+			},
+			// 100 - round(3*100/6) = 100 - 50 = 50
+			expectedScore: 50,
+			expectedGrade: "E",
+		},
 	}
 
 	analyzer := NewRspamdAnalyzer(nil)
@@ -410,5 +420,97 @@ func TestAnalyzeRspamdRealEmail(t *testing.T) {
 	score, _ := analyzer.CalculateRspamdScore(result)
 	if score != 100 {
 		t.Errorf("CalculateRspamdScore = %d, want 100", score)
+	}
+}
+
+// TestAnalyzeRspamdSpamStatus checks the SpamAssassin-shaped X-Spam-Status rspamd
+// emits when it runs alongside one, picked out of several X-Spam-Status headers.
+func TestAnalyzeRspamdSpamStatus(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{
+		"No, rspamdscore=-4.78, required=10.00",
+		"No, score=0.00, required=95.00",
+	}
+	email.Header["X-Rspamd-Server"] = []string{"rspamd15"}
+
+	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(email)
+	if result == nil {
+		t.Fatal("Expected rspamd result, got nil")
+	}
+
+	if result.Score != -4.78 {
+		t.Errorf("Score = %v, want -4.78", result.Score)
+	}
+	if result.Threshold != 10 {
+		t.Errorf("Threshold = %v, want 10", result.Threshold)
+	}
+	if result.IsSpam {
+		t.Error("IsSpam should be false")
+	}
+	if result.Server == nil || *result.Server != "rspamd15" {
+		t.Errorf("Server = %v, want rspamd15", result.Server)
+	}
+}
+
+// TestAnalyzeRspamdSpamStatusIgnoredWhenSpamdResultPresent checks that the richer
+// X-Spamd-Result header wins over rspamd's X-Spam-Status variant when both carry a
+// score and threshold, since X-Spam-Status is only meant as a fallback.
+func TestAnalyzeRspamdSpamStatusIgnoredWhenSpamdResultPresent(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spamd-Result"] = []string{"default: False [-3.91 / 15.00]; BAYES_HAM(-1.0)"}
+	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=-4.78, required=10.00"}
+
+	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(email)
+	if result == nil {
+		t.Fatal("Expected rspamd result, got nil")
+	}
+
+	if result.Score != -3.91 {
+		t.Errorf("Score = %v, want -3.91 (from X-Spamd-Result, not X-Spam-Status)", result.Score)
+	}
+	if result.Threshold != 15.00 {
+		t.Errorf("Threshold = %v, want 15.00 (from X-Spamd-Result, not X-Spam-Status)", result.Threshold)
+	}
+}
+
+// TestAnalyzeRspamdSpamStatusZeroRequired checks that a "required=0.00" in rspamd's
+// X-Spam-Status is not taken at face value: IsSpam still falls back to comparing
+// against the add-header default rather than treating everything as spam.
+func TestAnalyzeRspamdSpamStatusZeroRequired(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=2.5, required=0.00"}
+
+	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(email)
+	if result == nil {
+		t.Fatal("Expected rspamd result, got nil")
+	}
+
+	if result.Score != 2.5 {
+		t.Errorf("Score = %v, want 2.5", result.Score)
+	}
+	if result.Threshold != 0 {
+		t.Errorf("Threshold = %v, want 0 (required=0.00 must not be taken as a real threshold)", result.Threshold)
+	}
+	if result.IsSpam {
+		t.Error("IsSpam should be false: score 2.5 is below the add-header default of 6")
+	}
+}
+
+// TestAnalyzeRspamdSpamStatusCaseInsensitive checks that an X-Spam-Status header is
+// still recognized and parsed as rspamd's even when its markers are not lowercase.
+func TestAnalyzeRspamdSpamStatusCaseInsensitive(t *testing.T) {
+	email := &EmailMessage{Header: make(mail.Header)}
+	email.Header["X-Spam-Status"] = []string{"No, RspamdScore=-1.5, Required=5.00"}
+
+	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(email)
+	if result == nil {
+		t.Fatal("Expected rspamd result, got nil")
+	}
+
+	if result.Score != -1.5 {
+		t.Errorf("Score = %v, want -1.5", result.Score)
+	}
+	if result.Threshold != 5 {
+		t.Errorf("Threshold = %v, want 5", result.Threshold)
 	}
 }

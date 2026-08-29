@@ -22,8 +22,26 @@
 package analyzer
 
 import (
+	"regexp"
+	"strconv"
+
 	"git.happydns.org/happyDeliver/internal/model"
 )
+
+// extractFloatField finds re's first capture group in header and parses it as
+// a float32. Used to pull named numeric fields (score=, required=, ...) out
+// of X-Spam-Status-shaped headers.
+func extractFloatField(header string, re *regexp.Regexp) (float32, bool) {
+	matches := re.FindStringSubmatch(header)
+	if len(matches) < 2 {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return 0, false
+	}
+	return float32(v), true
+}
 
 // ScoreToGrade converts a percentage score (0-100) to a letter grade
 func ScoreToGrade(score int) string {
