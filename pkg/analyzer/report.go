@@ -130,8 +130,11 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers)
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
-	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(email)
-	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(email)
+
+	spamHeaders := email.SpamScannerHeaders()
+	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(spamHeaders.For(ScannerSpamAssassin))
+	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
+
 	results.Content = r.contentAnalyzer.AnalyzeContent(email)
 
 	return results

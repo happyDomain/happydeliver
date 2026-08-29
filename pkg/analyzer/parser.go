@@ -383,56 +383,6 @@ func (e *EmailMessage) AuthservIDs() []string {
 	return ids
 }
 
-// GetSpamAssassinHeaders extracts SpamAssassin-related headers
-func (e *EmailMessage) GetSpamAssassinHeaders() map[string]string {
-	headers := make(map[string]string)
-
-	// Common SpamAssassin headers
-	saHeaders := []string{
-		"X-Spam-Status",
-		"X-Spam-Score",
-		"X-Spam-Flag",
-		"X-Spam-Level",
-		"X-Spam-Report",
-		"X-Spam-Checker-Version",
-	}
-
-	for _, headerName := range saHeaders {
-		if values, ok := e.Header[headerName]; ok && len(values) > 0 {
-			for _, value := range values {
-				if strings.TrimSpace(value) != "" {
-					headers[headerName] = value
-					break
-				}
-			}
-		} else if value := e.Header.Get(headerName); value != "" {
-			headers[headerName] = value
-		}
-	}
-
-	return headers
-}
-
-// GetRspamdHeaders extracts rspamd-related headers
-func (e *EmailMessage) GetRspamdHeaders() map[string]string {
-	headers := make(map[string]string)
-
-	rspamdHeaders := []string{
-		"X-Spamd-Result",
-		"X-Rspamd-Score",
-		"X-Rspamd-Action",
-		"X-Rspamd-Server",
-	}
-
-	for _, headerName := range rspamdHeaders {
-		if value := e.Header.Get(headerName); value != "" {
-			headers[headerName] = value
-		}
-	}
-
-	return headers
-}
-
 // GetTextParts returns all text/plain parts
 func (e *EmailMessage) GetTextParts() []MessagePart {
 	return filterParts(e.Parts, func(p MessagePart) bool {

@@ -24,16 +24,27 @@ package analyzer
 import (
 	"math"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // Default rspamd action thresholds (rspamd built-in defaults)
 const (
 	rspamdDefaultRejectThreshold    float32 = 15
 	rspamdDefaultAddHeaderThreshold float32 = 6
+)
+
+// rspamd's SpamAssassin-shaped status header, e.g.
+// "No, rspamdscore=-4.78, required=10.00".
+var rspamdStatusScoreRe = regexp.MustCompile(`(?i)rspamdscore=(-?\d+\.?\d*)`)
+
+// X-Spamd-Result: the "[score / threshold]" verdict of its first line, and the
+// "SYMBOL(score)[params]" entries that follow.
+var (
+	rspamdResultScoreRe  = regexp.MustCompile(`\[\s*(-?\d+\.?\d*)\s*/\s*(-?\d+\.?\d*)\s*\]`)
+	rspamdResultSymbolRe = regexp.MustCompile(`(\w+)\((-?\d+\.?\d*)\)(?:\[(.*)\])?`)
 )
 
 // RspamdAnalyzer analyzes rspamd results from email headers
@@ -46,17 +57,22 @@ func NewRspamdAnalyzer(symbols map[string]string) *RspamdAnalyzer {
 	return &RspamdAnalyzer{symbols: symbols}
 }
 
-// AnalyzeRspamd extracts and analyzes rspamd results from email headers
-func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *model.RspamdResult {
-	headers := email.GetRspamdHeaders()
-	if len(headers) == 0 {
-		return nil
+// effectiveThreshold returns the threshold to score a message against: the one
+// rspamd reported, or its add-header default when it reported none. Only the
+// reported one is published, so that a client can tell a threshold this
+// instance actually uses from a default stood in for it.
+func effectiveThreshold(result *model.RspamdResult) float32 {
+	if result.Threshold != nil {
+		return *result.Threshold
 	}
+	return rspamdDefaultAddHeaderThreshold
+}
 
-	// Require at least X-Spamd-Result or X-Rspamd-Score to produce a meaningful report
-	_, hasSpamdResult := headers["X-Spamd-Result"]
-	_, hasRspamdScore := headers["X-Rspamd-Score"]
-	if !hasSpamdResult && !hasRspamdScore {
+// AnalyzeRspamd analyzes the headers SpamScannerHeaders attributed to rspamd
+func (a *RspamdAnalyzer) AnalyzeRspamd(headers ScannerHeaders) *model.RspamdResult {
+	// A bare X-Spam or a server stamp identifies rspamd but says nothing about
+	// the message: require a header carrying a verdict to produce a report.
+	if !headers.Has("X-Spamd-Result", "X-Rspamd-Score", "X-Spam-Status", "X-Spam-Score", "X-Spam-Flag") {
 		return nil
 	}
 
@@ -64,18 +80,42 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *model.RspamdResult 
 		Symbols: make(map[string]model.SpamTestDetail),
 	}
 
+	var hasScore bool
+
 	// Parse X-Spamd-Result header (primary source for score, threshold, and symbols)
 	// Format: "default: False [-3.91 / 15.00];\n\tSYMBOL(score)[params]; ..."
 	if spamdResult, ok := headers["X-Spamd-Result"]; ok {
 		report := strings.ReplaceAll(spamdResult, "; ", ";\n")
 		result.Report = &report
-		a.parseSpamdResult(spamdResult, result)
+		hasScore = a.parseSpamdResult(spamdResult, result)
+	}
+
+	// rspamd's X-Spam-Status variant carries no symbols, only the score and the
+	// threshold: fall back to it only for what X-Spamd-Result didn't supply.
+	if statusHeader, ok := headers["X-Spam-Status"]; ok && (!hasScore || result.Threshold == nil) {
+		hasScore = a.parseSpamStatus(statusHeader, result) || hasScore
 	}
 
 	// Parse X-Rspamd-Score as override/fallback for score
 	if scoreHeader, ok := headers["X-Rspamd-Score"]; ok {
-		if score, err := strconv.ParseFloat(strings.TrimSpace(scoreHeader), 64); err == nil {
-			result.Score = float32(score)
+		if score, ok := parseFloat32(scoreHeader); ok {
+			result.Score = score
+			hasScore = true
+		}
+	}
+
+	// rspamd's milter_headers also writes SpamAssassin's names, sometimes as the
+	// only verdict on the message: fill in what its own headers left out.
+	shared := readSharedSpamVerdict(headers)
+	if !hasScore && shared.hasScore {
+		result.Score = shared.score
+		hasScore = true
+	}
+	if result.Report == nil {
+		// Not a symbol breakdown this analyzer can parse, but still a report
+		// written about this message: surface it rather than drop it.
+		if report, ok := headers["X-Spam-Report"]; ok {
+			result.Report = utils.PtrTo(report)
 		}
 	}
 
@@ -95,38 +135,55 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(email *EmailMessage) *model.RspamdResult 
 		}
 	}
 
-	// Derive IsSpam from score vs reject threshold.
-	if result.Threshold > 0 {
-		result.IsSpam = result.Score >= result.Threshold
-	} else {
-		result.IsSpam = result.Score >= rspamdDefaultAddHeaderThreshold
+	// Derive IsSpam from score vs threshold. Without a score anywhere, the
+	// X-Spam-Flag verdict is all there is to go on.
+	switch {
+	case hasScore:
+		result.IsSpam = result.Score >= effectiveThreshold(result)
+	case shared.hasVerdict:
+		result.IsSpam = shared.isSpam
 	}
 
 	return result
 }
 
+// parseSpamStatus parses rspamd's X-Spam-Status header
+// Format: "No, rspamdscore=-4.78, required=10.00"
+// It reports whether the header carried a score.
+func (a *RspamdAnalyzer) parseSpamStatus(header string, result *model.RspamdResult) (hasScore bool) {
+	if score, ok := extractFloatField(header, rspamdStatusScoreRe); ok {
+		result.Score = score
+		hasScore = true
+	}
+
+	// A non-positive threshold says nothing (rspamd writes "required=0.00" when
+	// it has no reject action configured): leave it unreported.
+	if threshold, ok := extractFloatField(header, spamStatusRequiredRe); ok && threshold > 0 {
+		result.Threshold = utils.PtrTo(threshold)
+	}
+
+	return hasScore
+}
+
 // parseSpamdResult parses the X-Spamd-Result header
 // Format: "default: False [-3.91 / 15.00];\n\tSYMBOL(score)[params]; ..."
-func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdResult) {
+// It reports whether the header carried a score.
+func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdResult) (hasScore bool) {
 	// Extract score and threshold from the first line
 	// e.g. "default: False [-3.91 / 15.00]"
-	scoreRe := regexp.MustCompile(`\[\s*(-?\d+\.?\d*)\s*/\s*(-?\d+\.?\d*)\s*\]`)
-	if matches := scoreRe.FindStringSubmatch(header); len(matches) > 2 {
-		if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			result.Score = float32(score)
+	if matches := rspamdResultScoreRe.FindStringSubmatch(header); len(matches) > 2 {
+		if score, ok := parseFloat32(matches[1]); ok {
+			result.Score = score
+			hasScore = true
 		}
-		if threshold, err := strconv.ParseFloat(matches[2], 64); err == nil {
-			result.Threshold = float32(threshold)
-
-			// No threshold? use default AddHeaderThreshold
-			if result.Threshold <= 0 {
-				result.Threshold = rspamdDefaultAddHeaderThreshold
-			}
+		// Same as in parseSpamStatus: a non-positive threshold is not one.
+		if threshold, ok := parseFloat32(matches[2]); ok && threshold > 0 {
+			result.Threshold = utils.PtrTo(threshold)
 		}
 	}
 
 	// Parse is_spam from header (before we may get action from X-Rspamd-Action)
-	firstLine := strings.SplitN(header, ";", 2)[0]
+	firstLine, _, _ := strings.Cut(header, ";")
 	if strings.Contains(firstLine, ": True") || strings.Contains(firstLine, ": true") {
 		result.IsSpam = true
 	}
@@ -134,16 +191,15 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdRes
 	// Parse symbols: SYMBOL(score)[params]
 	// Each symbol entry is separated by ";", so within each part we use a
 	// greedy match to capture params that may contain nested brackets.
-	symbolRe := regexp.MustCompile(`(\w+)\((-?\d+\.?\d*)\)(?:\[(.*)\])?`)
-	for _, part := range strings.Split(header, ";") {
+	for part := range strings.SplitSeq(header, ";") {
 		part = strings.TrimSpace(part)
-		matches := symbolRe.FindStringSubmatch(part)
+		matches := rspamdResultSymbolRe.FindStringSubmatch(part)
 		if len(matches) > 2 {
 			name := matches[1]
-			score, _ := strconv.ParseFloat(matches[2], 64)
+			score, _ := parseFloat32(matches[2])
 			sym := model.SpamTestDetail{
 				Name:  name,
-				Score: float32(score),
+				Score: score,
 			}
 			if len(matches) > 3 && matches[3] != "" {
 				params := matches[3]
@@ -152,6 +208,8 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdRes
 			result.Symbols[name] = sym
 		}
 	}
+
+	return hasScore
 }
 
 // CalculateRspamdScore calculates the rspamd contribution to deliverability (0-100 scale)
@@ -160,8 +218,7 @@ func (a *RspamdAnalyzer) CalculateRspamdScore(result *model.RspamdResult) (int, 
 		return 100, "" // rspamd not installed
 	}
 
-	threshold := result.Threshold
-	percentage := 100 - int(math.Round(float64(result.Score*100/threshold)))
+	percentage := 100 - int(math.Round(float64(result.Score*100/effectiveThreshold(result))))
 
 	if percentage > 100 {
 		return 100, "A+"

@@ -127,32 +127,6 @@ Body content.
 	}
 }
 
-func TestGetSpamAssassinHeaders(t *testing.T) {
-	rawEmail := `From: sender@example.com
-To: recipient@example.com
-Subject: Test Email
-X-Spam-Status: No, score=2.3 required=5.0
-X-Spam-Score: 2.3
-X-Spam-Flag: NO
-
-Body content.
-`
-
-	email, err := ParseEmail(strings.NewReader(rawEmail))
-	if err != nil {
-		t.Fatalf("Failed to parse email: %v", err)
-	}
-
-	saHeaders := email.GetSpamAssassinHeaders()
-	if len(saHeaders) != 3 {
-		t.Errorf("Expected 3 SpamAssassin headers, got: %d", len(saHeaders))
-	}
-
-	if saHeaders["X-Spam-Score"] != "2.3" {
-		t.Errorf("Expected X-Spam-Score: 2.3, got: %s", saHeaders["X-Spam-Score"])
-	}
-}
-
 func TestHasHeader(t *testing.T) {
 	rawEmail := `From: sender@example.com
 To: recipient@example.com
