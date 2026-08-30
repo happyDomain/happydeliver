@@ -35,6 +35,11 @@ type AuthenticationAnalyzer struct {
 	// dkimVerifier computes a first-hand DKIM verdict when the message carries
 	// none. A nil verifier limits the analyzer to what other servers reported.
 	dkimVerifier *DKIMVerifier
+
+	// dmarcVerifier computes a first-hand DMARC verdict when no trusted
+	// Authentication-Results header covers it. A nil verifier limits the
+	// analyzer to what other servers reported.
+	dmarcVerifier *DMARCVerifier
 }
 
 // NewAuthenticationAnalyzer creates a new authentication analyzer.
@@ -47,12 +52,14 @@ func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer 
 }
 
 // NewAuthenticationAnalyzerWithResolver creates an analyzer that verifies DKIM
-// signatures itself, through resolver, when no trusted Authentication-Results
-// header covers them. A nil resolver disables that verification.
+// signatures and DMARC alignment itself, through resolver, when no trusted
+// Authentication-Results header covers them. A nil resolver disables that
+// verification.
 func NewAuthenticationAnalyzerWithResolver(receiverHostname string, timeout time.Duration, resolver DNSResolver) *AuthenticationAnalyzer {
 	return &AuthenticationAnalyzer{
 		receiverHostname: receiverHostname,
 		dkimVerifier:     NewDKIMVerifier(resolver, timeout),
+		dmarcVerifier:    NewDMARCVerifier(resolver, timeout),
 	}
 }
 
@@ -84,6 +91,20 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, auth
 		}
 	}
 
+	// No trusted Authentication-Results said anything about DMARC: evaluate
+	// alignment ourselves, against the SPF and DKIM verdicts now on hand and the
+	// policy published for the From domain. Same rule as DKIM above: this only
+	// ever fills a gap.
+	if results.Dmarc == nil {
+		if fromDomain := fromAddressDomain(email); fromDomain != "" {
+			var dkimResults []model.AuthResult
+			if results.Dkim != nil {
+				dkimResults = *results.Dkim
+			}
+			results.Dmarc = a.dmarcVerifier.VerifyDMARC(fromDomain, results.Spf, dkimResults)
+		}
+	}
+
 	// Parse ARC headers if not already parsed from Authentication-Results
 	if results.Arc == nil {
 		results.Arc = a.parseARCHeaders(email)
@@ -93,6 +114,19 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, auth
 	}
 
 	return results
+}
+
+// fromAddressDomain returns the domain of the message's From header, the
+// domain DMARC protects, or "" when the header is absent or unparsable.
+func fromAddressDomain(email *EmailMessage) string {
+	if email.From == nil {
+		return ""
+	}
+	idx := strings.LastIndex(email.From.Address, "@")
+	if idx == -1 {
+		return ""
+	}
+	return email.From.Address[idx+1:]
 }
 
 // parseAuthenticationResultsHeader parses an Authentication-Results header
