@@ -1133,3 +1133,32 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 		t.Errorf("CalculateContentScore() = %d for a complete body with no consistency, want less than %d", score, want)
 	}
 }
+
+// A truncated body must not collect the "no links, no images" credits either:
+// crediting a message for content it does not appear to have is rewarding an
+// absence of evidence, not an absence of links or images. It used to come out
+// around 80/100, no worse than a genuinely empty, fully-read message.
+func TestAnalyzeContent_IncompleteBodyIsNotScoredAsClean(t *testing.T) {
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	incomplete := analyzer.AnalyzeContent(&EmailMessage{
+		Header:         make(mail.Header),
+		BodyIncomplete: true,
+	})
+	empty := analyzer.AnalyzeContent(&EmailMessage{
+		Header: make(mail.Header),
+	})
+
+	if incomplete.TextPlainRatio != 0 {
+		t.Errorf("TextPlainRatio = %v, want 0 for a body that could not be read", incomplete.TextPlainRatio)
+	}
+	if empty.TextPlainRatio != 1.0 {
+		t.Errorf("TextPlainRatio = %v, want 1.0 for a genuinely single-part message", empty.TextPlainRatio)
+	}
+
+	incompleteScore, _ := analyzer.CalculateContentScore(incomplete)
+	emptyScore, _ := analyzer.CalculateContentScore(empty)
+	if incompleteScore >= emptyScore {
+		t.Errorf("Unreadable body scored %d, no better than a readable empty one at %d", incompleteScore, emptyScore)
+	}
+}

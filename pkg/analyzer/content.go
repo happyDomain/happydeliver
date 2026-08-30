@@ -981,6 +981,10 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		if len(results.Links) > 30 {
 			score -= 10
 		}
+	} else if results.BodyTruncated {
+		// A truncated body cannot be credited for links it does not appear to
+		// have: that would reward an absence of evidence, not an absence of links.
+		attainable -= 25
 	} else {
 		// No links is better, less suspiscous
 		score += 25
@@ -995,6 +999,10 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 			}
 		}
 		score += 15 * (len(results.Images) - noAltCount) / len(results.Images)
+	} else if results.BodyTruncated {
+		// Same caveat as the links above: a truncated body earns no credit for
+		// images it does not appear to have.
+		attainable -= 15
 	} else {
 		// No images is Ok
 		score += 15
