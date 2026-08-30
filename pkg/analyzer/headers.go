@@ -546,6 +546,13 @@ func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
 	return domain
 }
 
+// normalizeHostname puts a hostname in comparable form: lowercased, trimmed,
+// and without the root dot, so that "Mail.Example.Com." and "mail.example.com"
+// are recognised as the same host.
+func normalizeHostname(hostname string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
+}
+
 // getOrganizationalDomain extracts the organizational domain from a fully qualified domain name
 // using the Public Suffix List (PSL) to correctly handle multi-level TLDs.
 // For example: mail.example.com -> example.com, mail.example.co.uk -> example.co.uk

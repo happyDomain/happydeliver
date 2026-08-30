@@ -154,7 +154,7 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 // suffix before resuming normally (to stay within the 8-query budget).
 // Single-label (TLD) records are only accepted when they carry psd=y.
 func (d *DNSAnalyzer) walkDNSForDMARC(domain string) (record, foundDomain string, err error) {
-	labels := strings.Split(strings.ToLower(strings.TrimSuffix(domain, ".")), ".")
+	labels := strings.Split(normalizeHostname(domain), ".")
 	n := len(labels)
 
 	for i, queries := 0, 0; i < n && queries < 8; i, queries = i+1, queries+1 {
