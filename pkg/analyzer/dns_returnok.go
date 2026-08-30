@@ -103,11 +103,3 @@ func calculateReturnOKPenalty(results *model.DNSResults) (penalty int) {
 	}
 	return
 }
-
-// orgDomainOrEmpty dereferences an optional organizational domain pointer.
-func orgDomainOrEmpty(orgDomain *string) string {
-	if orgDomain == nil {
-		return ""
-	}
-	return *orgDomain
-}

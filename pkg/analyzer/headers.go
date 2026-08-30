@@ -30,8 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/publicsuffix"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
@@ -544,34 +542,6 @@ func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
 	domain = strings.TrimRight(domain, ">")
 
 	return domain
-}
-
-// normalizeHostname puts a hostname in comparable form: lowercased, trimmed,
-// and without the root dot, so that "Mail.Example.Com." and "mail.example.com"
-// are recognised as the same host.
-func normalizeHostname(hostname string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
-}
-
-// getOrganizationalDomain extracts the organizational domain from a fully qualified domain name
-// using the Public Suffix List (PSL) to correctly handle multi-level TLDs.
-// For example: mail.example.com -> example.com, mail.example.co.uk -> example.co.uk
-func getOrganizationalDomain(domain string) string {
-	domain = strings.ToLower(strings.TrimSpace(domain))
-
-	// Use golang.org/x/net/publicsuffix to get the eTLD+1 (organizational domain)
-	// This correctly handles cases like .co.uk, .com.au, etc.
-	etldPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
-	if err != nil {
-		// Fallback to simple two-label extraction if PSL lookup fails
-		labels := strings.Split(domain, ".")
-		if len(labels) <= 2 {
-			return domain
-		}
-		return strings.Join(labels[len(labels)-2:], ".")
-	}
-
-	return etldPlusOne
 }
 
 // findHeaderIssues identifies issues with headers

@@ -260,51 +260,6 @@ func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
 	return ips
 }
 
-// cgnatRange is the RFC 6598 shared address space: carrier-grade NAT addresses
-// never identify a sending MTA, and no DNS list carries them.
-var cgnatRange = net.IPNet{
-	IP:   net.IPv4(100, 64, 0, 0),
-	Mask: net.CIDRMask(10, 32),
-}
-
-// classEAndReservedRange is the IPv4 240.0.0.0/4 block: Class E plus the
-// reserved-but-unassigned space above it, including the broadcast address
-// 255.255.255.255. No sending MTA is ever addressed from it.
-var classEAndReservedRange = net.IPNet{
-	IP:   net.IPv4(240, 0, 0, 0),
-	Mask: net.CIDRMask(4, 32),
-}
-
-// isPublicIPAddr reports whether ipStr parses as a routable address. An address
-// that does not parse is not public.
-func isPublicIPAddr(ipStr string) bool {
-	return isPublicIP(net.ParseIP(ipStr))
-}
-
-// isPublicIP reports whether ip is a routable address, i.e. neither private,
-// loopback, link-local, unspecified, multicast, carrier-grade NAT, nor
-// Class-E/reserved. IPv6 unique-local addresses (fc00::/7) are covered by
-// net.IP.IsPrivate.
-func isPublicIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-
-	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return false
-	}
-
-	if ip.IsUnspecified() || ip.IsMulticast() {
-		return false
-	}
-
-	if cgnatRange.Contains(ip) || classEAndReservedRange.Contains(ip) {
-		return false
-	}
-
-	return true
-}
-
 // checkIP checks a single IP against a single DNS list
 func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
 	check := model.BlacklistCheck{

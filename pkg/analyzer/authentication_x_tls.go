@@ -130,14 +130,6 @@ func protocolIndicatesTLS(with *string) bool {
 	return strings.HasSuffix(p, "S") || strings.HasSuffix(p, "SA")
 }
 
-// submatch returns the first capture group of pattern in s, or "".
-func submatch(s, pattern string) string {
-	if matches := regexp.MustCompile(pattern).FindStringSubmatch(s); len(matches) > 1 {
-		return matches[1]
-	}
-	return ""
-}
-
 // formatTLSDetails builds a human-readable summary of the TLS parameters.
 func formatTLSDetails(version, cipher, bits string) string {
 	var parts []string

@@ -31,26 +31,6 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
-// textprotoCanonical converts a header name to canonical form
-func textprotoCanonical(s string) string {
-	// Simple implementation - capitalize each word
-	words := strings.Split(s, "-")
-	for i, word := range words {
-		if len(word) > 0 {
-			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-		}
-	}
-	return strings.Join(words, "-")
-}
-
-// pluralize returns "y" or "ies" based on count
-func pluralize(count int) string {
-	if count == 1 {
-		return "y"
-	}
-	return "ies"
-}
-
 // parseARCResult parses ARC result from Authentication-Results
 // Example: arc=pass
 func (a *AuthenticationAnalyzer) parseARCResult(part string) *model.ARCResult {

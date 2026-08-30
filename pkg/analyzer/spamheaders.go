@@ -23,28 +23,8 @@ package analyzer
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 )
-
-// parseFloat32 parses a header field as a float32, reporting whether it held a
-// number.
-func parseFloat32(s string) (float32, bool) {
-	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
-	if err != nil {
-		return 0, false
-	}
-	return float32(v), true
-}
-
-// extractFloatField parses re's first capture group in header as a float32.
-func extractFloatField(header string, re *regexp.Regexp) (float32, bool) {
-	matches := re.FindStringSubmatch(header)
-	if len(matches) < 2 {
-		return 0, false
-	}
-	return parseFloat32(matches[1])
-}
 
 // The threshold both scanners report the same way in their X-Spam-Status, e.g.
 // "required=5.0". The leading boundary keeps another scanner's prefixed field
