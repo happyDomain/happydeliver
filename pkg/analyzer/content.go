@@ -24,6 +24,7 @@ package analyzer
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -585,7 +586,7 @@ func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) boo
 	}
 
 	// Check for IP address instead of domain
-	if c.isIPAddress(parsedURL.Host) {
+	if c.isIPAddress(parsedURL.Hostname()) {
 		return true
 	}
 
@@ -617,33 +618,18 @@ func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) boo
 	return false
 }
 
-// isIPAddress checks if a string is an IP address
+// isIPAddress reports whether a URL host names an IP address literally rather
+// than through a domain. It accepts a raw Host, port and IPv6 brackets included,
+// as well as a Hostname().
 func (c *ContentAnalyzer) isIPAddress(host string) bool {
-	// Remove port if present
-	if idx := strings.LastIndex(host, ":"); idx != -1 {
-		host = host[:idx]
+	if hostname, _, err := net.SplitHostPort(host); err == nil {
+		host = hostname
 	}
 
-	// Simple check for IPv4
-	parts := strings.Split(host, ".")
-	if len(parts) == 4 {
-		for _, part := range parts {
-			// Check if all characters are digits
-			for _, ch := range part {
-				if !unicode.IsDigit(ch) {
-					return false
-				}
-			}
-		}
-		return true
-	}
+	// An IPv6 literal keeps its brackets in a URL host, but never in an address.
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 
-	// Check for IPv6 (contains colons)
-	if strings.Contains(host, ":") {
-		return true
-	}
-
-	return false
+	return net.ParseIP(host) != nil
 }
 
 // genericLinkTexts describe the action rather than the destination, and so

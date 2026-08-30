@@ -350,12 +350,11 @@ func TestIsSuspiciousURL(t *testing.T) {
 	}
 }
 
-// TestIsIPAddress exercises isIPAddress, a deliberately loose heuristic
-// rather than strict IP parsing: after stripping a trailing ":<port>", a
-// host counts as an IP if it's 4 dot-separated all-digit groups (IPv4, e.g.
-// "192.168.1.1") or simply contains any ":" at all (treated as IPv6, e.g.
-// "2001:db8::1" — no bracket or format validation). Anything else, including
-// "localhost" and ordinary domains/subdomains, is not an IP.
+// TestIsIPAddress exercises isIPAddress, which parses the host as an address
+// instead of guessing at its shape: a port and the brackets of an IPv6 literal
+// are stripped first, then the rest has to be an address net.ParseIP accepts.
+// Anything else — "localhost", ordinary domains and subdomains, and dotted
+// quads whose numbers are out of range — is not an IP.
 func TestIsIPAddress(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -376,6 +375,21 @@ func TestIsIPAddress(t *testing.T) {
 			name:     "IPv6 address",
 			host:     "2001:db8::1",
 			expected: true,
+		},
+		{
+			name:     "IPv6 literal with brackets and port",
+			host:     "[2001:db8::1]:8080",
+			expected: true,
+		},
+		{
+			name:     "Dotted quad out of range",
+			host:     "999.999.999.999",
+			expected: false,
+		},
+		{
+			name:     "Four empty labels",
+			host:     "...",
+			expected: false,
 		},
 		{
 			name:     "Domain name",
