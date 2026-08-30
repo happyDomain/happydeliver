@@ -50,3 +50,10 @@ func extractFloatField(header string, re *regexp.Regexp) (float32, bool) {
 	}
 	return parseFloat32(matches[1])
 }
+
+// normalizeHostname puts a hostname in comparable form: lowercased, trimmed,
+// and without the root dot, so that "Mail.Example.Com." and "mail.example.com"
+// are recognised as the same host.
+func normalizeHostname(hostname string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
+}

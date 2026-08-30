@@ -23,7 +23,6 @@ package analyzer
 
 import (
 	"context"
-	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 )
@@ -66,12 +65,12 @@ func (d *DNSAnalyzer) checkPTRAndForward(ip string) ([]string, []string) {
 // checkHeloPtrMatch reports whether the announced HELO hostname matches one of
 // the sender's PTR records (case-insensitive, trailing dot ignored).
 func checkHeloPtrMatch(helo string, ptrRecords []string) bool {
-	helo = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(helo)), ".")
+	helo = normalizeHostname(helo)
 	if helo == "" {
 		return false
 	}
 	for _, ptr := range ptrRecords {
-		if strings.TrimSuffix(strings.ToLower(ptr), ".") == helo {
+		if normalizeHostname(ptr) == helo {
 			return true
 		}
 	}

@@ -535,7 +535,7 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 
 		// Hostname() drops the port and the brackets of an IPv6 literal, which
 		// a manual cut at the last colon would slice in half.
-		actualDomain = strings.TrimSuffix(parsedURL.Hostname(), ".")
+		actualDomain = normalizeHostname(parsedURL.Hostname())
 	default:
 		// Skip checks for other URL schemes (tel, etc.)
 		return false
