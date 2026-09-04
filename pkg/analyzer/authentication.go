@@ -50,9 +50,18 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, auth
 		a.parseAuthenticationResultsHeader(header, results)
 	}
 
-	// If no Authentication-Results headers, try to parse legacy headers
+	// If the Authentication-Results headers reported no verdict on the envelope
+	// sender, fall back to the legacy Received-SPF ones, which may carry either
+	// identity. They are only consulted then: when the modern headers did report
+	// that verdict, they are the authority, and a stray Received-SPF written by
+	// another hop must not add a HELO penalty of its own.
 	if results.Spf == nil {
-		results.Spf = a.parseLegacySPF(email, authservID)
+		legacySpf, legacyHelo := a.parseLegacySPF(email, authservID)
+
+		results.Spf = legacySpf
+		if results.SpfHelo == nil {
+			results.SpfHelo = legacyHelo
+		}
 	}
 
 	// Parse ARC headers if not already parsed from Authentication-Results
@@ -75,6 +84,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 		return
 	}
 
+	// Best envelope sender verdict of this header, kept apart from results.Spf so
+	// that the priority below arbitrates between the methods of this header only.
+	// Across headers the topmost one wins: it was written by the closest hop,
+	// while a header below it was already in the message when that hop received
+	// it, and must never supersede the verdict it gave.
+	var headerSpf *model.AuthResult
+
 	// Skip the authserv-id (first part)
 	for i := 1; i < len(parts); i++ {
 		part := strings.TrimSpace(parts[i])
@@ -82,10 +98,19 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 			continue
 		}
 
-		// Parse SPF
+		// Parse SPF. A header may carry several spf= methods, one per identity
+		// checked: route each of them to the field describing that identity, so a
+		// HELO verdict never stands in for the envelope sender one.
 		if strings.HasPrefix(part, "spf=") {
-			if results.Spf == nil {
-				results.Spf = a.parseSPFResult(part)
+			spfResult := a.parseSPFResult(part)
+
+			if spfResult.Identity != nil && *spfResult.Identity == model.AuthResultIdentityHelo {
+				if results.SpfHelo == nil {
+					results.SpfHelo = spfResult
+				}
+			} else if headerSpf == nil || spfIdentityPriority(spfResult) > spfIdentityPriority(headerSpf) {
+				// An explicit smtp.mailfrom method supersedes one with no ptype
+				headerSpf = spfResult
 			}
 		}
 
@@ -158,6 +183,11 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 			}
 		}
 	}
+
+	// First verdict on the envelope sender wins, whichever header carried it
+	if results.Spf == nil {
+		results.Spf = headerSpf
+	}
 }
 
 // CalculateAuthenticationScore calculates the authentication score from auth results
@@ -182,6 +212,9 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 	// BIMI (10 points)
 	score += 10 * a.calculateBIMIScore(results) / 100
 
+	// Penalty-only: SPF on the HELO identity (up to -5 points on failure)
+	score += 5 * a.calculateSPFHeloScore(results) / 100
+
 	// Penalty-only: IPRev (up to -7 points on failure)
 	if iprevScore := a.calculateIPRevScore(results); iprevScore < 100 {
 		score += 7 * (iprevScore - 100) / 100
@@ -196,9 +229,12 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 	// Penalty-only: X-TLS / transport encryption (-10 points when not encrypted)
 	score += 10 * a.calculateXTLSScore(results) / 100
 
-	// Ensure score doesn't exceed 100
+	// Keep the score within bounds: the penalties above can add up to more than
+	// what the core checks award, so the total may go below zero
 	if score > 100 {
 		score = 100
+	} else if score < 0 {
+		score = 0
 	}
 
 	return score, ScoreToGrade(score)

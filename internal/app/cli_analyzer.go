@@ -281,6 +281,18 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			fmt.Fprintln(writer)
 		}
 
+		// SPF for the HELO identity, when the receiver checked it too
+		if auth.SpfHelo != nil {
+			fmt.Fprintf(writer, "\n  SPF (HELO): %s", strings.ToUpper(string(auth.SpfHelo.Result)))
+			if auth.SpfHelo.Domain != nil {
+				fmt.Fprintf(writer, " (domain: %s)", *auth.SpfHelo.Domain)
+			}
+			if auth.SpfHelo.Details != nil {
+				fmt.Fprintf(writer, "\n    Details: %s", *auth.SpfHelo.Details)
+			}
+			fmt.Fprintln(writer)
+		}
+
 		// DKIM
 		if auth.Dkim != nil && len(*auth.Dkim) > 0 {
 			fmt.Fprintln(writer, "\n  DKIM:")

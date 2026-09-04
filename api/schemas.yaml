@@ -565,7 +565,18 @@ components:
       type: object
       properties:
         spf:
-          $ref: '#/components/schemas/AuthResult'
+          allOf:
+            - $ref: '#/components/schemas/AuthResult'
+          description: >-
+            SPF result for the envelope sender (smtp.mailfrom). This is the result that
+            authenticates the sender and feeds DMARC alignment.
+        spf_helo:
+          allOf:
+            - $ref: '#/components/schemas/AuthResult'
+          description: >-
+            SPF result for the HELO/EHLO identity (smtp.helo), when the receiver reports it
+            alongside the envelope sender check. Informational: only `spf` authenticates the
+            sender for DMARC purposes.
         dkim:
           type: array
           items:
@@ -611,6 +622,13 @@ components:
           type: string
           description: DKIM selector (for DKIM only)
           example: "default"
+        identity:
+          type: string
+          enum: [mailfrom, helo]
+          description: >-
+            SPF identity the result applies to (for SPF only): the envelope sender
+            (smtp.mailfrom) or the HELO/EHLO name (smtp.helo).
+          example: "mailfrom"
         details:
           type: string
           description: Additional details about the result

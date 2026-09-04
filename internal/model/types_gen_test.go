@@ -55,6 +55,9 @@ func TestEnumValidKnownMembers(t *testing.T) {
 		{"ARCResultResult", []func() bool{
 			ARCResultResultFail.Valid, ARCResultResultNone.Valid, ARCResultResultPass.Valid,
 		}},
+		{"AuthResultIdentity", []func() bool{
+			AuthResultIdentityHelo.Valid, AuthResultIdentityMailfrom.Valid,
+		}},
 		{"AuthResultResult", []func() bool{
 			AuthResultResultDeclined.Valid, AuthResultResultDomainPass.Valid, AuthResultResultFail.Valid,
 			AuthResultResultInvalid.Valid, AuthResultResultMissing.Valid, AuthResultResultNeutral.Valid,
@@ -212,6 +215,7 @@ func TestEnumValidRejectsUnknown(t *testing.T) {
 	const bogus = "definitely-not-a-valid-enum-member"
 	rejects := []func() bool{
 		ARCResultResult(bogus).Valid,
+		AuthResultIdentity(bogus).Valid,
 		AuthResultResult(bogus).Valid,
 		BlacklistCheckResponseGrade(bogus).Valid,
 		ContentAnalysisUnsubscribeMethods(bogus).Valid,

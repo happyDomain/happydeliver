@@ -291,8 +291,8 @@
         {/if}
 
         <!-- SPF (Required) -->
-        <div class="list-group-item">
-            <div class="d-flex align-items-start" id="authentication-spf">
+        <div class="list-group-item" id="authentication-spf">
+            <div class="d-flex align-items-start">
                 {#if authentication.spf}
                     <i
                         class="bi {getAuthResultIcon(
@@ -324,6 +324,25 @@
                                 style="white-space: pre-wrap">{authentication.spf.details}</pre>
                         {/if}
                     </div>
+                {:else if authentication.spf_helo}
+                    <!-- Only the HELO identity was checked: SPF ran, it just reported nothing
+                         about the envelope sender, which is not the same as a missing policy. -->
+                    <i
+                        class="bi {getAuthResultIcon('none', false)} {getAuthResultClass(
+                            'none',
+                            false,
+                        )} me-2 fs-5"
+                    ></i>
+                    <div>
+                        <strong>SPF</strong>
+                        <span class="text-uppercase ms-2 {getAuthResultClass('none', false)}">
+                            Not checked
+                        </span>
+                        <div class="text-muted small">
+                            The receiver only checked the HELO identity below, so it reported no
+                            verdict for the envelope sender.
+                        </div>
+                    </div>
                 {:else}
                     <i
                         class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass(
@@ -342,6 +361,47 @@
                     </div>
                 {/if}
             </div>
+
+            <!-- SPF checked against the HELO identity, when the receiver reports it -->
+            {#if authentication.spf_helo}
+                <div class="d-flex align-items-start mt-3">
+                    <i
+                        class="bi {getAuthResultIcon(
+                            authentication.spf_helo.result,
+                            true,
+                        )} {getAuthResultClass(authentication.spf_helo.result, true)} me-2 fs-5"
+                    ></i>
+                    <div>
+                        <strong>SPF (HELO)</strong>
+                        <span
+                            class="text-uppercase ms-2 {getAuthResultClass(
+                                authentication.spf_helo.result,
+                                true,
+                            )}"
+                        >
+                            {authentication.spf_helo.result}
+                        </span>
+                        <div class="text-muted small">
+                            Checked against the hostname the sending server announced, not against
+                            the envelope sender.
+                        </div>
+                        {#if authentication.spf_helo.domain}
+                            <div class="small">
+                                <strong>Hostname:</strong>
+                                <span class="text-muted">{authentication.spf_helo.domain}</span>
+                            </div>
+                        {/if}
+                        {#if authentication.spf_helo.details}
+                            <pre
+                                class="p-2 mb-0 {$theme === 'light'
+                                    ? 'bg-light'
+                                    : 'bg-secondary'} text-muted small"
+                                style="white-space: pre-wrap">{authentication.spf_helo
+                                    .details}</pre>
+                        {/if}
+                    </div>
+                </div>
+            {/if}
         </div>
 
         <!-- DKIM (Required) -->
