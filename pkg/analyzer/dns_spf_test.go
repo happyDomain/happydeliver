@@ -25,6 +25,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // TestValidateSPF exercises validateSPF (and the isValidSPFMechanism check
@@ -331,5 +334,217 @@ func TestNoSPFRecordErrorPlain(t *testing.T) {
 	}
 	if got := noSPFRecordError([]string{"some unrelated txt value"}); got != "No SPF record found" {
 		t.Errorf("noSPFRecordError(unrelated) = %q, want plain message", got)
+	}
+}
+
+func TestCheckHeloSPFRecord(t *testing.T) {
+	tests := []struct {
+		name             string
+		helo             string
+		txt              map[string][]string
+		errMap           map[string]error
+		wantValid        bool
+		wantRecord       *string
+		wantAllQualifier *model.SPFRecordAllQualifier
+		wantErrSubst     string
+	}{
+		{
+			name: "HELO hostname publishes a valid policy",
+			helo: "mail.example.com",
+			txt: map[string][]string{
+				"mail.example.com": {"v=spf1 ip4:192.0.2.10 -all"},
+			},
+			wantValid:        true,
+			wantRecord:       utils.PtrTo("v=spf1 ip4:192.0.2.10 -all"),
+			wantAllQualifier: utils.PtrTo(model.SPFRecordAllQualifier("-")),
+		},
+		{
+			// The common case: a relay hostname carries no policy of its own
+			name:         "no SPF record",
+			helo:         "mail.example.com",
+			txt:          map[string][]string{"mail.example.com": {"some-unrelated-txt"}},
+			wantErrSubst: "No SPF record found",
+		},
+		{
+			name:         "hostname does not resolve",
+			helo:         "mail.example.com",
+			txt:          map[string][]string{},
+			wantErrSubst: "Failed to lookup TXT records",
+		},
+		{
+			name: "multiple SPF records",
+			helo: "mail.example.com",
+			txt: map[string][]string{
+				"mail.example.com": {"v=spf1 ip4:192.0.2.10 -all", "v=spf1 ip4:192.0.2.11 -all"},
+			},
+			wantRecord:   utils.PtrTo("v=spf1 ip4:192.0.2.10 -all"),
+			wantErrSubst: "Multiple SPF records found",
+		},
+		{
+			name: "invalid policy is reported but stays informational",
+			helo: "mail.example.com",
+			txt: map[string][]string{
+				"mail.example.com": {"v=spf1 include=example.net -all"},
+			},
+			wantRecord:   utils.PtrTo("v=spf1 include=example.net -all"),
+			wantErrSubst: "should use ':' not '='",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := newMockAnalyzer(tt.txt, tt.errMap)
+
+			result := analyzer.checkHeloSPFRecord(tt.helo)
+
+			if result == nil {
+				t.Fatal("checkHeloSPFRecord() = nil, want a result")
+			}
+			if result.Domain == nil || *result.Domain != tt.helo {
+				t.Errorf("Domain = %v, want %v", result.Domain, tt.helo)
+			}
+			if result.Valid != tt.wantValid {
+				t.Errorf("Valid = %v, want %v", result.Valid, tt.wantValid)
+			}
+
+			if tt.wantRecord == nil {
+				if result.Record != nil {
+					t.Errorf("Record = %q, want none", *result.Record)
+				}
+			} else if result.Record == nil || *result.Record != *tt.wantRecord {
+				t.Errorf("Record = %v, want %q", result.Record, *tt.wantRecord)
+			}
+
+			if tt.wantAllQualifier == nil {
+				if result.AllQualifier != nil {
+					t.Errorf("AllQualifier = %q, want none", *result.AllQualifier)
+				}
+			} else if result.AllQualifier == nil || *result.AllQualifier != *tt.wantAllQualifier {
+				t.Errorf("AllQualifier = %v, want %q", result.AllQualifier, *tt.wantAllQualifier)
+			}
+
+			if tt.wantErrSubst == "" {
+				if result.Error != nil {
+					t.Errorf("Error = %q, want none", *result.Error)
+				}
+			} else if result.Error == nil || !strings.Contains(*result.Error, tt.wantErrSubst) {
+				t.Errorf("Error = %v, want it to contain %q", result.Error, tt.wantErrSubst)
+			}
+		})
+	}
+}
+
+// TestCheckHeloSPFRecordDoesNotAffectScore pins the informational nature of the
+// check: whatever it finds, it must not move the DNS SPF score.
+func TestCheckHeloSPFRecordDoesNotAffectScore(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+
+	results := &model.DNSResults{
+		FromDomain: "example.com",
+		SpfRecords: &[]model.SPFRecord{
+			{
+				Domain:       utils.PtrTo("example.com"),
+				Record:       utils.PtrTo("v=spf1 ip4:192.0.2.10 -all"),
+				Valid:        true,
+				AllQualifier: utils.PtrTo(model.SPFRecordAllQualifier("-")),
+			},
+		},
+	}
+
+	want := analyzer.calculateSPFScore(results)
+
+	for _, heloRecord := range []*model.SPFRecord{
+		{Domain: utils.PtrTo("mail.example.com"), Error: utils.PtrTo("No SPF record found")},
+		{Domain: utils.PtrTo("mail.example.com"), Valid: true, Record: utils.PtrTo("v=spf1 -all")},
+	} {
+		results.HeloSpfRecord = heloRecord
+
+		if got := analyzer.calculateSPFScore(results); got != want {
+			t.Errorf("calculateSPFScore() = %d with a HELO record, want %d", got, want)
+		}
+	}
+}
+
+// TestHeloLookupName pins which announcements are worth a DNS lookup: the name
+// comes verbatim from the Received header, so it is not always a hostname.
+func TestHeloLookupName(t *testing.T) {
+	tests := []struct {
+		name string
+		helo string
+		want string
+	}{
+		{
+			name: "hostname",
+			helo: "mail.example.com",
+			want: "mail.example.com",
+		},
+		{
+			// Announcements are compared and looked up in their canonical form
+			name: "hostname is normalized",
+			helo: "  Mail.Example.Com.  ",
+			want: "mail.example.com",
+		},
+		{
+			// Postfix's placeholder when the reverse lookup fails
+			name: "unknown",
+			helo: "unknown",
+			want: "",
+		},
+		{
+			name: "address literal",
+			helo: "[192.0.2.1]",
+			want: "",
+		},
+		{
+			name: "IPv6 address literal",
+			helo: "[IPv6:2001:db8::1]",
+			want: "",
+		},
+		{
+			name: "bare address",
+			helo: "192.0.2.1",
+			want: "",
+		},
+		{
+			// A single label can never hold a policy of its own
+			name: "single label",
+			helo: "localhost",
+			want: "",
+		},
+		{
+			name: "empty",
+			helo: "   ",
+			want: "",
+		},
+		{
+			// An empty label makes the name unqueryable
+			name: "empty label",
+			helo: "mail..example.com",
+			want: "",
+		},
+		{
+			name: "dots only",
+			helo: "..",
+			want: "",
+		},
+		{
+			// Underscores are not allowed in a hostname (RFC 1123 section 2.1)
+			name: "underscore",
+			helo: "mail_relay.example.com",
+			want: "",
+		},
+		{
+			name: "label starting with a hyphen",
+			helo: "-mail.example.com",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := heloLookupName(tt.helo); got != tt.want {
+				t.Errorf("heloLookupName(%q) = %q, want %q", tt.helo, got, tt.want)
+			}
+		})
 	}
 }

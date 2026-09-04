@@ -177,6 +177,30 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			}
 		}
 
+		// SPF record of the announced HELO hostname: a recommendation, never a
+		// failure, so it is never marked as an error
+		if dns.HeloSpfRecord != nil {
+			helo := dns.HeloSpfRecord
+			status := "ℹ"
+			if helo.Valid {
+				status = "✓"
+			}
+			fmt.Fprintf(writer, "\n  SPF Record for the HELO hostname (optional):\n    %s ", status)
+			if helo.Domain != nil {
+				fmt.Fprintf(writer, "Hostname: %s", *helo.Domain)
+			}
+			if helo.AllQualifier != nil {
+				fmt.Fprintf(writer, " (all: %s)", *helo.AllQualifier)
+			}
+			fmt.Fprintln(writer)
+			if helo.Record != nil {
+				fmt.Fprintf(writer, "      %s\n", *helo.Record)
+			}
+			if helo.Error != nil {
+				fmt.Fprintf(writer, "      NOTE: %s\n", *helo.Error)
+			}
+		}
+
 		// DKIM Records
 		if dns.DkimRecords != nil && len(*dns.DkimRecords) > 0 {
 			fmt.Fprintln(writer, "\n  DKIM Records:")

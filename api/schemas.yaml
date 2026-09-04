@@ -899,6 +899,13 @@ components:
         helo_ptr_match:
           type: boolean
           description: Whether the announced HELO hostname matches one of the sender's PTR records (case-insensitive)
+        helo_spf_record:
+          allOf:
+            - $ref: '#/components/schemas/SPFRecord'
+          description: >-
+            SPF record published for the announced HELO/EHLO hostname. Informational only:
+            publishing one lets receivers authenticate the HELO identity, but its absence is
+            a recommendation rather than an error and never affects any score.
         return_ok:
           $ref: '#/components/schemas/ReturnOK'
         errors:

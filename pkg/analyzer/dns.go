@@ -123,6 +123,16 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	// SPF validates the MAIL FROM command, which corresponds to Return-Path
 	results.SpfRecords = d.checkSPFRecords(spfDomain)
 
+	// Check whether the announced HELO hostname publishes a policy of its own,
+	// which lets receivers authenticate the HELO identity as well. Purely
+	// informational: it is a recommendation, never a failure. Skipped entirely
+	// when nothing publishable was announced, as no record could be recommended.
+	if results.HeloHostname != nil {
+		if helo := heloLookupName(*results.HeloHostname); helo != "" {
+			results.HeloSpfRecord = d.checkHeloSPFRecord(helo)
+		}
+	}
+
 	// Check DKIM records by parsing DKIM-Signature headers directly
 	for _, sig := range parseDKIMSignatures(email.Header["Dkim-Signature"]) {
 		dkimRecord := d.checkDKIMRecord(sig)

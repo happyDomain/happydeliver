@@ -24,6 +24,7 @@ package analyzer
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 
@@ -114,19 +115,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	if validationErr != nil {
 		errMsg = utils.PtrTo(validationErr.Error())
 	} else {
-		// Extract qualifier from the "all" mechanism
-		if strings.HasSuffix(spfRecord, " -all") {
-			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("-"))
-		} else if strings.HasSuffix(spfRecord, " ~all") {
-			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("~"))
-		} else if strings.HasSuffix(spfRecord, " +all") {
-			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("+"))
-		} else if strings.HasSuffix(spfRecord, " ?all") {
-			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("?"))
-		} else if strings.HasSuffix(spfRecord, " all") {
-			// Implicit + qualifier (default)
-			allQualifier = utils.PtrTo(model.SPFRecordAllQualifier("+"))
-		}
+		allQualifier = extractSPFAllQualifier(spfRecord)
 	}
 
 	results = append(results, model.SPFRecord{
@@ -159,6 +148,141 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	return &results
+}
+
+// extractSPFAllQualifier returns the qualifier of the record's "all" mechanism,
+// or nil when the record ends with no such mechanism.
+func extractSPFAllQualifier(record string) *model.SPFRecordAllQualifier {
+	switch {
+	case strings.HasSuffix(record, " -all"):
+		return utils.PtrTo(model.SPFRecordAllQualifier("-"))
+	case strings.HasSuffix(record, " ~all"):
+		return utils.PtrTo(model.SPFRecordAllQualifier("~"))
+	case strings.HasSuffix(record, " +all"):
+		return utils.PtrTo(model.SPFRecordAllQualifier("+"))
+	case strings.HasSuffix(record, " ?all"):
+		return utils.PtrTo(model.SPFRecordAllQualifier("?"))
+	case strings.HasSuffix(record, " all"):
+		// Implicit + qualifier (default)
+		return utils.PtrTo(model.SPFRecordAllQualifier("+"))
+	default:
+		return nil
+	}
+}
+
+// isValidHostnameSyntax reports whether name has the shape of a domain name:
+// dot-separated labels of 1 to 63 characters made of letters, digits and
+// hyphens, none of them starting or ending with a hyphen (RFC 1123 section
+// 2.1), for a total of at most 253 characters.
+func isValidHostnameSyntax(name string) bool {
+	if name == "" || len(name) > 253 {
+		return false
+	}
+
+	for _, label := range strings.Split(name, ".") {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+
+		for i := 0; i < len(label); i++ {
+			switch c := label[i]; {
+			case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '-':
+			default:
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// heloLookupName normalizes the hostname announced at HELO/EHLO into a name that
+// could carry a policy of its own, or returns "" when the announcement is not
+// one.
+//
+// That name is taken verbatim from the Received header and is not always a
+// hostname: Postfix writes "unknown" when the reverse lookup fails, RFC 5321
+// section 4.1.3 allows an address literal, a single label can never hold a
+// policy, and what is left is not even always well formed. Recommending a record
+// for any of those would be nonsense, and the announcement being bogus is
+// already reported by the HELO/PTR check.
+func heloLookupName(helo string) string {
+	name := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(helo)), ".")
+
+	switch {
+	case name == "" || name == "unknown":
+		// Postfix's placeholder for a client it could not resolve
+		return ""
+	case strings.HasPrefix(name, "["):
+		// Address literal: [192.0.2.1] or [IPv6:2001:db8::1]
+		return ""
+	case net.ParseIP(name) != nil:
+		// Bare address, as announced by some clients
+		return ""
+	case !strings.Contains(name, "."):
+		// Single label (localhost, a LAN name): nothing publishable under it
+		return ""
+	case !isValidHostnameSyntax(name):
+		// Malformed announcement (an empty label, an underscore, a stray
+		// character): no such name could be queried, let alone published
+		return ""
+	}
+
+	return name
+}
+
+// checkHeloSPFRecord looks up the SPF policy published for the hostname the
+// sending server announced at HELO/EHLO.
+//
+// This is purely informational and never feeds a score: most relays publish no
+// policy for their own hostname, which is not a misconfiguration. Publishing one
+// simply lets receivers authenticate the HELO identity too, which matters for
+// bounces, where the envelope sender is empty and HELO is all SPF can check.
+// Unlike the envelope sender policy, include: directives are not resolved here.
+func (d *DNSAnalyzer) checkHeloSPFRecord(helo string) *model.SPFRecord {
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	result := &model.SPFRecord{Domain: &helo}
+
+	txtRecords, err := d.resolver.LookupTXT(ctx, helo)
+	if err != nil {
+		result.Error = utils.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %s", formatDNSError(err)))
+		return result
+	}
+
+	var spfRecords []string
+	for _, txt := range txtRecords {
+		if strings.HasPrefix(txt, "v=spf1") {
+			spfRecords = append(spfRecords, txt)
+		}
+	}
+
+	if len(spfRecords) == 0 {
+		result.Error = utils.PtrTo(noSPFRecordError(txtRecords))
+		return result
+	}
+
+	result.Record = &spfRecords[0]
+
+	if len(spfRecords) > 1 {
+		result.Error = utils.PtrTo("Multiple SPF records found (RFC violation)")
+		return result
+	}
+
+	if err := d.validateSPF(spfRecords[0], true); err != nil {
+		result.Error = utils.PtrTo(err.Error())
+		return result
+	}
+
+	result.Valid = true
+	result.AllQualifier = extractSPFAllQualifier(spfRecords[0])
+
+	return result
 }
 
 // noSPFRecordError explains the absence of an SPF record, hinting at the likely

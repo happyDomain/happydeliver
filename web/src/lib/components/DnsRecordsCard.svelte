@@ -7,6 +7,7 @@
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import GradeDisplay from "./GradeDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
+    import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
@@ -101,6 +102,14 @@
                     heloPtrMatch={dnsResults.helo_ptr_match}
                 />
 
+                <!-- SPF policy published for the announced HELO hostname (optional) -->
+                <HeloSpfRecordDisplay
+                    heloSpfRecord={dnsResults.helo_spf_record}
+                    senderDomain={dnsResults.rp_domain ?? dnsResults.from_domain}
+                    senderOrgDomain={domainAlignment?.return_path_org_domain ??
+                        domainAlignment?.from_org_domain}
+                />
+
                 <!-- Return Address Reachability (ReturnOK) -->
                 <ReturnOkDisplay returnOk={dnsResults.return_ok} />
 
@@ -154,8 +163,7 @@
                     </h4>
                     {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                         <span class="badge bg-danger ms-2">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path
-                            domain
+                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain
                         </span>
                     {/if}
                 </div>
