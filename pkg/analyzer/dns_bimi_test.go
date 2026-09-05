@@ -35,21 +35,25 @@ import (
 
 func TestCheckBIMIRecordLookup(t *testing.T) {
 	tests := []struct {
-		name         string
-		domain       string
-		txt          map[string][]string
-		wantValid    bool
-		wantLogoURL  string
-		wantVMCURL   string
-		wantErrSubst string
+		name        string
+		domain      string
+		txt         map[string][]string
+		wantValid   bool
+		wantLogoURL string
+		wantVMCURL  string
+		// wantRecordDom, when set, is the domain the record must be
+		// reported as coming from.
+		wantRecordDom string
+		wantErrSubst  string
 	}{
 		{
 			name:   "no BIMI record published",
 			domain: "example.com",
 			txt:    map[string][]string{},
-			// _bimi lookup returns NXDOMAIN via the mock resolver
+			// The _bimi location does not exist: that is the absence of a
+			// record, not a failure to look one up.
 			wantValid:    false,
-			wantErrSubst: "Failed to lookup BIMI record",
+			wantErrSubst: "No BIMI record found",
 		},
 		{
 			name:   "malformed record (missing version)",
@@ -69,6 +73,15 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 			},
 			// No assets to fetch: all checks skipped, record stays valid.
 			wantValid: true,
+		},
+		{
+			name:   "record inherited from the organizational domain",
+			domain: "news.example.com",
+			txt: map[string][]string{
+				"default._bimi.example.com": {"v=BIMI1; l=;"},
+			},
+			wantValid:     true,
+			wantRecordDom: "example.com",
 		},
 	}
 
@@ -92,6 +105,14 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 			if tt.wantVMCURL != "" {
 				if rec.VmcUrl == nil || *rec.VmcUrl != tt.wantVMCURL {
 					t.Errorf("VmcUrl = %v, want %q", rec.VmcUrl, tt.wantVMCURL)
+				}
+			}
+			if tt.wantRecordDom != "" {
+				if rec.RecordDomain == nil || *rec.RecordDomain != tt.wantRecordDom {
+					t.Errorf("RecordDomain = %v, want %q", rec.RecordDomain, tt.wantRecordDom)
+				}
+				if rec.Domain != tt.domain {
+					t.Errorf("Domain = %q, want the queried domain %q", rec.Domain, tt.domain)
 				}
 			}
 			if tt.wantErrSubst != "" {

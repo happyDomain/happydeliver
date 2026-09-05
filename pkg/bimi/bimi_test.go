@@ -23,19 +23,35 @@ package bimi
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"testing"
 	"time"
 )
 
-// stubResolver returns canned TXT records (or an error) for LookupTXT.
+// stubResolver returns canned TXT records (or an error) for LookupTXT. txt
+// answers every name, which suits the tests that visit a single location;
+// byName answers per queried name and takes precedence, so a test can tell the
+// queried domain's location apart from its organizational domain's. A name
+// missing from byName does not exist, as the DNS would report it.
 type stubResolver struct {
-	txt []string
-	err error
+	txt    []string
+	byName map[string][]string
+	err    error
 }
 
 func (r stubResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
-	return r.txt, r.err
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.byName == nil {
+		return r.txt, nil
+	}
+	txt, ok := r.byName[name]
+	if !ok {
+		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+	}
+	return txt, nil
 }
 
 func TestNewValidator(t *testing.T) {
@@ -63,5 +79,30 @@ func TestValidatorDefaults(t *testing.T) {
 	before := time.Now().Add(-time.Minute)
 	if got := v.now(); got.Before(before) {
 		t.Errorf("now() = %s, expected a recent time", got)
+	}
+}
+
+func TestDefaultOrganizationalDomain(t *testing.T) {
+	tests := []struct {
+		domain string
+		want   string
+	}{
+		{"example.com", "example.com"},
+		{"news.example.com", "example.com"},
+		{"a.b.c.example.com", "example.com"},
+		{"example.co.uk", "example.co.uk"},
+		{"news.example.co.uk", "example.co.uk"},
+		{"News.Example.COM.", "example.com"},
+		// A public suffix has no organizational domain of its own.
+		{"co.uk", ""},
+		{"com", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.domain, func(t *testing.T) {
+			if got := DefaultOrganizationalDomain(tt.domain); got != tt.want {
+				t.Errorf("DefaultOrganizationalDomain(%q) = %q, want %q", tt.domain, got, tt.want)
+			}
+		})
 	}
 }

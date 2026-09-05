@@ -51,7 +51,10 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 const (
@@ -127,8 +130,13 @@ func (c Check) MessageTexts() []string {
 type Record struct {
 	// Selector is the BIMI selector queried (e.g. "default").
 	Selector string
-	// Domain is the domain the record belongs to.
+	// Domain is the domain the analysis was requested for (the Author
+	// Domain).
 	Domain string
+	// RecordDomain is the domain the record was actually found at: Domain,
+	// or its organizational domain when the Author Domain publishes no
+	// record of its own and inherits that one.
+	RecordDomain string
 	// Record is the raw TXT record content.
 	Record string
 	// LogoURL is the value of the l= tag (empty for a declination record).
@@ -151,6 +159,14 @@ type Record struct {
 	VMC *VMCInfo
 }
 
+// Inherited reports whether the record was found at the Author Domain's
+// organizational domain rather than at the Author Domain itself, through the
+// Assertion Record discovery fallback. Such a record applies to the queried
+// domain, but is published and controlled by its organizational domain.
+func (r *Record) Inherited() bool {
+	return r.RecordDomain != "" && !strings.EqualFold(r.RecordDomain, r.Domain)
+}
+
 // Resolver looks up DNS TXT records. *net.Resolver satisfies it.
 type Resolver interface {
 	LookupTXT(ctx context.Context, name string) ([]string, error)
@@ -170,9 +186,35 @@ type Validator struct {
 	HTTPClient *http.Client
 	// Resolver performs the DNS TXT lookup.
 	Resolver Resolver
+	// OrganizationalDomain returns the organizational domain of a domain,
+	// for the fallback lookup Assertion Record discovery performs when the
+	// queried domain publishes no record of its own. It returns an empty
+	// string when the domain has none. Defaults to
+	// DefaultOrganizationalDomain; a caller that already has its own notion
+	// of organizational domain should install it here so BIMI agrees with
+	// the rest of its analysis.
+	OrganizationalDomain func(domain string) string
 	// Now returns the reference time for certificate validity checks.
 	// Defaults to time.Now.
 	Now func() time.Time
+}
+
+// DefaultOrganizationalDomain returns the organizational domain of domain: its
+// eTLD+1 according to the Public Suffix List, which is the definition DMARC
+// [RFC7489] gives and BIMI refers to. It returns an empty string when the
+// domain has no organizational domain, a public suffix itself for instance.
+func DefaultOrganizationalDomain(domain string) string {
+	org, err := publicsuffix.EffectiveTLDPlusOne(normalizeDomain(domain))
+	if err != nil {
+		return ""
+	}
+	return org
+}
+
+// normalizeDomain puts a domain name in the form comparisons and PSL lookups
+// expect: lowercase and without the root label's trailing dot.
+func normalizeDomain(domain string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
 }
 
 // NewValidator returns a Validator ready to use, backed by a default HTTP
@@ -184,6 +226,13 @@ func NewValidator() *Validator {
 		HTTPClient: NewHTTPClient(0),
 		Resolver:   &net.Resolver{},
 	}
+}
+
+func (v *Validator) organizationalDomain(domain string) string {
+	if v.OrganizationalDomain != nil {
+		return v.OrganizationalDomain(domain)
+	}
+	return DefaultOrganizationalDomain(domain)
 }
 
 func (v *Validator) now() time.Time {

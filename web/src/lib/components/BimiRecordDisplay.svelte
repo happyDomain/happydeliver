@@ -24,6 +24,15 @@
 
     type Dot = { status: Status; label: string };
 
+    /* Set when the record was found at the organizational domain because the
+       queried domain publishes none of its own: it applies here, but it is not
+       this domain's to control. */
+    const inheritedFrom: string | undefined = $derived(
+        bimiRecord?.record_domain && bimiRecord.record_domain !== bimiRecord.domain
+            ? bimiRecord.record_domain
+            : undefined,
+    );
+
     /* Dots in the same order as the entries of the expanded view. */
     const checksDots: Dot[] = $derived(
         (bimiRecord?.checks ?? []).map((c) => ({
@@ -167,6 +176,16 @@
                 <strong>Selector:</strong> <code>{bimiRecord.selector}</code>
                 <strong class="ms-3">Domain:</strong> <code>{bimiRecord.domain}</code>
             </div>
+            {#if inheritedFrom}
+                <div class="alert alert-info py-2">
+                    <i class="bi bi-diagram-2 me-1"></i>
+                    <code>{bimiRecord.domain}</code> publishes no BIMI record of its own: the one
+                    shown below is inherited from its organizational domain
+                    <code>{inheritedFrom}</code>. Publish a record at
+                    <code>{bimiRecord.selector}._bimi.{bimiRecord.domain}</code> to give this domain its
+                    own indicator, or a declination record to opt it out.
+                </div>
+            {/if}
             <div class="mb-2">
                 <strong>DNS record:</strong>
                 {#if bimiRecord.record_valid}

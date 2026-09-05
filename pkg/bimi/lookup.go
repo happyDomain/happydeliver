@@ -25,13 +25,74 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 )
 
-// Lookup resolves and parses the BIMI record published at
-// selector._bimi.domain. It returns ErrNoRecord when the name holds no TXT
-// record at all, or the resolver error when the DNS query fails. Assets are
-// not validated; call ValidateAssets or use Analyze for that.
+// bimiLocation is one BIMI DNS location visited during Assertion Record
+// discovery, together with what was published there.
+type bimiLocation struct {
+	// name is the queried DNS name (<selector>._bimi.<domain>).
+	name string
+	// domain is the domain that name belongs to.
+	domain string
+	// txt holds every TXT record published at name.
+	txt []string
+	// bimi holds those of txt that are BIMI records.
+	bimi []string
+}
+
+// isNameNotFound reports whether a resolver error means the queried name holds
+// no record, as opposed to the query having failed to get an answer at all.
+// Assertion Record discovery rests on that distinction: an empty location
+// leads to the organizational domain, whereas a resolution failure must not,
+// or a transient DNS error on a subdomain would silently hand it the
+// Indicator of its parent.
+func isNameNotFound(err error) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
+}
+
+// lookupLocation queries one BIMI location and sorts out what it holds,
+// keeping the records that carry the BIMI version tag apart from the rest. A
+// name that does not exist yields an empty location, not an error.
+func (v *Validator) lookupLocation(ctx context.Context, domain, selector string) (bimiLocation, error) {
+	loc := bimiLocation{
+		name:   fmt.Sprintf("%s._bimi.%s", selector, domain),
+		domain: domain,
+	}
+
+	txtRecords, err := v.Resolver.LookupTXT(ctx, loc.name)
+	if err != nil {
+		if isNameNotFound(err) {
+			return loc, nil
+		}
+		return loc, err
+	}
+
+	// Each element returned by the resolver is one whole TXT record: the
+	// character-strings a single record is split into are concatenated by
+	// the resolver itself. Several records therefore have to be selected
+	// between, never joined together.
+	loc.txt = txtRecords
+	for _, txt := range txtRecords {
+		if hasBIMIVersionTag(txt) {
+			loc.bimi = append(loc.bimi, txt)
+		}
+	}
+
+	return loc, nil
+}
+
+// Lookup performs BIMI Assertion Record discovery for domain and selector: it
+// resolves selector._bimi.domain and, when that name publishes no BIMI record,
+// falls back to selector._bimi.<organizational domain>, the record a domain
+// without one of its own inherits. The record's origin is reported by
+// Record.RecordDomain and Record.Inherited.
+//
+// It returns ErrNoRecord when no visited location holds any TXT record, or the
+// resolver error when a DNS query fails. Assets are not validated; call
+// ValidateAssets or use Analyze for that.
 //
 // A name can hold several TXT records, of which only those starting with the
 // BIMI version tag are BIMI records; publishing more than one of those is an
@@ -42,44 +103,61 @@ func (v *Validator) Lookup(ctx context.Context, domain, selector string) (*Recor
 		return nil, errors.New("bimi: Validator.Resolver is nil")
 	}
 
-	name := fmt.Sprintf("%s._bimi.%s", selector, domain)
-	txtRecords, err := v.Resolver.LookupTXT(ctx, name)
+	author, err := v.lookupLocation(ctx, domain, selector)
 	if err != nil {
 		return nil, err
 	}
-	if len(txtRecords) == 0 {
-		return nil, ErrNoRecord
-	}
+	locations := []bimiLocation{author}
 
-	// Each element returned by the resolver is one whole TXT record: the
-	// character-strings a single record is split into are concatenated by
-	// the resolver itself. Several records therefore have to be selected
-	// between, never joined together.
-	var candidates []string
-	for _, txt := range txtRecords {
-		if hasBIMIVersionTag(txt) {
-			candidates = append(candidates, txt)
+	// A domain publishing no BIMI record inherits the one its organizational
+	// domain publishes for the same selector. Only an empty location leads
+	// there: a record found but unusable, malformed or one of several, is
+	// the domain's own answer and is reported as such rather than papered
+	// over with its parent's.
+	if len(author.bimi) == 0 {
+		if org := v.organizationalDomain(domain); org != "" && org != normalizeDomain(domain) {
+			orgLocation, err := v.lookupLocation(ctx, org, selector)
+			if err != nil {
+				return nil, err
+			}
+			locations = append(locations, orgLocation)
 		}
 	}
 
-	switch len(candidates) {
-	case 0:
-		// No BIMI record here, but something else is: report the record
-		// most likely to explain the misconfiguration.
-		return ParseRecord(domain, selector, mostTellingRecord(txtRecords)), nil
+	for _, loc := range locations {
+		switch len(loc.bimi) {
+		case 0:
+			continue
 
-	case 1:
-		return ParseRecord(domain, selector, candidates[0]), nil
+		case 1:
+			rec := ParseRecord(domain, selector, loc.bimi[0])
+			rec.RecordDomain = loc.domain
+			return rec, nil
 
-	default:
-		return &Record{
-			Selector: selector,
-			Domain:   domain,
-			Record:   strings.Join(candidates, "\n"),
-			Error: fmt.Sprintf("%d BIMI records are published at %s: a domain must publish exactly one, so none of them can be used",
-				len(candidates), name),
-		}, nil
+		default:
+			return &Record{
+				Selector:     selector,
+				Domain:       domain,
+				RecordDomain: loc.domain,
+				Record:       strings.Join(loc.bimi, "\n"),
+				Error: fmt.Sprintf("%d BIMI records are published at %s: a domain must publish exactly one, so none of them can be used",
+					len(loc.bimi), loc.name),
+			}, nil
+		}
 	}
+
+	// No BIMI record anywhere, but something else may be there: report the
+	// record most likely to explain the misconfiguration, preferring the
+	// queried domain's own location over the organizational domain's.
+	for _, loc := range locations {
+		if len(loc.txt) > 0 {
+			rec := ParseRecord(domain, selector, mostTellingRecord(loc.txt))
+			rec.RecordDomain = loc.domain
+			return rec, nil
+		}
+	}
+
+	return nil, ErrNoRecord
 }
 
 // mostTellingRecord picks, among the TXT records found at a BIMI location

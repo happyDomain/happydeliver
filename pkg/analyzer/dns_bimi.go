@@ -65,9 +65,11 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 		Resolver:   d.resolver,
 	}
 
-	// Bound the DNS lookup by d.Timeout, and the asset downloads by their own,
-	// larger budget: pulling a file from a slow host is not the same wait as a
-	// TXT query, and sharing a single deadline would fail a slow-but-valid VMC
+	// Bound Assertion Record discovery by d.Timeout, however many queries it
+	// takes (a domain with no record of its own also queries its
+	// organizational domain), and the asset downloads by their own, larger
+	// budget: pulling a file from a slow host is not the same wait as a TXT
+	// query, and sharing a single deadline would fail a slow-but-valid VMC
 	// once the logo download consumed most of it.
 	lookupCtx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
@@ -104,6 +106,9 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 		Valid:       r.Valid,
 		LogoUrl:     utils.PtrTo(r.LogoURL),
 		VmcUrl:      utils.PtrTo(r.VMCURL),
+	}
+	if r.RecordDomain != "" {
+		m.RecordDomain = utils.PtrTo(r.RecordDomain)
 	}
 	if r.Record != "" {
 		m.Record = utils.PtrTo(r.Record)

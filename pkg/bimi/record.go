@@ -79,9 +79,10 @@ func hasBIMIVersionTag(txt string) bool {
 // Valid is false and Error explains why. No asset is fetched.
 func ParseRecord(domain, selector, txt string) *Record {
 	rec := &Record{
-		Selector: selector,
-		Domain:   domain,
-		Record:   txt,
+		Selector:     selector,
+		Domain:       domain,
+		RecordDomain: domain,
+		Record:       txt,
 	}
 
 	tags, malformed := splitTagList(txt)
