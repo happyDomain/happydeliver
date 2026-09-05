@@ -108,7 +108,7 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 			newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
 				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
 	} else {
-		vmcCheck, vmcInfo := v.analyzeVMCURL(ctx, rec.VMCURL, rec.Domain, logoContent)
+		vmcCheck, vmcInfo := v.analyzeVMCURL(ctx, rec.VMCURL, v.vmcBinding(rec), logoContent)
 		checks = append(checks, vmcCheck)
 		rec.VMC = vmcInfo
 		if vmcCheck.Status == StatusFail {
@@ -120,5 +120,18 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	if !allPassed {
 		rec.Valid = false
 		rec.Error = "BIMI assets failed validation, see detailed checks below"
+	}
+}
+
+// vmcBinding names the Assertion Record a Verified Mark Certificate published
+// by rec must be bound to. Both the queried domain and its organizational
+// domain are acceptable, whichever of them the record was actually found at:
+// a certificate is issued to an organization, and a subdomain that publishes
+// its own record is still covered by the organizational domain's certificate.
+func (v *Validator) vmcBinding(rec *Record) VMCBinding {
+	return VMCBinding{
+		Selector:             rec.Selector,
+		Domain:               rec.Domain,
+		OrganizationalDomain: v.organizationalDomain(rec.Domain),
 	}
 }

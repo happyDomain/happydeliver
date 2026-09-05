@@ -29,6 +29,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -81,17 +82,74 @@ type VMCInfo struct {
 	Error string
 }
 
+// VMCBinding names the BIMI Assertion Record a Verified Mark Certificate must
+// be bound to. The certificate is issued for a domain, not for a host, so the
+// binding carries every name the record may legitimately be identified by
+// rather than a single domain.
+type VMCBinding struct {
+	// Selector is the selector the Assertion Record was found under.
+	Selector string
+	// Domain is the Author Domain the record was requested for.
+	Domain string
+	// OrganizationalDomain is Domain's organizational domain, which a
+	// certificate may name in its stead. Leave empty when Domain has none,
+	// or when it is Domain itself.
+	OrganizationalDomain string
+}
+
+// acceptableSANs returns the dNSName values a Verified Mark Certificate may
+// carry to be bound to this Assertion Record: the Author Domain and its
+// organizational domain, each also in the <selector>._bimi.<domain> form that
+// restricts the certificate to a single selector.
+//
+// This is the domain verification of draft-fetch-validation-vmc-wchuang,
+// Section 5.2, gathered into one set: the specification sorts the certificate
+// names into a "selector-set" and a "domain-set" before comparing, but a name
+// carrying the _bimi label can never equal one that does not, so matching
+// against the union decides the same way.
+func (b VMCBinding) acceptableSANs() []string {
+	var names []string
+	for _, domain := range []string{b.Domain, b.OrganizationalDomain} {
+		domain = normalizeDomain(domain)
+		if domain == "" || slices.Contains(names, domain) {
+			continue
+		}
+		names = append(names, domain, normalizeDomain(fmt.Sprintf("%s._bimi.%s", b.Selector, domain)))
+	}
+	return names
+}
+
+// matches reports whether the certificate's SAN dNSNames bind it to this
+// Assertion Record. The comparison is exact: unlike a TLS server certificate,
+// a VMC covers the domain it names and not the subdomains beneath it, and a
+// subdomain is instead reached through the organizational domain the binding
+// already carries.
+func (b VMCBinding) matches(sans []string) bool {
+	return matchesAny(b.acceptableSANs(), sans)
+}
+
+// matchesAny reports whether any of the certificate's SAN dNSNames is one of
+// the acceptable names, which acceptableSANs already returns normalized.
+func matchesAny(acceptable, sans []string) bool {
+	for _, san := range sans {
+		if slices.Contains(acceptable, normalizeDomain(san)) {
+			return true
+		}
+	}
+	return false
+}
+
 // analyzeVMCURL downloads the Verified Mark Certificate published in the BIMI
 // a= tag and analyses it. logoContent, when non-nil, is the SVG published at
 // the l= URL, compared against the logo embedded in the certificate.
-func (v *Validator) analyzeVMCURL(ctx context.Context, vmcURL, domain string, logoContent []byte) (Check, *VMCInfo) {
+func (v *Validator) analyzeVMCURL(ctx context.Context, vmcURL string, binding VMCBinding, logoContent []byte) (Check, *VMCInfo) {
 	content, contentType, problems := v.fetchFile(ctx, vmcURL, MaxFileSize)
 	if len(problems) > 0 {
 		return newCheck("vmc", "Verified Mark Certificate", StatusFail, problems...),
 			&VMCInfo{Valid: false, Error: strings.Join(problems, "; ")}
 	}
 
-	check, info := AnalyzeVMC(content, domain, logoContent, v.now())
+	check, info := AnalyzeVMC(content, binding, logoContent, v.now())
 
 	// The Content-Type is a transport concern handled here rather than in
 	// the pure AnalyzeVMC helper.
@@ -107,13 +165,14 @@ func (v *Validator) analyzeVMCURL(ctx context.Context, vmcURL, domain string, lo
 }
 
 // AnalyzeVMC parses and validates a PEM certificate chain as a BIMI Verified
-// Mark Certificate. logoContent, when non-nil, is the SVG published at the l=
-// URL, compared against the logo embedded in the certificate. now is the
-// reference time used for the validity-period checks.
+// Mark Certificate. binding names the Assertion Record the certificate must be
+// bound to. logoContent, when non-nil, is the SVG published at the l= URL,
+// compared against the logo embedded in the certificate. now is the reference
+// time used for the validity-period checks.
 //
 // It returns the "vmc" evidence Check and a VMCInfo describing the leaf
 // certificate.
-func AnalyzeVMC(pemChain []byte, domain string, logoContent []byte, now time.Time) (Check, *VMCInfo) {
+func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now time.Time) (Check, *VMCInfo) {
 	fail := func(messages ...string) (Check, *VMCInfo) {
 		return newCheck("vmc", "Verified Mark Certificate", StatusFail, messages...),
 			&VMCInfo{Valid: false, Error: strings.Join(messages, "; ")}
@@ -168,9 +227,11 @@ func AnalyzeVMC(pemChain []byte, domain string, logoContent []byte, now time.Tim
 		warnings = append(warnings, fmt.Sprintf("The certificate expires soon (%s)", leaf.NotAfter.Format(time.RFC3339)))
 	}
 
-	// The certificate must cover the BIMI domain
-	if !vmcCoversDomain(leaf.DNSNames, domain) {
-		problems = append(problems, fmt.Sprintf("The certificate Subject Alternative Names (%s) do not cover the domain %q", strings.Join(leaf.DNSNames, ", "), domain))
+	// The certificate must name the domain the Assertion Record belongs to
+	if !binding.matches(leaf.DNSNames) {
+		problems = append(problems, fmt.Sprintf(
+			"The certificate Subject Alternative Names (%s) do not name this BIMI record: a Verified Mark Certificate must carry one of %s exactly",
+			strings.Join(leaf.DNSNames, ", "), strings.Join(binding.acceptableSANs(), ", ")))
 	}
 
 	// BIMI Extended Key Usage
@@ -229,23 +290,6 @@ func AnalyzeVMC(pemChain []byte, domain string, logoContent []byte, now time.Tim
 		return newCheck("vmc", "Verified Mark Certificate", StatusWarning, warnings...), info
 	}
 	return newCheck("vmc", "Verified Mark Certificate", StatusPass), info
-}
-
-// vmcCoversDomain tells whether one of the SAN dNSNames covers the given
-// domain: exact match, or the SAN is a parent (organizational) domain of it.
-func vmcCoversDomain(sans []string, domain string) bool {
-	domain = strings.ToLower(strings.TrimSuffix(domain, "."))
-	for _, san := range sans {
-		san = strings.ToLower(strings.TrimSuffix(san, "."))
-		if san == domain || strings.HasSuffix(domain, "."+san) {
-			return true
-		}
-		// Wildcard SAN (uncommon for VMC but tolerated)
-		if strings.HasPrefix(san, "*.") && strings.HasSuffix(domain, san[1:]) {
-			return true
-		}
-	}
-	return false
 }
 
 // extractLogotypeSVG extracts the SVG image embedded in the RFC 3709 logotype

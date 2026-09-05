@@ -35,6 +35,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -99,7 +100,7 @@ func TestAnalyzeVMC(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		domain         string
+		binding        VMCBinding
 		pem            func(t *testing.T) []byte
 		logoContent    []byte
 		expectedStatus CheckStatus
@@ -107,8 +108,8 @@ func TestAnalyzeVMC(t *testing.T) {
 		expectedValid  bool
 	}{
 		{
-			name:   "Valid VMC",
-			domain: "example.com",
+			name:    "Valid VMC",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
 			},
@@ -117,8 +118,8 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedValid:  true,
 		},
 		{
-			name:   "Valid VMC for subdomain sender",
-			domain: "mail.example.com",
+			name:    "Valid VMC for subdomain sender",
+			binding: VMCBinding{Selector: "default", Domain: "mail.example.com", OrganizationalDomain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
 			},
@@ -127,8 +128,8 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedValid:  true,
 		},
 		{
-			name:   "Expired certificate",
-			domain: "example.com",
+			name:    "Expired certificate",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, true, now.Add(-24*time.Hour))
 			},
@@ -137,8 +138,8 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "expired",
 		},
 		{
-			name:   "Missing BIMI EKU",
-			domain: "example.com",
+			name:    "Missing BIMI EKU",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, false, true, now.Add(365*24*time.Hour))
 			},
@@ -147,8 +148,8 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "Extended Key Usage",
 		},
 		{
-			name:   "Missing logotype extension",
-			domain: "example.com",
+			name:    "Missing logotype extension",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, false, now.Add(365*24*time.Hour))
 			},
@@ -157,18 +158,18 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "logotype",
 		},
 		{
-			name:   "Domain not covered",
-			domain: "example.org",
+			name:    "Domain not covered",
+			binding: VMCBinding{Selector: "default", Domain: "example.org"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
 			},
 			logoContent:    logo,
 			expectedStatus: StatusFail,
-			expectedInMsg:  "do not cover",
+			expectedInMsg:  "do not name this BIMI record",
 		},
 		{
-			name:   "Embedded logo differs from published logo",
-			domain: "example.com",
+			name:    "Embedded logo differs from published logo",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
 			},
@@ -177,8 +178,8 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "differs",
 		},
 		{
-			name:   "Not a certificate",
-			domain: "example.com",
+			name:    "Not a certificate",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			pem: func(t *testing.T) []byte {
 				return []byte("this is not a PEM file")
 			},
@@ -189,7 +190,7 @@ func TestAnalyzeVMC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			check, info := AnalyzeVMC(tt.pem(t), tt.domain, tt.logoContent, now)
+			check, info := AnalyzeVMC(tt.pem(t), tt.binding, tt.logoContent, now)
 			if check.Status != tt.expectedStatus {
 				t.Errorf("status = %s, want %s (messages: %v)", check.Status, tt.expectedStatus, check.Messages)
 			}
@@ -272,6 +273,7 @@ func TestExtractLogotypeSVG(t *testing.T) {
 
 func TestAnalyzeVMCURL(t *testing.T) {
 	logo := []byte(validTinyPSSVG)
+	binding := VMCBinding{Selector: "default", Domain: "example.com", OrganizationalDomain: "example.com"}
 	vmcPEM := generateTestVMC(t, "example.com", logo, true, true, time.Now().Add(365*24*time.Hour))
 
 	mux := http.NewServeMux()
@@ -291,7 +293,7 @@ func TestAnalyzeVMCURL(t *testing.T) {
 
 	t.Run("Fetch failure yields a failing check", func(t *testing.T) {
 		// A non-HTTPS URL is rejected by fetchFile before any request.
-		check, info := v.analyzeVMCURL(ctx, "http://example.com/vmc.pem", "example.com", logo)
+		check, info := v.analyzeVMCURL(ctx, "http://example.com/vmc.pem", binding, logo)
 		if check.Status != StatusFail {
 			t.Errorf("status = %s, want fail", check.Status)
 		}
@@ -301,7 +303,7 @@ func TestAnalyzeVMCURL(t *testing.T) {
 	})
 
 	t.Run("Wrong Content-Type downgrades a pass to a warning", func(t *testing.T) {
-		check, info := v.analyzeVMCURL(ctx, server.URL+"/wrong-type.pem", "example.com", logo)
+		check, info := v.analyzeVMCURL(ctx, server.URL+"/wrong-type.pem", binding, logo)
 		if check.Status != StatusWarning {
 			t.Errorf("status = %s, want warning (messages: %v)", check.Status, check.Messages)
 		}
@@ -314,7 +316,7 @@ func TestAnalyzeVMCURL(t *testing.T) {
 	})
 
 	t.Run("Correct Content-Type passes", func(t *testing.T) {
-		check, info := v.analyzeVMCURL(ctx, server.URL+"/vmc.pem", "example.com", logo)
+		check, info := v.analyzeVMCURL(ctx, server.URL+"/vmc.pem", binding, logo)
 		if check.Status != StatusPass {
 			t.Errorf("status = %s, want pass (messages: %v)", check.Status, check.Messages)
 		}
@@ -324,24 +326,90 @@ func TestAnalyzeVMCURL(t *testing.T) {
 	})
 }
 
-func TestVMCCoversDomain(t *testing.T) {
+// TestVMCBindingMatches covers the VMC domain verification of
+// draft-fetch-validation-vmc-wchuang, Section 5.2: a certificate names the
+// Assertion Record's domain, or its organizational domain, exactly, in either
+// the bare or the <selector>._bimi. form.
+func TestVMCBindingMatches(t *testing.T) {
+	subdomain := VMCBinding{Selector: "default", Domain: "mail.example.com", OrganizationalDomain: "example.com"}
+	orgDomain := VMCBinding{Selector: "default", Domain: "example.com", OrganizationalDomain: "example.com"}
+	summer := VMCBinding{Selector: "summer", Domain: "example.com", OrganizationalDomain: "example.com"}
+
 	tests := []struct {
-		name   string
-		sans   []string
-		domain string
-		want   bool
+		name    string
+		binding VMCBinding
+		sans    []string
+		want    bool
 	}{
-		{"exact match", []string{"example.com"}, "example.com", true},
-		{"parent covers subdomain", []string{"example.com"}, "mail.example.com", true},
-		{"unrelated domain", []string{"example.com"}, "example.org", false},
-		{"wildcard SAN", []string{"*.example.com"}, "mail.example.com", true},
-		{"trailing dot tolerated", []string{"example.com."}, "example.com", true},
+		{"exact domain", orgDomain, []string{"example.com"}, true},
+		{"trailing dot tolerated", orgDomain, []string{"example.com."}, true},
+		{"case-insensitive", orgDomain, []string{"EXAMPLE.COM"}, true},
+		{"one of several names", orgDomain, []string{"example.net", "example.com"}, true},
+		{"unrelated domain", orgDomain, []string{"example.org"}, false},
+
+		// A subdomain is reached through its organizational domain, which
+		// the binding carries, never through a suffix match.
+		{"organizational domain names the subdomain", subdomain, []string{"example.com"}, true},
+		{"subdomain names itself", subdomain, []string{"mail.example.com"}, true},
+		{"a sibling subdomain does not match", subdomain, []string{"news.example.com"}, false},
+		{"a certificate does not cover the subdomains it names", orgDomain, []string{"mail.example.com"}, false},
+
+		// A public suffix is not an organizational domain: without the
+		// suffix match, a certificate naming one covers nothing.
+		{"public suffix names nothing", VMCBinding{Selector: "default", Domain: "example.co.uk", OrganizationalDomain: "example.co.uk"}, []string{"co.uk"}, false},
+
+		// The selector-scoped form restricts the certificate to one selector.
+		{"selector-scoped name", orgDomain, []string{"default._bimi.example.com"}, true},
+		{"selector-scoped name of the organizational domain", subdomain, []string{"default._bimi.example.com"}, true},
+		{"selector-scoped name of another selector", summer, []string{"default._bimi.example.com"}, false},
+		{"selector-scoped name of this selector", summer, []string{"summer._bimi.example.com"}, true},
+
+		// The specification provides for no wildcard in a VMC.
+		{"wildcard name", subdomain, []string{"*.example.com"}, false},
+
+		{"no name at all", orgDomain, nil, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := vmcCoversDomain(tt.sans, tt.domain); got != tt.want {
-				t.Errorf("vmcCoversDomain(%v, %q) = %t, want %t", tt.sans, tt.domain, got, tt.want)
+			if got := tt.binding.matches(tt.sans); got != tt.want {
+				t.Errorf("VMCBinding{%s/%s, org %s}.matches(%v) = %t, want %t",
+					tt.binding.Selector, tt.binding.Domain, tt.binding.OrganizationalDomain, tt.sans, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestVMCBindingAcceptableSANs pins the names reported to a domain owner whose
+// certificate does not match, and that a domain which is its own
+// organizational domain is not listed twice.
+func TestVMCBindingAcceptableSANs(t *testing.T) {
+	tests := []struct {
+		name    string
+		binding VMCBinding
+		want    []string
+	}{
+		{
+			name:    "domain and organizational domain",
+			binding: VMCBinding{Selector: "default", Domain: "mail.example.com", OrganizationalDomain: "example.com"},
+			want:    []string{"mail.example.com", "default._bimi.mail.example.com", "example.com", "default._bimi.example.com"},
+		},
+		{
+			name:    "own organizational domain is not repeated",
+			binding: VMCBinding{Selector: "default", Domain: "example.com", OrganizationalDomain: "example.com"},
+			want:    []string{"example.com", "default._bimi.example.com"},
+		},
+		{
+			name:    "no organizational domain known",
+			binding: VMCBinding{Selector: "summer", Domain: "example.com"},
+			want:    []string{"example.com", "summer._bimi.example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.binding.acceptableSANs(); !slices.Equal(got, tt.want) {
+				t.Errorf("acceptableSANs() = %v, want %v", got, tt.want)
 			}
 		})
 	}
