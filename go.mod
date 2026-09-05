@@ -6,7 +6,6 @@ require (
 	github.com/JGLTechnologies/gin-rate-limit v1.5.9
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-smtp v0.25.0
-	github.com/getkin/kin-openapi v0.147.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -17,7 +16,6 @@ require (
 )
 
 require (
-	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -27,6 +25,7 @@ require (
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
+	github.com/getkin/kin-openapi v0.149.0 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-openapi/jsonpointer v0.23.1 // indirect
 	github.com/go-openapi/swag/jsonname v0.26.0 // indirect
@@ -55,7 +54,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
 	github.com/redis/go-redis/v9 v9.18.0 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.3 // indirect
 	github.com/speakeasy-api/openapi v1.24.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
