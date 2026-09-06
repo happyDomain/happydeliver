@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -225,14 +226,24 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 	var problems []string
 	var warnings []string
 
-	// Validity period
-	if now.Before(leaf.NotBefore) {
-		problems = append(problems, fmt.Sprintf("The certificate is not yet valid (valid from %s)", leaf.NotBefore.Format(time.RFC3339)))
+	// A Verified Mark Certificate is issued to a brand, not to an authority:
+	// a leaf asserting it is a CA is not one.
+	if leaf.BasicConstraintsValid && leaf.IsCA {
+		problems = append(problems, "The Verified Mark Certificate asserts it is a certification authority: a mark certificate is an end-entity certificate")
 	}
-	if now.After(leaf.NotAfter) {
-		problems = append(problems, fmt.Sprintf("The certificate expired on %s", leaf.NotAfter.Format(time.RFC3339)))
-	} else if now.Add(30 * 24 * time.Hour).After(leaf.NotAfter) {
-		warnings = append(warnings, fmt.Sprintf("The certificate expires soon (%s)", leaf.NotAfter.Format(time.RFC3339)))
+
+	// Validity period of every certificate of the chain, not just of the
+	// leaf: an expired issuer invalidates what it signed.
+	for i, cert := range certs {
+		label := certLabel(i, cert)
+		switch {
+		case now.Before(cert.NotBefore):
+			problems = append(problems, fmt.Sprintf("%s is not yet valid (valid from %s)", label, cert.NotBefore.Format(time.RFC3339)))
+		case now.After(cert.NotAfter):
+			problems = append(problems, fmt.Sprintf("%s expired on %s", label, cert.NotAfter.Format(time.RFC3339)))
+		case now.Add(30 * 24 * time.Hour).After(cert.NotAfter):
+			warnings = append(warnings, fmt.Sprintf("%s expires soon (%s)", label, cert.NotAfter.Format(time.RFC3339)))
+		}
 	}
 
 	// The certificate must name the domain the Assertion Record belongs to
@@ -278,13 +289,22 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 		}
 	}
 
-	// Verify the chain signatures (the VMC roots are not in the system
-	// trust store, so only the provided chain consistency is checked)
+	// Each certificate must be signed by the next one. The VMC roots are not
+	// in the system trust store, so this consistency of the provided chain is
+	// all that can be said about the issuance for now; it does at least name
+	// the faulty link.
 	for i := 0; i+1 < len(certs); i++ {
-		if err := certs[i].CheckSignatureFrom(certs[i+1]); err != nil {
-			problems = append(problems, fmt.Sprintf("Certificate #%d is not signed by the next certificate in the provided chain: %s", i+1, err))
-			break
+		err := certs[i].CheckSignatureFrom(certs[i+1])
+		if err == nil {
+			continue
 		}
+		var violation x509.ConstraintViolationError
+		if errors.As(err, &violation) {
+			problems = append(problems, fmt.Sprintf("%s is not allowed to sign certificates, yet the chain presents it as the issuer of %s", certLabel(i+1, certs[i+1]), certLabel(i, certs[i])))
+		} else {
+			problems = append(problems, fmt.Sprintf("%s is not signed by the next certificate in the provided chain: %s", certLabel(i, certs[i]), err))
+		}
+		break
 	}
 
 	if len(problems) > 0 {
@@ -298,6 +318,21 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 		return newCheck("vmc", "Verified Mark Certificate", StatusWarning, warnings...), info
 	}
 	return newCheck("vmc", "Verified Mark Certificate", StatusPass), info
+}
+
+// certLabel names a certificate of the chain in a message. The leaf is the
+// Verified Mark Certificate itself and is simply "the certificate"; the ones
+// above it are told apart by their position and their subject, so a domain
+// owner reading the report knows which link of the chain is at fault.
+func certLabel(i int, cert *x509.Certificate) string {
+	if i == 0 {
+		return "The certificate"
+	}
+	name := cert.Subject.CommonName
+	if name == "" {
+		name = cert.Subject.String()
+	}
+	return fmt.Sprintf("Issuer certificate #%d (%s)", i+1, name)
 }
 
 // extractLogotypeSVG extracts the SVG image embedded in the RFC 3709 logotype

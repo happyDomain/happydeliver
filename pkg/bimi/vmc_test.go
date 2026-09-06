@@ -41,88 +41,181 @@ import (
 	"time"
 )
 
-// generateTestVMC builds a self-signed certificate mimicking a Verified
-// Mark Certificate: BIMI EKU, SAN, and RFC 3709 logotype extension
-// embedding the gzipped SVG logo.
-func generateTestVMC(t *testing.T, domain string, svgLogo []byte, withEKU, withLogotype bool, notAfter time.Time) []byte {
+// oidBIMIExtKeyUsage and oidLogotype are the extensions a Verified Mark
+// Certificate is recognised by, spelled out here so the fixtures do not lean
+// on the constants the code under test uses.
+var (
+	oidBIMIExtKeyUsage = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 31}
+	oidLogotype        = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 12}
+)
+
+// testVMCOptions describes the chain generateTestVMCChain has to build. The
+// zero value of every flag yields a conforming certificate; each one names the
+// single requirement to be broken, so a test case reads as the deviation it
+// exercises.
+type testVMCOptions struct {
+	Domain   string
+	Logo     []byte
+	NotAfter time.Time
+
+	WithoutEKU      bool
+	WithoutLogotype bool
+	LeafIsCA        bool
+
+	IssuerNotCA    bool
+	IssuerNotAfter time.Time
+}
+
+// logotypeExtension builds an RFC 3709 logotype extension embedding svgLogo as
+// a gzipped base64 data URI. The URI is wrapped in a bare IA5String: the
+// analyser only needs to locate it inside the extension payload.
+func logotypeExtension(t *testing.T, svgLogo []byte) pkix.Extension {
 	t.Helper()
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	var gzipped bytes.Buffer
+	gz := gzip.NewWriter(&gzipped)
+	gz.Write(svgLogo)
+	gz.Close()
+
+	dataURI := "data:image/svg+xml-gzip;base64," + base64.StdEncoding.EncodeToString(gzipped.Bytes())
+	uriBytes, err := asn1.MarshalWithParams(dataURI, "ia5")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	template := &x509.Certificate{
+	return pkix.Extension{Id: oidLogotype, Value: uriBytes}
+}
+
+// generateTestVMCChain builds the issuance chain of a Verified Mark
+// Certificate: a self-signed root, the intermediate CA that issues mark
+// certificates, and the leaf itself. It returns the published chain, the leaf
+// followed by the intermediate, so that the analysis has more than the leaf to
+// look at.
+func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
+	t.Helper()
+
+	if opts.IssuerNotAfter.IsZero() {
+		opts.IssuerNotAfter = opts.NotAfter.Add(365 * 24 * time.Hour)
+	}
+
+	issue := func(template, parent *x509.Certificate, parentKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey) {
+		t.Helper()
+
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer, signerKey := parent, parentKey
+		if signer == nil { // self-signed
+			signer, signerKey = template, key
+		}
+		der, err := x509.CreateCertificate(rand.Reader, template, signer, &key.PublicKey, signerKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cert, key
+	}
+
+	rootCert, rootKey := issue(&x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Example Mark Verifying Authority Root"},
+		NotBefore:             time.Now().Add(-24 * time.Hour),
+		NotAfter:              opts.IssuerNotAfter,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}, nil, nil)
+
+	issuerTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(2),
+		Subject:               pkix.Name{CommonName: "Example Verified Mark CA"},
+		NotBefore:             time.Now().Add(-24 * time.Hour),
+		NotAfter:              opts.IssuerNotAfter,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign,
+		UnknownExtKeyUsage:    []asn1.ObjectIdentifier{oidBIMIExtKeyUsage},
+	}
+	if opts.IssuerNotCA {
+		issuerTemplate.IsCA = false
+		issuerTemplate.KeyUsage = 0
+	}
+	issuerCert, issuerKey := issue(issuerTemplate, rootCert, rootKey)
+
+	leafTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(42),
 		Subject: pkix.Name{
 			CommonName:   "Example Corp",
 			Organization: []string{"Example Corp"},
 		},
 		NotBefore: time.Now().Add(-time.Hour),
-		NotAfter:  notAfter,
-		DNSNames:  []string{domain},
+		NotAfter:  opts.NotAfter,
+		DNSNames:  []string{opts.Domain},
+	}
+	if opts.LeafIsCA {
+		leafTemplate.BasicConstraintsValid = true
+		leafTemplate.IsCA = true
+	}
+	if !opts.WithoutEKU {
+		leafTemplate.UnknownExtKeyUsage = []asn1.ObjectIdentifier{oidBIMIExtKeyUsage}
+	}
+	if !opts.WithoutLogotype {
+		leafTemplate.ExtraExtensions = append(leafTemplate.ExtraExtensions, logotypeExtension(t, opts.Logo))
+	}
+	leafCert, _ := issue(leafTemplate, issuerCert, issuerKey)
+
+	for _, cert := range []*x509.Certificate{leafCert, issuerCert} {
+		chainPEM = append(chainPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
 	}
 
-	if withEKU {
-		template.UnknownExtKeyUsage = []asn1.ObjectIdentifier{{1, 3, 6, 1, 5, 5, 7, 3, 31}}
-	}
-
-	if withLogotype {
-		var gzipped bytes.Buffer
-		gz := gzip.NewWriter(&gzipped)
-		gz.Write(svgLogo)
-		gz.Close()
-
-		dataURI := "data:image/svg+xml-gzip;base64," + base64.StdEncoding.EncodeToString(gzipped.Bytes())
-		// Wrap the data URI in an IA5String; the analyser only needs to
-		// locate the URI inside the extension payload.
-		uriBytes, err := asn1.MarshalWithParams(dataURI, "ia5")
-		if err != nil {
-			t.Fatal(err)
-		}
-		template.ExtraExtensions = []pkix.Extension{{
-			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 12},
-			Value: uriBytes,
-		}}
-	}
-
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	return chainPEM
 }
 
 func TestAnalyzeVMC(t *testing.T) {
 	logo := []byte(validTinyPSSVG)
 	now := time.Now()
 
+	// vmc builds a conforming chain for example.com, mutate breaking the one
+	// requirement the case is about.
+	vmc := func(mutate func(*testVMCOptions)) func(*testing.T) []byte {
+		return func(t *testing.T) []byte {
+			opts := testVMCOptions{
+				Domain:   "example.com",
+				Logo:     logo,
+				NotAfter: now.Add(365 * 24 * time.Hour),
+			}
+			if mutate != nil {
+				mutate(&opts)
+			}
+			return generateTestVMCChain(t, opts)
+		}
+	}
+
 	tests := []struct {
 		name           string
 		binding        VMCBinding
-		pem            func(t *testing.T) []byte
+		chain          func(t *testing.T) []byte
 		logoContent    []byte
 		expectedStatus CheckStatus
 		expectedInMsg  string
 		expectedValid  bool
 	}{
 		{
-			name:    "Valid VMC",
-			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
-			},
+			name:           "Valid VMC",
+			binding:        VMCBinding{Selector: "default", Domain: "example.com"},
+			chain:          vmc(nil),
 			logoContent:    logo,
 			expectedStatus: StatusPass,
 			expectedValid:  true,
 		},
 		{
-			name:    "Valid VMC for subdomain sender",
-			binding: VMCBinding{Selector: "default", Domain: "mail.example.com", OrganizationalDomain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
-			},
+			name:           "Valid VMC for subdomain sender",
+			binding:        VMCBinding{Selector: "default", Domain: "mail.example.com", OrganizationalDomain: "example.com"},
+			chain:          vmc(nil),
 			logoContent:    logo,
 			expectedStatus: StatusPass,
 			expectedValid:  true,
@@ -130,19 +223,49 @@ func TestAnalyzeVMC(t *testing.T) {
 		{
 			name:    "Expired certificate",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, true, now.Add(-24*time.Hour))
-			},
+			chain: vmc(func(o *testVMCOptions) {
+				o.NotAfter = now.Add(-24 * time.Hour)
+			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
-			expectedInMsg:  "expired",
+			expectedInMsg:  "The certificate expired on",
+		},
+		{
+			name:    "Expired issuer certificate",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.IssuerNotAfter = now.Add(-24 * time.Hour)
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "Issuer certificate #2 (Example Verified Mark CA) expired on",
+		},
+		{
+			name:    "Issuer not allowed to sign certificates",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.IssuerNotCA = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "is not allowed to sign certificates, yet the chain presents it as the issuer of",
+		},
+		{
+			name:    "Leaf asserting it is a CA",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.LeafIsCA = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "asserts it is a certification authority",
 		},
 		{
 			name:    "Missing BIMI EKU",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, false, true, now.Add(365*24*time.Hour))
-			},
+			chain: vmc(func(o *testVMCOptions) {
+				o.WithoutEKU = true
+			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
 			expectedInMsg:  "Extended Key Usage",
@@ -150,29 +273,25 @@ func TestAnalyzeVMC(t *testing.T) {
 		{
 			name:    "Missing logotype extension",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, false, now.Add(365*24*time.Hour))
-			},
+			chain: vmc(func(o *testVMCOptions) {
+				o.WithoutLogotype = true
+			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
 			expectedInMsg:  "logotype",
 		},
 		{
-			name:    "Domain not covered",
-			binding: VMCBinding{Selector: "default", Domain: "example.org"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
-			},
+			name:           "Domain not covered",
+			binding:        VMCBinding{Selector: "default", Domain: "example.org"},
+			chain:          vmc(nil),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
 			expectedInMsg:  "do not name this BIMI record",
 		},
 		{
-			name:    "Embedded logo differs from published logo",
-			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
-				return generateTestVMC(t, "example.com", logo, true, true, now.Add(365*24*time.Hour))
-			},
+			name:           "Embedded logo differs from published logo",
+			binding:        VMCBinding{Selector: "default", Domain: "example.com"},
+			chain:          vmc(nil),
 			logoContent:    []byte(`<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps"><title>Other</title></svg>`),
 			expectedStatus: StatusFail,
 			expectedInMsg:  "differs",
@@ -180,7 +299,7 @@ func TestAnalyzeVMC(t *testing.T) {
 		{
 			name:    "Not a certificate",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			pem: func(t *testing.T) []byte {
+			chain: func(t *testing.T) []byte {
 				return []byte("this is not a PEM file")
 			},
 			expectedStatus: StatusFail,
@@ -190,7 +309,7 @@ func TestAnalyzeVMC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			check, info := AnalyzeVMC(tt.pem(t), tt.binding, tt.logoContent, now)
+			check, info := AnalyzeVMC(tt.chain(t), tt.binding, tt.logoContent, now)
 			if check.Status != tt.expectedStatus {
 				t.Errorf("status = %s, want %s (messages: %v)", check.Status, tt.expectedStatus, check.Messages)
 			}
@@ -274,7 +393,9 @@ func TestExtractLogotypeSVG(t *testing.T) {
 func TestAnalyzeVMCURL(t *testing.T) {
 	logo := []byte(validTinyPSSVG)
 	binding := VMCBinding{Selector: "default", Domain: "example.com", OrganizationalDomain: "example.com"}
-	vmcPEM := generateTestVMC(t, "example.com", logo, true, true, time.Now().Add(365*24*time.Hour))
+	vmcPEM := generateTestVMCChain(t, testVMCOptions{
+		Domain: "example.com", Logo: logo, NotAfter: time.Now().Add(365 * 24 * time.Hour),
+	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/vmc.pem", func(w http.ResponseWriter, r *http.Request) {

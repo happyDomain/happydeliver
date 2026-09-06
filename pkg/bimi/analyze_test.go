@@ -32,7 +32,9 @@ import (
 )
 
 func TestValidateAssets(t *testing.T) {
-	logoPEM := generateTestVMC(t, "example.com", []byte(validTinyPSSVG), true, true, time.Now().Add(365*24*time.Hour))
+	logoPEM := generateTestVMCChain(t, testVMCOptions{
+		Domain: "example.com", Logo: []byte(validTinyPSSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
+	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +223,9 @@ func TestValidateAssets(t *testing.T) {
 }
 
 func TestAnalyze(t *testing.T) {
-	logoPEM := generateTestVMC(t, "example.com", []byte(validTinyPSSVG), true, true, time.Now().Add(365*24*time.Hour))
+	logoPEM := generateTestVMCChain(t, testVMCOptions{
+		Domain: "example.com", Logo: []byte(validTinyPSSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
+	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
