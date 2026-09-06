@@ -62,7 +62,7 @@ func newMockAnalyzer(txt map[string][]string, errMap map[string]error) *DNSAnaly
 	if errMap == nil {
 		errMap = map[string]error{}
 	}
-	return NewDNSAnalyzerWithResolver(5*time.Second, &mockDNSResolver{txt: txt, err: errMap})
+	return NewDNSAnalyzerWithResolver(5*time.Second, nil, &mockDNSResolver{txt: txt, err: errMap})
 }
 
 func TestCheckDMARCRecordFallback(t *testing.T) {
@@ -254,7 +254,7 @@ func TestParseDMARCRecordPolicy(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -292,7 +292,7 @@ func TestParseDMARCRecordTestMode(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -341,7 +341,7 @@ func TestParseDMARCRecordPSD(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -375,7 +375,7 @@ func TestParseDMARCRecordDeprecatedTags(t *testing.T) {
 		{name: "ri tag absent", record: "v=DMARC1; p=quarantine", wantRf: false, wantRi: false},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -430,7 +430,7 @@ func TestValidateDMARC(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -481,7 +481,7 @@ func TestParseDMARCRecordAlignment(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -541,7 +541,7 @@ func TestParseDMARCRecordSubdomainPolicy(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -593,7 +593,7 @@ func TestParseDMARCRecordPercentage(t *testing.T) {
 		{name: "pct=150 ignored", record: "v=DMARC1; p=quarantine; pct=150", expectedPercentage: nil},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

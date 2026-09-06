@@ -25,22 +25,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
 )
-
-// newBIMIHTTPClient builds the HTTP client used to fetch BIMI logo and VMC
-// assets. The only files DNSAnalyzer downloads are published by the domain
-// under analysis, so they go through the guarded client of pkg/bimi rather
-// than a bare one, with its own timeout: the DNS budget is no measure of a
-// file download.
-func newBIMIHTTPClient() *http.Client {
-	return bimi.NewHTTPClient(0)
-}
 
 // DefaultBIMIAssetsTimeout caps the wall time the logo and VMC downloads may
 // together add to a report. Each fetch keeps its own budget
@@ -69,6 +59,12 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string) *model
 	validator := &bimi.Validator{
 		HTTPClient: d.bimiHTTPClient,
 		Resolver:   d.resolver,
+		// Discovery falls back to the organizational domain, and the VMC
+		// is allowed to name it rather than the exact sender: both must
+		// agree with the notion DMARC alignment uses elsewhere in the
+		// report, including for the names the PSL cannot resolve.
+		OrganizationalDomain: getOrganizationalDomain,
+		VMCRoots:             d.VMCRoots,
 	}
 
 	// Bound Assertion Record discovery by d.Timeout, however many queries it

@@ -22,6 +22,7 @@
 package config
 
 import (
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"log"
@@ -31,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"git.happydns.org/happyDeliver/pkg/bimi"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -77,6 +79,14 @@ type AnalysisConfig struct {
 	DNSWLs       []string
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
+	// VMCRootsFile names the PEM file of BIMI root certificates a Verified
+	// Mark Certificate chain must lead back to. Empty uses the bundle
+	// embedded in the binary, bimi.DisableVMCRoots skips the check.
+	VMCRootsFile string
+	// VMCRoots is the pool built from VMCRootsFile by Validate. It is not
+	// configurable directly: the file is read once at startup so a broken
+	// trust policy is reported there rather than on every analysis.
+	VMCRoots *x509.CertPool `json:"-"`
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -168,6 +178,12 @@ func (c *Config) Validate() error {
 	if _, err := openapi_types.Email(fmt.Sprintf("%s1234-5678-9090@%s", c.Email.TestAddressPrefix, c.Email.Domain)).MarshalJSON(); err != nil {
 		return fmt.Errorf("invalid email domain: %w", err)
 	}
+
+	roots, err := bimi.LoadVMCRoots(c.Analysis.VMCRootsFile)
+	if err != nil {
+		return fmt.Errorf("invalid BIMI root certificates: %w", err)
+	}
+	c.Analysis.VMCRoots = roots
 
 	if c.Database.Type != "sqlite" && c.Database.Type != "postgres" {
 		return fmt.Errorf("unsupported database type: %s", c.Database.Type)

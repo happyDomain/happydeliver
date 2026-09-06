@@ -47,6 +47,7 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		cfg.Analysis.DNSWLs,
 		cfg.Analysis.CheckAllIPs,
 		cfg.Analysis.RspamdAPIURL,
+		cfg.Analysis.VMCRoots,
 	)
 
 	return &EmailAnalyzer{

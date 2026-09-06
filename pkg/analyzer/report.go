@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"crypto/x509"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -50,12 +51,13 @@ func NewReportGenerator(
 	dnswls []string,
 	checkAllIPs bool,
 	rspamdAPIURL string,
+	vmcRoots *x509.CertPool,
 ) *ReportGenerator {
 	return &ReportGenerator{
 		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
 		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
-		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout),
+		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout, vmcRoots),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
 		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
 		contentAnalyzer: NewContentAnalyzer(httpTimeout),

@@ -165,7 +165,7 @@ func TestValidateSPF(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,7 +234,7 @@ func TestValidateSPF_IncludedRecords(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -287,7 +287,7 @@ func TestExtractSPFRedirect(t *testing.T) {
 		},
 	}
 
-	analyzer := NewDNSAnalyzer(5 * time.Second)
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

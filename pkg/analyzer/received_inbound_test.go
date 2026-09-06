@@ -327,7 +327,7 @@ func TestInboundHopIndexFromParsedChain(t *testing.T) {
 	// the selection instead of reconstructing it. Exactly one hop carries the
 	// flag: an IP repeated across internal hops (10.0.0.1 above) makes matching
 	// on the sender IP alone ambiguous.
-	gen := NewReportGenerator("", time.Second, time.Second, nil, nil, false, "")
+	gen := NewReportGenerator("", time.Second, time.Second, nil, nil, false, "", nil)
 	results := gen.AnalyzeEmail(email, AnalysisOptions{Source: model.ReportSourceUploaded})
 
 	var flagged []int

@@ -22,31 +22,41 @@
 package analyzer
 
 import (
+	"crypto/x509"
 	"net/http"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/bimi"
 )
 
 // DNSAnalyzer analyzes DNS records for email domains
 type DNSAnalyzer struct {
 	Timeout  time.Duration
 	resolver DNSResolver
-	// bimiHTTPClient fetches BIMI logo/VMC assets (see newBIMIHTTPClient).
+	// bimiHTTPClient fetches BIMI logo/VMC assets. The only files
+	// DNSAnalyzer downloads are published by the domain under analysis, so
+	// they go through the guarded client of pkg/bimi rather than a bare
+	// one, with its own timeout: the DNS budget is no measure of a file
+	// download.
 	bimiHTTPClient *http.Client
 	// BIMIAssetsTimeout caps the total time the BIMI asset downloads may add to
 	// an analysis. Zero means DefaultBIMIAssetsTimeout.
 	BIMIAssetsTimeout time.Duration
+	// VMCRoots is the set of trust anchors a Verified Mark Certificate chain
+	// must lead to (see bimi.LoadVMCRoots). A nil pool leaves the issuer's
+	// legitimacy unexamined, which the report says rather than hides.
+	VMCRoots *x509.CertPool
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer with configurable timeout
-func NewDNSAnalyzer(timeout time.Duration) *DNSAnalyzer {
-	return NewDNSAnalyzerWithResolver(timeout, NewStandardDNSResolver())
+func NewDNSAnalyzer(timeout time.Duration, vmcRoots *x509.CertPool) *DNSAnalyzer {
+	return NewDNSAnalyzerWithResolver(timeout, vmcRoots, NewStandardDNSResolver())
 }
 
 // NewDNSAnalyzerWithResolver creates a new DNS analyzer with a custom resolver.
 // If resolver is nil, a StandardDNSResolver will be used.
-func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DNSAnalyzer {
+func NewDNSAnalyzerWithResolver(timeout time.Duration, vmcRoots *x509.CertPool, resolver DNSResolver) *DNSAnalyzer {
 	if timeout == 0 {
 		timeout = 10 * time.Second // Default timeout
 	}
@@ -56,7 +66,8 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, resolver DNSResolver) *DN
 	return &DNSAnalyzer{
 		Timeout:        timeout,
 		resolver:       resolver,
-		bimiHTTPClient: newBIMIHTTPClient(),
+		bimiHTTPClient: bimi.NewHTTPClient(0),
+		VMCRoots:       vmcRoots,
 	}
 }
 

@@ -109,7 +109,7 @@ func TestCheckReturnOKDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := NewDNSAnalyzerWithResolver(5*time.Second, tt.resolver)
+			d := NewDNSAnalyzerWithResolver(5*time.Second, nil, tt.resolver)
 			got := d.checkReturnOKDomain(tt.domain, tt.orgDomain)
 			if got == nil {
 				t.Fatalf("checkReturnOKDomain returned nil")
@@ -137,7 +137,7 @@ func TestCheckReturnOKDomain(t *testing.T) {
 }
 
 func TestCheckReturnOKDomainEmpty(t *testing.T) {
-	d := NewDNSAnalyzerWithResolver(5*time.Second, &returnOKMockResolver{})
+	d := NewDNSAnalyzerWithResolver(5*time.Second, nil, &returnOKMockResolver{})
 	if got := d.checkReturnOKDomain("", ""); got != nil {
 		t.Errorf("checkReturnOKDomain(\"\") = %v, want nil", got)
 	}

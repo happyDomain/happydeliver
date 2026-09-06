@@ -134,7 +134,7 @@ func TestDNSAnalyzerHTTPClientIsGuarded(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer server.Close()
 
-	_, err := NewDNSAnalyzer(5 * time.Second).bimiHTTPClient.Get(server.URL)
+	_, err := NewDNSAnalyzer(5*time.Second, nil).bimiHTTPClient.Get(server.URL)
 	if err == nil || !strings.Contains(err.Error(), "non-public address") {
 		t.Errorf("the analyzer's HTTP client reached a loopback address, err = %v", err)
 	}

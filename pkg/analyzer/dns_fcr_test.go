@@ -53,7 +53,7 @@ func TestCheckHeloPtrMatch(t *testing.T) {
 }
 
 func TestCalculatePTRScoreHeloMismatch(t *testing.T) {
-	d := NewDNSAnalyzer(0)
+	d := NewDNSAnalyzer(0, nil)
 	senderIP := "80.67.179.207"
 	ptr := []string{"mail.example.com"}
 	forward := []string{senderIP}

@@ -49,7 +49,7 @@ func TestNewDNSAnalyzer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewDNSAnalyzer(tt.timeout)
+			analyzer := NewDNSAnalyzer(tt.timeout, nil)
 			if analyzer.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", analyzer.Timeout, tt.expectedTimeout)
 			}
@@ -64,7 +64,7 @@ func TestNewDNSAnalyzer(t *testing.T) {
 // is left out of the weighted average (instead of counted as a 0/20 failure) when no
 // sender IP could be recovered from the Received chain, e.g. for an uploaded EML.
 func TestCalculateDNSScoreExcludesPTRWithoutSenderIP(t *testing.T) {
-	analyzer := NewDNSAnalyzer(10 * time.Second)
+	analyzer := NewDNSAnalyzer(10*time.Second, nil)
 
 	results := &model.DNSResults{
 		FromDomain: "example.com",
