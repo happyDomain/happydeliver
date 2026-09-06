@@ -93,7 +93,7 @@ func TestDecodeLogo(t *testing.T) {
 	t.Run("Decompression bomb is capped and named as such", func(t *testing.T) {
 		// Compresses to a few hundred bytes, so only the inflated size can
 		// catch it: the transfer limit never sees it coming.
-		bomb := gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxLogoSize)+1))
+		bomb := gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxFileSize)+1))
 
 		svg, _, err := DecodeLogo(bomb)
 		if err == nil {
@@ -105,14 +105,33 @@ func TestDecodeLogo(t *testing.T) {
 	})
 
 	t.Run("A document at the limit still decodes", func(t *testing.T) {
-		// The cap is a maximum, not a strict bound: MaxLogoSize bytes is
+		// The cap is a maximum, not a strict bound: MaxFileSize bytes is
 		// still an acceptable document.
-		svg, _, err := DecodeLogo(gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxLogoSize))))
+		svg, _, err := DecodeLogo(gzipBytes(t, bytes.Repeat([]byte("A"), int(MaxFileSize))))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if int64(len(svg)) != MaxLogoSize {
-			t.Errorf("len(svg) = %d, want %d", len(svg), MaxLogoSize)
+		if int64(len(svg)) != MaxFileSize {
+			t.Errorf("len(svg) = %d, want %d", len(svg), MaxFileSize)
+		}
+	})
+
+	// Only the hard cap stops the decoder. What the BIMI group recommends an
+	// Indicator stays under is reported later, on the decoded document, so a
+	// logo above it has to reach the checks that judge it rather than die
+	// here as an unreadable file.
+	t.Run("A document above the recommended size still decodes", func(t *testing.T) {
+		oversized := bytes.Repeat([]byte("A"), int(RecommendedLogoSize)+1)
+
+		svg, compressed, err := DecodeLogo(gzipBytes(t, oversized))
+		if err != nil {
+			t.Fatalf("a document over the recommendation is still a document: %v", err)
+		}
+		if !compressed {
+			t.Error("compressed = false, want true")
+		}
+		if !bytes.Equal(svg, oversized) {
+			t.Errorf("len(svg) = %d, want %d", len(svg), len(oversized))
 		}
 	})
 }

@@ -59,12 +59,18 @@ import (
 )
 
 const (
-	// MaxLogoSize is the maximum size allowed for a BIMI SVG logo (BIMI
-	// group recommendation: 32 kilobytes).
-	MaxLogoSize int64 = 32 * 1024
+	// RecommendedLogoSize is the size the BIMI group recommends an
+	// Indicator stays under. It is a recommendation and not a limit: a
+	// larger document is still an Indicator, still parseable and still the
+	// one the certificate has to match, so exceeding it is reported rather
+	// than treated as a retrieval failure. It is evaluated on the decoded
+	// document, an SVGZ being judged on what it inflates to.
+	RecommendedLogoSize int64 = 32 * 1024
 
-	// MaxFileSize is a hard cap on any file downloaded during BIMI
-	// evidence collection (VMC chains are larger than logos).
+	// MaxFileSize is a hard cap on every file downloaded during BIMI
+	// evidence collection, logos included (VMC chains are larger than
+	// logos). Past it a file is refused outright: nothing an Indicator
+	// could legitimately be is that big.
 	MaxFileSize int64 = 512 * 1024
 )
 

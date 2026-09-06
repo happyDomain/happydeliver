@@ -95,7 +95,7 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record, dmarc *DMAR
 					"No logo URL published (declination record)"))
 		}
 	} else {
-		content, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
+		content, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxFileSize)
 		if len(problems) > 0 {
 			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail, problems...))
 		} else if svg, compressed, err := DecodeLogo(content); err != nil {
@@ -230,6 +230,19 @@ func checkLogoFetch(contentType string, compressed bool, size int) Check {
 		check.Messages = append(check.Messages, CheckMessage{
 			Severity: SeverityInfo,
 			Text:     fmt.Sprintf("Logo served as SVGZ (gzip-compressed, RFC 6170 section 5.2), decompressing to %d bytes: BIMI accepts SVG and SVGZ alike for the l= tag", size),
+		})
+	}
+
+	// The size the BIMI group recommends is a recommendation, so going over
+	// it does not make the document unusable. It is still worth saying: a
+	// mailbox provider is free to refuse an Indicator it finds too costly to
+	// fetch, and the Domain Owner has no other way of learning that the file
+	// grew past what receivers expect.
+	if int64(size) > RecommendedLogoSize {
+		check.Status = StatusWarning
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityWarning,
+			Text:     fmt.Sprintf("Logo is %d bytes, above the %d bytes the BIMI group recommends: mailbox providers are free to refuse an Indicator this large", size, RecommendedLogoSize),
 		})
 	}
 

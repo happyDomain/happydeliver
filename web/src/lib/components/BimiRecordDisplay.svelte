@@ -30,18 +30,14 @@
        the verdict of the BIMI page, so the two cannot contradict each other.
        Assets that fail are graded as harshly as a record that does not parse:
        an Indicator receivers cannot validate is one they do not display, so
-       either way nothing is shown. The intermediate tier is the record that
-       works but asserts its Indicator without a certificate to vouch for it,
-       which the providers holding most of the inboxes will not act on. */
-    const selfAsserted = $derived(
-        !bimiRecord?.vmc_url &&
-            (bimiRecord?.checks?.some((c) => c.name === "vmc" && c.status === "warning") ?? false),
-    );
-
+       either way nothing is shown. The intermediate tier is the configuration
+       that works with a reservation (an Indicator no certificate vouches for,
+       a logo above the recommended size), which is exactly what a warning is,
+       so the tier is read off the checks rather than enumerated here. */
     const headline: Status = $derived(
         !bimiRecord?.record_valid || !bimiRecord?.valid
             ? "fail"
-            : selfAsserted
+            : (bimiRecord.checks?.some((c) => c.status === "warning") ?? false)
               ? "warning"
               : "pass",
     );

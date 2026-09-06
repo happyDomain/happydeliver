@@ -1035,7 +1035,7 @@ func TestParseLogotypeExtension(t *testing.T) {
 			// A decompression bomb hidden in the certificate: small on the
 			// wire, past the profile's ceiling once inflated.
 			name:    "embedded logo inflates past the maximum size",
-			logo:    bytes.Repeat([]byte("A"), int(MaxLogoSize)+1),
+			logo:    bytes.Repeat([]byte("A"), int(MaxFileSize)+1),
 			wantErr: "maximum allowed size",
 		},
 		{

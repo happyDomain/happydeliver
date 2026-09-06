@@ -47,8 +47,9 @@ var errNotUTF8 = errors.New("not encoded in UTF-8")
 // too, so the media type carries no signal.
 //
 // compressed reports whether content was an SVGZ. The inflated size is capped
-// at MaxLogoSize, both because the profile evaluates that limit on the
-// uncompressed document and to stop a decompression bomb.
+// at MaxFileSize, purely to stop a decompression bomb: what the BIMI group
+// recommends an Indicator stays under is a separate judgement, passed on the
+// decoded document once it is in hand.
 func DecodeLogo(content []byte) (svg []byte, compressed bool, err error) {
 	reader, err := gzip.NewReader(bytes.NewReader(content))
 	if err != nil {
@@ -63,12 +64,12 @@ func DecodeLogo(content []byte) (svg []byte, compressed bool, err error) {
 	// The payload announces itself as gzip, so a read failure means a corrupt
 	// stream, not a raw SVG: reporting it beats handing the still-compressed
 	// bytes back as if they were the logo.
-	inflated, err := io.ReadAll(io.LimitReader(reader, MaxLogoSize+1))
+	inflated, err := io.ReadAll(io.LimitReader(reader, MaxFileSize+1))
 	if err != nil {
 		return nil, true, fmt.Errorf("the file announces itself as gzip but the stream is corrupt: %w", err)
 	}
-	if int64(len(inflated)) > MaxLogoSize {
-		return nil, true, fmt.Errorf("the decompressed document exceeds the maximum allowed size of %d bytes", MaxLogoSize)
+	if int64(len(inflated)) > MaxFileSize {
+		return nil, true, fmt.Errorf("the decompressed document exceeds the maximum allowed size of %d bytes", MaxFileSize)
 	}
 
 	return inflated, true, nil

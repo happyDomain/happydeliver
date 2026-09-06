@@ -24,6 +24,7 @@ package bimi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,10 +37,31 @@ func TestValidateAssets(t *testing.T) {
 		Domain: "example.com", Logo: []byte(validTinyPSSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
 	})
 
+	// A fully compliant Indicator that simply grew past the size the BIMI
+	// group recommends, by repeating a shape the profile allows. Nothing about
+	// it is malformed, which is what makes it worth analysing.
+	oversizedSVG := strings.Replace(validTinyPSSVG,
+		`  <rect x="10" y="10" width="20" height="20" fill="#abcdef"/>`,
+		strings.Repeat(`  <rect x="10" y="10" width="20" height="20" fill="#abcdef"/>`+"\n", 700), 1)
+	if int64(len(oversizedSVG)) <= RecommendedLogoSize {
+		t.Fatalf("fixture is %d bytes, it has to exceed the %d bytes recommendation to test anything", len(oversizedSVG), RecommendedLogoSize)
+	}
+	oversizedPEM, _ := generateTestVMCChain(t, testVMCOptions{
+		Domain: "example.com", Logo: []byte(oversizedSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
+	})
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(validTinyPSSVG))
+	})
+	mux.HandleFunc("/oversized.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write([]byte(oversizedSVG))
+	})
+	mux.HandleFunc("/vmc-oversized.pem", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pem-certificate-chain")
+		w.Write(oversizedPEM)
 	})
 	mux.HandleFunc("/bad.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
@@ -82,6 +104,47 @@ func TestValidateAssets(t *testing.T) {
 		}
 		if rec.VMC == nil || !rec.VMC.Valid {
 			t.Errorf("expected valid VMC info, got %+v", rec.VMC)
+		}
+	})
+
+	// The size the BIMI group publishes is a recommendation, so exceeding it
+	// cannot fail the record. Refusing to download the file over it was worse
+	// than lenient: it left the Domain Owner with three skipped checks and no
+	// word on the document itself, the comparison against the certified mark
+	// included.
+	t.Run("Logo above the recommended size is reported, not dropped", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/oversized.svg",
+			VMCURL:   server.URL + "/vmc-oversized.pem",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
+		if !rec.Valid {
+			t.Errorf("a recommendation is not a requirement, got error: %s", rec.Error)
+		}
+
+		fetch, found := findCheck(rec.Checks, "logo_fetch")
+		if !found || fetch.Status != StatusWarning {
+			t.Errorf("logo_fetch = %+v, want a warning", fetch)
+		}
+		messages := strings.Join(fetch.MessageTexts(), " ")
+		for _, want := range []string{fmt.Sprint(len(oversizedSVG)), fmt.Sprint(RecommendedLogoSize)} {
+			if !strings.Contains(messages, want) {
+				t.Errorf("logo_fetch messages = %q, want them to name %s", messages, want)
+			}
+		}
+
+		// Keeping the document is the whole point: every check downstream of
+		// the fetch now has something to read.
+		for _, name := range []string{"logo_xml", "logo_svg_tiny_ps"} {
+			if check, found := findCheck(rec.Checks, name); !found || check.Status != StatusPass {
+				t.Errorf("check %s = %+v, want it to run and pass", name, check)
+			}
+		}
+		if rec.VMC == nil || rec.VMC.LogoMatches == nil || !*rec.VMC.LogoMatches {
+			t.Errorf("VMC = %+v, want the published logo compared against the certified mark", rec.VMC)
 		}
 	})
 

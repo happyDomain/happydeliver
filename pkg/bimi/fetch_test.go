@@ -40,7 +40,7 @@ func TestNewHTTPClientRefusesNonPublicAddress(t *testing.T) {
 	defer server.Close()
 
 	v := &Validator{HTTPClient: NewHTTPClient(0)}
-	_, _, problems := v.fetchFile(context.Background(), server.URL, MaxLogoSize)
+	_, _, problems := v.fetchFile(context.Background(), server.URL, MaxFileSize)
 
 	if len(problems) == 0 || !strings.Contains(problems[0], "non-public address") {
 		t.Errorf("expected the loopback server to be refused, got %v", problems)
@@ -127,7 +127,7 @@ func TestRejectInsecureRedirectBoundsChain(t *testing.T) {
 func TestFetchFileInvalidURL(t *testing.T) {
 	v := &Validator{}
 	// A control character in the URL makes url.Parse fail.
-	_, _, problems := v.fetchFile(context.Background(), "https://example.com/\x7f", MaxLogoSize)
+	_, _, problems := v.fetchFile(context.Background(), "https://example.com/\x7f", MaxFileSize)
 	if len(problems) == 0 || !strings.Contains(problems[0], "Invalid URL") {
 		t.Errorf("expected an invalid-URL problem, got %v", problems)
 	}
@@ -135,7 +135,7 @@ func TestFetchFileInvalidURL(t *testing.T) {
 
 func TestFetchFileRequiresHTTPS(t *testing.T) {
 	v := &Validator{}
-	_, _, problems := v.fetchFile(context.Background(), "http://example.com/logo.svg", MaxLogoSize)
+	_, _, problems := v.fetchFile(context.Background(), "http://example.com/logo.svg", MaxFileSize)
 	if len(problems) == 0 || !strings.Contains(problems[0], "HTTPS") {
 		t.Errorf("expected HTTPS requirement problem, got %v", problems)
 	}
@@ -151,7 +151,7 @@ func TestFetchFile(t *testing.T) {
 	})
 	mux.HandleFunc("/huge.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
-		w.Write(bytes.Repeat([]byte("a"), int(MaxLogoSize)+10))
+		w.Write(bytes.Repeat([]byte("a"), 2048))
 	})
 	server := httptest.NewTLSServer(mux)
 	defer server.Close()
@@ -159,7 +159,7 @@ func TestFetchFile(t *testing.T) {
 	v := &Validator{HTTPClient: server.Client()}
 
 	t.Run("Successful fetch", func(t *testing.T) {
-		content, contentType, problems := v.fetchFile(context.Background(), server.URL+"/logo.svg", MaxLogoSize)
+		content, contentType, problems := v.fetchFile(context.Background(), server.URL+"/logo.svg", MaxFileSize)
 		if len(problems) > 0 {
 			t.Fatalf("unexpected problems: %v", problems)
 		}
@@ -172,14 +172,14 @@ func TestFetchFile(t *testing.T) {
 	})
 
 	t.Run("404 response", func(t *testing.T) {
-		_, _, problems := v.fetchFile(context.Background(), server.URL+"/missing.svg", MaxLogoSize)
+		_, _, problems := v.fetchFile(context.Background(), server.URL+"/missing.svg", MaxFileSize)
 		if len(problems) == 0 || !strings.Contains(problems[0], "404") {
 			t.Errorf("expected 404 problem, got %v", problems)
 		}
 	})
 
 	t.Run("Too large", func(t *testing.T) {
-		_, _, problems := v.fetchFile(context.Background(), server.URL+"/huge.svg", MaxLogoSize)
+		_, _, problems := v.fetchFile(context.Background(), server.URL+"/huge.svg", 1024)
 		if len(problems) == 0 || !strings.Contains(problems[0], "maximum allowed size") {
 			t.Errorf("expected size problem, got %v", problems)
 		}

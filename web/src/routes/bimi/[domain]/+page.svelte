@@ -77,6 +77,13 @@
        deliberate and correct configuration rather than a half-finished one. */
     const declination = $derived(!!record?.record_valid && !record?.logo_url && !record?.vmc_url);
 
+    /* Checks that passed with something to say: an oversized logo, an
+       unexpected Content-Type. None of them stops an indicator from being
+       displayed, so they do not spoil the verdict, but a verdict that called
+       the configuration compliant without mentioning them would read as
+       nothing left to look at. */
+    const advisories = $derived(record?.checks?.filter((c) => c.status === "warning").length ?? 0);
+
     type Verdict = {
         level: "success" | "warning" | "danger" | "secondary";
         icon: string;
@@ -139,7 +146,13 @@
             level: "success",
             icon: "bi-check-circle-fill",
             title: "This BIMI configuration is compliant",
-            text: "The record, the logo and the certificate all passed. Mail clients that support BIMI can display this indicator for messages that pass DMARC.",
+            text:
+                "The record, the logo and the certificate all passed. Mail clients that support BIMI can display this indicator for messages that pass DMARC." +
+                (advisories === 1
+                    ? " One check raised an advisory point. Expand the detailed checks below."
+                    : advisories > 1
+                      ? ` ${advisories} checks raised advisory points. Expand the detailed checks below.`
+                      : ""),
         };
     });
 </script>
