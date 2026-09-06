@@ -54,6 +54,17 @@ func (r stubResolver) LookupTXT(ctx context.Context, name string) ([]string, err
 	return txt, nil
 }
 
+// findCheck returns the evidence check of the given name, so a test can assert
+// on the one it cares about without depending on where it sits in the list.
+func findCheck(checks []Check, name string) (Check, bool) {
+	for _, check := range checks {
+		if check.Name == name {
+			return check, true
+		}
+	}
+	return Check{}, false
+}
+
 func TestNewValidator(t *testing.T) {
 	v := NewValidator()
 	if v == nil {

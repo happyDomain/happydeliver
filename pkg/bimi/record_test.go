@@ -107,12 +107,34 @@ func TestParseRecord(t *testing.T) {
 			wantLogoURL: "https://example.com/logo.svg",
 		},
 		{
-			// Unknown tags are ignored, and a value containing an
-			// '=' is not mistaken for a tag of its own.
-			name:        "Unknown tags are ignored",
-			txt:         "v=BIMI1; l=https://example.com/logo.svg?html=1; avp=brand; lps=brand-",
+			// A value containing an '=' is not mistaken for a tag of
+			// its own.
+			name:        "Value containing an equals sign",
+			txt:         "v=BIMI1; l=https://example.com/logo.svg?html=1",
 			wantValid:   true,
 			wantLogoURL: "https://example.com/logo.svg?html=1",
+		},
+		{
+			// Only tags registered by the specification are read;
+			// anything else must be ignored rather than rejected.
+			name:        "Unregistered tags are ignored",
+			txt:         "v=BIMI1; l=https://example.com/logo.svg; zz=whatever",
+			wantValid:   true,
+			wantLogoURL: "https://example.com/logo.svg",
+		},
+		{
+			name:        "Local-part selector and avatar preference",
+			txt:         "v=BIMI1; l=https://example.com/logo.svg; avp=personal; lps=brand-one , brand-two",
+			wantValid:   true,
+			wantLogoURL: "https://example.com/logo.svg",
+		},
+		{
+			// A prefix outside the local-part text character set is
+			// a value that is not well-formed, hence an error.
+			name:        "Malformed local-part prefix",
+			txt:         "v=BIMI1; l=https://example.com/logo.svg; lps=brand_one",
+			wantValid:   false,
+			wantLogoURL: "https://example.com/logo.svg",
 		},
 		{
 			name:        "Duplicate l= tag",

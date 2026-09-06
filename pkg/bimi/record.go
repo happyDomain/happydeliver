@@ -27,6 +27,26 @@ import (
 	"strings"
 )
 
+// Avatar preferences a Domain Owner can express through the avp= tag, telling
+// a mailbox provider that displays personal avatars which of the two to prefer
+// for a message that qualifies for both.
+const (
+	// AvatarPreferenceBrand asks for the BIMI Indicator to win over the
+	// sender's personal avatar. It is the default.
+	AvatarPreferenceBrand = "brand"
+	// AvatarPreferencePersonal asks for the sender's personal avatar to win
+	// over the BIMI Indicator.
+	AvatarPreferencePersonal = "personal"
+)
+
+// isKnownAvatarPreference reports whether value is one of the registered avp=
+// values. The comparison is case-sensitive, as the specification writes that
+// tag's values with the case-sensitive ABNF notation, and forbids a receiver
+// from repairing a capitalization error.
+func isKnownAvatarPreference(value string) bool {
+	return value == AvatarPreferenceBrand || value == AvatarPreferencePersonal
+}
+
 // bimiTagSpec is one "name=value" pair of a BIMI record, with the folding
 // whitespace the syntax allows already stripped.
 type bimiTagSpec struct {
@@ -70,6 +90,12 @@ func splitTagList(record string) (tags []bimiTagSpec, malformed []string) {
 // not a BIMI record: it must be discarded rather than repaired.
 func hasBIMIVersionTag(txt string) bool {
 	tags, _ := splitTagList(txt)
+	return tagsHaveBIMIVersion(tags)
+}
+
+// tagsHaveBIMIVersion is hasBIMIVersionTag for a record already split into
+// tags, so that a parser holding them does not split the record a second time.
+func tagsHaveBIMIVersion(tags []bimiTagSpec) bool {
 	return len(tags) > 0 && tags[0].name == "v" && tags[0].value == "BIMI1"
 }
 
@@ -105,11 +131,18 @@ func ParseRecord(domain, selector, txt string) *Record {
 			rec.LogoURL = tag.value
 		case "a":
 			rec.VMCURL = tag.value
+		case "lps":
+			rec.LocalPartSelector = true
+			rec.LocalPartPrefixes = parseLocalPartPrefixes(tag.value)
+		case "avp":
+			rec.AvatarPreference = tag.value
 		}
 	}
 
+	badPrefix, hasBadPrefix := firstInvalidLocalPartPrefix(rec.LocalPartPrefixes)
+
 	switch {
-	case !hasBIMIVersionTag(txt):
+	case !tagsHaveBIMIVersion(tags):
 		rec.Error = notABIMIRecordError(txt)
 	case len(malformed) > 0:
 		rec.Error = fmt.Sprintf("BIMI record contains a tag without a value: %q", malformed[0])
@@ -117,6 +150,8 @@ func ParseRecord(domain, selector, txt string) *Record {
 		rec.Error = fmt.Sprintf("BIMI record publishes the %s tag more than once: each tag may appear only once", quotedTagNames(duplicates))
 	case !seen["l"]:
 		rec.Error = "BIMI record is missing the l= (logo URL) tag"
+	case hasBadPrefix:
+		rec.Error = fmt.Sprintf("BIMI record publishes the malformed local-part prefix %q in its lps= tag: a prefix is 1 to 63 letters, digits or dashes", badPrefix)
 	default:
 		rec.RecordValid = true
 		rec.Valid = true
@@ -128,14 +163,30 @@ func ParseRecord(domain, selector, txt string) *Record {
 // quotedTagNames renders tag names as a human-readable enumeration
 // ("l=", or "l= and a=").
 func quotedTagNames(names []string) string {
-	quoted := make([]string, len(names))
+	spelled := make([]string, len(names))
 	for i, n := range names {
-		quoted[i] = n + "="
+		spelled[i] = n + "="
 	}
-	if len(quoted) < 2 {
-		return strings.Join(quoted, "")
+	return enumerate(spelled)
+}
+
+// quotedList renders values as a human-readable enumeration, each one quoted
+// ("a", or "a", "b" and "c").
+func quotedList(values []string) string {
+	quoted := make([]string, len(values))
+	for i, value := range values {
+		quoted[i] = fmt.Sprintf("%q", value)
 	}
-	return strings.Join(quoted[:len(quoted)-1], ", ") + " and " + quoted[len(quoted)-1]
+	return enumerate(quoted)
+}
+
+// enumerate joins already-rendered items the way a sentence would, with "and"
+// before the last one.
+func enumerate(items []string) string {
+	if len(items) < 2 {
+		return strings.Join(items, "")
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
 }
 
 // notABIMIRecordError builds an explanatory error for a record found at the

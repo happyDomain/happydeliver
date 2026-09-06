@@ -33,6 +33,15 @@
             : undefined,
     );
 
+    /* How the lps= tag describes the senders it applies to. An empty prefix
+       list is not the absence of a list: it means every local-part. */
+    const localPartScope: string | undefined = $derived.by(() => {
+        if (!bimiRecord?.local_part_selector) return undefined;
+        const prefixes = bimiRecord.local_part_prefixes ?? [];
+        if (prefixes.length === 0) return "every sending address";
+        return `the addresses starting with ${prefixes.map((p) => `“${p}”`).join(", ")}`;
+    });
+
     /* Dots in the same order as the entries of the expanded view. */
     const checksDots: Dot[] = $derived(
         (bimiRecord?.checks ?? []).map((c) => ({
@@ -184,6 +193,31 @@
                     <code>{inheritedFrom}</code>. Publish a record at
                     <code>{bimiRecord.selector}._bimi.{bimiRecord.domain}</code> to give this domain its
                     own indicator, or a declination record to opt it out.
+                </div>
+            {/if}
+            {#if localPartScope}
+                <div class="alert alert-info py-2">
+                    <i class="bi bi-person-badge me-1"></i>
+                    This record's <code>lps=</code> tag sends {localPartScope} to a selector named after
+                    the address, so those senders can be served another indicator than the one shown below.
+                </div>
+            {/if}
+            {#if bimiRecord.avatar_preference}
+                <div class="mb-2">
+                    <strong>Avatar preference:</strong>
+                    <code>{bimiRecord.avatar_preference}</code>
+                    <span class="small text-muted ms-1">
+                        {#if bimiRecord.avatar_preference === "personal"}
+                            providers that display personal avatars are asked to prefer the sender's
+                            avatar over the brand indicator.
+                        {:else if bimiRecord.avatar_preference === "brand"}
+                            providers that display personal avatars are asked to prefer the brand
+                            indicator. This is also the default.
+                        {:else}
+                            unknown value: receivers must ignore it and fall back to
+                            <code>brand</code>, and some may treat the whole record as failing.
+                        {/if}
+                    </span>
                 </div>
             {/if}
             <div class="mb-2">

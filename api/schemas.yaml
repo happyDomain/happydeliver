@@ -1170,6 +1170,20 @@ components:
           format: uri
           description: URL to Verified Mark Certificate (optional)
           example: "https://example.com/vmc.pem"
+        local_part_selector:
+          type: boolean
+          description: Whether the record publishes an `lps=` tag, sending some senders to a selector named after their address so they can be served another Indicator than this one. Absent when the tag is not published.
+          example: true
+        local_part_prefixes:
+          type: array
+          items:
+            type: string
+          description: Local-part prefixes listed by the `lps=` tag. Present but empty when the tag is published without a value, which means every local-part is sent to its own selector.
+          example: ["brand-one", "brand-two"]
+        avatar_preference:
+          type: string
+          description: Value published in the `avp=` tag, telling providers that display personal avatars whether to prefer the sender's avatar or the brand Indicator. Absent when the tag is not published, in which case `brand` applies.
+          example: "brand"
         record_valid:
           type: boolean
           description: Whether the DNS TXT record itself is syntactically valid (well-formed BIMI record). This can be true even when `valid` is false because the referenced assets (logo, VMC) failed validation.

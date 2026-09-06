@@ -93,6 +93,12 @@ func TestValidateAssets(t *testing.T) {
 			t.Errorf("declination record should not fail checks")
 		}
 		for _, check := range rec.Checks {
+			// record_tags reports on the record itself, not on an asset:
+			// a declination has nothing to download, but its tags are
+			// still there to be judged.
+			if check.Name == "record_tags" {
+				continue
+			}
 			if check.Status != StatusSkipped {
 				t.Errorf("check %s = %s, want skipped", check.Name, check.Status)
 			}
@@ -115,8 +121,9 @@ func TestValidateAssets(t *testing.T) {
 		if rec.Valid {
 			t.Errorf("an empty l= is a declination only when a= is empty too: with a VMC published, no Indicator can be displayed")
 		}
-		if rec.Checks[0].Name != "logo_fetch" || rec.Checks[0].Status != StatusFail {
-			t.Errorf("logo_fetch = %+v, want a failing check", rec.Checks[0])
+		logoFetch, found := findCheck(rec.Checks, "logo_fetch")
+		if !found || logoFetch.Status != StatusFail {
+			t.Errorf("logo_fetch = %+v, want a failing check", logoFetch)
 		}
 	})
 

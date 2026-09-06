@@ -110,6 +110,20 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 	if r.RecordDomain != "" {
 		m.RecordDomain = utils.PtrTo(r.RecordDomain)
 	}
+	if r.LocalPartSelector {
+		m.LocalPartSelector = utils.PtrTo(true)
+		// An lps= tag published without a prefix matches every
+		// local-part, so the empty list is meaningful: send it rather
+		// than omitting the field, which would read as no list at all.
+		prefixes := r.LocalPartPrefixes
+		if prefixes == nil {
+			prefixes = []string{}
+		}
+		m.LocalPartPrefixes = &prefixes
+	}
+	if r.AvatarPreference != "" {
+		m.AvatarPreference = utils.PtrTo(r.AvatarPreference)
+	}
 	if r.Record != "" {
 		m.Record = utils.PtrTo(r.Record)
 	}

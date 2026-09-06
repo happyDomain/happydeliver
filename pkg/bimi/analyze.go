@@ -47,7 +47,7 @@ func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Reco
 // it sets rec.Valid to false and rec.Error. A BIMI record only leads to a
 // displayed logo if its assets are compliant.
 func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
-	var checks []Check
+	checks := []Check{checkRecordTags(rec)}
 	allPassed := true
 
 	var logoContent []byte
@@ -121,6 +121,46 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 		rec.Valid = false
 		rec.Error = "BIMI assets failed validation, see detailed checks below"
 	}
+}
+
+// checkRecordTags reports on the tags that carry a preference rather than an
+// asset, which the record's own syntax check cannot reject on its own.
+//
+// An avp= value outside the registered set is a warning, not a failure: the
+// specification has a receiver ignore it, falling back to the default
+// preference, and only allows a mailbox provider to treat it as a failing
+// record. Publishing it still says the Domain Owner believes it is expressing
+// a preference it is not, and on the providers that do act on it the record
+// stops working altogether.
+func checkRecordTags(rec *Record) Check {
+	check := Check{Name: "record_tags", Description: "BIMI record tags", Status: StatusPass}
+
+	if rec.AvatarPreference != "" && !isKnownAvatarPreference(rec.AvatarPreference) {
+		check.Status = StatusWarning
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityWarning,
+			Text: fmt.Sprintf("The avp= tag publishes the unknown avatar preference %q, expected %q or %q: receivers must ignore it and fall back to %q, and some may treat the whole record as failing",
+				rec.AvatarPreference, AvatarPreferencePersonal, AvatarPreferenceBrand, AvatarPreferenceBrand),
+		})
+	} else if rec.AvatarPreference == AvatarPreferencePersonal {
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityInfo,
+			Text:     "The avp=personal tag asks providers that display personal avatars to prefer the sender's avatar over the brand Indicator",
+		})
+	}
+
+	if rec.LocalPartSelector {
+		scope := "every local-part"
+		if len(rec.LocalPartPrefixes) > 0 {
+			scope = fmt.Sprintf("the local-parts starting with %s", quotedList(rec.LocalPartPrefixes))
+		}
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityInfo,
+			Text:     fmt.Sprintf("The lps= tag sends %s to a selector named after the address, so those senders can be served another Indicator than this one", scope),
+		})
+	}
+
+	return check
 }
 
 // vmcBinding names the Assertion Record a Verified Mark Certificate published

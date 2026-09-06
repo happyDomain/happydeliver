@@ -143,6 +143,17 @@ type Record struct {
 	LogoURL string
 	// VMCURL is the value of the a= tag (empty when no VMC is published).
 	VMCURL string
+	// LocalPartSelector reports whether the record publishes an lps= tag.
+	// It is distinct from LocalPartPrefixes being empty: a published "lps="
+	// with no value means every local-part matches.
+	LocalPartSelector bool
+	// LocalPartPrefixes holds the local-part prefixes of the lps= tag. It
+	// is empty when the tag is absent, and also when it is published
+	// without a value, which LocalPartSelector tells apart.
+	LocalPartPrefixes []string
+	// AvatarPreference is the raw value of the avp= tag, empty when the tag
+	// is absent. AvatarPreferenceOrDefault applies the specified default.
+	AvatarPreference string
 	// RecordValid reports whether the DNS TXT record itself is
 	// syntactically valid. Unlike Valid, this does not reflect the outcome
 	// of asset validation (logo/VMC checks).
@@ -165,6 +176,18 @@ type Record struct {
 // domain, but is published and controlled by its organizational domain.
 func (r *Record) Inherited() bool {
 	return r.RecordDomain != "" && !strings.EqualFold(r.RecordDomain, r.Domain)
+}
+
+// AvatarPreferenceOrDefault returns the Domain Owner's avatar preference,
+// applying the "brand" default the specification gives to a record that does
+// not publish an avp= tag. A value outside the registered set is not the
+// Domain Owner's preference either: it must be ignored, so it too yields the
+// default.
+func (r *Record) AvatarPreferenceOrDefault() string {
+	if isKnownAvatarPreference(r.AvatarPreference) {
+		return r.AvatarPreference
+	}
+	return AvatarPreferenceBrand
 }
 
 // Resolver looks up DNS TXT records. *net.Resolver satisfies it.
