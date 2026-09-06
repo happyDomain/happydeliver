@@ -31,7 +31,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -41,12 +43,13 @@ import (
 	"time"
 )
 
-// oidBIMIExtKeyUsage and oidLogotype are the extensions a Verified Mark
-// Certificate is recognised by, spelled out here so the fixtures do not lean
-// on the constants the code under test uses.
+// oidBIMIExtKeyUsage, oidLogotype and oidSCTList are the three extensions a
+// Verified Mark Certificate is recognised by, spelled out here so the fixtures
+// do not lean on the constants the code under test uses.
 var (
 	oidBIMIExtKeyUsage = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 31}
 	oidLogotype        = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 12}
+	oidSCTList         = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
 )
 
 // testVMCOptions describes the chain generateTestVMCChain has to build. The
@@ -60,10 +63,17 @@ type testVMCOptions struct {
 
 	WithoutEKU      bool
 	WithoutLogotype bool
+	WithoutCRLDP    bool
+	WithoutSCT      bool
+	EmptySCTList    bool
 	LeafIsCA        bool
 
-	IssuerNotCA    bool
-	IssuerNotAfter time.Time
+	// WithoutIssuer publishes the leaf alone, as a chain that omits the CA
+	// certificates that issued it.
+	WithoutIssuer    bool
+	IssuerWithoutEKU bool
+	IssuerNotCA      bool
+	IssuerNotAfter   time.Time
 }
 
 // logotypeExtension builds an RFC 3709 logotype extension embedding svgLogo as
@@ -86,11 +96,36 @@ func logotypeExtension(t *testing.T, svgLogo []byte) pkix.Extension {
 	return pkix.Extension{Id: oidLogotype, Value: uriBytes}
 }
 
+// sctListExtension builds an RFC 6962 extension announcing count Signed
+// Certificate Timestamps: an OCTET STRING wrapping the TLS-encoded list, in
+// which each timestamp is announced by a 16-bit length. The bodies are
+// arbitrary, since only their number is under test.
+func sctListExtension(t *testing.T, count int) pkix.Extension {
+	t.Helper()
+
+	var list []byte
+	for i := range count {
+		body := []byte(fmt.Sprintf("timestamp-%d", i))
+		list = binary.BigEndian.AppendUint16(list, uint16(len(body)))
+		list = append(list, body...)
+	}
+
+	payload := binary.BigEndian.AppendUint16(nil, uint16(len(list)))
+	payload = append(payload, list...)
+
+	value, err := asn1.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return pkix.Extension{Id: oidSCTList, Value: value}
+}
+
 // generateTestVMCChain builds the issuance chain of a Verified Mark
 // Certificate: a self-signed root, the intermediate CA that issues mark
-// certificates, and the leaf itself. It returns the published chain, the leaf
-// followed by the intermediate, so that the analysis has more than the leaf to
-// look at.
+// certificates, and the leaf itself. It returns the published chain: the leaf
+// followed by the intermediate, the root being optional in the published
+// file.
 func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
 	t.Helper()
 
@@ -138,7 +173,9 @@ func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		KeyUsage:              x509.KeyUsageCertSign,
-		UnknownExtKeyUsage:    []asn1.ObjectIdentifier{oidBIMIExtKeyUsage},
+	}
+	if !opts.IssuerWithoutEKU {
+		issuerTemplate.UnknownExtKeyUsage = []asn1.ObjectIdentifier{oidBIMIExtKeyUsage}
 	}
 	if opts.IssuerNotCA {
 		issuerTemplate.IsCA = false
@@ -166,9 +203,23 @@ func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
 	if !opts.WithoutLogotype {
 		leafTemplate.ExtraExtensions = append(leafTemplate.ExtraExtensions, logotypeExtension(t, opts.Logo))
 	}
+	if !opts.WithoutCRLDP {
+		leafTemplate.CRLDistributionPoints = []string{"https://crl.example.com/vmc.crl"}
+	}
+	if !opts.WithoutSCT {
+		count := 2
+		if opts.EmptySCTList {
+			count = 0
+		}
+		leafTemplate.ExtraExtensions = append(leafTemplate.ExtraExtensions, sctListExtension(t, count))
+	}
 	leafCert, _ := issue(leafTemplate, issuerCert, issuerKey)
 
-	for _, cert := range []*x509.Certificate{leafCert, issuerCert} {
+	published := []*x509.Certificate{leafCert, issuerCert}
+	if opts.WithoutIssuer {
+		published = published[:1]
+	}
+	for _, cert := range published {
 		chainPEM = append(chainPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
 	}
 
@@ -251,6 +302,56 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "is not allowed to sign certificates, yet the chain presents it as the issuer of",
 		},
 		{
+			name:    "Chain reduced to the leaf certificate",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.WithoutIssuer = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "the certificate of the issuing CA must be published alongside it",
+		},
+		{
+			name:    "Issuer without the BIMI EKU",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.IssuerWithoutEKU = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "is not designated to issue Verified Mark Certificates",
+		},
+		{
+			name:    "Missing CRL distribution point",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.WithoutCRLDP = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "does not publish a CRL distribution point",
+		},
+		{
+			name:    "Missing Signed Certificate Timestamps",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.WithoutSCT = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "was not logged to Certificate Transparency logs",
+		},
+		{
+			name:    "Empty Signed Certificate Timestamp list",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.EmptySCTList = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "Timestamp list of the certificate is empty",
+		},
+		{
 			name:    "Leaf asserting it is a CA",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			chain: vmc(func(o *testVMCOptions) {
@@ -268,7 +369,7 @@ func TestAnalyzeVMC(t *testing.T) {
 			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
-			expectedInMsg:  "Extended Key Usage",
+			expectedInMsg:  "The certificate does not carry the BIMI Extended Key Usage",
 		},
 		{
 			name:    "Missing logotype extension",
@@ -534,4 +635,68 @@ func TestVMCBindingAcceptableSANs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestParseSCTList covers the walk over the RFC 6962 timestamp list, which
+// tells "not logged" apart from "logged, but the proof is unreadable".
+func TestParseSCTList(t *testing.T) {
+	// sctList encodes count timestamps the way sctListExtension does, so the
+	// malformed cases below can be derived from a well-formed list.
+	sctList := func(t *testing.T, count int) []byte {
+		ext := sctListExtension(t, count)
+		var payload []byte
+		if _, err := asn1.Unmarshal(ext.Value, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+
+	certWith := func(t *testing.T, payload []byte) *x509.Certificate {
+		value, err := asn1.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: value}}}
+	}
+
+	t.Run("extension absent", func(t *testing.T) {
+		count, found, err := parseSCTList(&x509.Certificate{})
+		if found || err != nil || count != 0 {
+			t.Errorf("parseSCTList() = %d, %t, %v; want 0, false, nil", count, found, err)
+		}
+	})
+
+	for _, count := range []int{0, 1, 3} {
+		t.Run(fmt.Sprintf("%d timestamps", count), func(t *testing.T) {
+			got, found, err := parseSCTList(certWith(t, sctList(t, count)))
+			if err != nil || !found {
+				t.Fatalf("parseSCTList() = _, %t, %v; want found and no error", found, err)
+			}
+			if got != count {
+				t.Errorf("count = %d, want %d", got, count)
+			}
+		})
+	}
+
+	t.Run("truncated list", func(t *testing.T) {
+		full := sctList(t, 2)
+		_, found, err := parseSCTList(certWith(t, full[:len(full)-4]))
+		if !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
+
+	t.Run("list shorter than its own length prefix", func(t *testing.T) {
+		_, found, err := parseSCTList(certWith(t, []byte{0x00}))
+		if !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
+
+	t.Run("payload is not an OCTET STRING", func(t *testing.T) {
+		cert := &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: []byte{0xff, 0xff}}}}
+		if _, found, err := parseSCTList(cert); !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
 }

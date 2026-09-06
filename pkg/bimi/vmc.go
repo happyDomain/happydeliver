@@ -25,7 +25,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -42,6 +44,11 @@ const OIDBIMIExtKeyUsage = "1.3.6.1.5.5.7.3.31"
 // OIDLogotypeExtension is the RFC 3709 logotype extension carrying the
 // certified brand logo.
 const OIDLogotypeExtension = "1.3.6.1.5.5.7.1.12"
+
+// OIDSCTList is the RFC 6962 extension carrying the Signed Certificate
+// Timestamps that prove the certificate was logged to Certificate
+// Transparency logs.
+const OIDSCTList = "1.3.6.1.4.1.11129.2.4.2"
 
 // svgDataURIRegexp locates the embedded logo data URI inside the logotype
 // extension (RFC 3709). The SVG is base64-encoded, usually gzipped
@@ -69,9 +76,20 @@ type VMCInfo struct {
 	// HasBimiEku reports whether the leaf carries the BIMI Extended Key
 	// Usage (OIDBIMIExtKeyUsage).
 	HasBimiEku *bool
+	// IssuerHasBimiEku reports whether the certificate of the immediate
+	// issuer carries the BIMI Extended Key Usage too, as the profile
+	// requires of it. Nil when the chain does not carry that certificate.
+	IssuerHasBimiEku *bool
 	// HasLogotype reports whether the leaf carries the RFC 3709 logotype
 	// extension (OIDLogotypeExtension).
 	HasLogotype *bool
+	// HasCRLDistributionPoints reports whether the leaf publishes where its
+	// revocation status can be checked (RFC 5280 cRLDistributionPoints).
+	HasCRLDistributionPoints *bool
+	// SCTCount is the number of Signed Certificate Timestamps embedded in
+	// the leaf, proving it was logged to Certificate Transparency logs. Nil
+	// when the extension could not be read.
+	SCTCount *int
 	// LogoMatches reports whether the SVG embedded in the certificate
 	// matches the logo published at the l= URL. Nil when no comparison was
 	// made (no published logo or extraction failure).
@@ -226,6 +244,13 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 	var problems []string
 	var warnings []string
 
+	// The chain has to carry the certificates that issued the leaf: without
+	// them nothing above the Verified Mark Certificate can be examined, and
+	// the profile requires them to be published alongside it.
+	if len(certs) < 2 {
+		problems = append(problems, "The file contains only the Verified Mark Certificate: the certificate of the issuing CA must be published alongside it, so that the issuance chain can be verified")
+	}
+
 	// A Verified Mark Certificate is issued to a brand, not to an authority:
 	// a leaf asserting it is a CA is not one.
 	if leaf.BasicConstraintsValid && leaf.IsCA {
@@ -254,15 +279,20 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 	}
 
 	// BIMI Extended Key Usage
-	hasBIMIEKU := false
-	for _, eku := range leaf.UnknownExtKeyUsage {
-		if eku.String() == OIDBIMIExtKeyUsage {
-			hasBIMIEKU = true
-		}
-	}
+	hasBIMIEKU := certHasBIMIEKU(leaf)
 	info.HasBimiEku = &hasBIMIEKU
 	if !hasBIMIEKU {
 		problems = append(problems, "The certificate does not carry the BIMI Extended Key Usage (1.3.6.1.5.5.7.3.31): this is not a Verified Mark Certificate")
+	}
+
+	// The authority that issued it must itself be designated for that use:
+	// the BIMI Extended Key Usage is required of the immediate issuer too.
+	if len(certs) > 1 {
+		issuerHasBIMIEKU := certHasBIMIEKU(certs[1])
+		info.IssuerHasBimiEku = &issuerHasBIMIEKU
+		if !issuerHasBIMIEKU {
+			problems = append(problems, fmt.Sprintf("%s does not carry the BIMI Extended Key Usage (1.3.6.1.5.5.7.3.31): it is not designated to issue Verified Mark Certificates", certLabel(1, certs[1])))
+		}
 	}
 
 	// Logotype extension and embedded logo comparison
@@ -287,6 +317,28 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 				problems = append(problems, "The logo embedded in the certificate differs from the logo published at the l= URL: both must be identical")
 			}
 		}
+	}
+
+	// Revocation has to remain checkable for the whole life of the
+	// certificate, so the certificate has to say where.
+	hasCRLDP := len(leaf.CRLDistributionPoints) > 0
+	info.HasCRLDistributionPoints = &hasCRLDP
+	if !hasCRLDP {
+		problems = append(problems, "The certificate does not publish a CRL distribution point: its revocation status cannot be checked")
+	}
+
+	// Certificate Transparency: the issuance must be publicly auditable.
+	sctCount, foundSCT, err := parseSCTList(leaf)
+	switch {
+	case !foundSCT:
+		problems = append(problems, "The certificate does not carry any Signed Certificate Timestamp (1.3.6.1.4.1.11129.2.4.2): its issuance was not logged to Certificate Transparency logs")
+	case err != nil:
+		problems = append(problems, fmt.Sprintf("The Signed Certificate Timestamp list of the certificate cannot be read: %s", err))
+	case sctCount == 0:
+		info.SCTCount = &sctCount
+		problems = append(problems, "The Signed Certificate Timestamp list of the certificate is empty: at least one timestamp is required")
+	default:
+		info.SCTCount = &sctCount
 	}
 
 	// Each certificate must be signed by the next one. The VMC roots are not
@@ -333,6 +385,70 @@ func certLabel(i int, cert *x509.Certificate) string {
 		name = cert.Subject.String()
 	}
 	return fmt.Sprintf("Issuer certificate #%d (%s)", i+1, name)
+}
+
+// certHasBIMIEKU reports whether cert carries the BIMI Extended Key Usage.
+// The OID is unknown to crypto/x509, which files it under UnknownExtKeyUsage
+// rather than in the parsed ExtKeyUsage list.
+func certHasBIMIEKU(cert *x509.Certificate) bool {
+	for _, eku := range cert.UnknownExtKeyUsage {
+		if eku.String() == OIDBIMIExtKeyUsage {
+			return true
+		}
+	}
+	return false
+}
+
+// parseSCTList counts the Signed Certificate Timestamps embedded in cert by
+// the RFC 6962 extension. found reports whether the extension is present at
+// all, which is what tells "not logged" apart from "logged, but the proof is
+// unreadable".
+//
+// Only the structure is walked: validating the timestamps themselves would
+// require the public keys of the recognised Certificate Transparency logs,
+// which is a matter of receiver policy, like the trust anchors.
+func parseSCTList(cert *x509.Certificate) (count int, found bool, err error) {
+	var payload []byte
+	for _, ext := range cert.Extensions {
+		if ext.Id.String() == OIDSCTList {
+			payload = ext.Value
+			found = true
+		}
+	}
+	if !found {
+		return 0, false, nil
+	}
+
+	// The extension value is a DER OCTET STRING wrapping the TLS-encoded
+	// SignedCertificateTimestampList of RFC 6962, Section 3.3.
+	var list []byte
+	if rest, err := asn1.Unmarshal(payload, &list); err != nil {
+		return 0, true, fmt.Errorf("invalid extension payload: %w", err)
+	} else if len(rest) > 0 {
+		return 0, true, fmt.Errorf("invalid extension payload: %d trailing bytes", len(rest))
+	}
+
+	if len(list) < 2 {
+		return 0, true, fmt.Errorf("the timestamp list is truncated")
+	}
+	// A 16-bit length prefix announces the whole list, then each timestamp
+	// is announced by its own.
+	if declared := int(binary.BigEndian.Uint16(list)); declared != len(list)-2 {
+		return 0, true, fmt.Errorf("the timestamp list announces %d bytes but carries %d", declared, len(list)-2)
+	}
+
+	for rest := list[2:]; len(rest) > 0; count++ {
+		if len(rest) < 2 {
+			return 0, true, fmt.Errorf("timestamp #%d is truncated", count+1)
+		}
+		length := int(binary.BigEndian.Uint16(rest))
+		if len(rest[2:]) < length {
+			return 0, true, fmt.Errorf("timestamp #%d announces %d bytes but only %d remain", count+1, length, len(rest[2:]))
+		}
+		rest = rest[2+length:]
+	}
+
+	return count, true, nil
 }
 
 // extractLogotypeSVG extracts the SVG image embedded in the RFC 3709 logotype

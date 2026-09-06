@@ -1283,9 +1283,19 @@ components:
         has_bimi_eku:
           type: boolean
           description: Whether the certificate carries the BIMI Extended Key Usage (1.3.6.1.5.5.7.3.31)
+        issuer_has_bimi_eku:
+          type: boolean
+          description: Whether the certificate of the immediate issuer carries the BIMI Extended Key Usage too, as the profile requires of it. Absent when the chain does not carry that certificate.
         has_logotype:
           type: boolean
           description: Whether the certificate carries the logotype extension (1.3.6.1.5.5.7.1.12)
+        has_crl_distribution_points:
+          type: boolean
+          description: Whether the certificate publishes where its revocation status can be checked (cRLDistributionPoints)
+        sct_count:
+          type: integer
+          description: Number of Signed Certificate Timestamps embedded in the certificate, proving it was logged to Certificate Transparency logs. Absent when the extension could not be read.
+          example: 3
         logo_matches:
           type: boolean
           description: Whether the SVG embedded in the certificate matches the logo published at the l= URL

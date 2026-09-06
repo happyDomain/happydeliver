@@ -71,7 +71,14 @@
 
         const dots: Dot[] = [
             { status: triState(vmc.has_bimi_eku), label: "BIMI Extended Key Usage" },
+            { status: triState(vmc.issuer_has_bimi_eku), label: "Issuer allowed to issue VMCs" },
             { status: triState(vmc.has_logotype), label: "Embedded logo" },
+            { status: triState(vmc.has_crl_distribution_points), label: "Revocation checkable" },
+            {
+                status:
+                    vmc.sct_count === undefined ? "skipped" : vmc.sct_count > 0 ? "pass" : "fail",
+                label: "Logged to Certificate Transparency",
+            },
         ];
         if (vmc.logo_matches !== undefined) {
             dots.push({
@@ -389,6 +396,27 @@
                             <span class="badge bg-success ms-1">matches published logo</span>
                         {:else if bimiRecord.vmc.logo_matches === false}
                             <span class="badge bg-danger ms-1">differs from published logo</span>
+                        {/if}
+                    </div>
+                    <div class="mb-1">
+                        <strong>Issuer Extended Key Usage:</strong>
+                        {@render presenceBadge(bimiRecord.vmc.issuer_has_bimi_eku)}
+                        <strong class="ms-3">CRL distribution point:</strong>
+                        {@render presenceBadge(bimiRecord.vmc.has_crl_distribution_points)}
+                    </div>
+                    <div class="mb-1">
+                        <strong>Certificate Transparency:</strong>
+                        {#if bimiRecord.vmc.sct_count === undefined}
+                            <span class="badge bg-secondary">not evaluated</span>
+                        {:else if bimiRecord.vmc.sct_count > 0}
+                            <span class="badge bg-success">
+                                {bimiRecord.vmc.sct_count} signed timestamp{bimiRecord.vmc
+                                    .sct_count > 1
+                                    ? "s"
+                                    : ""}
+                            </span>
+                        {:else}
+                            <span class="badge bg-danger">no signed timestamp</span>
                         {/if}
                     </div>
                 </div>

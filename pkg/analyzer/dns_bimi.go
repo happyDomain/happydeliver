@@ -163,10 +163,13 @@ func bimiChecksToModel(checks []bimi.Check) []model.BIMICheck {
 
 func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
 	m := &model.VMCInfo{
-		Valid:       v.Valid,
-		HasBimiEku:  v.HasBimiEku,
-		HasLogotype: v.HasLogotype,
-		LogoMatches: v.LogoMatches,
+		Valid:                    v.Valid,
+		HasBimiEku:               v.HasBimiEku,
+		IssuerHasBimiEku:         v.IssuerHasBimiEku,
+		HasLogotype:              v.HasLogotype,
+		HasCrlDistributionPoints: v.HasCRLDistributionPoints,
+		SctCount:                 v.SCTCount,
+		LogoMatches:              v.LogoMatches,
 	}
 	if v.Issuer != "" {
 		m.Issuer = utils.PtrTo(v.Issuer)
