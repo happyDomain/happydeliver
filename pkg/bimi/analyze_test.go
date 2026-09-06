@@ -76,12 +76,59 @@ func TestValidateAssets(t *testing.T) {
 			VMCURL:   server.URL + "/vmc.pem",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if !rec.Valid {
 			t.Errorf("expected all checks to pass, got checks: %+v", rec.Checks)
 		}
 		if rec.VMC == nil || !rec.VMC.Valid {
 			t.Errorf("expected valid VMC info, got %+v", rec.VMC)
+		}
+	})
+
+	// Section 7.1 is a precondition, not an asset: a domain whose policy
+	// forbids BIMI processing displays no Indicator however good its logo and
+	// its certificate are, and the verdict has to say so.
+	t.Run("Policy of none fails the record despite compliant assets", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/logo.svg",
+			VMCURL:   server.URL + "/vmc.pem",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec, &DMARCPolicy{Found: true, Domain: "example.com", Policy: DMARCPolicyNone})
+
+		if rec.Valid {
+			t.Errorf("p=none must fail the record, got checks: %+v", rec.Checks)
+		}
+		if !strings.Contains(rec.Error, "DMARC at enforcement") {
+			t.Errorf("Error = %q, want it to name the failing check", rec.Error)
+		}
+		for _, name := range []string{"logo_fetch", "logo_xml", "logo_svg_tiny_ps", "vmc"} {
+			if check, found := findCheck(rec.Checks, name); !found || check.Status != StatusPass {
+				t.Errorf("check %s = %+v, want it to still pass: the assets are compliant, the policy is not", name, check)
+			}
+		}
+	})
+
+	// A caller that does not resolve DMARC gets no verdict on it, rather than
+	// a silent pass on a criterion nobody checked.
+	t.Run("Nil policy leaves the DMARC check skipped", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/logo.svg",
+			VMCURL:   server.URL + "/vmc.pem",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec, nil)
+
+		if !rec.Valid {
+			t.Errorf("an unevaluated DMARC policy must not fail the record, got checks: %+v", rec.Checks)
+		}
+		check, found := findCheck(rec.Checks, "dmarc_enforcement")
+		if !found || check.Status != StatusSkipped {
+			t.Errorf("check dmarc_enforcement = %+v, want skipped", check)
 		}
 	})
 
@@ -93,7 +140,7 @@ func TestValidateAssets(t *testing.T) {
 			VMCURL:   server.URL + "/vmc.pem",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if !rec.Valid {
 			t.Errorf("BIMI accepts SVG and SVGZ alike for the l= tag, got checks: %+v", rec.Checks)
 		}
@@ -130,7 +177,7 @@ func TestValidateAssets(t *testing.T) {
 			LogoURL:  server.URL + "/truncated.svgz",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if rec.Valid {
 			t.Error("a logo that cannot be decoded is no logo at all")
 		}
@@ -157,7 +204,7 @@ func TestValidateAssets(t *testing.T) {
 			LogoURL:  server.URL + "/bad.svg",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if rec.Valid {
 			t.Errorf("expected checks to fail for non-compliant logo")
 		}
@@ -169,15 +216,16 @@ func TestValidateAssets(t *testing.T) {
 			Domain:   "example.com",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if !rec.Valid {
 			t.Errorf("declination record should not fail checks")
 		}
 		for _, check := range rec.Checks {
-			// record_tags reports on the record itself, not on an asset:
-			// a declination has nothing to download, but its tags are
-			// still there to be judged.
-			if check.Name == "record_tags" {
+			// record_tags reports on the record itself and
+			// dmarc_enforcement on the policy that governs it: neither
+			// judges an asset. A declination has nothing to download,
+			// but both of them still have something to say.
+			if check.Name == "record_tags" || check.Name == "dmarc_enforcement" {
 				continue
 			}
 			if check.Status != StatusSkipped {
@@ -198,7 +246,7 @@ func TestValidateAssets(t *testing.T) {
 			VMCURL:   server.URL + "/vmc.pem",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if rec.Valid {
 			t.Errorf("an empty l= is a declination only when a= is empty too: with a VMC published, no Indicator can be displayed")
 		}
@@ -215,7 +263,7 @@ func TestValidateAssets(t *testing.T) {
 			LogoURL:  server.URL + "/missing.svg",
 			Valid:    true,
 		}
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
 		if rec.Valid {
 			t.Errorf("expected checks to fail for unreachable logo")
 		}
@@ -245,7 +293,7 @@ func TestAnalyze(t *testing.T) {
 		txt := "v=BIMI1; l=" + server.URL + "/logo.svg; a=" + server.URL + "/vmc.pem"
 		v := &Validator{HTTPClient: server.Client(), Resolver: stubResolver{txt: []string{txt}}}
 
-		rec, err := v.Analyze(ctx, "example.com", "default")
+		rec, err := v.Analyze(ctx, "example.com", "default", enforcedDMARC("example.com"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +311,7 @@ func TestAnalyze(t *testing.T) {
 	t.Run("Invalid record skips asset checks", func(t *testing.T) {
 		v := &Validator{HTTPClient: server.Client(), Resolver: stubResolver{txt: []string{"v=BIMI1;"}}}
 
-		rec, err := v.Analyze(ctx, "example.com", "default")
+		rec, err := v.Analyze(ctx, "example.com", "default", enforcedDMARC("example.com"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,7 +325,7 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("Propagates lookup error", func(t *testing.T) {
 		v := &Validator{HTTPClient: server.Client(), Resolver: stubResolver{txt: nil}}
-		_, err := v.Analyze(ctx, "example.com", "default")
+		_, err := v.Analyze(ctx, "example.com", "default", enforcedDMARC("example.com"))
 		if !errors.Is(err, ErrNoRecord) {
 			t.Errorf("err = %v, want ErrNoRecord", err)
 		}

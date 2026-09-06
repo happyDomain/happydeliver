@@ -32,7 +32,7 @@
 // A minimal use looks like:
 //
 //	v := bimi.NewValidator()
-//	rec, err := v.Analyze(ctx, "example.com", "default")
+//	rec, err := v.Analyze(ctx, "example.com", "default", dmarcPolicy)
 //
 // The returned Record fully describes validity (Valid, Error, Checks, VMC).
 // The building blocks (ParseRecord, DecodeLogo, CheckLogoXML,

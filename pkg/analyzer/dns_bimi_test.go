@@ -28,6 +28,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/bimi"
 )
 
 // Record parsing and asset validation are covered by the reusable pkg/bimi
@@ -89,7 +93,7 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := newMockAnalyzer(tt.txt, nil)
-			rec := analyzer.checkBIMIRecord(tt.domain, "default", "")
+			rec := analyzer.checkBIMIRecord(tt.domain, "default", "", enforcingDMARC(tt.domain))
 
 			if rec.Valid != tt.wantValid {
 				errStr := ""
@@ -172,7 +176,7 @@ func TestCheckBIMIRecordLocalPartSelector(t *testing.T) {
 	}
 
 	t.Run("A matching sender is served the local-part record", func(t *testing.T) {
-		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "brand.news")
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "brand.news", enforcingDMARC("example.com"))
 
 		if rec.Selector != "brand-news" {
 			t.Errorf("Selector = %q, want %q", rec.Selector, "brand-news")
@@ -186,7 +190,7 @@ func TestCheckBIMIRecordLocalPartSelector(t *testing.T) {
 	})
 
 	t.Run("Without a sender the requested selector answers", func(t *testing.T) {
-		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "")
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "", enforcingDMARC("example.com"))
 
 		if rec.Selector != "default" {
 			t.Errorf("Selector = %q, want %q", rec.Selector, "default")
@@ -199,6 +203,114 @@ func TestCheckBIMIRecordLocalPartSelector(t *testing.T) {
 		}
 		if rec.AvatarPreference == nil || *rec.AvatarPreference != "personal" {
 			t.Errorf("AvatarPreference = %v, want %q", rec.AvatarPreference, "personal")
+		}
+	})
+}
+
+// enforcingDMARC is the DMARC record the BIMI tests that are not about DMARC
+// run under: BIMI section 7.1 refuses to display an Indicator without one, so
+// every other case needs a policy that stays out of the way.
+func enforcingDMARC(domain string) *model.DMARCRecord {
+	return &model.DMARCRecord{
+		Valid:  true,
+		Domain: utils.PtrTo(domain),
+		Policy: utils.PtrTo(model.DMARCRecordPolicyReject),
+	}
+}
+
+// The precondition has to reach the reported record, not just the pkg/bimi
+// check: a syntactically valid record under p=none is one no receiver acts on.
+func TestCheckBIMIRecordDMARCEnforcement(t *testing.T) {
+	txt := map[string][]string{
+		"default._bimi.example.com": {"v=BIMI1; l=;"},
+	}
+
+	t.Run("A policy of none fails the record", func(t *testing.T) {
+		dmarc := &model.DMARCRecord{
+			Valid:  true,
+			Domain: utils.PtrTo("example.com"),
+			Policy: utils.PtrTo(model.DMARCRecordPolicyNone),
+		}
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "", dmarc)
+
+		if rec.Valid {
+			t.Error("Valid = true, want false: p=none forbids BIMI processing altogether")
+		}
+		if rec.RecordValid == nil || !*rec.RecordValid {
+			t.Error("RecordValid = false, want true: the TXT record itself is well-formed")
+		}
+		check, found := findModelCheck(rec, "dmarc_enforcement")
+		if !found || check.Status != model.BIMICheckStatusFail {
+			t.Errorf("check dmarc_enforcement = %+v, want a failure", check)
+		}
+	})
+
+	t.Run("An enforcing policy leaves the record valid", func(t *testing.T) {
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "", enforcingDMARC("example.com"))
+
+		if !rec.Valid {
+			t.Errorf("Valid = false, want true (error: %v)", rec.Error)
+		}
+		check, found := findModelCheck(rec, "dmarc_enforcement")
+		if !found || check.Status != model.BIMICheckStatusPass {
+			t.Errorf("check dmarc_enforcement = %+v, want a pass", check)
+		}
+	})
+}
+
+func findModelCheck(rec *model.BIMIRecord, name string) (model.BIMICheck, bool) {
+	if rec.Checks == nil {
+		return model.BIMICheck{}, false
+	}
+	for _, c := range *rec.Checks {
+		if c.Name == name {
+			return c, true
+		}
+	}
+	return model.BIMICheck{}, false
+}
+
+func TestBimiDMARCPolicy(t *testing.T) {
+	t.Run("A record that was not analysed leaves the criterion unevaluated", func(t *testing.T) {
+		if got := bimiDMARCPolicy(nil); got != nil {
+			t.Errorf("bimiDMARCPolicy(nil) = %+v, want nil", got)
+		}
+	})
+
+	t.Run("A record that did not validate is not a policy", func(t *testing.T) {
+		got := bimiDMARCPolicy(&model.DMARCRecord{
+			Valid: false,
+			Error: utils.PtrTo("No DMARC record found"),
+		})
+		if got == nil || got.Found {
+			t.Errorf("Found = %+v, want a non-nil policy reporting Found = false", got)
+		}
+	})
+
+	t.Run("Every tag section 7.1 reads is carried over", func(t *testing.T) {
+		got := bimiDMARCPolicy(&model.DMARCRecord{
+			Valid:           true,
+			Domain:          utils.PtrTo("example.com"),
+			Policy:          utils.PtrTo(model.DMARCRecordPolicyQuarantine),
+			SubdomainPolicy: utils.PtrTo(model.DMARCRecordSubdomainPolicyNone),
+			Percentage:      utils.PtrTo(50),
+			TestMode:        utils.PtrTo(true),
+		})
+
+		if got == nil {
+			t.Fatal("bimiDMARCPolicy returned nil for a valid record")
+		}
+		if !got.Found || got.Domain != "example.com" {
+			t.Errorf("Found = %t, Domain = %q, want true and \"example.com\"", got.Found, got.Domain)
+		}
+		if got.Policy != bimi.DMARCPolicyQuarantine || got.SubdomainPolicy != bimi.DMARCPolicyNone {
+			t.Errorf("Policy = %q, SubdomainPolicy = %q, want quarantine and none", got.Policy, got.SubdomainPolicy)
+		}
+		if got.Percentage == nil || *got.Percentage != 50 {
+			t.Errorf("Percentage = %v, want 50", got.Percentage)
+		}
+		if !got.TestMode {
+			t.Error("TestMode = false, want true")
 		}
 	})
 }

@@ -55,7 +55,11 @@ func (d *DNSAnalyzer) bimiAssetsTimeout() time.Duration {
 // different Indicator per mailbox, so without it the record reported is the
 // one the selector alone leads to, which is not necessarily the one a receiver
 // would act on for a given sender.
-func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string) *model.BIMIRecord {
+//
+// dmarc is this domain's DMARC record, already analysed: BIMI section 7.1 makes
+// an enforcing DMARC policy a precondition of Indicator display, so a compliant
+// record under p=none is still a record no receiver will act on.
+func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string, dmarc *model.DMARCRecord) *model.BIMIRecord {
 	validator := &bimi.Validator{
 		HTTPClient: d.bimiHTTPClient,
 		Resolver:   d.resolver,
@@ -93,10 +97,30 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string) *model
 	if rec.Valid {
 		assetsCtx, cancelAssets := context.WithTimeout(context.Background(), d.bimiAssetsTimeout())
 		defer cancelAssets()
-		validator.ValidateAssets(assetsCtx, rec)
+		validator.ValidateAssets(assetsCtx, rec, bimiDMARCPolicy(dmarc))
 	}
 
 	return bimiRecordToModel(rec)
+}
+
+// bimiDMARCPolicy converts the analysed DMARC record into the policy input
+// pkg/bimi needs for BIMI section 7.1. A nil record means DMARC was not
+// analysed at all, which leaves the check skipped rather than failed; a record
+// that did not validate is not a policy, since it cannot make a message pass
+// DMARC, so Found stays false.
+func bimiDMARCPolicy(rec *model.DMARCRecord) *bimi.DMARCPolicy {
+	if rec == nil {
+		return nil
+	}
+
+	return &bimi.DMARCPolicy{
+		Found:           rec.Valid,
+		Domain:          utils.Deref(rec.Domain),
+		Policy:          string(utils.Deref(rec.Policy)),
+		SubdomainPolicy: string(utils.Deref(rec.SubdomainPolicy)),
+		Percentage:      utils.ClonePtr(rec.Percentage),
+		TestMode:        utils.Deref(rec.TestMode),
+	}
 }
 
 // bimiRecordToModel converts a *bimi.Record into the API *model.BIMIRecord.

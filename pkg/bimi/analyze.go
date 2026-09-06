@@ -28,35 +28,46 @@ import (
 )
 
 // Analyze looks up the BIMI record for domain/selector, parses it and, when
-// it is syntactically valid, runs the asset evidence checks. The returned
+// it is syntactically valid, runs the evidence checks. dmarc is the DMARC
+// policy in force for domain, which section 7.1 makes a precondition of
+// Indicator display; a nil policy leaves that check skipped. The returned
 // Record fully describes validity. A non-nil error is returned only when the
 // DNS lookup fails or no record exists (ErrNoRecord).
-func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Record, error) {
-	return v.AnalyzeForLocalPart(ctx, domain, selector, "")
+func (v *Validator) Analyze(ctx context.Context, domain, selector string, dmarc *DMARCPolicy) (*Record, error) {
+	return v.AnalyzeForLocalPart(ctx, domain, selector, "", dmarc)
 }
 
 // AnalyzeForLocalPart analyses the BIMI record like Analyze, resolving it with
 // LookupForLocalPart so that the Local-part Selector of the sending address is
 // honoured. Callers analysing a message should prefer it: it is the record the
 // receiver of that message would act on.
-func (v *Validator) AnalyzeForLocalPart(ctx context.Context, domain, selector, localPart string) (*Record, error) {
+func (v *Validator) AnalyzeForLocalPart(ctx context.Context, domain, selector, localPart string, dmarc *DMARCPolicy) (*Record, error) {
 	rec, err := v.LookupForLocalPart(ctx, domain, selector, localPart)
 	if err != nil {
 		return nil, err
 	}
 	if rec.Valid {
-		v.ValidateAssets(ctx, rec)
+		v.ValidateAssets(ctx, rec, dmarc)
 	}
 	return rec, nil
 }
 
-// ValidateAssets performs the evidence checks (logo download, XML
-// well-formedness, SVG Tiny P/S profile, VMC analysis) for a syntactically
-// valid record, filling rec.Checks and rec.VMC. When a mandatory check fails
-// it sets rec.Valid to false and rec.Error. A BIMI record only leads to a
-// displayed logo if its assets are compliant.
-func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
-	checks := []Check{checkRecordTags(rec)}
+// ValidateAssets performs the evidence checks (DMARC enforcement, logo
+// download, XML well-formedness, SVG Tiny P/S profile, VMC analysis) for a
+// syntactically valid record, filling rec.Checks and rec.VMC. When a mandatory
+// check fails it sets rec.Valid to false and rec.Error. A BIMI record only
+// leads to a displayed logo if the DMARC policy allows BIMI processing at all
+// and its assets are compliant.
+//
+// dmarc is the DMARC policy in force for rec.Domain, which the caller resolves:
+// this package does not look DMARC up. A nil policy leaves that check skipped
+// rather than assumed to pass.
+func (v *Validator) ValidateAssets(ctx context.Context, rec *Record, dmarc *DMARCPolicy) {
+	// The DMARC precondition comes first because section 7.1 puts it before
+	// Assertion Record Discovery itself: it is checked against rec.Domain,
+	// the Author Domain the analysis was requested for, and not against the
+	// domain the record was eventually found at.
+	checks := []Check{CheckDMARCEnforcement(dmarc, rec.Domain), checkRecordTags(rec)}
 
 	// The logo and the certificate sit at two unrelated URLs, and only the
 	// final comparison of one against the other needs both: download them

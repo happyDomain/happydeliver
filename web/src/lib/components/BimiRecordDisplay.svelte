@@ -13,6 +13,10 @@
 
     let { bimiRecord, dmarcRecord }: Props = $props();
 
+    /* Only consulted when no BIMI record exists at all, to offer the
+       declination advice below. The authoritative dmarc_enforcement check is
+       not available there: the analyser only runs the checks on a record it
+       found, so this is the raw policy rather than a second opinion on it. */
     const dmarcEnforced = $derived(
         dmarcRecord?.policy === "quarantine" || dmarcRecord?.policy === "reject",
     );
@@ -47,6 +51,17 @@
         const prefixes = bimiRecord.local_part_prefixes ?? [];
         if (prefixes.length === 0) return "every sending address";
         return `the addresses starting with ${prefixes.map((p) => `“${p}”`).join(", ")}`;
+    });
+
+    /* Why section 7.1 forbids BIMI processing here, as the analyser decided
+       it: a record and assets that are fully compliant still display nothing
+       when the DMARC policy is not at enforcement. The reasons are read off
+       the check rather than recomputed from dmarcRecord, so this banner cannot
+       drift from the verdict the rest of the report shows. */
+    const dmarcBlockers: string[] = $derived.by(() => {
+        const check = bimiRecord?.checks?.find((c) => c.name === "dmarc_enforcement");
+        if (check?.status !== "fail") return [];
+        return (check.messages ?? []).filter((m) => m.severity === "error").map((m) => m.text);
     });
 
     /* Dots in the same order as the entries of the expanded view. */
@@ -213,6 +228,29 @@
                 <strong>Selector:</strong> <code>{bimiRecord.selector}</code>
                 <strong class="ms-3">Domain:</strong> <code>{bimiRecord.domain}</code>
             </div>
+            {#if dmarcBlockers.length > 0}
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                        This logo will not be displayed
+                    </h6>
+                    <p class="mb-2 small">
+                        A message is only considered for BIMI once the sending domain's DMARC policy
+                        is at enforcement. Receivers must not perform BIMI processing here, so no
+                        indicator is shown however compliant the record and the logo below are.
+                    </p>
+                    <ul class="mb-2 small">
+                        {#each dmarcBlockers as reason, i (i)}
+                            <li>{reason}</li>
+                        {/each}
+                    </ul>
+                    <p class="mb-0 small text-muted">
+                        Requirement from §&thinsp;7.1 of
+                        <em>draft-brand-indicators-for-message-identification</em>. See the
+                        <a href="#dns-dmarc" class="alert-link">DMARC section</a> of this report.
+                    </p>
+                </div>
+            {/if}
             {#if inheritedFrom}
                 <div class="alert alert-info py-2">
                     <i class="bi bi-diagram-2 me-1"></i>

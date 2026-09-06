@@ -36,3 +36,24 @@ func PtrToNonZero[T comparable](v T) *T {
 	}
 	return &v
 }
+
+// Deref returns the value p points to, or the zero value of its type when p is
+// nil.
+func Deref[T any](p *T) T {
+	if p == nil {
+		var zero T
+		return zero
+	}
+	return *p
+}
+
+// ClonePtr returns a pointer to a copy of what p points to, or nil when p is
+// nil. Unlike Deref it keeps the distinction between an absent value and the
+// zero value, without sharing the original pointer.
+func ClonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
