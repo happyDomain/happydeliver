@@ -25,8 +25,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -74,26 +77,273 @@ type testVMCOptions struct {
 	IssuerWithoutEKU bool
 	IssuerNotCA      bool
 	IssuerNotAfter   time.Time
+
+	// Logotype describes the logotype extension to embed. Its zero value
+	// yields a conforming one.
+	Logotype testLogotypeOptions
 }
 
-// logotypeExtension builds an RFC 3709 logotype extension embedding svgLogo as
-// a gzipped base64 data URI. The URI is wrapped in a bare IA5String: the
-// analyser only needs to locate it inside the extension payload.
-func logotypeExtension(t *testing.T, svgLogo []byte) pkix.Extension {
+// Digest algorithms the fixture hashes a mark with, spelled out here so it
+// does not lean on the table the code under test uses.
+var (
+	oidSHA1   = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 26}
+	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	oidMD5    = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 5}
+)
+
+// The RFC 9399 logotype structures, transcribed a second time for the fixture
+// so that a mistake in the production ones cannot cancel itself out here.
+//
+// The tagged members carry their tag in the asn1.RawValue rather than in a
+// struct tag: encoding/asn1 emits a RawValue's FullBytes verbatim and drops
+// any explicit wrapper asked for by a tag, so the header has to be described
+// by Class, Tag and IsCompound with FullBytes left nil.
+type derLogotypeExtn struct {
+	IssuerLogo  asn1.RawValue `asn1:"optional"`
+	SubjectLogo asn1.RawValue `asn1:"optional"`
+}
+
+type derLogotypeData struct {
+	Image []derLogotypeImage
+}
+
+type derLogotypeImage struct {
+	ImageDetails derLogotypeDetails
+}
+
+type derLogotypeDetails struct {
+	MediaType string `asn1:"ia5"`
+	// LogotypeHash and LogotypeURI are SEQUENCE OF. The URIs go through
+	// asn1.RawValue because a []string is marshalled with empty parameters,
+	// which would emit them as UTF8String rather than IA5String.
+	LogotypeHash []derHashAlgAndValue
+	LogotypeURI  []asn1.RawValue
+}
+
+type derHashAlgAndValue struct {
+	HashAlg   pkix.AlgorithmIdentifier
+	HashValue []byte
+}
+
+type derLogotypeReference struct {
+	RefStructHash []derHashAlgAndValue
+	RefStructURI  []asn1.RawValue
+}
+
+// testLogotypeOptions describes the logotype extension to embed. Its zero
+// value yields a conforming one: the mark under subjectLogo, gzipped in a
+// base64 data URI, with a SHA-256 logotypeHash computed over the document with
+// canonicalized end-of-line characters. Each flag names the single requirement
+// the case is about.
+type testLogotypeOptions struct {
+	// UnderIssuerLogo files the mark under issuerLogo instead of
+	// subjectLogo, as the authority's own branding would be.
+	UnderIssuerLogo bool
+	// IssuerLogo additionally files this document under issuerLogo, to check
+	// that the subject's mark is the one that comes out.
+	IssuerLogo []byte
+
+	Indirect bool // a LogotypeReference instead of a LogotypeData
+	NoImage  bool // a LogotypeData carrying an empty image sequence
+
+	MediaType          string // overrides both the mediaType member and the data URI's
+	DataURIMediaType   string // overrides the data URI's alone
+	DataURINoMediaType bool   // the data URI announces none
+
+	HashAlg          asn1.ObjectIdentifier // defaults to SHA-256
+	WrongHash        bool
+	NoHash           bool
+	HashOverRawBytes bool // hashes without canonicalizing the end-of-line characters
+
+	Uncompressed  bool
+	PrecedingLink bool // lists an https:// URI before the data one
+	ExternalURI   bool // lists an https:// URI and nothing else
+	NoBase64      bool
+	CorruptBase64 bool
+	CorruptGzip   bool
+
+	// RawValue replaces the whole extension value, for payloads no
+	// structured builder would produce.
+	RawValue []byte
+}
+
+// testCanonicalEOL is the fixture's own rendition of the RFC 9399 section 7
+// end-of-line canonicalization, so that the hash it computes does not lean on
+// the implementation under test.
+func testCanonicalEOL(svg []byte) []byte {
+	return bytes.ReplaceAll(bytes.ReplaceAll(svg, []byte("\r\n"), []byte("\n")), []byte("\r"), []byte("\n"))
+}
+
+// testDigest hashes b with the algorithm alg names.
+func testDigest(t *testing.T, alg asn1.ObjectIdentifier, b []byte) []byte {
 	t.Helper()
 
-	var gzipped bytes.Buffer
-	gz := gzip.NewWriter(&gzipped)
-	gz.Write(svgLogo)
-	gz.Close()
+	switch alg.String() {
+	case oidSHA1.String():
+		sum := sha1.Sum(b)
+		return sum[:]
+	case oidSHA256.String():
+		sum := sha256.Sum256(b)
+		return sum[:]
+	case oidMD5.String():
+		sum := md5.Sum(b)
+		return sum[:]
+	}
 
-	dataURI := "data:image/svg+xml-gzip;base64," + base64.StdEncoding.EncodeToString(gzipped.Bytes())
-	uriBytes, err := asn1.MarshalWithParams(dataURI, "ia5")
+	t.Fatalf("the fixture cannot hash with %s", alg)
+	return nil
+}
+
+// marshalIA5Strings encodes each value as an IA5String, ready to be carried in
+// a SEQUENCE OF.
+func marshalIA5Strings(t *testing.T, values []string) []asn1.RawValue {
+	t.Helper()
+
+	out := make([]asn1.RawValue, 0, len(values))
+	for _, value := range values {
+		tlv, err := asn1.MarshalWithParams(value, "ia5")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, asn1.RawValue{FullBytes: tlv})
+	}
+	return out
+}
+
+// logotypeInfo builds a LogotypeInfo, that is the complete [0] direct (or [1]
+// indirect) element that goes inside an explicit issuerLogo or subjectLogo.
+func logotypeInfo(t *testing.T, svgLogo []byte, opts testLogotypeOptions) []byte {
+	t.Helper()
+
+	mediaType := opts.MediaType
+	if mediaType == "" {
+		mediaType = "image/svg+xml"
+	}
+	dataURIMediaType := opts.DataURIMediaType
+	if dataURIMediaType == "" {
+		dataURIMediaType = mediaType
+	}
+	if opts.DataURINoMediaType {
+		dataURIMediaType = ""
+	}
+
+	payload := svgLogo
+	if !opts.Uncompressed {
+		var gzipped bytes.Buffer
+		gz := gzip.NewWriter(&gzipped)
+		gz.Write(svgLogo)
+		gz.Close()
+		payload = gzipped.Bytes()
+	}
+	if opts.CorruptGzip {
+		payload = payload[:len(payload)/2]
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(payload)
+	if opts.CorruptBase64 {
+		encoded = "not base64 at all!"
+	}
+	separator := ";base64,"
+	if opts.NoBase64 {
+		separator = ","
+	}
+
+	var uris []string
+	switch {
+	case opts.ExternalURI:
+		uris = []string{"https://logo.example.com/mark.svg"}
+	case opts.PrecedingLink:
+		uris = []string{"https://logo.example.com/mark.svg", "data:" + dataURIMediaType + separator + encoded}
+	default:
+		uris = []string{"data:" + dataURIMediaType + separator + encoded}
+	}
+
+	alg := opts.HashAlg
+	if alg == nil {
+		alg = oidSHA256
+	}
+	hashed := testCanonicalEOL(svgLogo)
+	if opts.HashOverRawBytes {
+		hashed = svgLogo
+	}
+	var hashes []derHashAlgAndValue
+	if !opts.NoHash {
+		value := testDigest(t, alg, hashed)
+		if opts.WrongHash {
+			value[0] ^= 0xff
+		}
+		hashes = []derHashAlgAndValue{{
+			HashAlg:   pkix.AlgorithmIdentifier{Algorithm: alg, Parameters: asn1.NullRawValue},
+			HashValue: value,
+		}}
+	}
+
+	details := derLogotypeDetails{
+		MediaType:    mediaType,
+		LogotypeHash: hashes,
+		LogotypeURI:  marshalIA5Strings(t, uris),
+	}
+
+	if opts.Indirect {
+		reference, err := asn1.MarshalWithParams(derLogotypeReference{
+			RefStructHash: hashes,
+			RefStructURI:  details.LogotypeURI,
+		}, "tag:1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reference
+	}
+
+	images := []derLogotypeImage{{ImageDetails: details}}
+	if opts.NoImage {
+		images = nil
+	}
+	direct, err := asn1.MarshalWithParams(derLogotypeData{Image: images}, "tag:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return direct
+}
+
+// logotypeExtension builds an RFC 9399 logotype extension embedding svgLogo,
+// by default as the conforming subjectLogo of a Verified Mark Certificate.
+func logotypeExtension(t *testing.T, svgLogo []byte, opts testLogotypeOptions) pkix.Extension {
+	t.Helper()
+
+	if opts.RawValue != nil {
+		return pkix.Extension{Id: oidLogotype, Value: opts.RawValue}
+	}
+
+	mark := asn1.RawValue{
+		Class:      asn1.ClassContextSpecific,
+		Tag:        2,
+		IsCompound: true,
+		Bytes:      logotypeInfo(t, svgLogo, opts),
+	}
+
+	var extn derLogotypeExtn
+	if opts.UnderIssuerLogo {
+		mark.Tag = 1
+		extn.IssuerLogo = mark
+	} else {
+		extn.SubjectLogo = mark
+		if opts.IssuerLogo != nil {
+			extn.IssuerLogo = asn1.RawValue{
+				Class:      asn1.ClassContextSpecific,
+				Tag:        1,
+				IsCompound: true,
+				Bytes:      logotypeInfo(t, opts.IssuerLogo, testLogotypeOptions{}),
+			}
+		}
+	}
+
+	value, err := asn1.Marshal(extn)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return pkix.Extension{Id: oidLogotype, Value: uriBytes}
+	return pkix.Extension{Id: oidLogotype, Value: value}
 }
 
 // sctListExtension builds an RFC 6962 extension announcing count Signed
@@ -202,7 +452,7 @@ func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte, r
 		leafTemplate.UnknownExtKeyUsage = []asn1.ObjectIdentifier{oidBIMIExtKeyUsage}
 	}
 	if !opts.WithoutLogotype {
-		leafTemplate.ExtraExtensions = append(leafTemplate.ExtraExtensions, logotypeExtension(t, opts.Logo))
+		leafTemplate.ExtraExtensions = append(leafTemplate.ExtraExtensions, logotypeExtension(t, opts.Logo, opts.Logotype))
 	}
 	if !opts.WithoutCRLDP {
 		leafTemplate.CRLDistributionPoints = []string{"https://crl.example.com/vmc.crl"}
@@ -404,6 +654,26 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "differs",
 		},
 		{
+			name:    "Logo hash does not cover the embedded logo",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.Logotype.WrongHash = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "does not match the hash the authority certified it by",
+		},
+		{
+			name:    "Logo embedded under issuerLogo",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.Logotype.UnderIssuerLogo = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "no subjectLogo",
+		},
+		{
 			name:    "Not a certificate",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			chain: func(t *testing.T) ([]byte, *x509.CertPool) {
@@ -499,6 +769,56 @@ func TestAnalyzeVMCAnchoring(t *testing.T) {
 	})
 }
 
+// TestAnalyzeVMCLogotype pins what the logotypeHash verification does to the
+// rest of the analysis. RFC 9399 section 4.1 has a client discard logotype
+// data whose hash does not match, so a mark that fails it must not go on to be
+// compared with the logo published at the l= URL, not even when the two
+// happen to be the same bytes, which is exactly the case set up here.
+func TestAnalyzeVMCLogotype(t *testing.T) {
+	logo := []byte(validTinyPSSVG)
+	now := time.Now()
+	binding := VMCBinding{Selector: "default", Domain: "example.com"}
+
+	t.Run("a verified hash is reported with the digest that established it", func(t *testing.T) {
+		chain, _ := generateTestVMCChain(t, testVMCOptions{
+			Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour),
+			Logotype: testLogotypeOptions{HashAlg: oidSHA1},
+		})
+
+		_, info := AnalyzeVMC(chain, binding, logo, nil, now)
+		if info.LogoHashVerified == nil || !*info.LogoHashVerified {
+			t.Errorf("LogoHashVerified = %v, want true", info.LogoHashVerified)
+		}
+		if info.LogoHashAlgorithm != "SHA-1" {
+			t.Errorf("LogoHashAlgorithm = %q, want %q", info.LogoHashAlgorithm, "SHA-1")
+		}
+		if info.LogoMediaType != "image/svg+xml" {
+			t.Errorf("LogoMediaType = %q, want %q", info.LogoMediaType, "image/svg+xml")
+		}
+		if info.LogoMatches == nil || !*info.LogoMatches {
+			t.Errorf("LogoMatches = %v, want true", info.LogoMatches)
+		}
+	})
+
+	t.Run("a logo that fails its hash is never compared with the published one", func(t *testing.T) {
+		chain, _ := generateTestVMCChain(t, testVMCOptions{
+			Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour),
+			Logotype: testLogotypeOptions{WrongHash: true},
+		})
+
+		check, info := AnalyzeVMC(chain, binding, logo, nil, now)
+		if check.Status != StatusFail || info.Valid {
+			t.Errorf("status = %s, valid = %t, want a failing check", check.Status, info.Valid)
+		}
+		if info.LogoHashVerified == nil || *info.LogoHashVerified {
+			t.Errorf("LogoHashVerified = %v, want false", info.LogoHashVerified)
+		}
+		if info.LogoMatches != nil {
+			t.Errorf("LogoMatches = %v, want nil: the logotype data had to be discarded before any comparison", *info.LogoMatches)
+		}
+	})
+}
+
 // TestParseSCTList covers the walk over the RFC 6962 timestamp list, which
 // tells "not logged" apart from "logged, but the proof is unreadable".
 func TestParseSCTList(t *testing.T) {
@@ -563,69 +883,222 @@ func TestParseSCTList(t *testing.T) {
 	})
 }
 
-func TestExtractLogotypeSVG(t *testing.T) {
-	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><title>X</title></svg>`)
+func TestParseLogotypeExtension(t *testing.T) {
+	svg := []byte(validTinyPSSVG)
+	crlfSVG := bytes.ReplaceAll(svg, []byte("\n"), []byte("\r\n"))
+	otherSVG := []byte(strings.Replace(validTinyPSSVG, "<title>", "<title>Not ", 1))
 
-	gzipDataURI := func(payload []byte) []byte {
-		var buf bytes.Buffer
-		gz := gzip.NewWriter(&buf)
-		gz.Write(payload)
-		gz.Close()
-		return []byte("data:image/svg+xml-gzip;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()))
+	// The old fixture: the data URI in a bare IA5String, with none of the
+	// RFC 9399 structure around it. The regexp-based extractor accepted it.
+	bareDataURI := marshalIA5Strings(t, []string{"data:image/svg+xml;base64,"})[0].FullBytes
+
+	cases := []struct {
+		name string
+		// logo is the document the fixture embeds and hashes; it defaults
+		// to a conforming SVG Tiny P/S one.
+		logo        []byte
+		opts        testLogotypeOptions
+		wantSVG     []byte // defaults to logo
+		wantAlg     string
+		wantWarning string
+		wantErr     string
+	}{
+		{
+			name:    "conforming certificate",
+			wantAlg: "SHA-256",
+		},
+		{
+			name:    "SHA-1, as the authorities in the field hash",
+			opts:    testLogotypeOptions{HashAlg: oidSHA1},
+			wantAlg: "SHA-1",
+		},
+		{
+			name:    "end-of-line characters are canonicalized before hashing",
+			logo:    crlfSVG,
+			wantAlg: "SHA-256",
+		},
+		{
+			name:        "authority hashed the document as it stands",
+			logo:        crlfSVG,
+			opts:        testLogotypeOptions{HashOverRawBytes: true},
+			wantAlg:     "SHA-256",
+			wantWarning: "end-of-line characters left as they are",
+		},
+		{
+			name:    "a link listed before the embedded logo is stepped over",
+			opts:    testLogotypeOptions{PrecedingLink: true},
+			wantAlg: "SHA-256",
+		},
+		{
+			name:    "unregistered but deployed media type spelling",
+			opts:    testLogotypeOptions{MediaType: "image/svg+xml-gzip"},
+			wantAlg: "SHA-256",
+		},
+		{
+			// The whole point of reading subjectLogo rather than the first
+			// data URI that turns up: the issuer's own branding sits in the
+			// same extension, earlier in the encoding.
+			name:    "the subject's mark wins over the issuer's",
+			opts:    testLogotypeOptions{IssuerLogo: otherSVG},
+			wantSVG: svg,
+			wantAlg: "SHA-256",
+		},
+		{
+			name:    "mark filed under issuerLogo alone",
+			opts:    testLogotypeOptions{UnderIssuerLogo: true},
+			wantErr: "no subjectLogo",
+		},
+		{
+			name:    "logo referenced instead of embedded",
+			opts:    testLogotypeOptions{Indirect: true},
+			wantErr: "references its logo instead of embedding it",
+		},
+		{
+			name:    "logo linked instead of embedded",
+			opts:    testLogotypeOptions{ExternalURI: true},
+			wantErr: "links to its logo instead of embedding it",
+		},
+		{
+			name:    "hash does not cover the embedded logo",
+			opts:    testLogotypeOptions{WrongHash: true},
+			wantErr: errLogotypeHashMismatch.Error(),
+		},
+		{
+			name:    "no hash of the embedded logo",
+			opts:    testLogotypeOptions{NoHash: true},
+			wantErr: "carries no hash of the embedded logo",
+		},
+		{
+			name:    "digest this implementation does not compute",
+			opts:    testLogotypeOptions{HashAlg: oidMD5},
+			wantErr: "1.2.840.113549.2.5",
+		},
+		{
+			name:    "embedded image is not an SVG",
+			opts:    testLogotypeOptions{MediaType: "image/png"},
+			wantErr: "has to be an SVG document",
+		},
+		{
+			name:    "the two media types disagree",
+			opts:    testLogotypeOptions{MediaType: "image/svg+xml", DataURIMediaType: "image/svg+xml+gzip"},
+			wantErr: "both have to name the same one",
+		},
+		{
+			name:    "the data URI announces no media type",
+			opts:    testLogotypeOptions{DataURINoMediaType: true},
+			wantErr: "announces no media type",
+		},
+		{
+			name:    "embedded logo is not compressed",
+			opts:    testLogotypeOptions{Uncompressed: true},
+			wantErr: "not gzip-compressed",
+		},
+		{
+			name:    "payload is not announced as base64",
+			opts:    testLogotypeOptions{NoBase64: true},
+			wantErr: "not base64-encoded",
+		},
+		{
+			name:    "payload is not valid base64",
+			opts:    testLogotypeOptions{CorruptBase64: true},
+			wantErr: "base64 payload",
+		},
+		{
+			name:    "gzip stream is truncated",
+			opts:    testLogotypeOptions{CorruptGzip: true},
+			wantErr: "gzip",
+		},
+		{
+			name:    "subjectLogo carries no image",
+			opts:    testLogotypeOptions{NoImage: true},
+			wantErr: "carries no image",
+		},
+		{
+			// A decompression bomb hidden in the certificate: small on the
+			// wire, past the profile's ceiling once inflated.
+			name:    "embedded logo inflates past the maximum size",
+			logo:    bytes.Repeat([]byte("A"), int(MaxLogoSize)+1),
+			wantErr: "maximum allowed size",
+		},
+		{
+			name:    "extension value is not a logotype structure",
+			opts:    testLogotypeOptions{RawValue: []byte("not DER at all")},
+			wantErr: "not a well-formed RFC 9399 structure",
+		},
+		{
+			name:    "a bare data URI, as the regexp extractor used to accept",
+			opts:    testLogotypeOptions{RawValue: bareDataURI},
+			wantErr: "not a well-formed RFC 9399 structure",
+		},
 	}
 
-	t.Run("gzipped payload is inflated", func(t *testing.T) {
-		got, err := extractLogotypeSVG(gzipDataURI(svg))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, svg) {
-			t.Errorf("got %q, want %q", got, svg)
-		}
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logo := tc.logo
+			if logo == nil {
+				logo = svg
+			}
+			wantSVG := tc.wantSVG
+			if wantSVG == nil {
+				wantSVG = logo
+			}
 
-	t.Run("raw (non-gzipped) payload is returned as-is", func(t *testing.T) {
-		raw := []byte("data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(svg))
-		got, err := extractLogotypeSVG(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(got, svg) {
-			t.Errorf("got %q, want %q", got, svg)
-		}
-	})
+			mark, warnings, err := parseLogotypeExtension(logotypeExtension(t, logo, tc.opts).Value)
 
-	t.Run("truncated gzip payload is an error, not the compressed bytes", func(t *testing.T) {
-		var buf bytes.Buffer
-		gz := gzip.NewWriter(&buf)
-		gz.Write(svg)
-		gz.Close()
-		truncated := buf.Bytes()[:buf.Len()-5]
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("parseLogotypeExtension() = %v, nil; want an error mentioning %q", mark, tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("err = %q, want it to mention %q", err, tc.wantErr)
+				}
+				if mark != nil {
+					t.Errorf("mark = %v, want none alongside an error: unauthenticated logotype data must not leave the parser", mark)
+				}
+				return
+			}
 
-		got, err := extractLogotypeSVG([]byte("data:image/svg+xml-gzip;base64," + base64.StdEncoding.EncodeToString(truncated)))
-		if err == nil {
-			t.Fatalf("err = nil, want a gzip error (got %q)", got)
-		}
-		if !strings.Contains(err.Error(), "gzip") {
-			t.Errorf("err = %v, want a gzip error", err)
-		}
-	})
+			if err != nil {
+				t.Fatalf("parseLogotypeExtension() error = %v", err)
+			}
+			if !bytes.Equal(mark.SVG, wantSVG) {
+				t.Errorf("mark.SVG = %q, want %q", mark.SVG, wantSVG)
+			}
+			if mark.HashAlgorithm != tc.wantAlg {
+				t.Errorf("mark.HashAlgorithm = %q, want %q", mark.HashAlgorithm, tc.wantAlg)
+			}
+			if tc.wantWarning == "" {
+				if len(warnings) > 0 {
+					t.Errorf("warnings = %q, want none", warnings)
+				}
+			} else if !slices.ContainsFunc(warnings, func(w string) bool { return strings.Contains(w, tc.wantWarning) }) {
+				t.Errorf("warnings = %q, want one mentioning %q", warnings, tc.wantWarning)
+			}
+		})
+	}
+}
 
-	t.Run("no data URI", func(t *testing.T) {
-		_, err := extractLogotypeSVG([]byte("nothing embedded here"))
-		if err == nil || !strings.Contains(err.Error(), "no SVG data URI") {
-			t.Errorf("err = %v, want a no-data-URI error", err)
-		}
-	})
+func TestCanonicalizeEOL(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "linefeeds are left alone", in: "<svg>\n<title/>\n</svg>", want: "<svg>\n<title/>\n</svg>"},
+		{name: "no end of line at all", in: "<svg><title/></svg>", want: "<svg><title/></svg>"},
+		{name: "carriage return and linefeed", in: "<svg>\r\n<title/>\r\n</svg>", want: "<svg>\n<title/>\n</svg>"},
+		{name: "lone carriage return", in: "<svg>\r<title/>\r</svg>", want: "<svg>\n<title/>\n</svg>"},
+		{name: "trailing carriage return", in: "<svg/>\r", want: "<svg/>\n"},
+		{name: "the two mixed", in: "a\r\nb\rc\nd", want: "a\nb\nc\nd"},
+	}
 
-	t.Run("invalid base64 payload", func(t *testing.T) {
-		// "abc" is a valid base64 alphabet string but not a valid length,
-		// so decoding fails while the data-URI regexp still matches.
-		_, err := extractLogotypeSVG([]byte("data:image/svg+xml;base64,abc"))
-		if err == nil || !strings.Contains(err.Error(), "base64") {
-			t.Errorf("err = %v, want a base64 error", err)
-		}
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := string(canonicalizeEOL([]byte(tc.in))); got != tc.want {
+				t.Errorf("canonicalizeEOL(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
 }
 
 func TestAnalyzeVMCURL(t *testing.T) {

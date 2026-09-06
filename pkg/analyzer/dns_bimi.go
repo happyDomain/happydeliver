@@ -163,34 +163,28 @@ func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
 		HasBimiEku:               v.HasBimiEku,
 		IssuerHasBimiEku:         v.IssuerHasBimiEku,
 		HasLogotype:              v.HasLogotype,
+		LogoHashVerified:         v.LogoHashVerified,
 		HasCrlDistributionPoints: v.HasCRLDistributionPoints,
 		SctCount:                 v.SCTCount,
 		ChainTrusted:             v.ChainTrusted,
 		LogoMatches:              v.LogoMatches,
 	}
-	if v.Issuer != "" {
-		m.Issuer = utils.PtrTo(v.Issuer)
-	}
-	if v.Subject != "" {
-		m.Subject = utils.PtrTo(v.Subject)
-	}
-	if v.SerialNumber != "" {
-		m.SerialNumber = utils.PtrTo(v.SerialNumber)
-	}
+	m.Issuer = utils.PtrToNonZero(v.Issuer)
+	m.Subject = utils.PtrToNonZero(v.Subject)
+	m.SerialNumber = utils.PtrToNonZero(v.SerialNumber)
+	m.LogoHashAlgorithm = utils.PtrToNonZero(v.LogoHashAlgorithm)
+	m.LogoMediaType = utils.PtrToNonZero(v.LogoMediaType)
+	m.ChainLength = utils.PtrToNonZero(v.ChainLength)
+	m.Error = utils.PtrToNonZero(v.Error)
+
 	if !v.NotBefore.IsZero() {
 		m.NotBefore = utils.PtrTo(v.NotBefore)
 	}
 	if !v.NotAfter.IsZero() {
 		m.NotAfter = utils.PtrTo(v.NotAfter)
 	}
-	if v.ChainLength > 0 {
-		m.ChainLength = utils.PtrTo(v.ChainLength)
-	}
 	if len(v.SanDomains) > 0 {
 		m.SanDomains = utils.PtrTo(v.SanDomains)
-	}
-	if v.Error != "" {
-		m.Error = utils.PtrTo(v.Error)
 	}
 	return m
 }

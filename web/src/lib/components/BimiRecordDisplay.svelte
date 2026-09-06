@@ -73,25 +73,30 @@
             { status: triState(vmc.has_bimi_eku), label: "BIMI Extended Key Usage" },
             { status: triState(vmc.issuer_has_bimi_eku), label: "Issuer allowed to issue VMCs" },
             { status: triState(vmc.has_logotype), label: "Embedded logo" },
+            {
+                status: triState(vmc.logo_hash_verified),
+                label: "Embedded logo matches its certified hash",
+            },
             { status: triState(vmc.has_crl_distribution_points), label: "Revocation checkable" },
             {
-                status:
-                    vmc.sct_count === undefined ? "skipped" : vmc.sct_count > 0 ? "pass" : "fail",
+                status: triState(vmc.sct_count === undefined ? undefined : vmc.sct_count > 0),
                 label: "Logged to Certificate Transparency",
             },
         ];
+
+        /* Two criteria only an analysis that had both sides to compare could
+           reach: without the published logo, or without a set of trusted
+           roots, a permanently grey dot would read as a failing criterion
+           rather than as one that was never asked. */
         if (vmc.logo_matches !== undefined) {
             dots.push({
-                status: vmc.logo_matches ? "pass" : "fail",
+                status: triState(vmc.logo_matches),
                 label: "Embedded logo matches published logo",
             });
         }
-        /* No set of trusted BIMI roots is configured for now, and a
-           permanently grey dot would read as a failing criterion rather than
-           as one nobody asked for. */
         if (vmc.chain_trusted !== undefined) {
             dots.push({
-                status: vmc.chain_trusted ? "pass" : "fail",
+                status: triState(vmc.chain_trusted),
                 label: "Chain leads to a trusted BIMI root",
             });
         }
@@ -401,11 +406,28 @@
                         {@render presenceBadge(bimiRecord.vmc.has_bimi_eku)}
                         <strong class="ms-3">Embedded logo:</strong>
                         {@render presenceBadge(bimiRecord.vmc.has_logotype)}
+                        {#if bimiRecord.vmc.logo_media_type}
+                            <span class="badge bg-secondary ms-1"
+                                >{bimiRecord.vmc.logo_media_type}</span
+                            >
+                        {/if}
                         {#if bimiRecord.vmc.logo_matches === true}
                             <span class="badge bg-success ms-1">matches published logo</span>
                         {:else if bimiRecord.vmc.logo_matches === false}
                             <span class="badge bg-danger ms-1">differs from published logo</span>
                         {/if}
+                    </div>
+                    <div class="mb-1">
+                        <strong>Certified logo hash:</strong>
+                        {@render presenceBadge(
+                            bimiRecord.vmc.logo_hash_verified,
+                            `verified${
+                                bimiRecord.vmc.logo_hash_algorithm
+                                    ? ` (${bimiRecord.vmc.logo_hash_algorithm})`
+                                    : ""
+                            }`,
+                            "does not cover the embedded logo",
+                        )}
                     </div>
                     <div class="mb-1">
                         <strong>Issuer Extended Key Usage:</strong>

@@ -1289,6 +1289,17 @@ components:
         has_logotype:
           type: boolean
           description: Whether the certificate carries the logotype extension (1.3.6.1.5.5.7.1.12)
+        logo_hash_verified:
+          type: boolean
+          description: Whether the logo embedded in the certificate matches the logotypeHash the authority computed over it, which binds the mark to the certificate. Absent when no hash could be checked.
+        logo_hash_algorithm:
+          type: string
+          description: Digest the logotypeHash was verified with. Absent when no verification took place.
+          example: SHA-256
+        logo_media_type:
+          type: string
+          description: Media type the certificate carries its mark under. Absent when the logotype extension could not be read.
+          example: image/svg+xml
         has_crl_distribution_points:
           type: boolean
           description: Whether the certificate publishes where its revocation status can be checked (cRLDistributionPoints)

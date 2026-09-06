@@ -52,9 +52,11 @@ var errNotUTF8 = errors.New("not encoded in UTF-8")
 func DecodeLogo(content []byte) (svg []byte, compressed bool, err error) {
 	reader, err := gzip.NewReader(bytes.NewReader(content))
 	if err != nil {
-		// Not a gzip stream: the bytes are the document itself. A logo
-		// published as plain SVG is the common case, and the certificate
-		// profile that also goes through here tolerates one as well.
+		// Not a gzip stream: the bytes are the document itself, which is
+		// the common case for a logo published at the l= URL. The
+		// certificate profile also goes through here, but it requires the
+		// mark it embeds to be compressed; compressed says which of the
+		// two this was, so that caller can tell.
 		return content, false, nil
 	}
 

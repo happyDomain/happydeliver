@@ -26,12 +26,10 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/asn1"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -50,10 +48,16 @@ const OIDLogotypeExtension = "1.3.6.1.5.5.7.1.12"
 // Transparency logs.
 const OIDSCTList = "1.3.6.1.4.1.11129.2.4.2"
 
-// svgDataURIRegexp locates the embedded logo data URI inside the logotype
-// extension (RFC 3709). The SVG is base64-encoded, usually gzipped
-// (image/svg+xml-gzip per the BIMI profile).
-var svgDataURIRegexp = regexp.MustCompile(`data:image/svg\+xml(?:-gzip)?(?:;[a-zA-Z0-9=/+.-]+)*;base64,([A-Za-z0-9+/=]+)`)
+// The same three OIDs in the decoded form the certificates carry them in.
+// Comparisons run over every extension and every unknown EKU of the chain, so
+// they compare component by component rather than formatting each candidate
+// back into its dotted string; the constants above stay the form used in
+// messages.
+var (
+	bimiEKUOID  = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 31}
+	logotypeOID = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 12}
+	sctListOID  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+)
 
 // VMCInfo describes an analysed Verified Mark Certificate. Optional boolean
 // fields are pointers: a nil value means the criterion was not evaluated
@@ -83,6 +87,18 @@ type VMCInfo struct {
 	// HasLogotype reports whether the leaf carries the RFC 3709 logotype
 	// extension (OIDLogotypeExtension).
 	HasLogotype *bool
+	// LogoHashVerified reports whether the logo embedded in the leaf matches
+	// the logotypeHash the authority computed over it, which is the
+	// integrity binding RFC 9399 provides between a certificate and the mark
+	// it certifies. Nil when no hash could be checked, because the extension
+	// could not be read or named no digest this implementation computes.
+	LogoHashVerified *bool
+	// LogoHashAlgorithm names the digest logotypeHash was verified with,
+	// e.g. "SHA-256". Empty when no verification took place.
+	LogoHashAlgorithm string
+	// LogoMediaType is the media type the leaf carries its mark under.
+	// Empty when the extension could not be read.
+	LogoMediaType string
 	// HasCRLDistributionPoints reports whether the leaf publishes where its
 	// revocation status can be checked (RFC 5280 cRLDistributionPoints).
 	HasCRLDistributionPoints *bool
@@ -211,28 +227,9 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, roots *
 			&VMCInfo{Valid: false, Error: strings.Join(messages, "; ")}
 	}
 
-	// Parse every certificate of the PEM chain; the first one is the leaf
-	// (subscriber) certificate.
-	var certs []*x509.Certificate
-	rest := pemChain
-	for {
-		var block *pem.Block
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
-		}
-		if block.Type != "CERTIFICATE" {
-			continue
-		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return fail(fmt.Sprintf("Unable to parse certificate #%d of the chain: %s", len(certs)+1, err))
-		}
-		certs = append(certs, cert)
-	}
-
-	if len(certs) == 0 {
-		return fail("The file does not contain any PEM-encoded certificate")
+	certs, err := parseVMCChain(pemChain)
+	if err != nil {
+		return fail(err.Error())
 	}
 
 	leaf := certs[0]
@@ -264,25 +261,15 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, roots *
 		problems = append(problems, "The Verified Mark Certificate asserts it is a certification authority: a mark certificate is an end-entity certificate")
 	}
 
-	// Validity period of every certificate of the chain, not just of the
-	// leaf: an expired issuer invalidates what it signed.
-	for i, cert := range certs {
-		label := certLabel(i, cert)
-		switch {
-		case now.Before(cert.NotBefore):
-			problems = append(problems, fmt.Sprintf("%s is not yet valid (valid from %s)", label, cert.NotBefore.Format(time.RFC3339)))
-		case now.After(cert.NotAfter):
-			problems = append(problems, fmt.Sprintf("%s expired on %s", label, cert.NotAfter.Format(time.RFC3339)))
-		case now.Add(30 * 24 * time.Hour).After(cert.NotAfter):
-			warnings = append(warnings, fmt.Sprintf("%s expires soon (%s)", label, cert.NotAfter.Format(time.RFC3339)))
-		}
-	}
+	validityProblems, validityWarnings := checkValidityPeriods(certs, now)
+	problems = append(problems, validityProblems...)
+	warnings = append(warnings, validityWarnings...)
 
 	// The certificate must name the domain the Assertion Record belongs to
-	if !binding.matches(leaf.DNSNames) {
+	if acceptable := binding.acceptableSANs(); !matchesAny(acceptable, leaf.DNSNames) {
 		problems = append(problems, fmt.Sprintf(
 			"The certificate Subject Alternative Names (%s) do not name this BIMI record: a Verified Mark Certificate must carry one of %s exactly",
-			strings.Join(leaf.DNSNames, ", "), strings.Join(binding.acceptableSANs(), ", ")))
+			strings.Join(leaf.DNSNames, ", "), strings.Join(acceptable, ", ")))
 	}
 
 	// BIMI Extended Key Usage
@@ -302,29 +289,9 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, roots *
 		}
 	}
 
-	// Logotype extension and embedded logo comparison
-	var logotypeValue []byte
-	for _, ext := range leaf.Extensions {
-		if ext.Id.String() == OIDLogotypeExtension {
-			logotypeValue = ext.Value
-		}
-	}
-	hasLogotype := logotypeValue != nil
-	info.HasLogotype = &hasLogotype
-	if logotypeValue == nil {
-		problems = append(problems, "The certificate does not carry the logotype extension (1.3.6.1.5.5.7.1.12) embedding the certified logo")
-	} else {
-		embeddedSVG, err := extractLogotypeSVG(logotypeValue)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("Unable to extract the logo embedded in the certificate: %s", err))
-		} else if logoContent != nil {
-			matches := bytes.Equal(normalizeSVG(embeddedSVG), normalizeSVG(logoContent))
-			info.LogoMatches = &matches
-			if !matches {
-				problems = append(problems, "The logo embedded in the certificate differs from the logo published at the l= URL: both must be identical")
-			}
-		}
-	}
+	logotypeProblems, logotypeWarnings := checkLogotype(leaf, logoContent, info)
+	problems = append(problems, logotypeProblems...)
+	warnings = append(warnings, logotypeWarnings...)
 
 	// Revocation has to remain checkable for the whole life of the
 	// certificate, so the certificate has to say where.
@@ -348,61 +315,15 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, roots *
 		info.SCTCount = &sctCount
 	}
 
-	// Each certificate must be signed by the next one. This is what the
-	// chain says about itself, and it names the faulty link where the
-	// anchoring below can only reject the chain as a whole.
-	for i := 0; i+1 < len(certs); i++ {
-		err := certs[i].CheckSignatureFrom(certs[i+1])
-		if err == nil {
-			continue
-		}
-		var violation x509.ConstraintViolationError
-		if errors.As(err, &violation) {
-			problems = append(problems, fmt.Sprintf("%s is not allowed to sign certificates, yet the chain presents it as the issuer of %s", certLabel(i+1, certs[i+1]), certLabel(i, certs[i])))
-		} else {
-			problems = append(problems, fmt.Sprintf("%s is not signed by the next certificate in the provided chain: %s", certLabel(i, certs[i]), err))
-		}
-		break
-	}
-
-	// Anchoring: whether the issuer is an authority the caller recognises.
-	// Mark certificate roots are a matter of receiver policy and are absent
-	// from the system trust store, so without a pool there is nothing to
-	// anchor to, and the check reports that it did not happen rather than
-	// letting the chain pass for trusted.
-	if roots == nil {
-		infos = append(infos, "The issuance chain was not checked against a set of trusted BIMI root certificates: its consistency is verified, but not that it leads to a recognised Mark Verifying Authority")
-	} else {
-		intermediates := x509.NewCertPool()
-		for _, cert := range certs[1:] {
-			intermediates.AddCert(cert)
-		}
-		// The BIMI Extended Key Usage is unknown to crypto/x509, which
-		// would reject the whole chain if asked to filter on it; the two
-		// checks above cover it. No DNSName either: a mark certificate is
-		// bound to its record by VMCBinding, not by the TLS name rules.
-		_, err := leaf.Verify(x509.VerifyOptions{
-			Roots:         roots,
-			Intermediates: intermediates,
-			CurrentTime:   now,
-			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		})
-		trusted := err == nil
-		info.ChainTrusted = &trusted
-		if !trusted {
-			problems = append(problems, fmt.Sprintf("The issuance chain does not lead to a trusted BIMI root certificate: %s", err))
-		}
-	}
+	anchorProblems, anchorInfos := checkChainAnchoring(certs, roots, now, info)
+	problems = append(problems, anchorProblems...)
+	infos = append(infos, anchorInfos...)
 
 	info.Valid = len(problems) == 0
 
-	status := StatusPass
-	switch {
-	case len(problems) > 0:
-		status = StatusFail
+	status := statusFor(problems, warnings)
+	if status == StatusFail {
 		info.Error = strings.Join(problems, "; ")
-	case len(warnings) > 0:
-		status = StatusWarning
 	}
 
 	return newCheckWithSeverities("vmc", "Verified Mark Certificate", status, problems, warnings, infos), info
@@ -428,7 +349,7 @@ func certLabel(i int, cert *x509.Certificate) string {
 // rather than in the parsed ExtKeyUsage list.
 func certHasBIMIEKU(cert *x509.Certificate) bool {
 	for _, eku := range cert.UnknownExtKeyUsage {
-		if eku.String() == OIDBIMIExtKeyUsage {
+		if eku.Equal(bimiEKUOID) {
 			return true
 		}
 	}
@@ -446,9 +367,10 @@ func certHasBIMIEKU(cert *x509.Certificate) bool {
 func parseSCTList(cert *x509.Certificate) (count int, found bool, err error) {
 	var payload []byte
 	for _, ext := range cert.Extensions {
-		if ext.Id.String() == OIDSCTList {
+		if ext.Id.Equal(sctListOID) {
 			payload = ext.Value
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -487,34 +409,150 @@ func parseSCTList(cert *x509.Certificate) (count int, found bool, err error) {
 	return count, true, nil
 }
 
-// extractLogotypeSVG extracts the SVG image embedded in the RFC 3709 logotype
-// extension. The image is carried as a base64 data URI, gzipped per the BIMI
-// profile.
-func extractLogotypeSVG(extensionValue []byte) ([]byte, error) {
-	matches := svgDataURIRegexp.FindSubmatch(extensionValue)
-	if matches == nil {
-		return nil, fmt.Errorf("no SVG data URI found in the logotype extension")
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(string(matches[1]))
-	if err != nil {
-		return nil, fmt.Errorf("invalid base64 payload: %w", err)
-	}
-
-	// RFC 6170 section 5.2 requires the SVG carried by a data URI to be
-	// gzipped, which is exactly what an SVGZ published at the l= URL is:
-	// DecodeLogo inflates both, and caps the result against a decompression
-	// bomb hidden in the certificate.
-	svg, _, err := DecodeLogo(decoded)
-	if err != nil {
-		return nil, err
-	}
-
-	return svg, nil
-}
-
 // normalizeSVG makes the byte comparison between the published and the
 // embedded logo resilient to trailing whitespace differences.
 func normalizeSVG(svg []byte) []byte {
 	return bytes.TrimSpace(svg)
+}
+
+// parseVMCChain decodes the PEM chain the a= URL served. The first certificate
+// is the leaf (subscriber) certificate, the ones after it its issuers.
+func parseVMCChain(pemChain []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+
+	rest := pemChain
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse certificate #%d of the chain: %s", len(certs)+1, err)
+		}
+		certs = append(certs, cert)
+	}
+
+	if len(certs) == 0 {
+		return nil, errors.New("The file does not contain any PEM-encoded certificate")
+	}
+	return certs, nil
+}
+
+// checkValidityPeriods checks the validity period of every certificate of the
+// chain, not just of the leaf: an expired issuer invalidates what it signed.
+func checkValidityPeriods(certs []*x509.Certificate, now time.Time) (problems, warnings []string) {
+	for i, cert := range certs {
+		label := certLabel(i, cert)
+		switch {
+		case now.Before(cert.NotBefore):
+			problems = append(problems, fmt.Sprintf("%s is not yet valid (valid from %s)", label, cert.NotBefore.Format(time.RFC3339)))
+		case now.After(cert.NotAfter):
+			problems = append(problems, fmt.Sprintf("%s expired on %s", label, cert.NotAfter.Format(time.RFC3339)))
+		case now.Add(30 * 24 * time.Hour).After(cert.NotAfter):
+			warnings = append(warnings, fmt.Sprintf("%s expires soon (%s)", label, cert.NotAfter.Format(time.RFC3339)))
+		}
+	}
+	return problems, warnings
+}
+
+// checkLogotype examines the mark the certificate embeds and records what it
+// found in info. logoContent, when non-nil, is the SVG published at the l= URL,
+// which the certified mark must be identical to.
+func checkLogotype(leaf *x509.Certificate, logoContent []byte, info *VMCInfo) (problems, warnings []string) {
+	// Logotype extension: the mark itself. RFC 9399 binds it to the
+	// certificate through logotypeHash, and its section 4.1 has a client
+	// discard logotype data whose hash does not match, so nothing is
+	// compared against the embedded logo until that hash has checked out.
+	var logotypeValue []byte
+	for _, ext := range leaf.Extensions {
+		if ext.Id.Equal(logotypeOID) {
+			logotypeValue = ext.Value
+			break
+		}
+	}
+	hasLogotype := logotypeValue != nil
+	info.HasLogotype = &hasLogotype
+	if logotypeValue == nil {
+		problems = append(problems, "The certificate does not carry the logotype extension (1.3.6.1.5.5.7.1.12) embedding the certified logo")
+	} else {
+		mark, markWarnings, err := parseLogotypeExtension(logotypeValue)
+		warnings = append(warnings, markWarnings...)
+		switch {
+		case errors.Is(err, errLogotypeHashMismatch):
+			verified := false
+			info.LogoHashVerified = &verified
+			problems = append(problems, "The logo embedded in the certificate does not match the hash the authority certified it by: it is not the logo the certificate was issued for, and it cannot be trusted")
+		case err != nil:
+			problems = append(problems, err.Error())
+		default:
+			verified := true
+			info.LogoHashVerified = &verified
+			info.LogoHashAlgorithm = mark.HashAlgorithm
+			info.LogoMediaType = mark.MediaType
+			if logoContent != nil {
+				matches := bytes.Equal(normalizeSVG(mark.SVG), normalizeSVG(logoContent))
+				info.LogoMatches = &matches
+				if !matches {
+					problems = append(problems, "The logo embedded in the certificate differs from the logo published at the l= URL: both must be identical")
+				}
+			}
+		}
+	}
+	return problems, warnings
+}
+
+// checkChainAnchoring verifies the chain against itself and, when roots is
+// non-nil, against the Mark Verifying Authorities the caller recognises.
+func checkChainAnchoring(certs []*x509.Certificate, roots *x509.CertPool, now time.Time, info *VMCInfo) (problems, infos []string) {
+	// Each certificate must be signed by the next one. This is what the
+	// chain says about itself, and it names the faulty link where the
+	// anchoring below can only reject the chain as a whole.
+	for i := 0; i+1 < len(certs); i++ {
+		err := certs[i].CheckSignatureFrom(certs[i+1])
+		if err == nil {
+			continue
+		}
+		var violation x509.ConstraintViolationError
+		if errors.As(err, &violation) {
+			problems = append(problems, fmt.Sprintf("%s is not allowed to sign certificates, yet the chain presents it as the issuer of %s", certLabel(i+1, certs[i+1]), certLabel(i, certs[i])))
+		} else {
+			problems = append(problems, fmt.Sprintf("%s is not signed by the next certificate in the provided chain: %s", certLabel(i, certs[i]), err))
+		}
+		break
+	}
+
+	// Anchoring: whether the issuer is an authority the caller recognises.
+	// Mark certificate roots are a matter of receiver policy and are absent
+	// from the system trust store, so without a pool there is nothing to
+	// anchor to, and the check reports that it did not happen rather than
+	// letting the chain pass for trusted.
+	if roots == nil {
+		infos = append(infos, "The issuance chain was not checked against a set of trusted BIMI root certificates: its consistency is verified, but not that it leads to a recognised Mark Verifying Authority")
+	} else {
+		intermediates := x509.NewCertPool()
+		for _, cert := range certs[1:] {
+			intermediates.AddCert(cert)
+		}
+		// The BIMI Extended Key Usage is unknown to crypto/x509, which
+		// would reject the whole chain if asked to filter on it; the two
+		// checks above cover it. No DNSName either: a mark certificate is
+		// bound to its record by VMCBinding, not by the TLS name rules.
+		_, err := certs[0].Verify(x509.VerifyOptions{
+			Roots:         roots,
+			Intermediates: intermediates,
+			CurrentTime:   now,
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		})
+		trusted := err == nil
+		info.ChainTrusted = &trusted
+		if !trusted {
+			problems = append(problems, fmt.Sprintf("The issuance chain does not lead to a trusted BIMI root certificate: %s", err))
+		}
+	}
+	return problems, infos
 }
