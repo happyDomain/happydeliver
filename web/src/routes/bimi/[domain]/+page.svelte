@@ -62,8 +62,23 @@
         record?.checks?.some((c) => c.name === "dmarc_enforcement" && c.status === "fail") ?? false,
     );
 
+    /* A record that publishes no a= tag asserts its Indicator on the Domain
+       Owner's word alone. The tag is optional, so the record stays valid, but
+       the verdict cannot call that "compliant" when the providers most people
+       read their mail on will show nothing. Read off the check rather than
+       from vmc_url alone: a published certificate can warn for its own
+       reasons, and only the analyser knows which case this is. */
+    const selfAsserted = $derived(
+        !record?.vmc_url &&
+            (record?.checks?.some((c) => c.name === "vmc" && c.status === "warning") ?? false),
+    );
+
+    /* Both asset tags left empty: a Declination to Publish, which is a
+       deliberate and correct configuration rather than a half-finished one. */
+    const declination = $derived(!!record?.record_valid && !record?.logo_url && !record?.vmc_url);
+
     type Verdict = {
-        level: "success" | "warning" | "danger";
+        level: "success" | "warning" | "danger" | "secondary";
         icon: string;
         title: string;
         text: string;
@@ -98,10 +113,26 @@
         }
         if (!record.valid) {
             return {
-                level: "warning",
-                icon: "bi-exclamation-triangle-fill",
+                level: "danger",
+                icon: "bi-exclamation-octagon-fill",
                 title: "The record is valid, its assets are not",
-                text: "The DNS record is well-formed, but the logo or the certificate it points at failed validation. Expand the detailed checks below to see which one.",
+                text: "The DNS record is well-formed, but the logo or the certificate it points at failed validation. An indicator receivers cannot validate is one they do not display, so nothing will be shown until this is fixed. Expand the detailed checks below to see what failed.",
+            };
+        }
+        if (declination) {
+            return {
+                level: "secondary",
+                icon: "bi-slash-circle-fill",
+                title: "This domain declines to publish an indicator",
+                text: "The record is well-formed and publishes neither a logo nor a certificate, which is how a domain deliberately opts out of BIMI. No indicator will be shown, and none is meant to be.",
+            };
+        }
+        if (selfAsserted) {
+            return {
+                level: "warning",
+                icon: "bi-patch-exclamation-fill",
+                title: "Valid, but the indicator is self-asserted",
+                text: "The record and the logo passed, and the a= tag they leave out is optional. But with no Verified Mark Certificate vouching for the logo, only the mail clients that accept a self-asserted indicator will display it: Gmail and Apple Mail, between them most of the inboxes, will not.",
             };
         }
         return {

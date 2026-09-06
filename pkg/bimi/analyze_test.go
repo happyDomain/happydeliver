@@ -239,6 +239,32 @@ func TestValidateAssets(t *testing.T) {
 		}
 	})
 
+	// The a= tag is optional, so leaving it out cannot fail the record. It
+	// still costs the Domain Owner the providers that only display an
+	// evidence-backed Indicator, which a silently skipped check would not say.
+	t.Run("Logo without a VMC warns instead of passing silently", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/logo.svg",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec, enforcedDMARC(rec.Domain))
+		if !rec.Valid {
+			t.Errorf("a self-asserted Indicator is still a valid record, got checks: %+v", rec.Checks)
+		}
+
+		check, found := findCheck(rec.Checks, "vmc")
+		if !found || check.Status != StatusWarning {
+			t.Errorf("vmc = %+v, want a warning: the record works, but not everywhere", check)
+		}
+		for _, msg := range check.Messages {
+			if msg.Severity != SeverityWarning {
+				t.Errorf("vmc message %q severity = %s, want warning", msg.Text, msg.Severity)
+			}
+		}
+	})
+
 	t.Run("Empty l= with a VMC published fails", func(t *testing.T) {
 		rec := &Record{
 			Selector: "default",

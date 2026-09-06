@@ -121,9 +121,24 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record, dmarc *DMAR
 	}
 
 	if rec.VMCURL == "" {
-		checks = append(checks,
-			newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
-				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
+		if rec.LogoURL == "" {
+			// A Declination to Publish leaves both tags empty on purpose:
+			// there is no Indicator to certify, so the absent evidence is
+			// not something the Domain Owner failed to provide.
+			checks = append(checks,
+				newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
+					"No VMC published (a= tag absent or empty), as a declination record has no Indicator to certify"))
+		} else {
+			// The a= tag is optional, so a record without it stays valid:
+			// it asserts an Indicator on the Domain Owner's word alone.
+			// That is a warning rather than a plain observation, because
+			// the providers holding most of the inboxes will not act on
+			// it: an Indicator no evidence backs is one Gmail and Apple
+			// Mail display nothing for.
+			checks = append(checks,
+				newCheck("vmc", "Verified Mark Certificate", StatusWarning,
+					"No VMC published (a= tag absent or empty): the Indicator is self-asserted, which the specification allows, but Gmail and Apple Mail only display an Indicator a Mark Certificate vouches for"))
+		}
 	} else {
 		vmcCheck, vmcInfo := v.analyzeVMCFetch(<-vmcFetch, v.vmcBinding(rec), logoContent)
 		checks = append(checks, vmcCheck)

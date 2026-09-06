@@ -26,6 +26,26 @@
 
     type Status = BimiCheck["status"];
 
+    /* The card headline grades the configuration on the same three tiers as
+       the verdict of the BIMI page, so the two cannot contradict each other.
+       Assets that fail are graded as harshly as a record that does not parse:
+       an Indicator receivers cannot validate is one they do not display, so
+       either way nothing is shown. The intermediate tier is the record that
+       works but asserts its Indicator without a certificate to vouch for it,
+       which the providers holding most of the inboxes will not act on. */
+    const selfAsserted = $derived(
+        !bimiRecord?.vmc_url &&
+            (bimiRecord?.checks?.some((c) => c.name === "vmc" && c.status === "warning") ?? false),
+    );
+
+    const headline: Status = $derived(
+        !bimiRecord?.record_valid || !bimiRecord?.valid
+            ? "fail"
+            : selfAsserted
+              ? "warning"
+              : "pass",
+    );
+
     type Dot = { status: Status; label: string };
 
     /* Set when the record was found at the organizational domain because the
@@ -203,13 +223,12 @@
             <h5 class="text-muted mb-0">
                 <i
                     class="bi"
-                    class:bi-check-circle-fill={bimiRecord.valid}
-                    class:text-success={bimiRecord.valid}
-                    class:bi-exclamation-triangle-fill={bimiRecord.record_valid &&
-                        !bimiRecord.valid}
-                    class:text-warning={bimiRecord.record_valid && !bimiRecord.valid}
-                    class:bi-x-circle-fill={!bimiRecord.record_valid}
-                    class:text-danger={!bimiRecord.record_valid}
+                    class:bi-check-circle-fill={headline === "pass"}
+                    class:text-success={headline === "pass"}
+                    class:bi-exclamation-triangle-fill={headline === "warning"}
+                    class:text-warning={headline === "warning"}
+                    class:bi-x-circle-fill={headline === "fail"}
+                    class:text-danger={headline === "fail"}
                 ></i>
                 Brand Indicators for Message Identification
             </h5>
