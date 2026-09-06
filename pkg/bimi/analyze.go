@@ -24,6 +24,7 @@ package bimi
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // Analyze looks up the BIMI record for domain/selector, parses it and, when
@@ -56,7 +57,15 @@ func (v *Validator) AnalyzeForLocalPart(ctx context.Context, domain, selector, l
 // displayed logo if its assets are compliant.
 func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 	checks := []Check{checkRecordTags(rec)}
-	allPassed := true
+
+	// The logo and the certificate sit at two unrelated URLs, and only the
+	// final comparison of one against the other needs both: download them
+	// at the same time, so a pair of slow hosts costs one fetch timeout
+	// rather than the sum of two.
+	var vmcFetch <-chan fetchedFile
+	if rec.VMCURL != "" {
+		vmcFetch = v.fetchAsync(ctx, rec.VMCURL, MaxFileSize)
+	}
 
 	var logoContent []byte
 
@@ -69,7 +78,6 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 			checks = append(checks,
 				newCheck("logo_fetch", "Logo file retrieval", StatusFail,
 					"The l= tag is empty while a VMC is published in a=: with no logo URL, no Indicator can be displayed"))
-			allPassed = false
 		} else {
 			checks = append(checks,
 				newCheck("logo_fetch", "Logo file retrieval", StatusSkipped,
@@ -79,15 +87,15 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 		content, contentType, problems := v.fetchFile(ctx, rec.LogoURL, MaxLogoSize)
 		if len(problems) > 0 {
 			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail, problems...))
-			allPassed = false
+		} else if svg, compressed, err := DecodeLogo(content); err != nil {
+			checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusFail,
+				fmt.Sprintf("Unable to decode the logo file: %s", err)))
 		} else {
-			logoContent = content
-			if contentType != "image/svg+xml" {
-				checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusWarning,
-					fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType)))
-			} else {
-				checks = append(checks, newCheck("logo_fetch", "Logo file retrieval", StatusPass))
-			}
+			// Every later check reads the decoded document: an SVGZ is a
+			// gzip stream, which is neither XML nor comparable to the
+			// logo the certificate carries, itself already inflated.
+			logoContent = svg
+			checks = append(checks, checkLogoFetch(contentType, compressed, len(svg)))
 		}
 
 		if logoContent == nil {
@@ -97,17 +105,7 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 				newCheck("logo_svg_tiny_ps", "Logo SVG Tiny Portable/Secure profile", StatusSkipped,
 					"Skipped: the logo could not be retrieved"))
 		} else {
-			xmlCheck := CheckLogoXML(logoContent)
-			checks = append(checks, xmlCheck)
-			if xmlCheck.Status == StatusFail {
-				allPassed = false
-			}
-
-			svgCheck := CheckLogoSVGTinyPS(logoContent)
-			checks = append(checks, svgCheck)
-			if svgCheck.Status == StatusFail {
-				allPassed = false
-			}
+			checks = append(checks, CheckLogoXML(logoContent), CheckLogoSVGTinyPS(logoContent))
 		}
 	}
 
@@ -116,19 +114,31 @@ func (v *Validator) ValidateAssets(ctx context.Context, rec *Record) {
 			newCheck("vmc", "Verified Mark Certificate", StatusSkipped,
 				"No VMC published (a= tag absent or empty): VMC is optional but required by some mail providers (e.g. Gmail, Apple Mail)"))
 	} else {
-		vmcCheck, vmcInfo := v.analyzeVMCURL(ctx, rec.VMCURL, v.vmcBinding(rec), logoContent)
+		vmcCheck, vmcInfo := v.analyzeVMCFetch(<-vmcFetch, v.vmcBinding(rec), logoContent)
 		checks = append(checks, vmcCheck)
 		rec.VMC = vmcInfo
-		if vmcCheck.Status == StatusFail {
-			allPassed = false
-		}
 	}
 
 	rec.Checks = checks
-	if !allPassed {
+	// The verdict is read back from the checks rather than tracked
+	// alongside them: a check added here cannot then be forgotten in the
+	// bookkeeping and let a failing record be reported as valid.
+	if failed := failedChecks(checks); len(failed) > 0 {
 		rec.Valid = false
-		rec.Error = "BIMI assets failed validation, see detailed checks below"
+		rec.Error = fmt.Sprintf("BIMI assets failed validation: %s", strings.Join(failed, ", "))
 	}
+}
+
+// failedChecks lists the descriptions of the checks that failed, in the order
+// they were run.
+func failedChecks(checks []Check) []string {
+	var failed []string
+	for _, c := range checks {
+		if c.Status == StatusFail {
+			failed = append(failed, c.Description)
+		}
+	}
+	return failed
 }
 
 // checkRecordTags reports on the tags that carry a preference rather than an
@@ -172,6 +182,36 @@ func checkRecordTags(rec *Record) Check {
 		check.Messages = append(check.Messages, CheckMessage{
 			Severity: SeverityInfo,
 			Text:     fmt.Sprintf("This record was found under the %q selector, derived from the sender's local-part by the lps= tag of the %q record", rec.Selector, rec.RequestedSelector),
+		})
+	}
+
+	return check
+}
+
+// checkLogoFetch reports on the file the l= URL actually served, once it has
+// been retrieved and decoded.
+//
+// Publishing an SVGZ is not a defect: BIMI accepts SVG and SVGZ alike for the
+// l= tag, so the compression is reported informationally, next to the size the
+// profile measures its own limit against. The media type stays the one thing
+// that can be wrong on its own here, compressed or not: RFC 6170 section 5.2
+// mandates image/svg+xml for SVG and SVGZ images alike, so an SVGZ announced
+// as application/gzip is still misdeclared.
+func checkLogoFetch(contentType string, compressed bool, size int) Check {
+	check := Check{Name: "logo_fetch", Description: "Logo file retrieval", Status: StatusPass}
+
+	if compressed {
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityInfo,
+			Text:     fmt.Sprintf("Logo served as SVGZ (gzip-compressed, RFC 6170 section 5.2), decompressing to %d bytes: BIMI accepts SVG and SVGZ alike for the l= tag", size),
+		})
+	}
+
+	if contentType != "image/svg+xml" {
+		check.Status = StatusWarning
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityWarning,
+			Text:     fmt.Sprintf("Logo served with Content-Type %q, expected \"image/svg+xml\"", contentType),
 		})
 	}
 

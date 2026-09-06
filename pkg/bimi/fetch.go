@@ -174,6 +174,26 @@ func (v *Validator) httpClient() *http.Client {
 	return http.DefaultClient
 }
 
+// fetchedFile is what a fetchFile call returned, so that a download started
+// ahead of time can be carried to the code that consumes it.
+type fetchedFile struct {
+	content     []byte
+	contentType string
+	problems    []string
+}
+
+// fetchAsync starts a fetchFile in the background and hands back the channel
+// its single result will arrive on. The channel is buffered: the fetch
+// completes and the goroutine exits even if nobody ever reads it.
+func (v *Validator) fetchAsync(ctx context.Context, fileURL string, maxSize int64) <-chan fetchedFile {
+	done := make(chan fetchedFile, 1)
+	go func() {
+		content, contentType, problems := v.fetchFile(ctx, fileURL, maxSize)
+		done <- fetchedFile{content: content, contentType: contentType, problems: problems}
+	}()
+	return done
+}
+
 // fetchFile downloads a file referenced by a BIMI record and validates
 // transport requirements (HTTPS, reachability, size). It returns the file
 // content, the media type announced by the server and the list of problems

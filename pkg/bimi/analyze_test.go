@@ -26,6 +26,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -41,6 +42,19 @@ func TestValidateAssets(t *testing.T) {
 	mux.HandleFunc("/bad.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`))
+	})
+	// An SVGZ is the gzip stream itself, served under the media type RFC 6170
+	// section 5.2 mandates for SVG and SVGZ alike. Content-Encoding is
+	// deliberately left unset: the transport would then inflate it on its own,
+	// which is the case that already worked.
+	svgz := gzipBytes(t, []byte(validTinyPSSVG))
+	mux.HandleFunc("/logo.svgz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write(svgz)
+	})
+	mux.HandleFunc("/truncated.svgz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write(svgz[:len(svgz)-5])
 	})
 	mux.HandleFunc("/vmc.pem", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/pem-certificate-chain")
@@ -66,6 +80,71 @@ func TestValidateAssets(t *testing.T) {
 		}
 		if rec.VMC == nil || !rec.VMC.Valid {
 			t.Errorf("expected valid VMC info, got %+v", rec.VMC)
+		}
+	})
+
+	t.Run("SVGZ logo is decompressed before every check", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/logo.svgz",
+			VMCURL:   server.URL + "/vmc.pem",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec)
+		if !rec.Valid {
+			t.Errorf("BIMI accepts SVG and SVGZ alike for the l= tag, got checks: %+v", rec.Checks)
+		}
+
+		logoFetch, found := findCheck(rec.Checks, "logo_fetch")
+		if !found || logoFetch.Status != StatusPass {
+			t.Errorf("logo_fetch = %+v, want a passing check: an SVGZ is not a defect", logoFetch)
+		}
+		if len(logoFetch.Messages) != 1 || logoFetch.Messages[0].Severity != SeverityInfo ||
+			!strings.Contains(logoFetch.Messages[0].Text, "SVGZ") {
+			t.Errorf("logo_fetch messages = %+v, want a single informational message naming SVGZ", logoFetch.Messages)
+		}
+
+		// Both checks read XML: they can only pass on the inflated document.
+		for _, name := range []string{"logo_xml", "logo_svg_tiny_ps"} {
+			check, found := findCheck(rec.Checks, name)
+			if !found || check.Status != StatusPass {
+				t.Errorf("%s = %+v, want a passing check on the inflated document", name, check)
+			}
+		}
+
+		// The certificate carries the same logo, gzipped inside its logotype
+		// extension. Comparing the published file without inflating it would
+		// oppose gzip bytes to an SVG document, and never match.
+		if rec.VMC == nil || rec.VMC.LogoMatches == nil || !*rec.VMC.LogoMatches {
+			t.Errorf("VMC.LogoMatches = %v, want true: both sides carry the same document", rec.VMC)
+		}
+	})
+
+	t.Run("Corrupt SVGZ fails the fetch and skips the logo checks", func(t *testing.T) {
+		rec := &Record{
+			Selector: "default",
+			Domain:   "example.com",
+			LogoURL:  server.URL + "/truncated.svgz",
+			Valid:    true,
+		}
+		v.ValidateAssets(ctx, rec)
+		if rec.Valid {
+			t.Error("a logo that cannot be decoded is no logo at all")
+		}
+
+		logoFetch, found := findCheck(rec.Checks, "logo_fetch")
+		if !found || logoFetch.Status != StatusFail {
+			t.Errorf("logo_fetch = %+v, want a failing check", logoFetch)
+		}
+
+		// Reporting the still-compressed bytes as malformed XML would send the
+		// Domain Owner looking for a syntax error that is not there.
+		for _, name := range []string{"logo_xml", "logo_svg_tiny_ps"} {
+			check, found := findCheck(rec.Checks, name)
+			if !found || check.Status != StatusSkipped {
+				t.Errorf("%s = %+v, want a skipped check", name, check)
+			}
 		}
 	})
 

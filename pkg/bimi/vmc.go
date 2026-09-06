@@ -144,6 +144,14 @@ func matchesAny(acceptable, sans []string) bool {
 // the l= URL, compared against the logo embedded in the certificate.
 func (v *Validator) analyzeVMCURL(ctx context.Context, vmcURL string, binding VMCBinding, logoContent []byte) (Check, *VMCInfo) {
 	content, contentType, problems := v.fetchFile(ctx, vmcURL, MaxFileSize)
+	return v.analyzeVMCFetch(fetchedFile{content: content, contentType: contentType, problems: problems}, binding, logoContent)
+}
+
+// analyzeVMCFetch is analyzeVMCURL for a certificate already downloaded, so
+// that the caller can pull it at the same time as the logo instead of waiting
+// for one fetch before starting the other.
+func (v *Validator) analyzeVMCFetch(fetched fetchedFile, binding VMCBinding, logoContent []byte) (Check, *VMCInfo) {
+	content, contentType, problems := fetched.content, fetched.contentType, fetched.problems
 	if len(problems) > 0 {
 		return newCheck("vmc", "Verified Mark Certificate", StatusFail, problems...),
 			&VMCInfo{Valid: false, Error: strings.Join(problems, "; ")}
