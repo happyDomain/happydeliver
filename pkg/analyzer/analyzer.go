@@ -126,6 +126,12 @@ func (a *APIAdapter) AnalyzeDomain(domain string) (*model.DNSResults, int, strin
 	return dnsResults, score, grade
 }
 
+// CheckBIMI validates the BIMI record a domain publishes under the given
+// selector, and returns the DMARC record its verdict depends on alongside.
+func (a *APIAdapter) CheckBIMI(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord) {
+	return a.analyzer.generator.dnsAnalyzer.AnalyzeBIMIOnly(domain, selector, localPart)
+}
+
 // CheckBlacklistIP checks a single IP address against DNS blacklists and whitelists
 func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, int, int, string, error) {
 	// Check the IP against all configured RBLs

@@ -108,6 +108,10 @@ type fakeAnalyzer struct {
 	lastSource model.ReportSource
 	lastRaw    []byte
 	err        error
+
+	lastBIMIDomain    string
+	lastBIMISelector  string
+	lastBIMILocalPart string
 }
 
 func (f *fakeAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) ([]byte, error) {
@@ -131,6 +135,11 @@ func (f *fakeAnalyzer) AnalyzeDomain(domain string) (*model.DNSResults, int, str
 
 func (f *fakeAnalyzer) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, int, int, string, error) {
 	return nil, nil, 0, 0, "F", nil
+}
+
+func (f *fakeAnalyzer) CheckBIMI(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord) {
+	f.lastBIMIDomain, f.lastBIMISelector, f.lastBIMILocalPart = domain, selector, localPart
+	return &model.BIMIRecord{Domain: domain, Selector: selector}, nil
 }
 
 func newTestHandler(t *testing.T, cfg *config.Config) (*APIHandler, *fakeStorage, *fakeAnalyzer) {
@@ -349,4 +358,123 @@ func TestReanalyzeReportKeepsSource(t *testing.T) {
 			}
 		})
 	}
+}
+
+// bimiRequest builds a JSON request for the /bimi endpoint.
+func bimiRequest(t *testing.T, body string) *http.Request {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/bimi", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func TestCheckBimi(t *testing.T) {
+	t.Run("an omitted selector means the default one", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = bimiRequest(t, `{"domain":"example.com"}`)
+
+		handler.CheckBimi(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+		if analyzer.lastBIMISelector != "default" {
+			t.Errorf("Looked up selector %q, expected \"default\"", analyzer.lastBIMISelector)
+		}
+
+		var response model.BIMICheckResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.Selector != "default" {
+			t.Errorf("Response selector = %q, expected \"default\"", response.Selector)
+		}
+		if response.LocalPart != nil {
+			t.Errorf("Response carries a local-part %q, expected none", *response.LocalPart)
+		}
+		if response.BimiRecord.Domain != "example.com" {
+			t.Errorf("Response record domain = %q, expected \"example.com\"", response.BimiRecord.Domain)
+		}
+	})
+
+	t.Run("the selector and the local-part reach the analyzer", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = bimiRequest(t, `{"domain":"example.com","selector":"brand","local_part":"newsletter"}`)
+
+		handler.CheckBimi(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+		if analyzer.lastBIMIDomain != "example.com" || analyzer.lastBIMISelector != "brand" || analyzer.lastBIMILocalPart != "newsletter" {
+			t.Errorf("Analyzed (%q, %q, %q), expected (\"example.com\", \"brand\", \"newsletter\")",
+				analyzer.lastBIMIDomain, analyzer.lastBIMISelector, analyzer.lastBIMILocalPart)
+		}
+
+		var response model.BIMICheckResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.LocalPart == nil || *response.LocalPart != "newsletter" {
+			t.Errorf("Response local-part = %v, expected \"newsletter\"", response.LocalPart)
+		}
+	})
+
+	t.Run("a missing domain is refused rather than looked up", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = bimiRequest(t, `{}`)
+
+		handler.CheckBimi(c)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("Status = %d, expected 400: %s", rec.Code, rec.Body.String())
+		}
+		if analyzer.lastBIMISelector != "" {
+			t.Error("Analyzer was called, expected the request to be refused first")
+		}
+	})
+
+	t.Run("a trailing root label is trimmed", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = bimiRequest(t, `{"domain":"example.com."}`)
+
+		handler.CheckBimi(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+		if analyzer.lastBIMIDomain != "example.com" {
+			t.Errorf("Analyzed %q, expected %q", analyzer.lastBIMIDomain, "example.com")
+		}
+	})
+
+	t.Run("a selector that is not a single label is refused", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = bimiRequest(t, `{"domain":"example.com","selector":"brand._bimi.example.net"}`)
+
+		handler.CheckBimi(c)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("Status = %d, expected 400: %s", rec.Code, rec.Body.String())
+		}
+		if analyzer.lastBIMIDomain != "" {
+			t.Errorf("Analyzer was called with %q, expected the request to be refused first", analyzer.lastBIMIDomain)
+		}
+	})
 }

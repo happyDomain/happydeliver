@@ -295,6 +295,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /bimi:
+    post:
+      tags:
+        - tests
+      summary: Check a domain's BIMI record
+      description: Looks up the BIMI Assertion Record of a domain and validates it together with the assets it points at (logo and Verified Mark Certificate), without requiring an actual email to be sent. The DMARC record of the same domain is reported alongside, since BIMI display depends on it. Returns results immediately.
+      operationId: checkBimi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BIMICheckRequest'
+      responses:
+        '200':
+          description: BIMI check completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BIMICheckResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /blacklist:
     post:
       tags:
@@ -415,6 +448,10 @@ components:
       $ref: './schemas.yaml#/components/schemas/DomainTestRequest'
     DomainTestResponse:
       $ref: './schemas.yaml#/components/schemas/DomainTestResponse'
+    BIMICheckRequest:
+      $ref: './schemas.yaml#/components/schemas/BIMICheckRequest'
+    BIMICheckResponse:
+      $ref: './schemas.yaml#/components/schemas/BIMICheckResponse'
     BlacklistCheckRequest:
       $ref: './schemas.yaml#/components/schemas/BlacklistCheckRequest'
     BlacklistCheckResponse:

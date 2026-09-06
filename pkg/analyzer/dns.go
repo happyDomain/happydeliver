@@ -188,6 +188,25 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	return results
 }
 
+// AnalyzeBIMIOnly validates the BIMI Assertion Record a domain publishes under
+// the given selector, without any message to take a sender from. The DMARC
+// record is looked up first and returned alongside: BIMI section 7.1 makes an
+// enforcing policy a precondition of Indicator display, so the BIMI verdict
+// cannot be reached without it, and the caller has to be able to show why.
+//
+// selector defaults to "default", the one a message carrying no BIMI-Selector
+// header is served. localPart may be empty; supplying one lets discovery follow
+// the lps= tag of a record that serves a different Indicator per mailbox.
+func (d *DNSAnalyzer) AnalyzeBIMIOnly(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord) {
+	if selector == "" {
+		selector = "default"
+	}
+
+	dmarc := d.checkDMARCRecord(domain)
+
+	return d.checkBIMIRecord(domain, selector, localPart, dmarc), dmarc
+}
+
 // AnalyzeDomainOnly performs DNS validation for a domain without email context
 // This is useful for checking domain configuration without sending an actual email
 func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {

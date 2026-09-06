@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +47,7 @@ type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
 	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, listedCount int, score int, grade string, err error)
+	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -432,6 +435,73 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 		Grade:      responseGrade,
 		DnsResults: *dnsResults,
 	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// bimiSelectorPattern is the shape of a selector that can be prepended to
+// _bimi.<domain>: a single DNS label.
+var bimiSelectorPattern = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?$`)
+
+// bimiDomainPattern is the shape of the name the record is looked up under.
+// Binding does not enforce the schema pattern, so an empty or malformed domain
+// would otherwise reach the resolver and come back as "No BIMI record found",
+// which reads as a verdict on the domain rather than on the request.
+var bimiDomainPattern = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
+
+// CheckBimi validates a domain's BIMI record on its own
+// (POST /bimi)
+func (h *APIHandler) CheckBimi(c *gin.Context) {
+	var request model.BIMICheckRequest
+
+	// Bind and validate request
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	domain := strings.TrimSuffix(strings.TrimSpace(request.Domain), ".")
+	if !bimiDomainPattern.MatchString(domain) {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_domain",
+			Message: "Invalid domain name",
+			Details: utils.PtrTo("Expected a domain name such as example.com"),
+		})
+		return
+	}
+
+	// The selector becomes a label of the queried name, so it is checked
+	// here rather than left to produce a puzzling lookup failure. An
+	// omitted selector means the default one, which is what a message
+	// carrying no BIMI-Selector header is served.
+	selector := utils.Deref(request.Selector)
+	if selector == "" {
+		selector = "default"
+	} else if !bimiSelectorPattern.MatchString(selector) {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_selector",
+			Message: "Invalid BIMI selector",
+			Details: utils.PtrTo("A selector is a single DNS label: letters, digits, hyphens and underscores"),
+		})
+		return
+	}
+
+	localPart := utils.Deref(request.LocalPart)
+
+	bimiRecord, dmarcRecord := h.analyzer.CheckBIMI(domain, selector, localPart)
+
+	// Build response
+	response := model.BIMICheckResponse{
+		Domain:      domain,
+		Selector:    selector,
+		BimiRecord:  *bimiRecord,
+		DmarcRecord: dmarcRecord,
+	}
+	response.LocalPart = utils.PtrToNonZero(localPart)
 
 	c.JSON(http.StatusOK, response)
 }

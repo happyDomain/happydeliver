@@ -271,6 +271,8 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	router.GET("/", serveOrReverse("/", cfg))
 	router.GET("/blacklist/", serveOrReverse("/", cfg))
 	router.GET("/blacklist/:ip", serveOrReverse("/", cfg))
+	router.GET("/bimi/", serveOrReverse("/", cfg))
+	router.GET("/bimi/:domain", serveOrReverse("/", cfg))
 	router.GET("/domain/", serveOrReverse("/", cfg))
 	router.GET("/domain/:domain", serveOrReverse("/", cfg))
 	router.GET("/test/", serveOrReverse("/", cfg))

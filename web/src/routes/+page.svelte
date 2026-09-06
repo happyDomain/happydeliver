@@ -123,6 +123,8 @@
             description:
                 "Brand Indicators for Message Identification - verify your brand logo configuration.",
             variant: "info" as const,
+            href: resolve("/bimi"),
+            linkLabel: "Check a BIMI record",
         },
         {
             icon: "bi-link-45deg",
@@ -391,6 +393,10 @@
             <a href={resolve("/domain")} class="btn btn-secondary btn-lg me-2">
                 <i class="bi bi-globe me-2"></i>
                 Test Domain Only
+            </a>
+            <a href={resolve("/bimi")} class="btn btn-secondary btn-lg me-2">
+                <i class="bi bi-building-check me-2"></i>
+                Check BIMI Only
             </a>
             <a href={resolve("/blacklist")} class="btn btn-secondary btn-lg">
                 <i class="bi bi-shield-exclamation me-2"></i>

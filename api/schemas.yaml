@@ -1431,6 +1431,51 @@ components:
         dns_results:
           $ref: '#/components/schemas/DNSResults'
 
+    BIMICheckRequest:
+      type: object
+      required:
+        - domain
+      properties:
+        domain:
+          type: string
+          pattern: '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+          description: Domain name whose BIMI record is looked up (e.g., example.com)
+          example: "example.com"
+        selector:
+          type: string
+          pattern: '^[a-zA-Z0-9]([a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?$'
+          description: Selector the record is published under. Defaults to `default`, the selector a message that carries no `BIMI-Selector` header is served.
+          example: "default"
+        local_part:
+          type: string
+          description: Local-part of a sending address, so discovery can follow the `lps=` tag of a record that serves one Indicator per mailbox. Omit to report the Indicator the selector alone leads to.
+          example: "newsletter"
+
+    BIMICheckResponse:
+      type: object
+      required:
+        - domain
+        - selector
+        - bimi_record
+      properties:
+        domain:
+          type: string
+          description: The domain that was checked
+          example: "example.com"
+        selector:
+          type: string
+          description: The selector the lookup started from, before any local-part redirection
+          example: "default"
+        local_part:
+          type: string
+          description: The local-part discovery was run for, when one was supplied
+          example: "newsletter"
+        bimi_record:
+          $ref: '#/components/schemas/BIMIRecord'
+        dmarc_record:
+          $ref: '#/components/schemas/DMARCRecord'
+          description: The DMARC record of the same domain. BIMI section 7.1 makes an enforcing policy a precondition of Indicator display, so the record is reported alongside rather than left for a separate lookup.
+
     BlacklistCheckRequest:
       type: object
       required:

@@ -314,3 +314,55 @@ func TestBimiDMARCPolicy(t *testing.T) {
 		}
 	})
 }
+
+// AnalyzeBIMIOnly is what the standalone checker calls: it has no message to
+// take a DMARC verdict from, so it has to look the policy up itself and feed it
+// to the BIMI validation. A record checked without it would be reported as
+// compliant while no receiver would act on it.
+func TestAnalyzeBIMIOnly(t *testing.T) {
+	txt := map[string][]string{
+		"default._bimi.example.com": {"v=BIMI1; l=;"},
+		"brand._bimi.example.com":   {"v=BIMI1; l=;"},
+	}
+
+	t.Run("looks the DMARC policy up and applies it", func(t *testing.T) {
+		withDMARC := map[string][]string{"_dmarc.example.com": {"v=DMARC1; p=reject"}}
+		for k, v := range txt {
+			withDMARC[k] = v
+		}
+
+		rec, dmarc := newMockAnalyzer(withDMARC, nil).AnalyzeBIMIOnly("example.com", "", "")
+
+		if dmarc == nil || !dmarc.Valid {
+			t.Fatalf("DMARC record = %+v, want a valid one", dmarc)
+		}
+		if rec.Selector != "default" {
+			t.Errorf("Selector = %q, want %q: an empty selector means the default one", rec.Selector, "default")
+		}
+		if !rec.Valid {
+			t.Errorf("Valid = false, want true (error: %v)", rec.Error)
+		}
+		check, found := findModelCheck(rec, "dmarc_enforcement")
+		if !found || check.Status != model.BIMICheckStatusPass {
+			t.Errorf("check dmarc_enforcement = %+v, want a pass", check)
+		}
+	})
+
+	t.Run("a domain without DMARC cannot display an Indicator", func(t *testing.T) {
+		rec, dmarc := newMockAnalyzer(txt, nil).AnalyzeBIMIOnly("example.com", "brand", "")
+
+		if dmarc == nil || dmarc.Valid {
+			t.Fatalf("DMARC record = %+v, want an invalid one", dmarc)
+		}
+		if rec.Selector != "brand" {
+			t.Errorf("Selector = %q, want %q", rec.Selector, "brand")
+		}
+		if rec.Valid {
+			t.Error("Valid = true, want false: no DMARC policy forbids BIMI processing")
+		}
+		check, found := findModelCheck(rec, "dmarc_enforcement")
+		if !found || check.Status != model.BIMICheckStatusFail {
+			t.Errorf("check dmarc_enforcement = %+v, want a failure", check)
+		}
+	})
+}
