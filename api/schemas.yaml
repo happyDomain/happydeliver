@@ -1296,6 +1296,9 @@ components:
           type: integer
           description: Number of Signed Certificate Timestamps embedded in the certificate, proving it was logged to Certificate Transparency logs. Absent when the extension could not be read.
           example: 3
+        chain_trusted:
+          type: boolean
+          description: Whether the issuance chain leads to a trusted BIMI root certificate. Absent when no set of trusted roots was supplied, in which case nothing is claimed about the issuer's legitimacy.
         logo_matches:
           type: boolean
           description: Whether the SVG embedded in the certificate matches the logo published at the l= URL

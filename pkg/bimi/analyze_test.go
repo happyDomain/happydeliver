@@ -32,7 +32,7 @@ import (
 )
 
 func TestValidateAssets(t *testing.T) {
-	logoPEM := generateTestVMCChain(t, testVMCOptions{
+	logoPEM, _ := generateTestVMCChain(t, testVMCOptions{
 		Domain: "example.com", Logo: []byte(validTinyPSSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
 	})
 
@@ -223,7 +223,7 @@ func TestValidateAssets(t *testing.T) {
 }
 
 func TestAnalyze(t *testing.T) {
-	logoPEM := generateTestVMCChain(t, testVMCOptions{
+	logoPEM, _ := generateTestVMCChain(t, testVMCOptions{
 		Domain: "example.com", Logo: []byte(validTinyPSSVG), NotAfter: time.Now().Add(365 * 24 * time.Hour),
 	})
 

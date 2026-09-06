@@ -122,11 +122,12 @@ func sctListExtension(t *testing.T, count int) pkix.Extension {
 }
 
 // generateTestVMCChain builds the issuance chain of a Verified Mark
-// Certificate: a self-signed root, the intermediate CA that issues mark
-// certificates, and the leaf itself. It returns the published chain: the leaf
-// followed by the intermediate, the root being optional in the published
-// file.
-func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
+// Certificate: a self-signed root, the intermediate CA designated to issue
+// mark certificates, and the leaf itself. It returns the published chain (the
+// leaf followed by the intermediate, the root being optional in the published
+// file) and a pool holding the root, so that both branches of the anchoring
+// check can be exercised.
+func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte, roots *x509.CertPool) {
 	t.Helper()
 
 	if opts.IssuerNotAfter.IsZero() {
@@ -223,7 +224,10 @@ func generateTestVMCChain(t *testing.T, opts testVMCOptions) (chainPEM []byte) {
 		chainPEM = append(chainPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
 	}
 
-	return chainPEM
+	roots = x509.NewCertPool()
+	roots.AddCert(rootCert)
+
+	return chainPEM, roots
 }
 
 func TestAnalyzeVMC(t *testing.T) {
@@ -231,9 +235,10 @@ func TestAnalyzeVMC(t *testing.T) {
 	now := time.Now()
 
 	// vmc builds a conforming chain for example.com, mutate breaking the one
-	// requirement the case is about.
-	vmc := func(mutate func(*testVMCOptions)) func(*testing.T) []byte {
-		return func(t *testing.T) []byte {
+	// requirement the case is about. The trust anchors are left out: the
+	// anchoring check is exercised by the two cases that pass them.
+	vmc := func(mutate func(*testVMCOptions)) func(*testing.T) ([]byte, *x509.CertPool) {
+		return func(t *testing.T) ([]byte, *x509.CertPool) {
 			opts := testVMCOptions{
 				Domain:   "example.com",
 				Logo:     logo,
@@ -242,14 +247,15 @@ func TestAnalyzeVMC(t *testing.T) {
 			if mutate != nil {
 				mutate(&opts)
 			}
-			return generateTestVMCChain(t, opts)
+			chain, _ := generateTestVMCChain(t, opts)
+			return chain, nil
 		}
 	}
 
 	tests := []struct {
 		name           string
 		binding        VMCBinding
-		chain          func(t *testing.T) []byte
+		chain          func(t *testing.T) ([]byte, *x509.CertPool)
 		logoContent    []byte
 		expectedStatus CheckStatus
 		expectedInMsg  string
@@ -292,14 +298,24 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "Issuer certificate #2 (Example Verified Mark CA) expired on",
 		},
 		{
-			name:    "Issuer not allowed to sign certificates",
+			name:    "Missing BIMI EKU",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			chain: vmc(func(o *testVMCOptions) {
-				o.IssuerNotCA = true
+				o.WithoutEKU = true
 			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
-			expectedInMsg:  "is not allowed to sign certificates, yet the chain presents it as the issuer of",
+			expectedInMsg:  "The certificate does not carry the BIMI Extended Key Usage",
+		},
+		{
+			name:    "Issuer without the BIMI EKU",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.IssuerWithoutEKU = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "is not designated to issue Verified Mark Certificates",
 		},
 		{
 			name:    "Chain reduced to the leaf certificate",
@@ -312,14 +328,24 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "the certificate of the issuing CA must be published alongside it",
 		},
 		{
-			name:    "Issuer without the BIMI EKU",
+			name:    "Issuer not allowed to sign certificates",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			chain: vmc(func(o *testVMCOptions) {
-				o.IssuerWithoutEKU = true
+				o.IssuerNotCA = true
 			}),
 			logoContent:    logo,
 			expectedStatus: StatusFail,
-			expectedInMsg:  "is not designated to issue Verified Mark Certificates",
+			expectedInMsg:  "is not allowed to sign certificates, yet the chain presents it as the issuer of",
+		},
+		{
+			name:    "Leaf asserting it is a CA",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: vmc(func(o *testVMCOptions) {
+				o.LeafIsCA = true
+			}),
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "asserts it is a certification authority",
 		},
 		{
 			name:    "Missing CRL distribution point",
@@ -352,26 +378,6 @@ func TestAnalyzeVMC(t *testing.T) {
 			expectedInMsg:  "Timestamp list of the certificate is empty",
 		},
 		{
-			name:    "Leaf asserting it is a CA",
-			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			chain: vmc(func(o *testVMCOptions) {
-				o.LeafIsCA = true
-			}),
-			logoContent:    logo,
-			expectedStatus: StatusFail,
-			expectedInMsg:  "asserts it is a certification authority",
-		},
-		{
-			name:    "Missing BIMI EKU",
-			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			chain: vmc(func(o *testVMCOptions) {
-				o.WithoutEKU = true
-			}),
-			logoContent:    logo,
-			expectedStatus: StatusFail,
-			expectedInMsg:  "The certificate does not carry the BIMI Extended Key Usage",
-		},
-		{
 			name:    "Missing logotype extension",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
 			chain: vmc(func(o *testVMCOptions) {
@@ -400,17 +406,47 @@ func TestAnalyzeVMC(t *testing.T) {
 		{
 			name:    "Not a certificate",
 			binding: VMCBinding{Selector: "default", Domain: "example.com"},
-			chain: func(t *testing.T) []byte {
-				return []byte("this is not a PEM file")
+			chain: func(t *testing.T) ([]byte, *x509.CertPool) {
+				return []byte("this is not a PEM file"), nil
 			},
 			expectedStatus: StatusFail,
 			expectedInMsg:  "PEM",
+		},
+
+		// Anchoring: the two branches of the trust-anchor decision.
+		{
+			name:    "Chain leading to a trusted root",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: func(t *testing.T) ([]byte, *x509.CertPool) {
+				return generateTestVMCChain(t, testVMCOptions{
+					Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour),
+				})
+			},
+			logoContent:    logo,
+			expectedStatus: StatusPass,
+			expectedValid:  true,
+		},
+		{
+			name:    "Chain leading to an unknown root",
+			binding: VMCBinding{Selector: "default", Domain: "example.com"},
+			chain: func(t *testing.T) ([]byte, *x509.CertPool) {
+				opts := testVMCOptions{Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour)}
+				chain, _ := generateTestVMCChain(t, opts)
+				// The anchors of another authority, which never issued
+				// this chain.
+				_, foreignRoots := generateTestVMCChain(t, opts)
+				return chain, foreignRoots
+			},
+			logoContent:    logo,
+			expectedStatus: StatusFail,
+			expectedInMsg:  "does not lead to a trusted BIMI root certificate",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			check, info := AnalyzeVMC(tt.chain(t), tt.binding, tt.logoContent, now)
+			chain, roots := tt.chain(t)
+			check, info := AnalyzeVMC(chain, tt.binding, tt.logoContent, roots, now)
 			if check.Status != tt.expectedStatus {
 				t.Errorf("status = %s, want %s (messages: %v)", check.Status, tt.expectedStatus, check.Messages)
 			}
@@ -424,6 +460,107 @@ func TestAnalyzeVMC(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAnalyzeVMCAnchoring pins what the analysis says about the issuer's
+// legitimacy: without a set of trust anchors it says nothing, and says so.
+func TestAnalyzeVMCAnchoring(t *testing.T) {
+	logo := []byte(validTinyPSSVG)
+	now := time.Now()
+	binding := VMCBinding{Selector: "default", Domain: "example.com"}
+	chain, roots := generateTestVMCChain(t, testVMCOptions{
+		Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour),
+	})
+
+	t.Run("without anchors the chain is not claimed to be trusted", func(t *testing.T) {
+		check, info := AnalyzeVMC(chain, binding, logo, nil, now)
+		if info.ChainTrusted != nil {
+			t.Errorf("ChainTrusted = %v, want nil when no anchor was supplied", *info.ChainTrusted)
+		}
+		if check.Status != StatusPass || !info.Valid {
+			t.Fatalf("status = %s, valid = %t, want a passing check (messages: %v)", check.Status, info.Valid, check.Messages)
+		}
+		var informed bool
+		for _, m := range check.Messages {
+			if m.Severity == SeverityInfo && strings.Contains(m.Text, "trusted BIMI root certificates") {
+				informed = true
+			}
+		}
+		if !informed {
+			t.Errorf("expected an informational message about the missing anchors, got %v", check.Messages)
+		}
+	})
+
+	t.Run("with the issuing anchors the chain is trusted", func(t *testing.T) {
+		_, info := AnalyzeVMC(chain, binding, logo, roots, now)
+		if info.ChainTrusted == nil || !*info.ChainTrusted {
+			t.Errorf("ChainTrusted = %v, want true", info.ChainTrusted)
+		}
+	})
+}
+
+// TestParseSCTList covers the walk over the RFC 6962 timestamp list, which
+// tells "not logged" apart from "logged, but the proof is unreadable".
+func TestParseSCTList(t *testing.T) {
+	// sctList encodes count timestamps the way sctListExtension does, so the
+	// malformed cases below can be derived from a well-formed list.
+	sctList := func(t *testing.T, count int) []byte {
+		ext := sctListExtension(t, count)
+		var payload []byte
+		if _, err := asn1.Unmarshal(ext.Value, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+
+	certWith := func(t *testing.T, payload []byte) *x509.Certificate {
+		value, err := asn1.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: value}}}
+	}
+
+	t.Run("extension absent", func(t *testing.T) {
+		count, found, err := parseSCTList(&x509.Certificate{})
+		if found || err != nil || count != 0 {
+			t.Errorf("parseSCTList() = %d, %t, %v; want 0, false, nil", count, found, err)
+		}
+	})
+
+	for _, count := range []int{0, 1, 3} {
+		t.Run(fmt.Sprintf("%d timestamps", count), func(t *testing.T) {
+			got, found, err := parseSCTList(certWith(t, sctList(t, count)))
+			if err != nil || !found {
+				t.Fatalf("parseSCTList() = _, %t, %v; want found and no error", found, err)
+			}
+			if got != count {
+				t.Errorf("count = %d, want %d", got, count)
+			}
+		})
+	}
+
+	t.Run("truncated list", func(t *testing.T) {
+		full := sctList(t, 2)
+		_, found, err := parseSCTList(certWith(t, full[:len(full)-4]))
+		if !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
+
+	t.Run("list shorter than its own length prefix", func(t *testing.T) {
+		_, found, err := parseSCTList(certWith(t, []byte{0x00}))
+		if !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
+
+	t.Run("payload is not an OCTET STRING", func(t *testing.T) {
+		cert := &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: []byte{0xff, 0xff}}}}
+		if _, found, err := parseSCTList(cert); !found || err == nil {
+			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
+		}
+	})
 }
 
 func TestExtractLogotypeSVG(t *testing.T) {
@@ -494,7 +631,7 @@ func TestExtractLogotypeSVG(t *testing.T) {
 func TestAnalyzeVMCURL(t *testing.T) {
 	logo := []byte(validTinyPSSVG)
 	binding := VMCBinding{Selector: "default", Domain: "example.com", OrganizationalDomain: "example.com"}
-	vmcPEM := generateTestVMCChain(t, testVMCOptions{
+	vmcPEM, _ := generateTestVMCChain(t, testVMCOptions{
 		Domain: "example.com", Logo: logo, NotAfter: time.Now().Add(365 * 24 * time.Hour),
 	})
 
@@ -635,68 +772,4 @@ func TestVMCBindingAcceptableSANs(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestParseSCTList covers the walk over the RFC 6962 timestamp list, which
-// tells "not logged" apart from "logged, but the proof is unreadable".
-func TestParseSCTList(t *testing.T) {
-	// sctList encodes count timestamps the way sctListExtension does, so the
-	// malformed cases below can be derived from a well-formed list.
-	sctList := func(t *testing.T, count int) []byte {
-		ext := sctListExtension(t, count)
-		var payload []byte
-		if _, err := asn1.Unmarshal(ext.Value, &payload); err != nil {
-			t.Fatal(err)
-		}
-		return payload
-	}
-
-	certWith := func(t *testing.T, payload []byte) *x509.Certificate {
-		value, err := asn1.Marshal(payload)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: value}}}
-	}
-
-	t.Run("extension absent", func(t *testing.T) {
-		count, found, err := parseSCTList(&x509.Certificate{})
-		if found || err != nil || count != 0 {
-			t.Errorf("parseSCTList() = %d, %t, %v; want 0, false, nil", count, found, err)
-		}
-	})
-
-	for _, count := range []int{0, 1, 3} {
-		t.Run(fmt.Sprintf("%d timestamps", count), func(t *testing.T) {
-			got, found, err := parseSCTList(certWith(t, sctList(t, count)))
-			if err != nil || !found {
-				t.Fatalf("parseSCTList() = _, %t, %v; want found and no error", found, err)
-			}
-			if got != count {
-				t.Errorf("count = %d, want %d", got, count)
-			}
-		})
-	}
-
-	t.Run("truncated list", func(t *testing.T) {
-		full := sctList(t, 2)
-		_, found, err := parseSCTList(certWith(t, full[:len(full)-4]))
-		if !found || err == nil {
-			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
-		}
-	})
-
-	t.Run("list shorter than its own length prefix", func(t *testing.T) {
-		_, found, err := parseSCTList(certWith(t, []byte{0x00}))
-		if !found || err == nil {
-			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
-		}
-	})
-
-	t.Run("payload is not an OCTET STRING", func(t *testing.T) {
-		cert := &x509.Certificate{Extensions: []pkix.Extension{{Id: oidSCTList, Value: []byte{0xff, 0xff}}}}
-		if _, found, err := parseSCTList(cert); !found || err == nil {
-			t.Errorf("parseSCTList() = _, %t, %v; want the extension found and an error", found, err)
-		}
-	})
 }

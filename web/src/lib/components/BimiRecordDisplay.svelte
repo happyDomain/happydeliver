@@ -86,6 +86,15 @@
                 label: "Embedded logo matches published logo",
             });
         }
+        /* No set of trusted BIMI roots is configured for now, and a
+           permanently grey dot would read as a failing criterion rather than
+           as one nobody asked for. */
+        if (vmc.chain_trusted !== undefined) {
+            dots.push({
+                status: vmc.chain_trusted ? "pass" : "fail",
+                label: "Chain leads to a trusted BIMI root",
+            });
+        }
 
         return dots;
     });
@@ -406,17 +415,22 @@
                     </div>
                     <div class="mb-1">
                         <strong>Certificate Transparency:</strong>
-                        {#if bimiRecord.vmc.sct_count === undefined}
-                            <span class="badge bg-secondary">not evaluated</span>
-                        {:else if bimiRecord.vmc.sct_count > 0}
-                            <span class="badge bg-success">
-                                {bimiRecord.vmc.sct_count} signed timestamp{bimiRecord.vmc
-                                    .sct_count > 1
-                                    ? "s"
-                                    : ""}
-                            </span>
-                        {:else}
-                            <span class="badge bg-danger">no signed timestamp</span>
+                        {@render presenceBadge(
+                            bimiRecord.vmc.sct_count === undefined
+                                ? undefined
+                                : bimiRecord.vmc.sct_count > 0,
+                            `${bimiRecord.vmc.sct_count} signed timestamp${
+                                (bimiRecord.vmc.sct_count ?? 0) > 1 ? "s" : ""
+                            }`,
+                            "no signed timestamp",
+                        )}
+                        {#if bimiRecord.vmc.chain_trusted !== undefined}
+                            <strong class="ms-3">Issuance chain:</strong>
+                            {@render presenceBadge(
+                                bimiRecord.vmc.chain_trusted,
+                                "leads to a trusted BIMI root",
+                                "does not lead to a trusted BIMI root",
+                            )}
                         {/if}
                     </div>
                 </div>

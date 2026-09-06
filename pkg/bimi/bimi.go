@@ -48,6 +48,7 @@ package bimi
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"net"
 	"net/http"
@@ -230,6 +231,14 @@ type Validator struct {
 	// of organizational domain should install it here so BIMI agrees with
 	// the rest of its analysis.
 	OrganizationalDomain func(domain string) string
+	// VMCRoots is the set of trust anchors a Verified Mark Certificate must
+	// chain up to, i.e. the roots of the Mark Verifying Authorities the
+	// caller recognises. Mark Certificate roots are not in the system trust
+	// store and the set is a matter of receiver policy, so there is no
+	// sensible default: leaving it nil skips the anchoring check of
+	// draft-fetch-validation-vmc-wchuang, Section 5.1, and says so in the
+	// evidence rather than pretending the chain was trusted.
+	VMCRoots *x509.CertPool
 	// Now returns the reference time for certificate validity checks.
 	// Defaults to time.Now.
 	Now func() time.Time
@@ -299,15 +308,34 @@ func newCheck(name, description string, status CheckStatus, messages ...string) 
 	return c
 }
 
+// statusFor derives the status a check carries from what it collected: any
+// hard failure reason makes it fail, an accompanying warning downgrades an
+// otherwise clean check, and nothing to report leaves it passing.
+func statusFor(errors, warnings []string) CheckStatus {
+	switch {
+	case len(errors) > 0:
+		return StatusFail
+	case len(warnings) > 0:
+		return StatusWarning
+	default:
+		return StatusPass
+	}
+}
+
 // newCheckWithSeverities builds a Check whose Messages mix hard failure
-// reasons (errors) and accompanying warnings under a single status.
-func newCheckWithSeverities(name, description string, status CheckStatus, errors, warnings []string) Check {
+// reasons (errors), accompanying warnings and plain observations (infos) under
+// a single status. A check that passed can still have something to say: an
+// observation is what it noticed, not a grievance.
+func newCheckWithSeverities(name, description string, status CheckStatus, errors, warnings, infos []string) Check {
 	c := Check{Name: name, Description: description, Status: status}
 	for _, m := range errors {
 		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: SeverityError})
 	}
 	for _, m := range warnings {
 		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: SeverityWarning})
+	}
+	for _, m := range infos {
+		c.Messages = append(c.Messages, CheckMessage{Text: m, Severity: SeverityInfo})
 	}
 	return c
 }

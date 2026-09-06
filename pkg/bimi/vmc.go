@@ -90,6 +90,10 @@ type VMCInfo struct {
 	// the leaf, proving it was logged to Certificate Transparency logs. Nil
 	// when the extension could not be read.
 	SCTCount *int
+	// ChainTrusted reports whether the chain leads to one of the trust
+	// anchors the caller supplied. Nil when no anchor set was supplied, in
+	// which case nothing is claimed about the issuer's legitimacy.
+	ChainTrusted *bool
 	// LogoMatches reports whether the SVG embedded in the certificate
 	// matches the logo published at the l= URL. Nil when no comparison was
 	// made (no published logo or extraction failure).
@@ -176,7 +180,7 @@ func (v *Validator) analyzeVMCFetch(fetched fetchedFile, binding VMCBinding, log
 			&VMCInfo{Valid: false, Error: strings.Join(problems, "; ")}
 	}
 
-	check, info := AnalyzeVMC(content, binding, logoContent, v.now())
+	check, info := AnalyzeVMC(content, binding, logoContent, v.VMCRoots, v.now())
 
 	// The Content-Type is a transport concern handled here rather than in
 	// the pure AnalyzeVMC helper.
@@ -194,12 +198,14 @@ func (v *Validator) analyzeVMCFetch(fetched fetchedFile, binding VMCBinding, log
 // AnalyzeVMC parses and validates a PEM certificate chain as a BIMI Verified
 // Mark Certificate. binding names the Assertion Record the certificate must be
 // bound to. logoContent, when non-nil, is the SVG published at the l= URL,
-// compared against the logo embedded in the certificate. now is the reference
-// time used for the validity-period checks.
+// compared against the logo embedded in the certificate. roots, when non-nil,
+// is the set of trust anchors the chain must lead to; a nil pool leaves the
+// issuer's legitimacy unexamined and says so in the returned Check. now is the
+// reference time used for the validity-period checks.
 //
 // It returns the "vmc" evidence Check and a VMCInfo describing the leaf
 // certificate.
-func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now time.Time) (Check, *VMCInfo) {
+func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, roots *x509.CertPool, now time.Time) (Check, *VMCInfo) {
 	fail := func(messages ...string) (Check, *VMCInfo) {
 		return newCheck("vmc", "Verified Mark Certificate", StatusFail, messages...),
 			&VMCInfo{Valid: false, Error: strings.Join(messages, "; ")}
@@ -243,6 +249,7 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 
 	var problems []string
 	var warnings []string
+	var infos []string
 
 	// The chain has to carry the certificates that issued the leaf: without
 	// them nothing above the Verified Mark Certificate can be examined, and
@@ -341,10 +348,9 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 		info.SCTCount = &sctCount
 	}
 
-	// Each certificate must be signed by the next one. The VMC roots are not
-	// in the system trust store, so this consistency of the provided chain is
-	// all that can be said about the issuance for now; it does at least name
-	// the faulty link.
+	// Each certificate must be signed by the next one. This is what the
+	// chain says about itself, and it names the faulty link where the
+	// anchoring below can only reject the chain as a whole.
 	for i := 0; i+1 < len(certs); i++ {
 		err := certs[i].CheckSignatureFrom(certs[i+1])
 		if err == nil {
@@ -359,17 +365,47 @@ func AnalyzeVMC(pemChain []byte, binding VMCBinding, logoContent []byte, now tim
 		break
 	}
 
-	if len(problems) > 0 {
-		info.Valid = false
-		info.Error = strings.Join(problems, "; ")
-		return newCheckWithSeverities("vmc", "Verified Mark Certificate", StatusFail, problems, warnings), info
+	// Anchoring: whether the issuer is an authority the caller recognises.
+	// Mark certificate roots are a matter of receiver policy and are absent
+	// from the system trust store, so without a pool there is nothing to
+	// anchor to, and the check reports that it did not happen rather than
+	// letting the chain pass for trusted.
+	if roots == nil {
+		infos = append(infos, "The issuance chain was not checked against a set of trusted BIMI root certificates: its consistency is verified, but not that it leads to a recognised Mark Verifying Authority")
+	} else {
+		intermediates := x509.NewCertPool()
+		for _, cert := range certs[1:] {
+			intermediates.AddCert(cert)
+		}
+		// The BIMI Extended Key Usage is unknown to crypto/x509, which
+		// would reject the whole chain if asked to filter on it; the two
+		// checks above cover it. No DNSName either: a mark certificate is
+		// bound to its record by VMCBinding, not by the TLS name rules.
+		_, err := leaf.Verify(x509.VerifyOptions{
+			Roots:         roots,
+			Intermediates: intermediates,
+			CurrentTime:   now,
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		})
+		trusted := err == nil
+		info.ChainTrusted = &trusted
+		if !trusted {
+			problems = append(problems, fmt.Sprintf("The issuance chain does not lead to a trusted BIMI root certificate: %s", err))
+		}
 	}
 
-	info.Valid = true
-	if len(warnings) > 0 {
-		return newCheck("vmc", "Verified Mark Certificate", StatusWarning, warnings...), info
+	info.Valid = len(problems) == 0
+
+	status := StatusPass
+	switch {
+	case len(problems) > 0:
+		status = StatusFail
+		info.Error = strings.Join(problems, "; ")
+	case len(warnings) > 0:
+		status = StatusWarning
 	}
-	return newCheck("vmc", "Verified Mark Certificate", StatusPass), info
+
+	return newCheckWithSeverities("vmc", "Verified Mark Certificate", status, problems, warnings, infos), info
 }
 
 // certLabel names a certificate of the chain in a message. The leaf is the

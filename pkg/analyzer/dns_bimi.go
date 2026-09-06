@@ -169,6 +169,7 @@ func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
 		HasLogotype:              v.HasLogotype,
 		HasCrlDistributionPoints: v.HasCRLDistributionPoints,
 		SctCount:                 v.SCTCount,
+		ChainTrusted:             v.ChainTrusted,
 		LogoMatches:              v.LogoMatches,
 	}
 	if v.Issuer != "" {

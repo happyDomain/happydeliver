@@ -172,15 +172,7 @@ func CheckLogoSVGTinyPS(content []byte) Check {
 		}
 	}
 
-	status := StatusPass
-	switch {
-	case len(errors) > 0:
-		status = StatusFail
-	case len(warnings) > 0:
-		status = StatusWarning
-	}
-
-	return newCheckWithSeverities(name, description, status, errors, warnings)
+	return newCheckWithSeverities(name, description, statusFor(errors, warnings), errors, warnings, nil)
 }
 
 // formatLogoProblem renders a profile problem, locating it in the file and
