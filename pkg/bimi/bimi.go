@@ -128,8 +128,13 @@ func (c Check) MessageTexts() []string {
 // Record is a parsed BIMI record together with the evidence gathered about
 // the assets it references.
 type Record struct {
-	// Selector is the BIMI selector queried (e.g. "default").
+	// Selector is the BIMI selector the record was found under (e.g.
+	// "default"). It differs from RequestedSelector when an lps= tag sent
+	// discovery to a local-part selector.
 	Selector string
+	// RequestedSelector is the selector the caller asked for, before any
+	// local-part selector redirection.
+	RequestedSelector string
 	// Domain is the domain the analysis was requested for (the Author
 	// Domain).
 	Domain string
@@ -176,6 +181,14 @@ type Record struct {
 // domain, but is published and controlled by its organizational domain.
 func (r *Record) Inherited() bool {
 	return r.RecordDomain != "" && !strings.EqualFold(r.RecordDomain, r.Domain)
+}
+
+// FromLocalPartSelector reports whether the record was found under a selector
+// derived from the sender's local-part rather than under the one the caller
+// asked for, because the record published at the requested selector carried a
+// matching lps= tag.
+func (r *Record) FromLocalPartSelector() bool {
+	return r.RequestedSelector != "" && !strings.EqualFold(r.Selector, r.RequestedSelector)
 }
 
 // AvatarPreferenceOrDefault returns the Domain Owner's avatar preference,

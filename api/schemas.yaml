@@ -1146,7 +1146,11 @@ components:
       properties:
         selector:
           type: string
-          description: BIMI selector
+          description: BIMI selector the record was found under. Equal to `requested_selector`, or a selector derived from the sender's local-part when the record published at the requested selector redirected discovery through its `lps=` tag.
+          example: "default"
+        requested_selector:
+          type: string
+          description: Selector the lookup started from, before any local-part selector redirection.
           example: "default"
         domain:
           type: string

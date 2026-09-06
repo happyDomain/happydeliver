@@ -167,8 +167,12 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	// DMARC validates alignment between SPF/DKIM and the From domain
 	results.DmarcRecord = d.checkDMARCRecord(fromDomain)
 
-	// Check BIMI record (for From domain - branding is based on visible sender)
-	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default")
+	// Check BIMI record (for From domain - branding is based on visible sender).
+	// The local-part goes with it: a record publishing an lps= tag reserves a
+	// distinct Indicator for the mailboxes it names, so discovery must know
+	// which mailbox sent this message to land on the record a receiver would
+	// act on.
+	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default", localPartOf(email.GetHeaderValue("From")))
 
 	return results
 }
@@ -194,8 +198,10 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
 	// Check DMARC record
 	results.DmarcRecord = d.checkDMARCRecord(domain)
 
-	// Check BIMI record with default selector
-	results.BimiRecord = d.checkBIMIRecord(domain, "default")
+	// Check BIMI record with default selector. There is no message here, so
+	// no sending address either: a local-part selector cannot be resolved,
+	// and the record reported is the one the default selector leads to.
+	results.BimiRecord = d.checkBIMIRecord(domain, "default", "")
 
 	return results
 }

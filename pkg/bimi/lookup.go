@@ -98,7 +98,32 @@ func (v *Validator) lookupLocation(ctx context.Context, domain, selector string)
 // BIMI version tag are BIMI records; publishing more than one of those is an
 // error that leaves the domain without a usable record, and is reported as
 // such on the returned Record.
+//
+// Discovery for a message whose sender is known should go through
+// LookupForLocalPart instead, so that a record publishing an lps= tag can
+// direct it to the Indicator it reserves for that mailbox.
 func (v *Validator) Lookup(ctx context.Context, domain, selector string) (*Record, error) {
+	return v.LookupForLocalPart(ctx, domain, selector, "")
+}
+
+// LookupForLocalPart performs Assertion Record discovery like Lookup, and
+// additionally honours the Local-part Selector: when the record found carries
+// an lps= tag whose prefix list matches localPart, the selector derived from
+// that local-part is looked up at the same domain and its record used instead.
+// A domain owner uses it to serve a distinct Indicator per mailbox, or to
+// decline BIMI for some of them, without having to set a BIMI-Selector header
+// on the outgoing mail.
+//
+// localPart is the local-part of the RFC5322.From address, unquoted and
+// without the '@'. An empty localPart makes this exactly Lookup: with no
+// sender to derive a selector from, an lps= tag cannot apply.
+//
+// The refinement never costs the caller the record it already has. A
+// local-part no selector can be derived from, a prefix list that does not
+// match, a derived location that is empty, that publishes several records or
+// that publishes a malformed one all leave the record found at the requested
+// selector in place, as the specification requires.
+func (v *Validator) LookupForLocalPart(ctx context.Context, domain, selector, localPart string) (*Record, error) {
 	if v.Resolver == nil {
 		return nil, errors.New("bimi: Validator.Resolver is nil")
 	}
@@ -132,14 +157,15 @@ func (v *Validator) Lookup(ctx context.Context, domain, selector string) (*Recor
 		case 1:
 			rec := ParseRecord(domain, selector, loc.bimi[0])
 			rec.RecordDomain = loc.domain
-			return rec, nil
+			return v.applyLocalPartSelector(ctx, rec, loc, localPart), nil
 
 		default:
 			return &Record{
-				Selector:     selector,
-				Domain:       domain,
-				RecordDomain: loc.domain,
-				Record:       strings.Join(loc.bimi, "\n"),
+				Selector:          selector,
+				RequestedSelector: selector,
+				Domain:            domain,
+				RecordDomain:      loc.domain,
+				Record:            strings.Join(loc.bimi, "\n"),
 				Error: fmt.Sprintf("%d BIMI records are published at %s: a domain must publish exactly one, so none of them can be used",
 					len(loc.bimi), loc.name),
 			}, nil

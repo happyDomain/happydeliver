@@ -59,7 +59,13 @@ func (d *DNSAnalyzer) bimiAssetsTimeout() time.Duration {
 // checkBIMIRecord looks up and validates the BIMI record for a domain and
 // selector. The actual validation lives in the reusable pkg/bimi package;
 // this method adapts its result to the API model.
-func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord {
+//
+// localPart is the local-part of the sending address, empty when the analysis
+// has no message to take one from. A record publishing an lps= tag serves a
+// different Indicator per mailbox, so without it the record reported is the
+// one the selector alone leads to, which is not necessarily the one a receiver
+// would act on for a given sender.
+func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string) *model.BIMIRecord {
 	validator := &bimi.Validator{
 		HTTPClient: d.bimiHTTPClient,
 		Resolver:   d.resolver,
@@ -74,7 +80,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector string) *model.BIMIRecord
 	lookupCtx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
-	rec, err := validator.Lookup(lookupCtx, domain, selector)
+	rec, err := validator.LookupForLocalPart(lookupCtx, domain, selector, localPart)
 	if err != nil {
 		msg := "No BIMI record found"
 		if !errors.Is(err, bimi.ErrNoRecord) {
@@ -107,9 +113,12 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 		LogoUrl:     utils.PtrTo(r.LogoURL),
 		VmcUrl:      utils.PtrTo(r.VMCURL),
 	}
-	if r.RecordDomain != "" {
-		m.RecordDomain = utils.PtrTo(r.RecordDomain)
-	}
+	m.RecordDomain = utils.PtrToNonZero(r.RecordDomain)
+	m.RequestedSelector = utils.PtrToNonZero(r.RequestedSelector)
+	m.AvatarPreference = utils.PtrToNonZero(r.AvatarPreference)
+	m.Record = utils.PtrToNonZero(r.Record)
+	m.Error = utils.PtrToNonZero(r.Error)
+
 	if r.LocalPartSelector {
 		m.LocalPartSelector = utils.PtrTo(true)
 		// An lps= tag published without a prefix matches every
@@ -120,15 +129,6 @@ func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
 			prefixes = []string{}
 		}
 		m.LocalPartPrefixes = &prefixes
-	}
-	if r.AvatarPreference != "" {
-		m.AvatarPreference = utils.PtrTo(r.AvatarPreference)
-	}
-	if r.Record != "" {
-		m.Record = utils.PtrTo(r.Record)
-	}
-	if r.Error != "" {
-		m.Error = utils.PtrTo(r.Error)
 	}
 	if len(r.Checks) > 0 {
 		m.Checks = utils.PtrTo(bimiChecksToModel(r.Checks))

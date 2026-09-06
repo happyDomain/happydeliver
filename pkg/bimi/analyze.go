@@ -31,7 +31,15 @@ import (
 // Record fully describes validity. A non-nil error is returned only when the
 // DNS lookup fails or no record exists (ErrNoRecord).
 func (v *Validator) Analyze(ctx context.Context, domain, selector string) (*Record, error) {
-	rec, err := v.Lookup(ctx, domain, selector)
+	return v.AnalyzeForLocalPart(ctx, domain, selector, "")
+}
+
+// AnalyzeForLocalPart analyses the BIMI record like Analyze, resolving it with
+// LookupForLocalPart so that the Local-part Selector of the sending address is
+// honoured. Callers analysing a message should prefer it: it is the record the
+// receiver of that message would act on.
+func (v *Validator) AnalyzeForLocalPart(ctx context.Context, domain, selector, localPart string) (*Record, error) {
+	rec, err := v.LookupForLocalPart(ctx, domain, selector, localPart)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +165,13 @@ func checkRecordTags(rec *Record) Check {
 		check.Messages = append(check.Messages, CheckMessage{
 			Severity: SeverityInfo,
 			Text:     fmt.Sprintf("The lps= tag sends %s to a selector named after the address, so those senders can be served another Indicator than this one", scope),
+		})
+	}
+
+	if rec.FromLocalPartSelector() {
+		check.Messages = append(check.Messages, CheckMessage{
+			Severity: SeverityInfo,
+			Text:     fmt.Sprintf("This record was found under the %q selector, derived from the sender's local-part by the lps= tag of the %q record", rec.Selector, rec.RequestedSelector),
 		})
 	}
 

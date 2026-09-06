@@ -25,3 +25,14 @@ package utils
 func PtrTo[T any](v T) *T {
 	return &v
 }
+
+// PtrToNonZero returns a pointer to the provided value, or nil when the value
+// is the zero value of its type. It is what an optional API field wants: a
+// field left empty is absent from the payload rather than sent as "".
+func PtrToNonZero[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
+}

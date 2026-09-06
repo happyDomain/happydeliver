@@ -24,6 +24,7 @@ package analyzer
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := newMockAnalyzer(tt.txt, nil)
-			rec := analyzer.checkBIMIRecord(tt.domain, "default")
+			rec := analyzer.checkBIMIRecord(tt.domain, "default", "")
 
 			if rec.Valid != tt.wantValid {
 				errStr := ""
@@ -137,4 +138,67 @@ func TestDNSAnalyzerHTTPClientIsGuarded(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "non-public address") {
 		t.Errorf("the analyzer's HTTP client reached a loopback address, err = %v", err)
 	}
+}
+
+func TestLocalPartOf(t *testing.T) {
+	tests := []struct {
+		address string
+		want    string
+	}{
+		{address: "bob@example.com", want: "bob"},
+		{address: "Bob Smith <bob.smith@example.com>", want: "bob.smith"},
+		{address: "<bob+news@example.com>", want: "bob+news"},
+		{address: `"odd@name"@example.com`, want: "odd@name"},
+		// An address a strict parser rejects still plainly holds a
+		// local-part, and reporting nothing would silently drop the
+		// local-part selector for it.
+		{address: "bob@example.com (Bob)", want: "bob"},
+		{address: "not-an-address", want: ""},
+		{address: "@example.com", want: ""},
+		{address: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		if got := localPartOf(tt.address); got != tt.want {
+			t.Errorf("localPartOf(%q) = %q, want %q", tt.address, got, tt.want)
+		}
+	}
+}
+
+func TestCheckBIMIRecordLocalPartSelector(t *testing.T) {
+	txt := map[string][]string{
+		"default._bimi.example.com":    {"v=BIMI1; l=https://example.com/default.svg; lps=brand-; avp=personal"},
+		"brand-news._bimi.example.com": {"v=BIMI1; l=https://example.com/news.svg"},
+	}
+
+	t.Run("A matching sender is served the local-part record", func(t *testing.T) {
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "brand.news")
+
+		if rec.Selector != "brand-news" {
+			t.Errorf("Selector = %q, want %q", rec.Selector, "brand-news")
+		}
+		if rec.RequestedSelector == nil || *rec.RequestedSelector != "default" {
+			t.Errorf("RequestedSelector = %v, want %q", rec.RequestedSelector, "default")
+		}
+		if rec.LogoUrl == nil || *rec.LogoUrl != "https://example.com/news.svg" {
+			t.Errorf("LogoUrl = %v, want the local-part record's logo", rec.LogoUrl)
+		}
+	})
+
+	t.Run("Without a sender the requested selector answers", func(t *testing.T) {
+		rec := newMockAnalyzer(txt, nil).checkBIMIRecord("example.com", "default", "")
+
+		if rec.Selector != "default" {
+			t.Errorf("Selector = %q, want %q", rec.Selector, "default")
+		}
+		if rec.LocalPartSelector == nil || !*rec.LocalPartSelector {
+			t.Error("LocalPartSelector is not reported, though the record publishes an lps= tag")
+		}
+		if rec.LocalPartPrefixes == nil || !slices.Equal(*rec.LocalPartPrefixes, []string{"brand-"}) {
+			t.Errorf("LocalPartPrefixes = %v, want [brand-]", rec.LocalPartPrefixes)
+		}
+		if rec.AvatarPreference == nil || *rec.AvatarPreference != "personal" {
+			t.Errorf("AvatarPreference = %v, want %q", rec.AvatarPreference, "personal")
+		}
+	})
 }

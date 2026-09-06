@@ -28,6 +28,7 @@ package analyzer
 
 import (
 	"net"
+	"net/mail"
 	"regexp"
 	"strconv"
 	"strings"
@@ -87,6 +88,26 @@ func pluralize(count int) string {
 // are recognised as the same host.
 func normalizeHostname(hostname string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
+}
+
+// localPartOf extracts the local-part of an address header, the part before
+// the '@'. It parses the header properly first, so that a display name and a
+// quoted local-part are handled, and falls back to cutting at the last '@' the
+// way the domain is extracted, so that an address a strict parser rejects
+// still yields what it plainly holds. It returns an empty string when there is
+// no address to read.
+func localPartOf(address string) string {
+	if addr, err := mail.ParseAddress(address); err == nil {
+		address = addr.Address
+	} else {
+		address = strings.Trim(address, "<> ")
+	}
+
+	at := strings.LastIndex(address, "@")
+	if at <= 0 {
+		return ""
+	}
+	return address[:at]
 }
 
 // getOrganizationalDomain extracts the organizational domain from a fully qualified domain name

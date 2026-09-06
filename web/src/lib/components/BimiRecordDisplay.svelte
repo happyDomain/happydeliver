@@ -33,6 +33,13 @@
             : undefined,
     );
 
+    /* Set when the record shown is not the one the requested selector points
+       at, because its lps= tag sent discovery to a selector named after the
+       sender's address. */
+    const derivedFromLocalPart: boolean = $derived(
+        !!bimiRecord?.requested_selector && bimiRecord.requested_selector !== bimiRecord.selector,
+    );
+
     /* How the lps= tag describes the senders it applies to. An empty prefix
        list is not the absence of a list: it means every local-part. */
     const localPartScope: string | undefined = $derived.by(() => {
@@ -195,7 +202,22 @@
                     own indicator, or a declination record to opt it out.
                 </div>
             {/if}
-            {#if localPartScope}
+            {#if derivedFromLocalPart}
+                <div class="alert alert-info py-2">
+                    <i class="bi bi-person-badge me-1"></i>
+                    The record published at
+                    <code
+                        >{bimiRecord.requested_selector}._bimi.{bimiRecord.record_domain ??
+                            bimiRecord.domain}</code
+                    >
+                    sends this sender to a selector named after its address, so the indicator shown below
+                    is the one published at
+                    <code
+                        >{bimiRecord.selector}._bimi.{bimiRecord.record_domain ??
+                            bimiRecord.domain}</code
+                    >.
+                </div>
+            {:else if localPartScope}
                 <div class="alert alert-info py-2">
                     <i class="bi bi-person-badge me-1"></i>
                     This record's <code>lps=</code> tag sends {localPartScope} to a selector named after
