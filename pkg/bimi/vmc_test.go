@@ -769,11 +769,14 @@ func TestAnalyzeVMCAnchoring(t *testing.T) {
 	})
 }
 
-// TestAnalyzeVMCLogotype pins what the logotypeHash verification does to the
-// rest of the analysis. RFC 9399 section 4.1 has a client discard logotype
-// data whose hash does not match, so a mark that fails it must not go on to be
-// compared with the logo published at the l= URL, not even when the two
-// happen to be the same bytes, which is exactly the case set up here.
+// TestAnalyzeVMCLogotype pins how the mark the certificate carries reaches the
+// rest of the analysis: which digest authenticated it, and what the comparison
+// with the logo published at the l= URL makes of it.
+//
+// RFC 9399 section 4.1 has a client discard logotype data whose hash does not
+// match, so a mark that fails it must not go on to be compared, not even
+// when the two happen to be the same bytes, which is exactly the case set up
+// below.
 func TestAnalyzeVMCLogotype(t *testing.T) {
 	logo := []byte(validTinyPSSVG)
 	now := time.Now()
@@ -797,6 +800,21 @@ func TestAnalyzeVMCLogotype(t *testing.T) {
 		}
 		if info.LogoMatches == nil || !*info.LogoMatches {
 			t.Errorf("LogoMatches = %v, want true", info.LogoMatches)
+		}
+	})
+
+	t.Run("a logo published with other end-of-line characters still matches", func(t *testing.T) {
+		chain, _ := generateTestVMCChain(t, testVMCOptions{
+			Domain: "example.com", Logo: logo, NotAfter: now.Add(365 * 24 * time.Hour),
+		})
+		published := bytes.ReplaceAll(logo, []byte("\n"), []byte("\r\n"))
+
+		check, info := AnalyzeVMC(chain, binding, published, nil, now)
+		if info.LogoMatches == nil || !*info.LogoMatches {
+			t.Errorf("LogoMatches = %v, want true: the two documents differ only by their end-of-line characters", info.LogoMatches)
+		}
+		if check.Status == StatusFail {
+			t.Errorf("status = %s, want the check not to fail (messages: %v)", check.Status, check.Messages)
 		}
 	})
 

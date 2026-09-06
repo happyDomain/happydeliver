@@ -410,9 +410,17 @@ func parseSCTList(cert *x509.Certificate) (count int, found bool, err error) {
 }
 
 // normalizeSVG makes the byte comparison between the published and the
-// embedded logo resilient to trailing whitespace differences.
+// embedded logo resilient to the differences that do not change the document:
+// the end-of-line characters, which RFC 9399 section 7 canonicalizes to
+// linefeeds before hashing an SVG, and the surrounding whitespace.
+//
+// The trimming goes beyond that canonicalization, and belongs to this
+// comparison alone: confronting the published logo with the embedded one is a
+// MAY of the Verified Mark Certificate profile, so a tolerant comparison is
+// defensible here, where the hash that authenticates the mark tolerates
+// nothing.
 func normalizeSVG(svg []byte) []byte {
-	return bytes.TrimSpace(svg)
+	return bytes.TrimSpace(canonicalizeEOL(svg))
 }
 
 // parseVMCChain decodes the PEM chain the a= URL served. The first certificate
