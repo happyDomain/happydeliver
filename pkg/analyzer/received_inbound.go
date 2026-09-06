@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"net"
+	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 )
@@ -38,8 +39,15 @@ import (
 // infrastructure, the external delivery sitting further down. As all its
 // headers are attacker-controlled, only one unambiguous shape is recognised:
 // contiguous non-public hops followed by a public one. Anything else falls back
-// to the topmost hop. Hops are skipped on IP class alone, never on protocol
-// keyword, hostname or domain, all trivially forged.
+// to the topmost hop.
+//
+// Hops are skipped on IP class, and on the LMTP transport keyword. The latter is
+// the single exception to distrusting keywords, and it is one the protocol
+// itself makes: LMTP is defined for delivery to a local mail store, so an LMTP
+// hop is never where the message entered. It matters because such a hop often
+// carries no address at all, which would otherwise abort the scan on the very
+// first entry. Hostnames and domains stay ignored, being trivially forged with
+// nothing to back them.
 func InboundHopIndex(chain []model.ReceivedHop, source model.ReportSource) int {
 	if len(chain) == 0 {
 		return -1
@@ -50,6 +58,12 @@ func InboundHopIndex(chain []model.ReceivedHop, source model.ReportSource) int {
 	}
 
 	for i := range chain {
+		// A local handoff inside the recipient's infrastructure, whether or not
+		// it carries an address.
+		if protocolIsLocalDelivery(chain[i].With) {
+			continue
+		}
+
 		if chain[i].Ip == nil {
 			break
 		}
@@ -70,4 +84,20 @@ func InboundHopIndex(chain []model.ReceivedHop, source model.ReportSource) int {
 	// Unclassifiable hop, or a fully internal chain: nothing better to offer
 	// than the topmost hop.
 	return 0
+}
+
+// protocolIsLocalDelivery reports whether an SMTP "with" transport keyword denotes
+// LMTP (RFC 2033), the variant reserved for delivery to a local mail store and
+// never spoken across the internet. Covers the RFC 3848 suffixed forms.
+func protocolIsLocalDelivery(with *string) bool {
+	if with == nil {
+		return false
+	}
+
+	switch strings.ToUpper(strings.TrimSpace(*with)) {
+	case "LMTP", "LMTPA", "LMTPS", "LMTPSA":
+		return true
+	default:
+		return false
+	}
 }

@@ -43,6 +43,15 @@ func hop(from, ip string) model.ReceivedHop {
 	return h
 }
 
+// lmtpHop builds a hop delivered over LMTP, as the local handoffs of a
+// recipient's infrastructure write it. Such a header often carries no bracketed
+// address at all, hence the ip-less variant.
+func lmtpHop(from, ip string) model.ReceivedHop {
+	h := hop(from, ip)
+	h.With = utils.PtrTo("LMTP")
+	return h
+}
+
 // TestInboundHopIndex covers the selection of the point-of-entry hop (sender IP,
 // HELO name, PTR/FCrDNS verification).
 //
@@ -199,6 +208,49 @@ func TestInboundHopIndex(t *testing.T) {
 			wantIndex: 0,
 		},
 		{
+			// The shape that motivated skipping on the LMTP keyword: the local
+			// handoff on top carries no address, which used to abort the scan
+			// before it could reach the external delivery two hops below.
+			name: "uploaded: ip-less LMTP hop, then a private hop, then the public sender",
+			chain: []model.ReceivedHop{
+				lmtpHop("toaster-e2-01.internal.example", ""),
+				hop("relay.mail.example.com", "172.20.243.94"),
+				hop("relay.mail.example.com", "192.0.2.10"),
+			},
+			source:    model.ReportSourceUploaded,
+			wantIndex: 2,
+		},
+		{
+			// LMTP is skipped whatever its address: a local delivery is never
+			// where the message entered.
+			name: "uploaded: publicly-addressed LMTP hop is still skipped",
+			chain: []model.ReceivedHop{
+				lmtpHop("toaster-e2-01.internal.example", "192.0.2.99"),
+				hop("relay.mail.example.com", "192.0.2.10"),
+			},
+			source:    model.ReportSourceUploaded,
+			wantIndex: 1,
+		},
+		{
+			name: "uploaded: fully LMTP chain falls back to the topmost hop",
+			chain: []model.ReceivedHop{
+				lmtpHop("toaster-e2-01.internal.example", ""),
+				lmtpHop("toaster-e2-02.internal.example", "10.0.0.1"),
+			},
+			source:    model.ReportSourceUploaded,
+			wantIndex: 0,
+		},
+		{
+			// Our own MTA wrote the topmost header; the keyword changes nothing.
+			name: "received: an LMTP topmost hop is still the selected one",
+			chain: []model.ReceivedHop{
+				lmtpHop("toaster-e2-01.internal.example", ""),
+				hop("relay.mail.example.com", "192.0.2.10"),
+			},
+			source:    model.ReportSourceReceived,
+			wantIndex: 0,
+		},
+		{
 			name:      "uploaded: empty chain",
 			chain:     []model.ReceivedHop{},
 			source:    model.ReportSourceUploaded,
@@ -286,5 +338,49 @@ func TestInboundHopIndexFromParsedChain(t *testing.T) {
 	}
 	if len(flagged) != 1 || flagged[0] != 2 {
 		t.Errorf("AnalyzeEmail() flagged hops %v as inbound, want only hop 2", flagged)
+	}
+}
+
+// TestInboundHopIndexAddresslessLMTP runs the selection on a chain built by the
+// real Received parser, on the shape that motivated skipping the LMTP keyword:
+// an address-less local handoff on top, an internally-addressed relay below it,
+// and the external delivery only on the third hop.
+func TestInboundHopIndexAddresslessLMTP(t *testing.T) {
+	rawEmail := "Received: from toaster-e2-01.internal.example\r\n" +
+		"\tby toaster-e2-01.internal.example with LMTP\r\n" +
+		"\tid WONnDO4VmWoNixcAiQPY2A\r\n" +
+		"\t(envelope-from <sender@mail.example.com>)\r\n" +
+		"\tfor <recipient@example.test>; Thu, 03 Sep 2026 08:38:38 +0200\r\n" +
+		"Received: from relay.mail.example.com (mx24-g26.internal.example [172.20.243.94])\r\n" +
+		"\tby toaster-e2-01.internal.example (Postfix) with ESMTP id D58B229E0872\r\n" +
+		"\tfor <recipient@example.test>; Thu,  3 Sep 2026 08:38:37 +0200 (CEST)\r\n" +
+		"Received: from relay.mail.example.com ([192.0.2.10])\r\n" +
+		"\tby mx1-g20.example.test (MXproxy) with ESMTPS for recipient@example.test\r\n" +
+		"\t(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256);\r\n" +
+		"\tThu,  3 Sep 2026 08:38:38 +0200 (CEST)\r\n" +
+		"From: Sender <sender@mail.example.com>\r\n" +
+		"To: recipient@example.test\r\n" +
+		"Subject: Test\r\n" +
+		"\r\n" +
+		"body\r\n"
+
+	email, err := ParseEmail([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("ParseEmail() error = %v", err)
+	}
+
+	chain := NewHeaderAnalyzer().parseReceivedChain(email)
+	if len(chain) != 3 {
+		t.Fatalf("parseReceivedChain() returned %d hops, want 3", len(chain))
+	}
+
+	// The parser must have picked the LMTP keyword up for the skip to apply.
+	if chain[0].With == nil || *chain[0].With != "LMTP" {
+		t.Fatalf("parseReceivedChain() hop 0 With = %+v, want LMTP", chain[0].With)
+	}
+
+	uploaded := chain[InboundHopIndex(chain, model.ReportSourceUploaded)]
+	if uploaded.Ip == nil || *uploaded.Ip != "192.0.2.10" {
+		t.Errorf("InboundHopIndex(uploaded) = %+v, want the 192.0.2.10 hop", uploaded)
 	}
 }
