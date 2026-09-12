@@ -272,7 +272,10 @@ func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
 		return check
 	}
 
-	query := fmt.Sprintf("%s.%s", reversedIP, list)
+	// Absolute name: a relative one would be retried with the search list
+	// of /etc/resolv.conf once the list answers NXDOMAIN, and a wildcard
+	// under any of those suffixes would then be read as a listing.
+	query := absoluteDNSName(fmt.Sprintf("%s.%s", reversedIP, list))
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()

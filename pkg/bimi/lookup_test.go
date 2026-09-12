@@ -137,8 +137,44 @@ type recordingResolver struct {
 }
 
 func (r *recordingResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
-	r.queried = append(r.queried, name)
+	r.queried = append(r.queried, normalizeDomain(name))
 	return r.stubResolver.LookupTXT(ctx, name)
+}
+
+// TestLookupQueriesAbsoluteNames pins the form the queries go out in. A
+// relative name is completed with the search list of the host's resolv.conf
+// when the location does not exist, and a wildcard published under one of
+// those suffixes then answers in its place: the domain under analysis gets
+// credited with a record it never published, usually not even a BIMI one, and
+// is told it misconfigured its BIMI location.
+func TestLookupQueriesAbsoluteNames(t *testing.T) {
+	r := &recordingResolver{stubResolver: stubResolver{byName: map[string][]string{
+		"default._bimi.example.com": {"v=BIMI1; l=https://example.com/logo.svg"},
+	}}}
+	// Record the names as they reach the resolver, trailing dot included.
+	raw := &rawRecordingResolver{inner: r}
+	v := &Validator{Resolver: raw}
+
+	if _, err := v.Lookup(context.Background(), "news.example.com", "default"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"default._bimi.news.example.com.", "default._bimi.example.com."}
+	if !slices.Equal(raw.queried, want) {
+		t.Errorf("queried %q, want %q", raw.queried, want)
+	}
+}
+
+// rawRecordingResolver notes the names exactly as they are handed to the
+// resolver, where recordingResolver normalizes them to the location queried.
+type rawRecordingResolver struct {
+	inner   Resolver
+	queried []string
+}
+
+func (r *rawRecordingResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
+	r.queried = append(r.queried, name)
+	return r.inner.LookupTXT(ctx, name)
 }
 
 // TestLookupOrganizationalDomainFallback covers Assertion Record discovery:

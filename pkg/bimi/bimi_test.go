@@ -47,7 +47,10 @@ func (r stubResolver) LookupTXT(ctx context.Context, name string) ([]string, err
 	if r.byName == nil {
 		return r.txt, nil
 	}
-	txt, ok := r.byName[name]
+	// Discovery queries absolute names (see absoluteName); a stub keyed on
+	// the location itself is clearer than one repeating the trailing dot,
+	// and TestLookupQueriesAbsoluteNames asserts the wire form separately.
+	txt, ok := r.byName[normalizeDomain(name)]
 	if !ok {
 		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
 	}

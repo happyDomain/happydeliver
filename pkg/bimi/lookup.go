@@ -62,7 +62,9 @@ func (v *Validator) lookupLocation(ctx context.Context, domain, selector string)
 		domain: domain,
 	}
 
-	txtRecords, err := v.Resolver.LookupTXT(ctx, loc.name)
+	// loc.name keeps the relative form the report displays, while the query
+	// is issued on the absolute name: see absoluteName.
+	txtRecords, err := v.Resolver.LookupTXT(ctx, absoluteName(loc.name))
 	if err != nil {
 		if isNameNotFound(err) {
 			return loc, nil

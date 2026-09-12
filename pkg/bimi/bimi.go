@@ -268,6 +268,22 @@ func normalizeDomain(domain string) string {
 	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
 }
 
+// absoluteName returns name as an absolute (fully qualified) DNS name, the
+// form an Assertion Record lookup must be issued in.
+//
+// A relative name is completed with the search list of the host's
+// /etc/resolv.conf when it does not exist, so a wildcard published under any
+// of those suffixes answers in place of the BIMI location: the caller is told
+// the domain publishes a record, at a name it does not own. The record found
+// that way is typically not even a BIMI one, which turns the absence of an
+// Indicator into an accusation of misconfiguration against an innocent domain.
+func absoluteName(name string) string {
+	if name == "" || strings.HasSuffix(name, ".") {
+		return name
+	}
+	return name + "."
+}
+
 // NewValidator returns a Validator ready to use, backed by a default HTTP
 // client with a sane timeout and the system DNS resolver. Callers that need
 // custom transport, DNS or reference time can set the corresponding fields on

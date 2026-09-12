@@ -121,12 +121,12 @@ func NewStandardDNSResolver() DNSResolver {
 
 // LookupMX implements DNSResolver.LookupMX using net.Resolver.
 func (r *StandardDNSResolver) LookupMX(ctx context.Context, name string) ([]*net.MX, error) {
-	return r.resolver.LookupMX(ctx, name)
+	return r.resolver.LookupMX(ctx, absoluteDNSName(name))
 }
 
 // LookupTXT implements DNSResolver.LookupTXT using net.Resolver.
 func (r *StandardDNSResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
-	return r.resolver.LookupTXT(ctx, name)
+	return r.resolver.LookupTXT(ctx, absoluteDNSName(name))
 }
 
 // LookupAddr implements DNSResolver.LookupAddr using net.Resolver.
@@ -136,5 +136,19 @@ func (r *StandardDNSResolver) LookupAddr(ctx context.Context, addr string) ([]st
 
 // LookupHost implements DNSResolver.LookupHost using net.Resolver.
 func (r *StandardDNSResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
-	return r.resolver.LookupHost(ctx, host)
+	return r.resolver.LookupHost(ctx, absoluteDNSName(host))
+}
+
+// absoluteDNSName returns name as an absolute (fully qualified) DNS name, so
+// the query is not completed with the search list of /etc/resolv.conf. An
+// empty name, a name already absolute and an address literal are returned
+// untouched.
+func absoluteDNSName(name string) string {
+	if name == "" || strings.HasSuffix(name, ".") {
+		return name
+	}
+	if net.ParseIP(name) != nil {
+		return name
+	}
+	return name + "."
 }

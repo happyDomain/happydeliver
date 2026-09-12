@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,10 +40,14 @@ type mockDNSResolver struct {
 }
 
 func (m *mockDNSResolver) LookupTXT(_ context.Context, name string) ([]string, error) {
-	if err, ok := m.err[name]; ok {
+	// Some lookups reach the resolver on the absolute name (see
+	// absoluteDNSName), so the maps are keyed on the location itself rather
+	// than on whether the caller spelled out the root label.
+	key := strings.TrimSuffix(name, ".")
+	if err, ok := m.err[key]; ok {
 		return nil, err
 	}
-	if records, ok := m.txt[name]; ok {
+	if records, ok := m.txt[key]; ok {
 		return records, nil
 	}
 	return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
