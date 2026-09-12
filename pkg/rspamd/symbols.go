@@ -19,7 +19,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+package rspamd
 
 import (
 	_ "embed"
@@ -31,25 +31,46 @@ import (
 	"time"
 )
 
-//go:embed rspamd-symbols.json
-var embeddedRspamdSymbols []byte
+//go:embed data/rspamd-symbols.json
+var embedded []byte
 
-// rspamdSymbolGroup represents a group of rspamd symbols from the API/embedded JSON.
-type rspamdSymbolGroup struct {
-	Group string              `json:"group"`
-	Rules []rspamdSymbolEntry `json:"rules"`
+// License is the Apache-2.0 text rspamd publishes, shipped alongside the
+// descriptions so that binary-only recipients of happyDeliver (a release
+// artifact, a container image) get the copy section 4(a) asks to be given.
+//
+//go:embed data/rspamd.LICENSE
+var License string
+
+// Attribution is the credit Apache-2.0 section 4(c) asks to be retained.
+const Attribution = `rspamd symbol descriptions
+--------------------------
+
+Copyright (c) Vsevolod Stakhov <vsevolod@rspamd.com> and the rspamd
+         contributors
+Source:  https://github.com/rspamd/rspamd, read from the /symbols endpoint of
+         a running instance
+License: Apache License 2.0, https://www.apache.org/licenses/LICENSE-2.0
+Changes: none, each description is embedded exactly as rspamd publishes it.
+         How much a symbol weighs on a report, and what happyDeliver advises a
+         sender to do about it, live in its own source code, not in these
+         descriptions.`
+
+// symbolGroup represents a group of rspamd symbols from the API/embedded JSON.
+type symbolGroup struct {
+	Group string        `json:"group"`
+	Rules []symbolEntry `json:"rules"`
 }
 
-// rspamdSymbolEntry represents a single rspamd symbol entry.
-type rspamdSymbolEntry struct {
+// symbolEntry represents a single rspamd symbol entry.
+type symbolEntry struct {
 	Symbol      string  `json:"symbol"`
 	Description string  `json:"description"`
 	Weight      float64 `json:"weight"`
 }
 
-// parseRspamdSymbolsJSON parses the rspamd symbols JSON into a name->description map.
-func parseRspamdSymbolsJSON(data []byte) map[string]string {
-	var groups []rspamdSymbolGroup
+// parseSymbols parses the rspamd symbols JSON into a name->description map.
+func parseSymbols(data []byte) map[string]string {
+	var groups []symbolGroup
 	if err := json.Unmarshal(data, &groups); err != nil {
 		log.Printf("Failed to parse rspamd symbols JSON: %v", err)
 		return nil
@@ -66,20 +87,21 @@ func parseRspamdSymbolsJSON(data []byte) map[string]string {
 	return symbols
 }
 
-// LoadRspamdSymbols loads rspamd symbol descriptions.
+// Symbols reads the descriptions rspamd gives its symbols, keyed by symbol
+// name.
 // If apiURL is non-empty, it fetches from the rspamd API first, falling back to the embedded list on error.
-func LoadRspamdSymbols(apiURL string) map[string]string {
+func Symbols(apiURL string) map[string]string {
 	if apiURL != "" {
-		if symbols := fetchRspamdSymbols(apiURL); symbols != nil {
+		if symbols := fetch(apiURL); symbols != nil {
 			return symbols
 		}
 		log.Printf("Failed to fetch rspamd symbols from %s, using embedded list", apiURL)
 	}
-	return parseRspamdSymbolsJSON(embeddedRspamdSymbols)
+	return parseSymbols(embedded)
 }
 
-// fetchRspamdSymbols fetches symbol descriptions from the rspamd API.
-func fetchRspamdSymbols(apiURL string) map[string]string {
+// fetch fetches symbol descriptions from the rspamd API.
+func fetch(apiURL string) map[string]string {
 	url := strings.TrimRight(apiURL, "/") + "/symbols"
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -101,5 +123,5 @@ func fetchRspamdSymbols(apiURL string) map[string]string {
 		return nil
 	}
 
-	return parseRspamdSymbolsJSON(body)
+	return parseSymbols(body)
 }

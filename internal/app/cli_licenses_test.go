@@ -53,6 +53,11 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		"Attribution-ShareAlike 4.0 International",
 		// An attribution says what was changed, which is what it is for.
 		"Changes:",
+		// The rspamd symbol descriptions, Apache-2.0.
+		"Vsevolod Stakhov",
+		"https://github.com/rspamd/rspamd",
+		"Apache License",
+		"END OF TERMS AND CONDITIONS",
 		// The root certificates, which carry no license text of their own and
 		// are named for where they come from.
 		"Mark Verifying Authority root certificates",
