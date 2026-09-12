@@ -46,4 +46,9 @@ var contentChecks = []contentCheck{
 
 	harmfulHTMLCheck,
 	htmlRemarkCheck,
+
+	// What the spam filter observed comes last: it complements the checks
+	// above rather than replacing them, and the reader has met our own
+	// findings by the time they reach it.
+	rspamdFindingsCheck,
 }

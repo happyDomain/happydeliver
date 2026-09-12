@@ -69,6 +69,11 @@ var (
 	// Each tag costs a flat twenty points: they are all equally fatal to the
 	// rendering, so weighing them by severity would say nothing.
 	familyHarmfulHTML = &reading.Family{Name: "harmful_html", Cap: 40, PerItem: 20}
+
+	// familyRspamd answers for what the spam filter of the receiving MTA
+	// observed about the content. It is capped like the others: a filter with
+	// a lot to say informs the reader, it does not decide the grade.
+	familyRspamd = &reading.Family{Name: "rspamd", Cap: 10}
 )
 
 // Reading is what the checks made of what was observed: the findings a report
@@ -82,7 +87,8 @@ type Reading = reading.Evaluation
 // on its own: a check may fetch a URL or hand a file to a scanner, and no
 // message is to be read twice for one report.
 //
-// Everything a check reads must therefore be observed first.
+// Everything a check reads must therefore be observed first, the filter's
+// verdict included.
 func (c *Analyzer) Read(observed *Results) Reading {
 	// The analysis owns the deadline it gives its checks, as it owns the one it
 	// gives its HTTP client. The day a request context is threaded down to
