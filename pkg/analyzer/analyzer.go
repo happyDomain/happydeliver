@@ -41,16 +41,16 @@ type EmailAnalyzer struct {
 
 // NewEmailAnalyzer creates a new email analyzer with the given configuration
 func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
-	generator := NewReportGenerator(
-		cfg.Email.ReceiverHostname,
-		cfg.Analysis.DNSTimeout,
-		cfg.Analysis.HTTPTimeout,
-		cfg.Analysis.RBLs,
-		cfg.Analysis.DNSWLs,
-		cfg.Analysis.CheckAllIPs,
-		cfg.Analysis.RspamdAPIURL,
-		cfg.Analysis.VMCRoots,
-	)
+	generator := NewReportGenerator(GeneratorOptions{
+		ReceiverHostname: cfg.Email.ReceiverHostname,
+		DNSTimeout:       cfg.Analysis.DNSTimeout,
+		HTTPTimeout:      cfg.Analysis.HTTPTimeout,
+		RBLs:             cfg.Analysis.RBLs,
+		DNSWLs:           cfg.Analysis.DNSWLs,
+		CheckAllIPs:      cfg.Analysis.CheckAllIPs,
+		RspamdAPIURL:     cfg.Analysis.RspamdAPIURL,
+		VMCRoots:         cfg.Analysis.VMCRoots,
+	})
 
 	return &EmailAnalyzer{
 		generator: generator,
