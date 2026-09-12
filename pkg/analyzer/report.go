@@ -46,25 +46,54 @@ type ReportGenerator struct {
 	headerAnalyzer  *HeaderAnalyzer
 }
 
+// GeneratorOptions is what a ReportGenerator is built from. It is a struct
+// rather than a parameter list because the list had grown to eight, where
+// neither a caller nor a reader could tell which timeout or which list of
+// servers a given argument was.
+//
+// Every field may be left at its zero value: each analyzer stands in its own
+// default for what it was given nothing for.
+type GeneratorOptions struct {
+	// ReceiverHostname is the authserv-id whose Authentication-Results this
+	// instance wrote itself, and therefore the only one trusted on a message
+	// it received.
+	ReceiverHostname string
+
+	// DNSTimeout bounds every name lookup: the DNS analysis, and the RBL and
+	// allow-list checks.
+	DNSTimeout time.Duration
+
+	// HTTPTimeout bounds fetching what the message points at.
+	HTTPTimeout time.Duration
+
+	// RBLs and DNSWLs are the block and allow lists to query. Empty means the
+	// built-in sets.
+	RBLs   []string
+	DNSWLs []string
+
+	// CheckAllIPs queries the lists for every IP found in the headers rather
+	// than for the sending one alone.
+	CheckAllIPs bool
+
+	// RspamdAPIURL is the rspamd controller to read symbol descriptions from.
+	// Empty uses the list embedded in the binary.
+	RspamdAPIURL string
+
+	// VMCRoots is the trust anchor a BIMI Verified Mark Certificate must chain
+	// back to. Nil uses the embedded bundle.
+	VMCRoots *x509.CertPool
+}
+
 // NewReportGenerator creates a new report generator
-func NewReportGenerator(
-	receiverHostname string,
-	dnsTimeout time.Duration,
-	httpTimeout time.Duration,
-	rbls []string,
-	dnswls []string,
-	checkAllIPs bool,
-	rspamdAPIURL string,
-	vmcRoots *x509.CertPool,
-) *ReportGenerator {
+func NewReportGenerator(opts GeneratorOptions) *ReportGenerator {
 	return &ReportGenerator{
-		authAnalyzer:    NewAuthenticationAnalyzer(receiverHostname),
+		authAnalyzer:    NewAuthenticationAnalyzer(opts.ReceiverHostname),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
-		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(rspamdAPIURL)),
-		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout, vmcRoots),
-		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
-		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
-		contentAnalyzer: content.NewAnalyzer(httpTimeout),
+		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(opts.RspamdAPIURL)),
+		dnsAnalyzer:     NewDNSAnalyzer(opts.DNSTimeout, opts.VMCRoots),
+		rblChecker:      NewRBLChecker(opts.DNSTimeout, opts.RBLs, opts.CheckAllIPs),
+		dnswlChecker:    NewDNSWLChecker(opts.DNSTimeout, opts.DNSWLs, opts.CheckAllIPs),
+		contentAnalyzer: content.NewAnalyzer(opts.HTTPTimeout),
 		headerAnalyzer:  NewHeaderAnalyzer(),
 	}
 }

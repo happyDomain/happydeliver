@@ -35,7 +35,7 @@ import (
 )
 
 func TestNewReportGenerator(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", nil)
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
 	if gen == nil {
 		t.Fatal("Expected report generator, got nil")
 	}
@@ -58,7 +58,7 @@ func TestNewReportGenerator(t *testing.T) {
 }
 
 func TestAnalyzeEmail(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", nil)
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
 
 	email := createTestEmail()
 
@@ -78,7 +78,7 @@ func TestAnalyzeEmail(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", nil)
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
 	testID := uuid.New()
 
 	email := createTestEmail()
@@ -133,7 +133,7 @@ func TestGenerateReport(t *testing.T) {
 }
 
 func TestGenerateReportWithSpamAssassin(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", nil)
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
 	testID := uuid.New()
 
 	email := createTestEmailWithSpamAssassin()
@@ -157,7 +157,7 @@ func TestGenerateReportWithSpamAssassin(t *testing.T) {
 // spam: no SpamAssassin/rspamd result) is left out of both the overall score average
 // and the overall grade, instead of being averaged in as if it scored 0.
 func TestGenerateReportExcludesCategoriesThatDidNotRun(t *testing.T) {
-	gen := NewReportGenerator("", 10*time.Second, 10*time.Second, DefaultRBLs, DefaultDNSWLs, false, "", nil)
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
 	testID := uuid.New()
 
 	email := createTestEmail()
@@ -249,7 +249,7 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 	}
 
 	t.Run("received message trusts the configured receiver hostname", func(t *testing.T) {
-		gen := NewReportGenerator("mx.example.org", time.Second, time.Second, nil, nil, false, "", nil)
+		gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.example.org", DNSTimeout: time.Second, HTTPTimeout: time.Second})
 
 		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceReceived})
 
@@ -262,7 +262,7 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 	})
 
 	t.Run("received message ignores a foreign authority", func(t *testing.T) {
-		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "", nil)
+		gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.happydeliver.test", DNSTimeout: time.Second, HTTPTimeout: time.Second})
 
 		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceReceived})
 
@@ -274,7 +274,7 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 	t.Run("uploaded message trusts the topmost header", func(t *testing.T) {
 		// The configured hostname appears nowhere in the file, yet the verdicts of the
 		// server that actually received the message must still be read.
-		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "", nil)
+		gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.happydeliver.test", DNSTimeout: time.Second, HTTPTimeout: time.Second})
 
 		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceUploaded})
 
@@ -305,7 +305,7 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 	})
 
 	t.Run("uploaded message without any authentication header", func(t *testing.T) {
-		gen := NewReportGenerator("mx.happydeliver.test", time.Second, time.Second, nil, nil, false, "", nil)
+		gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.happydeliver.test", DNSTimeout: time.Second, HTTPTimeout: time.Second})
 
 		results := gen.AnalyzeEmail(createTestEmail(), AnalysisOptions{Source: model.ReportSourceUploaded})
 
@@ -323,7 +323,7 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 	})
 
 	t.Run("default options record a received message", func(t *testing.T) {
-		gen := NewReportGenerator("mx.example.org", time.Second, time.Second, nil, nil, false, "", nil)
+		gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.example.org", DNSTimeout: time.Second, HTTPTimeout: time.Second})
 
 		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{})
 
