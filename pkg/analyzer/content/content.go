@@ -99,6 +99,15 @@ type Results struct {
 	email        *mailmsg.Message
 	htmlDocument *html.Node
 
+	// Rspamd is what the spam filter of the receiving MTA said about this same
+	// message, when it said anything. It is not produced here: the content
+	// analysis borrows it so that the filter's observations about the content
+	// reach the report as advice rather than as a table of symbols.
+	//
+	// It is attached before Read is asked anything, the checks reading it from
+	// here like every other fact.
+	Rspamd *model.RspamdResult
+
 	// BodyTruncated reports that the MIME body stopped short of its end, so the
 	// parts analysed above are only the ones that arrived. What is missing from
 	// them says nothing about the message that was sent, hence the criteria it
