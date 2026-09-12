@@ -79,6 +79,13 @@ type AnalysisConfig struct {
 	DNSWLs       []string
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one
 	RspamdAPIURL string // rspamd API URL for fetching symbol descriptions (empty = use embedded list)
+	// RspamdScanURL is the rspamd normal worker an uploaded message is
+	// submitted to, for want of a filter annotation of our own on it. This is
+	// the scanning worker (11333 by default), not the controller
+	// RspamdAPIURL names: the controller's own /checkv2 is behind its
+	// password, while the normal worker is what an MTA talks to. Empty, the
+	// default, leaves uploaded messages unscanned.
+	RspamdScanURL string
 	// VMCRootsFile names the PEM file of BIMI root certificates a Verified
 	// Mark Certificate chain must lead back to. Empty uses the bundle
 	// embedded in the binary, bimi.DisableVMCRoots skips the check.
