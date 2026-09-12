@@ -27,6 +27,23 @@ service.
 go generate -tags refresh_shorteners ./pkg/emaildata/shorteners/
 ```
 
+## rspamd symbol descriptions
+
+- **File**: `pkg/rspamd/data/rspamd-symbols.json`
+- **Upstream**: [rspamd](https://github.com/rspamd/rspamd), by Vsevolod Stakhov
+  and contributors, read from the `/symbols` endpoint of a running instance
+- **License**: [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0), full
+  text in `pkg/rspamd/data/rspamd.LICENSE`
+- **Modified**: no (each description is embedded exactly as rspamd publishes
+  it; how much a symbol weighs on a report, and what happyDeliver advises a
+  sender to do about it, live as Go code in `pkg/analyzer/`)
+
+Used to say, in a sender's own terms, what a symbol an rspamd scan returned
+means. A configured instance is asked first; this copy is what answers when
+there is none.
+
+**To refresh the descriptions**, see `pkg/rspamd/README.md`.
+
 ## Mark Verifying Authority root certificates
 
 - **File**: `pkg/bimi/roots/vmc-roots.pem`

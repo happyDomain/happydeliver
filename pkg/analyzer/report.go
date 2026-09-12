@@ -27,6 +27,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/rspamd"
 	"github.com/google/uuid"
 
 	"git.happydns.org/happyDeliver/pkg/analyzer/content"
@@ -44,6 +45,9 @@ type ReportGenerator struct {
 	dnswlChecker    *DNSListChecker
 	contentAnalyzer *content.Analyzer
 	headerAnalyzer  *HeaderAnalyzer
+	// rspamdScanner asks an rspamd instance about a message this one did not
+	// receive itself. Nil unless an operator configured one, and usable nil.
+	rspamdScanner *rspamd.Scanner
 }
 
 // GeneratorOptions is what a ReportGenerator is built from. It is a struct
@@ -79,6 +83,12 @@ type GeneratorOptions struct {
 	// Empty uses the list embedded in the binary.
 	RspamdAPIURL string
 
+	// RspamdScanURL is the rspamd normal worker to submit an uploaded message
+	// to, for want of a filter annotation of our own on it. That is the
+	// scanning worker rather than the controller RspamdAPIURL names. Empty,
+	// the default, leaves uploaded messages unscanned.
+	RspamdScanURL string
+
 	// VMCRoots is the trust anchor a BIMI Verified Mark Certificate must chain
 	// back to. Nil uses the embedded bundle.
 	VMCRoots *x509.CertPool
@@ -86,10 +96,15 @@ type GeneratorOptions struct {
 
 // NewReportGenerator creates a new report generator
 func NewReportGenerator(opts GeneratorOptions) *ReportGenerator {
+	// Read once, and shared by the two things that describe a symbol: the
+	// analyzer reading the headers, and the scanner reading a reply.
+	symbols := rspamd.Symbols(opts.RspamdAPIURL)
+
 	return &ReportGenerator{
 		authAnalyzer:    NewAuthenticationAnalyzer(opts.ReceiverHostname),
 		spamAnalyzer:    NewSpamAssassinAnalyzer(),
-		rspamdAnalyzer:  NewRspamdAnalyzer(LoadRspamdSymbols(opts.RspamdAPIURL)),
+		rspamdAnalyzer:  NewRspamdAnalyzer(symbols),
+		rspamdScanner:   rspamd.NewScanner(opts.RspamdScanURL, opts.HTTPTimeout, symbols),
 		dnsAnalyzer:     NewDNSAnalyzer(opts.DNSTimeout, opts.VMCRoots),
 		rblChecker:      NewRBLChecker(opts.DNSTimeout, opts.RBLs, opts.CheckAllIPs),
 		dnswlChecker:    NewDNSWLChecker(opts.DNSTimeout, opts.DNSWLs, opts.CheckAllIPs),
@@ -192,6 +207,19 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	// above, and stays nil when no filter annotated the message.
 	if results.Content != nil {
 		results.Content.Rspamd = results.Rspamd
+
+		// A message this instance did not receive carries no annotation of
+		// ours, so a filter is asked directly, when the operator configured
+		// one. What comes back feeds the content findings only: it is a scan
+		// without an SMTP connection, so it says nothing worth scoring about
+		// the sender, and results.Rspamd is left as it was found. A .eml
+		// carrying some third party's X-Spamd-Result therefore keeps its spam
+		// block, and the spam grade means the same thing as before.
+		if results.Source != model.ReportSourceReceived {
+			if scanned := r.rspamdScanner.Scan(email.Raw); scanned != nil {
+				results.Content.Rspamd = scanned
+			}
+		}
 
 		// Everything the checks read has been observed by now, the filter's
 		// verdict included.
