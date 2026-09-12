@@ -30,7 +30,9 @@
         },
 
         "SPF" : {
-            "hide_none" : 0
+            "hide_none" : 0,
+            "helo_check" : 1,
+            "spfu_detection" : 2,
         },
 
         "DKIM" : {
