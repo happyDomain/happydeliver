@@ -3,6 +3,7 @@
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import IssueAlert from "./IssueAlert.svelte";
 
     interface Props {
         dmarcRecord?: DmarcRecord;
@@ -38,28 +39,12 @@
             <div class="mb-3">
                 <h5>Issues</h5>
                 {#each headerAnalysis.issues as issue, i (i)}
-                    <div
-                        class="alert alert-{issue.severity === 'critical' ||
-                        issue.severity === 'high'
-                            ? 'danger'
-                            : issue.severity === 'medium'
-                              ? 'warning'
-                              : 'info'} py-2 px-3 mb-2"
-                    >
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{issue.header}</strong>
-                                <div class="small">{issue.message}</div>
-                                {#if issue.advice}
-                                    <div class="small mt-1">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        {issue.advice}
-                                    </div>
-                                {/if}
-                            </div>
-                            <span class="badge bg-secondary">{issue.severity}</span>
-                        </div>
-                    </div>
+                    <IssueAlert
+                        title={issue.header}
+                        severity={issue.severity}
+                        message={issue.message}
+                        advice={issue.advice}
+                    />
                 {/each}
             </div>
         {/if}
@@ -214,8 +199,8 @@
                                         <i class="bi bi-info-circle me-1"></i>
                                         <strong>Relaxed SPF alignment allowed</strong> — Your DMARC policy
                                         allows organizational domain matching. As long as both domains
-                                        share the same organizational domain (e.g., mail.example.com
-                                        and example.com), SPF alignment can pass.
+                                        share the same organizational domain (e.g., mail.example.com and
+                                        example.com), SPF alignment can pass.
                                     {/if}
                                 </div>
                             {/if}
@@ -331,8 +316,8 @@
                                                     <strong>Relaxed DKIM alignment allowed</strong> —
                                                     Your DMARC policy allows organizational domain matching.
                                                     As long as both domains share the same organizational
-                                                    domain (e.g., mail.example.com and example.com),
-                                                    DKIM alignment can pass.
+                                                    domain (e.g., mail.example.com and example.com), DKIM
+                                                    alignment can pass.
                                                 {/if}
                                             </div>
                                         {/if}
