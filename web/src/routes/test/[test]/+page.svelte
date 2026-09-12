@@ -6,6 +6,7 @@
     import { getReport, getTest, reanalyzeReport } from "$lib/api";
     import type { BlacklistCheck, Report, Test } from "$lib/api/types.gen";
     import { isUploadedMessage } from "$lib/authentication";
+    import { adviceAnchorsBySymbol } from "$lib/issues";
     import {
         AuthenticationCard,
         BlacklistCard,
@@ -454,7 +455,12 @@
                     {/if}
                     {#if report.rspamd}
                         <div class={report.spamassassin ? "col col-lg-6" : "col-12"}>
-                            <RspamdCard rspamd={report.rspamd} />
+                            <RspamdCard
+                                rspamd={report.rspamd}
+                                adviceAnchors={adviceAnchorsBySymbol(
+                                    report.content_analysis?.html_issues,
+                                )}
+                            />
                         </div>
                     {/if}
                 </div>

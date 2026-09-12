@@ -6,9 +6,16 @@
 
     interface Props {
         rspamd: RspamdResult;
+        /**
+         * Symbol to the anchor of the content finding that carries its advice, for the symbols
+         * that produced one. Without it the table is a list of names and numbers: a reader
+         * seeing ZERO_FONT at +1.00 has no way of knowing that what to do about it is written
+         * out further down the page.
+         */
+        adviceAnchors?: Record<string, string>;
     }
 
-    let { rspamd }: Props = $props();
+    let { rspamd, adviceAnchors = {} }: Props = $props();
 
     // rspamd's built-in action ladder, used to derive the action the message
     // would have triggered: the action header is unreliable in milter setups
@@ -58,6 +65,18 @@
         <tr class={symbol.score > 0 ? "table-warning" : symbol.score < 0 ? "table-success" : ""}>
             <td>
                 <span class="font-monospace">{symbolName}</span>
+                {#if adviceAnchors[symbolName]}
+                    <!-- The symbol itself stays plain text: it is a name to read, not
+                         somewhere to go. Only the lightbulb leads to the advice. -->
+                    <a
+                        class="ms-1"
+                        href="#{adviceAnchors[symbolName]}"
+                        title="This symbol produced a finding with advice, further down in Content Analysis"
+                        aria-label="Read the advice for {symbolName}"
+                    >
+                        <i class="bi bi-lightbulb" aria-hidden="true"></i>
+                    </a>
+                {/if}
                 {#if symbol.params}
                     <small class="d-block text-muted">
                         {symbol.params}

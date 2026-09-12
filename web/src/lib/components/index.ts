@@ -13,6 +13,7 @@ export { default as FeatureCard } from "./FeatureCard.svelte";
 export { default as GradeDisplay } from "./GradeDisplay.svelte";
 export { default as HeaderAnalysisCard } from "./HeaderAnalysisCard.svelte";
 export { default as HowItWorksStep } from "./HowItWorksStep.svelte";
+export { default as IssueAlert } from "./IssueAlert.svelte";
 export { default as Logo } from "./Logo.svelte";
 export { default as MxRecordsDisplay } from "./MxRecordsDisplay.svelte";
 export { default as PendingState } from "./PendingState.svelte";
