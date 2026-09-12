@@ -289,7 +289,7 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects]
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat]
           description: Type of content issue
           example: "missing_alt"
         severity:
@@ -309,6 +309,23 @@ components:
           type: string
           description: How to fix this issue
           example: "Add descriptive alt text to all images for better accessibility and deliverability"
+        source:
+          $ref: '#/components/schemas/ContentIssueSource'
+        symbol:
+          type: string
+          description: Name of the rspamd symbol the issue was derived from, when source is rspamd
+          example: "MIME_BASE64_TEXT"
+
+    ContentIssueSource:
+      type: string
+      description: >-
+        Who observed the issue. Absent means happyDeliver itself, which is also
+        what "self" says explicitly; anything else names the third party that
+        saw it, such as the spam filter that raised a symbol on this message.
+        It is a plain string rather than a closed list, because which third
+        parties an instance asks is the instance's business and not something
+        a reader of a report has to have been told in advance.
+      example: "rspamd"
 
     LinkCheck:
       type: object

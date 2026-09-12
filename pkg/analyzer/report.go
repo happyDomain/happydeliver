@@ -187,8 +187,14 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
 
 	results.Content = r.contentAnalyzer.Analyze(email)
+	// The content analysis reports what the spam filter observed about the
+	// content, so it needs the filter's result. It is read after AnalyzeRspamd
+	// above, and stays nil when no filter annotated the message.
 	if results.Content != nil {
-		// Everything the checks read has been observed by now.
+		results.Content.Rspamd = results.Rspamd
+
+		// Everything the checks read has been observed by now, the filter's
+		// verdict included.
 		results.ContentReading = r.contentAnalyzer.Read(results.Content)
 	}
 
