@@ -1,8 +1,10 @@
 <script lang="ts">
     import type { ContentAnalysis } from "$lib/api/types.gen";
+    import { contentIssueAnchor, contentIssueLabel, issueObserver } from "$lib/issues";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import IssueAlert from "./IssueAlert.svelte";
 
     interface Props {
         contentAnalysis: ContentAnalysis;
@@ -86,31 +88,17 @@
             <div class="mt-3">
                 <h5>Content Issues</h5>
                 {#each contentAnalysis.html_issues as issue, i (i)}
-                    <div
-                        class="alert alert-{issue.severity === 'critical' ||
-                        issue.severity === 'high'
-                            ? 'danger'
-                            : issue.severity === 'medium'
-                              ? 'warning'
-                              : 'info'} py-2 px-3 mb-2"
-                    >
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{issue.type}</strong>
-                                <div class="small">{issue.message}</div>
-                                {#if issue.location}
-                                    <div class="small text-muted">{issue.location}</div>
-                                {/if}
-                                {#if issue.advice}
-                                    <div class="small mt-1">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        {issue.advice}
-                                    </div>
-                                {/if}
-                            </div>
-                            <span class="badge bg-secondary">{issue.severity}</span>
-                        </div>
-                    </div>
+                    <IssueAlert
+                        id={contentIssueAnchor(i)}
+                        title={contentIssueLabel(issue.type)}
+                        severity={issue.severity}
+                        message={issue.message}
+                        location={issue.location}
+                        advice={issue.advice}
+                        observer={issueObserver(issue)}
+                        symbol={issue.symbol}
+                        corroboratedBy={issue.corroborated_by}
+                    />
                 {/each}
             </div>
         {/if}
