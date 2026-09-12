@@ -65,6 +65,15 @@ type Message struct {
 	// RawHeaders is the header block as it appeared on the wire: order, folding,
 	// casing and line endings preserved, because it is shown as-is in the report.
 	RawHeaders string
+
+	// Raw is the whole message as it was handed to mailmsg.Parse. It aliases the
+	// caller's slice rather than copying it, so nothing here may write to it.
+	//
+	// It is kept because some analyses need the message and not its parsed
+	// form: re-serialising Parts would change the transfer encodings and the
+	// MIME boundaries, and those are themselves what a filter reads when it
+	// raises MIME_BASE64_TEXT or SUSPICIOUS_BOUNDARY.
+	Raw []byte
 }
 
 // Part represents a MIME part of an email
@@ -93,6 +102,7 @@ func Parse(raw []byte) (*Message, error) {
 		Date:       entity.Header.Get("Date"),
 		ReturnPath: entity.Header.Get("Return-Path"),
 		RawHeaders: rawHeaderBlock(raw),
+		Raw:        raw,
 	}
 
 	// Subject and the display names of From/To may be RFC 2047 encoded words:

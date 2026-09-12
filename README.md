@@ -257,12 +257,17 @@ curl -F "file=@message.eml" http://localhost:8080/api/test/upload
 
 Only what the file already carries can be reported: SPF, DKIM, DMARC, ARC, BIMI, reverse DNS, transport encryption and the spam filters' verdicts are all produced by the server that receives a message, so an uploaded file only has them if that server wrote them. The report records `"source": "uploaded"` so a missing verdict is not mistaken for a misconfiguration of your instance.
 
-Two settings control this endpoint:
+The content, though, is in the file. With `-rspamd-scan-url` set to an rspamd normal worker (`http://127.0.0.1:11333` in the bundled image), an uploaded message is submitted to it and what it observes about the content (hidden text, a linked image standing in for the whole message, an archive inside an archive, a link to a domain listed for phishing) is reported as advice in the content section, just as it is for a message received over SMTP. The bundled image sets it to its own rspamd, so this works out of the box; it is off by default for a binary run on its own.
+
+The scan is deliberately envelope-less: no client IP, HELO or MAIL FROM is claimed, because an uploaded file has no SMTP connection behind it and reconstructing one from `Received:` headers would describe whichever relay wrote them rather than the sender under test. Everything rspamd derives from a connection is therefore meaningless in such a scan, so only the content observations are read out of it: the **spam score of the report is not affected**, and an uploaded message keeps whatever verdict its own headers carried. Note also that checking link reputation means DNS queries to public URI blocklists for every upload, from your instance's resolver.
+
+Three settings control this endpoint:
 
 | Flag | Environment variable | Default | Description |
 |------|----------------------|---------|-------------|
 | `-disable-eml-upload` | `HAPPYDELIVER_DISABLE_EML_UPLOAD` | *enabled* | Turn the upload endpoint off (it also hides the widget in the web UI) |
 | `-max-message-size` | `HAPPYDELIVER_MAX_MESSAGE_SIZE` | `52428800` (50 MiB) | Maximum size in bytes of a message, matching the largest message Gmail accepts. It caps uploaded files, and is also announced as the SMTP `SIZE` limit by the LMTP receiver |
+| `-rspamd-scan-url` | `HAPPYDELIVER_RSPAMD_SCAN_URL` | *unset standalone; `http://127.0.0.1:11333` in the image* | rspamd **normal worker** to submit an uploaded message to, for what it can say about the content. Not the controller `-rspamd-api-url` names: the controller answers `/checkv2` too, but behind its password. Unset leaves uploads unscanned |
 
 Note that an uploaded message is stored and listed like any other report; disable the upload endpoint, or the public listing with `-disable-test-list`, if that does not suit your instance.
 
