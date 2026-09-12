@@ -30,7 +30,55 @@
             return { label: "Greylist", cls: "bg-warning text-dark" };
         return { label: "No action", cls: "bg-success" };
     });
+
+    const symbols = $derived(Object.entries(rspamd.symbols ?? {}));
+
+    // What actually moved the score, worst first.
+    const scoring = $derived(
+        symbols
+            .filter(([, symbol]) => symbol.score !== 0)
+            .sort(([, a], [, b]) => b.score - a.score),
+    );
+
+    // A symbol scoring zero neither helped nor hurt: rspamd raises a great many of
+    // them to record that a check ran and had nothing to say (ARC_NA, R_SPF_NA,
+    // DMARC_NA) or simply to trace what it saw (MIME_TRACE, DKIM_TRACE, ASN). On an
+    // ordinary message they outnumber the rest several times over and bury it.
+    //
+    // They are folded away rather than dropped: "the check ran and found nothing" is
+    // worth being able to look up, and a reader chasing one symbol in particular
+    // needs to find it here. Sorted by name, since they have no score to rank them by.
+    const quiet = $derived(
+        symbols.filter(([, symbol]) => symbol.score === 0).sort(([a], [b]) => a.localeCompare(b)),
+    );
 </script>
+
+{#snippet symbolRows(rows: typeof symbols)}
+    {#each rows as [symbolName, symbol] (symbolName)}
+        <tr class={symbol.score > 0 ? "table-warning" : symbol.score < 0 ? "table-success" : ""}>
+            <td>
+                <span class="font-monospace">{symbolName}</span>
+                {#if symbol.params}
+                    <small class="d-block text-muted">
+                        {symbol.params}
+                    </small>
+                {/if}
+            </td>
+            <td class="text-end">
+                <span
+                    class={symbol.score > 0
+                        ? "text-danger fw-bold"
+                        : symbol.score < 0
+                          ? "text-success fw-bold"
+                          : "text-muted"}
+                >
+                    {symbol.score > 0 ? "+" : ""}{symbol.score.toFixed(2)}
+                </span>
+            </td>
+            <td class="small text-muted">{symbol.description ?? ""}</td>
+        </tr>
+    {/each}
+{/snippet}
 
 <div class="card shadow-sm" id="rspamd-details">
     <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
@@ -76,51 +124,50 @@
             </div>
         </div>
 
-        {#if rspamd.symbols && Object.keys(rspamd.symbols).length > 0}
+        {#if symbols.length > 0}
             <div class="mb-3">
-                <div class="table-responsive mt-2">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th class="text-end">Score</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {#each Object.entries(rspamd.symbols).sort(([, a], [, b]) => b.score - a.score) as [symbolName, symbol] (symbolName)}
-                                <tr
-                                    class={symbol.score > 0
-                                        ? "table-warning"
-                                        : symbol.score < 0
-                                          ? "table-success"
-                                          : ""}
-                                >
-                                    <td>
-                                        <span class="font-monospace">{symbolName}</span>
-                                        {#if symbol.params}
-                                            <small class="d-block text-muted">
-                                                {symbol.params}
-                                            </small>
-                                        {/if}
-                                    </td>
-                                    <td class="text-end">
-                                        <span
-                                            class={symbol.score > 0
-                                                ? "text-danger fw-bold"
-                                                : symbol.score < 0
-                                                  ? "text-success fw-bold"
-                                                  : "text-muted"}
-                                        >
-                                            {symbol.score > 0 ? "+" : ""}{symbol.score.toFixed(2)}
-                                        </span>
-                                    </td>
-                                    <td class="small text-muted">{symbol.description ?? ""}</td>
+                {#if scoring.length > 0}
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th class="text-end">Score</th>
+                                    <th>Description</th>
                                 </tr>
-                            {/each}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {@render symbolRows(scoring)}
+                            </tbody>
+                        </table>
+                    </div>
+                {:else}
+                    <p class="text-muted small mb-0 mt-2">
+                        The filter ran every check and none of them moved the score.
+                    </p>
+                {/if}
+
+                {#if quiet.length > 0}
+                    <details class="mt-2">
+                        <summary class="cursor-pointer small text-muted">
+                            {quiet.length} symbol{quiet.length > 1 ? "s" : ""} that scored nothing
+                        </summary>
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th class="text-end">Score</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {@render symbolRows(quiet)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                {/if}
             </div>
         {/if}
 
