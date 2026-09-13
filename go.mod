@@ -9,6 +9,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
+	github.com/tdewolff/parse/v2 v2.8.16
 	golang.org/x/net v0.59.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/driver/sqlite v1.6.0
