@@ -87,8 +87,12 @@ type Results struct {
 	HasOneClickUnsubscribe bool
 	TextContent            string
 	HTMLContent            string
-	TextPlainRatio         float32 // Ratio of plain text to HTML consistency
-	ImageTextRatio         float32 // Ratio of images to text
+	// TextAlternative says how the plain text part stands to the HTML one:
+	// saying the same thing, saying part of it, saying something else, or
+	// standing in for it without carrying it. It is read once, when the
+	// message is, so that the score and the report answer from one reading.
+	TextAlternative textAltLevel
+	ImageTextRatio  float32 // Ratio of images to text
 	// UnprobedURLs counts the distinct URLs left unfetched because the message
 	// carried more than one analysis may check.
 	UnprobedURLs int
@@ -163,6 +167,13 @@ type LinkCheck struct {
 	IsSafe     bool
 	Warning    string
 	IsTemplate bool // URL still contains an unreplaced templating placeholder (e.g. "{unsubscribe}")
+	// InHTML and InText say which parts of the message wrote this destination.
+	// One link is read once however many parts carry it, so the two are not
+	// exclusive, and a link both parts write has both set. Keeping them is what
+	// lets the parts be compared at all: the links themselves are gathered into
+	// one list, and without this the second part to name a URL left no trace.
+	InHTML bool
+	InText bool
 	// Suspicions lists the concrete reasons this URL was flagged, if any.
 	// IsSafe is simply "no suspicion was found".
 	Suspicions []URLSuspicion
@@ -230,18 +241,14 @@ func (c *Analyzer) Analyze(email *mailmsg.Message) *Results {
 	// per distinct URL and several at a time.
 	c.probeContentURLs(results)
 
-	// Check plain text/HTML consistency. A truncated body may look single-part
-	// while it is not: a perfect ratio would then score the parts that never
-	// arrived rather than the message that was sent. It is left at zero, which
-	// Score and Analysis read as "unknown" rather
-	// than as a failure, BodyTruncated telling the two apart.
-	if !results.BodyTruncated {
-		if len(htmlParts) > 0 && len(textParts) > 0 {
-			results.TextPlainRatio = c.calculateTextPlainConsistency(results.TextContent, results.HTMLContent)
-		} else if !results.IsMultipart {
-			results.TextPlainRatio = 1.0
-		}
+	// Read the text part against the HTML one. The markup is compared as the
+	// text it renders to, off the tree already parsed above rather than off a
+	// second parse of its source.
+	var htmlText string
+	if results.htmlDocument != nil {
+		htmlText = extractTextFromNode(results.htmlDocument)
 	}
+	results.TextAlternative = textAlternativeLevel(results.TextContent, htmlText, results.BodyTruncated)
 
 	return results
 }
@@ -291,16 +298,19 @@ func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 			schemeSynthesized = true
 		}
 
-		// Check if this URL already exists in results.Links (from HTML analysis)
+		// A URL the HTML already wrote is not read a second time, but it is
+		// marked as written here too: that a destination appears in both parts
+		// is exactly what comparing them needs to know, and skipping silently
+		// used to lose it.
 		exists := false
-		for _, link := range results.Links {
+		for i, link := range results.Links {
 			if link.URL == urlStr {
+				results.Links[i].InText = true
 				exists = true
 				break
 			}
 		}
 
-		// Only validate if not already checked
 		if !exists {
 			check := analyzeLinkOffline(urlStr)
 
@@ -315,6 +325,7 @@ func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 				check.IsSafe = len(check.Suspicions) == 0
 			}
 
+			check.InText = true
 			results.Links = append(results.Links, check)
 		}
 	}
@@ -436,6 +447,7 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 					linkCheck.IsSafe = false
 				}
 
+				linkCheck.InHTML = true
 				results.Links = append(results.Links, linkCheck)
 			}
 
@@ -723,16 +735,6 @@ func isMissingSpace(token string) bool {
 	return unicode.IsUpper(last) && !unicode.IsUpper(previous)
 }
 
-// extractTextFromHTML extracts plain text from HTML
-func (c *Analyzer) extractTextFromHTML(htmlContent string) string {
-	doc, err := html.Parse(strings.NewReader(htmlContent))
-	if err != nil {
-		return ""
-	}
-
-	return extractTextFromNode(doc)
-}
-
 // extractTextFromNode reads the text of an already parsed tree, so that a
 // caller holding the document does not parse its source a second time.
 func extractTextFromNode(doc *html.Node) string {
@@ -755,78 +757,6 @@ func extractTextFromNode(doc *html.Node) string {
 	return strings.TrimSpace(text.String())
 }
 
-// calculateTextPlainConsistency compares plain text and HTML versions
-func (c *Analyzer) calculateTextPlainConsistency(plainText, htmlText string) float32 {
-	// Extract text from HTML
-	htmlPlainText := c.extractTextFromHTML(htmlText)
-
-	// Normalize both texts
-	plainNorm := c.normalizeText(plainText)
-	htmlNorm := c.normalizeText(htmlPlainText)
-
-	// Calculate similarity using simple word overlap
-	plainWords := strings.Fields(plainNorm)
-	htmlWords := strings.Fields(htmlNorm)
-
-	if len(plainWords) == 0 || len(htmlWords) == 0 {
-		return 0.0
-	}
-
-	// Count common words by building sets
-	plainWordSet := make(map[string]int)
-	for _, word := range plainWords {
-		plainWordSet[word]++
-	}
-
-	htmlWordSet := make(map[string]int)
-	for _, word := range htmlWords {
-		htmlWordSet[word]++
-	}
-
-	// Count matches: for each unique word, count minimum occurrences in both texts
-	commonWords := 0
-	for word, plainCount := range plainWordSet {
-		if htmlCount, exists := htmlWordSet[word]; exists {
-			// Count the minimum occurrences between both texts
-			if plainCount < htmlCount {
-				commonWords += plainCount
-			} else {
-				commonWords += htmlCount
-			}
-		}
-	}
-
-	// Calculate ratio using total words from both texts (union approach)
-	// This provides a balanced measure: perfect match = 1.0, partial overlap = 0.3-0.8
-	totalWords := len(plainWords) + len(htmlWords)
-	if totalWords == 0 {
-		return 0.0
-	}
-
-	// Divide by average word count for better scoring
-	avgWords := float32(totalWords) / 2.0
-	ratio := float32(commonWords) / avgWords
-
-	// Cap at 1.0 for perfect matches
-	if ratio > 1.0 {
-		ratio = 1.0
-	}
-
-	return ratio
-}
-
-// normalizeText normalizes text for comparison
-func (c *Analyzer) normalizeText(text string) string {
-	// Convert to lowercase
-	text = strings.ToLower(text)
-
-	// Remove extra whitespace
-	text = strings.TrimSpace(text)
-	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
-
-	return text
-}
-
 // Analysis creates structured content analysis from results
 func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalysis {
 	if results == nil {
@@ -841,8 +771,8 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 	}
 
 	// Calculate text-to-image ratio (inverse of image-to-text)
-	if len(results.Images) > 0 && results.HTMLContent != "" {
-		textLen := float32(len(c.extractTextFromHTML(results.HTMLContent)))
+	if len(results.Images) > 0 && results.htmlDocument != nil {
+		textLen := float32(len(extractTextFromNode(results.htmlDocument)))
 		if textLen > 0 {
 			ratio := textLen / float32(len(results.Images))
 			analysis.TextToImageRatio = &ratio

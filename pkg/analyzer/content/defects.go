@@ -33,6 +33,7 @@ var contentDefects = []*reading.Defect{
 	defectMissingAlt,
 	defectExcessiveImages,
 	defectTextHTMLMismatch,
+	defectTextLinkMissing,
 	defectUnreplacedTemplate,
 	defectSuspiciousURL,
 	defectDeadLink,
@@ -80,6 +81,21 @@ var (
 	// what the HTML says: the previous campaign's text, or a line telling a
 	// reader their client cannot do HTML when it plainly can.
 	defectTextHTMLMismatch = &reading.Defect{Name: "text_html_mismatch"}
+
+	// defectTextLinkMissing: a destination the text part offers and the HTML
+	// part does not, which suggests the two were not generated together.
+	//
+	// It is reported and not charged, and the reason is worth writing down:
+	// many senders rewrite their links through a click tracker that mints a
+	// distinct token per part, so a text link "missing" from the HTML may be
+	// the very same link wearing another token. Nothing here can tell that
+	// apart from a text part left behind, and a sender is not to lose a grade
+	// over an ambiguity we hold rather than they do. So it is put in front of
+	// them to judge.
+	defectTextLinkMissing = &reading.Defect{
+		Name:      "text_link_missing",
+		Uncharged: "a click tracker minting one token per part makes the same link look like two, and nothing here tells that apart from a text part left behind: the reader judges it, we only point at it",
+	}
 
 	// defectUnreplacedTemplate: a link whose URL still carries a merge field,
 	// so it designates no destination at all.
