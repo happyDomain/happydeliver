@@ -611,14 +611,10 @@ func (c *Analyzer) hasDomainMisalignment(href, linkText string) bool {
 			return false // Invalid mailto
 		}
 	case "http", "https":
-		// Check if URL has a host
-		if parsedURL.Host == "" {
+		actualDomain = domainname.HostOfURL(href)
+		if actualDomain == "" {
 			return false
 		}
-
-		// Hostname() drops the port and the brackets of an IPv6 literal, which
-		// a manual cut at the last colon would slice in half.
-		actualDomain = domainname.Normalize(parsedURL.Hostname())
 	default:
 		// Skip checks for other URL schemes (tel, etc.)
 		return false
