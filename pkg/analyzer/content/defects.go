@@ -43,6 +43,7 @@ var contentDefects = []*reading.Defect{
 	defectUnprobedURLs,
 	defectClientCompat,
 	defectEventHandler,
+	defectLowContrast,
 	defectRspamdObservation,
 }
 
@@ -154,6 +155,14 @@ var (
 		Name:      "client_compat",
 		Uncharged: "nothing here says whether the unsupported property changes what the reader sees: it is put in front of the sender rather than billed to them",
 	}
+
+	// defectLowContrast: text painted too close in colour to what is behind it
+	// for a reader to make out.
+	//
+	// It is measured, not supposed: the ratio comes from the two colours the
+	// sender wrote, and the bar from WCAG. What is not measured is not reported,
+	// which is why this check reads only what a message declares inline.
+	defectLowContrast = &reading.Defect{Name: "low_contrast", Family: familyLowContrast}
 
 	// defectEventHandler: an on* attribute, which no email client runs and
 	// every sanitiser strips.

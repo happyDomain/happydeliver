@@ -44,6 +44,11 @@ var contentChecks = []contentCheck{
 	missingAltCheck,
 	excessiveImagesCheck,
 
+	// Whether the text can be made out at all, which is of a piece with the
+	// images a reader is told nothing about: both answer for the recipients a
+	// message leaves out.
+	lowContrastCheck,
+
 	templatePlaceholderCheck,
 	linkSuspicionCheck,
 	imageSuspicionCheck,
