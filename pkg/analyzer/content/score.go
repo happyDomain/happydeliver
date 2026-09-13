@@ -86,8 +86,9 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// Links that lead somewhere, and not so many of them that the message
-		// is mostly destinations.
+		// Links that lead somewhere (a destination that answers, and a URL
+		// that designates one at all) and not so many of them that the
+		// message is mostly destinations.
 		Name:   "links",
 		Weight: 25,
 		Points: func(in *contentInput) (int, bool) {
@@ -105,9 +106,14 @@ var contentCriteria = []contentCriterion{
 
 			broken := 0
 			for _, link := range in.Results.Links {
-				// A destination that turned the checker away is not a dead
-				// one: the recipient who clicks it gets the page.
-				if link.Status >= 400 && !refusesAutomatedClients(link.Status) {
+				// A link whose redirections never end is as dead as one
+				// answering 404, though it carries no status code of its own.
+				// So is one that was never fetchable in the first place: a URL
+				// left with an unsubstituted merge field, or one that does not
+				// parse, designates no destination at all. A destination that
+				// turned the checker away is not dead, though: the recipient
+				// who clicks it gets the page.
+				if !link.Valid || (link.Status >= 400 && !refusesAutomatedClients(link.Status)) || link.hasFinding(LinkHTTPRedirectLoop) {
 					broken++
 				}
 			}
@@ -121,8 +127,9 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// Images a recipient who cannot see them can still be told about.
-		// A tracking pixel is not one of them: it shows nothing to anyone.
+		// Images that reach the recipient: they load, and the one who cannot
+		// see them is told what they showed. A tracking pixel is not one of
+		// them: it shows nothing to anyone.
 		Name:   "images",
 		Weight: 15,
 		Points: func(in *contentInput) (int, bool) {
@@ -135,18 +142,22 @@ var contentCriteria = []contentCriterion{
 				return 15, true
 			}
 
-			noAlt := 0
+			// An image earns its share when the recipient gets something out
+			// of it: it loads, or it says what it would have shown. One that
+			// does neither is a hole in the message, whether the client blocks
+			// it or the server never answered.
+			lost := 0
 			for _, img := range visible {
-				if !img.HasAlt {
-					noAlt++
+				if !img.HasAlt || img.IsBroken {
+					lost++
 				}
 			}
 
-			// Each undescribed image costs its share of the criterion, over
-			// a count of at least five: a message with a single undescribed
-			// picture is short of one description, not of every one, and
-			// loses three points for it rather than fifteen.
-			return 15 - 15*noAlt/max(len(visible), minImagesForShare), true
+			// Each lost image costs its share of the criterion, over a count
+			// of at least five: a message with a single undescribed picture
+			// is short of one description, not of every one, and loses three
+			// points for it rather than fifteen.
+			return 15 - 15*lost/max(len(visible), minImagesForShare), true
 		},
 	},
 	{

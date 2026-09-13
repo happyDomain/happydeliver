@@ -135,6 +135,22 @@
                                         {#if link.is_shortened}
                                             <span class="badge bg-warning ms-1">Shortened</span>
                                         {/if}
+                                        {#if link.redirect_chain && link.redirect_chain.length > 0}
+                                            <div>
+                                                <small
+                                                    class="text-muted text-break"
+                                                    title={link.redirect_chain.join(" → ")}
+                                                >
+                                                    → {link.redirect_chain.length} redirect{link
+                                                        .redirect_chain.length > 1
+                                                        ? "s"
+                                                        : ""}, ending at {link.final_url ??
+                                                        link.redirect_chain[
+                                                            link.redirect_chain.length - 1
+                                                        ]}
+                                                </small>
+                                            </div>
+                                        {/if}
                                     </td>
                                     <td>
                                         <span
@@ -142,7 +158,9 @@
                                                 ? 'bg-success'
                                                 : link.status === 'broken'
                                                   ? 'bg-danger'
-                                                  : 'bg-warning'}"
+                                                  : link.status === 'redirected'
+                                                    ? 'bg-info'
+                                                    : 'bg-warning'}"
                                         >
                                             {link.status}
                                         </span>
@@ -171,7 +189,16 @@
                         <tbody>
                             {#each contentAnalysis.images as image, i (i)}
                                 <tr>
-                                    <td><small class="text-break">{image.src || "-"}</small></td>
+                                    <td>
+                                        <small class="text-break">{image.src || "-"}</small>
+                                        {#if image.is_broken}
+                                            <span class="badge bg-danger ms-1">
+                                                Does not load{image.http_code
+                                                    ? ` (HTTP ${image.http_code})`
+                                                    : ""}
+                                            </span>
+                                        {/if}
+                                    </td>
                                     <td>
                                         {#if image.has_alt}
                                             <i class="bi bi-check-circle text-success me-1"></i>

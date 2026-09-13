@@ -82,6 +82,7 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			ContentIssueTypeBrokenHtml.Valid, ContentIssueTypeDangerousHtml.Valid, ContentIssueTypeExcessiveImages.Valid,
 			ContentIssueTypeMissingAlt.Valid, ContentIssueTypeObfuscatedUrl.Valid, ContentIssueTypeSuspiciousLink.Valid,
 			ContentIssueTypeTruncatedBody.Valid, ContentIssueTypeUnreplacedTemplate.Valid,
+			ContentIssueTypeUnreachableLink.Valid, ContentIssueTypeExcessiveRedirects.Valid,
 		}},
 		{"DMARCRecordDkimAlignment", []func() bool{
 			DMARCRecordDkimAlignmentRelaxed.Valid, DMARCRecordDkimAlignmentStrict.Valid,
