@@ -38,8 +38,8 @@ import (
 var templatePlaceholderCheck = contentCheck{
 	Name:     "unreplaced_template",
 	Category: reading.CategoryContent,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
-		var issues []model.ContentIssue
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		var issues []reading.Finding
 
 		for _, link := range in.Results.Links {
 			if !link.IsTemplate {
@@ -47,13 +47,13 @@ var templatePlaceholderCheck = contentCheck{
 			}
 
 			location := link.URL
-			issues = append(issues, model.ContentIssue{
+			issues = append(issues, reading.Finding{ContentIssue: model.ContentIssue{
 				Type:     model.ContentIssueTypeUnreplacedTemplate,
 				Severity: model.ContentIssueSeverityHigh,
 				Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
 				Location: &location,
 				Advice:   utils.PtrTo("Ensure all merge fields and template placeholders are substituted before sending"),
-			})
+			}})
 		}
 
 		return issues, nil
@@ -66,17 +66,20 @@ var linkSuspicionCheck = contentCheck{
 	Name:     "link_suspicion",
 	Category: reading.CategorySecurity,
 	Family:   familyURLSuspicion,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
-		var issues []model.ContentIssue
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		var issues []reading.Finding
 
 		for _, link := range in.Results.Links {
 			for _, suspicion := range link.Suspicions {
-				issues = append(issues, model.ContentIssue{
-					Type:     model.ContentIssueTypeSuspiciousLink,
-					Severity: suspicion.Severity,
-					Message:  suspicion.Message,
-					Location: &link.URL,
-					Advice:   utils.PtrTo(suspicion.Advice),
+				issues = append(issues, reading.Finding{
+					ContentIssue: model.ContentIssue{
+						Type:     model.ContentIssueTypeSuspiciousLink,
+						Severity: suspicion.Severity,
+						Message:  suspicion.Message,
+						Location: &link.URL,
+						Advice:   utils.PtrTo(suspicion.Advice),
+					},
+					Concern: suspicionConcern(suspicion.Kind, link.URL),
 				})
 			}
 		}
@@ -96,11 +99,13 @@ var probeFindingCheck = contentCheck{
 	Name:     "probe_finding",
 	Category: reading.CategoryDeliverability,
 	Family:   familyHTTPProbe,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
-		var issues []model.ContentIssue
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		var issues []reading.Finding
 
 		for _, probed := range in.Results.probedURLs() {
-			issues = append(issues, httpFindingIssues(probed.Location, probed.HTTPFindings)...)
+			for _, issue := range httpFindingIssues(probed.Location, probed.HTTPFindings) {
+				issues = append(issues, reading.Finding{ContentIssue: issue})
+			}
 		}
 
 		return issues, nil
@@ -115,16 +120,29 @@ var probeFindingCheck = contentCheck{
 var unprobedURLsCheck = contentCheck{
 	Name:     "unprobed_urls",
 	Category: reading.CategoryDeliverability,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.UnprobedURLs <= 0 {
 			return nil, nil
 		}
 
-		return []model.ContentIssue{{
+		return []reading.Finding{{ContentIssue: model.ContentIssue{
 			Type:     model.ContentIssueTypeUnreachableLink,
 			Severity: model.ContentIssueSeverityInfo,
 			Message:  fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
 			Advice:   utils.PtrTo("Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same"),
-		}}, nil
+		}}}, nil
 	},
+}
+
+// suspicionConcern keys the suspicions a symbol of the spam filter also
+// describes, so the two are reported once. The others get no key: a suspicion
+// nothing else observes has nothing to be merged with, and keying it anyway
+// would risk collapsing two distinct suspicions about one URL into one.
+func suspicionConcern(kind URLSuspicionKind, rawURL string) string {
+	switch kind {
+	case URLSuspicionShortener, URLSuspicionIPHost, URLSuspicionUserInfo:
+		return concernForURL(string(kind), rawURL)
+	default:
+		return ""
+	}
 }

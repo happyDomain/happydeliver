@@ -694,6 +694,11 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 						fmt.Fprintln(writer, "      Reported by: rspamd")
 					}
 				}
+				// When another observer saw the same defect, say so: it is
+				// the difference between a guess and a corroborated finding.
+				if issue.CorroboratedBy != nil && len(*issue.CorroboratedBy) > 0 {
+					fmt.Fprintf(writer, "      Also reported by: %s\n", strings.Join(*issue.CorroboratedBy, ", "))
+				}
 				if issue.Location != nil {
 					fmt.Fprintf(writer, "      Location: %s\n", *issue.Location)
 				}

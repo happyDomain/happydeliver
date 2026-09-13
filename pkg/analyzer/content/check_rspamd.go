@@ -57,7 +57,22 @@ type rspamdFinding struct {
 
 	// Advice says what to change, and the fact that says why.
 	Advice string
+
+	// Concern is the key under which this finding may be recognised as the
+	// same defect one of happyDeliver's own checks reported. Empty means it is
+	// always reported on its own, which is the case for everything no check of
+	// ours observes.
+	//
+	// A recipe ending in ":@url" is keyed on the URL the symbol's options
+	// name, through the same concernForURL our checks use, so the two agree
+	// whenever they agree on the URL. Anything else is used as written, which
+	// suits a statement about the whole message.
+	Concern string
 }
+
+// concernURLRecipe marks a catalogue concern to be keyed on the URL found in
+// the symbol's options rather than used as written.
+const concernURLRecipe = ":@url"
 
 // rspamdFindingCatalog maps a symbol to what it means.
 //
@@ -261,6 +276,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "A link points at a bare IP address rather than a name: %s",
 		Advice:   "Link to a hostname; an IP address cannot be checked against a domain reputation or a TLS certificate",
+		Concern:  "ip_host" + concernURLRecipe,
 	},
 	"URL_NO_TLD": {
 		Issue:    model.ContentIssueTypeObfuscatedUrl,
@@ -343,6 +359,33 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Advice:   "Send the document unencrypted over a channel that protects it, or link to it; an encrypted PDF cannot be scanned",
 	},
 
+	// --- What a check of our own also observes: merged, not dropped
+	// These overlap a check of happyDeliver's own on purpose. Both run, and the
+	// pipeline reports whichever saw the defect, or one of them with the
+	// other's agreement noted, when both did. Leaving them out of the catalogue
+	// would mean losing the cases our own check misses.
+	"R_SUSPICIOUS_IMAGES": {
+		Issue:    model.ContentIssueTypeExcessiveImages,
+		Severity: model.ContentIssueSeverityMedium,
+		Message:  "The message carries far more image than text.",
+		Advice:   "Put the message in text and let images illustrate it; a mostly-image mailing reads as empty to a filter, and to clients that block remote content",
+		Concern:  "excessive_images",
+	},
+	"REDIRECTOR_URL": {
+		Issue:    model.ContentIssueTypeSuspiciousLink,
+		Severity: model.ContentIssueSeverityMedium,
+		Message:  "A link goes through a public redirector rather than straight to its destination: %s",
+		Advice:   "Link to your own domain, a branded click-tracker included; a filter weighs the reputation of a public redirector rather than yours",
+		Concern:  "shortener" + concernURLRecipe,
+	},
+	"URL_USER_PASSWORD": {
+		Issue:    model.ContentIssueTypeSuspiciousLink,
+		Severity: model.ContentIssueSeverityHigh,
+		Message:  "A URL carries a user field before its host: %s",
+		Advice:   "Remove the \"user@\" part; it shows one domain while the link reaches another, and filters score it as such",
+		Concern:  "userinfo" + concernURLRecipe,
+	},
+
 	// --- Client compatibility
 	"HTML_META_REFRESH_URL": {
 		Issue:    model.ContentIssueTypeClientCompat,
@@ -355,6 +398,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "The HTML references an external stylesheet: %s",
 		Advice:   "Inline the styles; most clients never fetch an external stylesheet and render the message unstyled",
+		Concern:  "external_css" + concernURLRecipe,
 	},
 }
 
@@ -371,7 +415,7 @@ var rspamdFindingsCheck = contentCheck{
 	Name:     "rspamd_finding",
 	Category: reading.CategoryDeliverability,
 	Family:   familyRspamd,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.Rspamd == nil {
 			return nil, nil
 		}
@@ -407,7 +451,7 @@ var rspamdFindingsCheck = contentCheck{
 			return cmp.Compare(a.symbol, b.symbol)
 		})
 
-		issues := make([]model.ContentIssue, 0, len(matched))
+		issues := make([]reading.Finding, 0, len(matched))
 		for _, m := range matched {
 			message := m.finding.Message
 			if strings.Contains(message, "%s") {
@@ -432,9 +476,31 @@ var rspamdFindingsCheck = contentCheck{
 				issue.Location = utils.PtrTo(m.params)
 			}
 
-			issues = append(issues, issue)
+			issues = append(issues, reading.Finding{
+				ContentIssue: issue,
+				Concern:      rspamdConcern(m.finding.Concern, m.params),
+			})
 		}
 
 		return issues, nil
 	},
+}
+
+// rspamdConcern turns a catalogue recipe into the key this finding is merged
+// under. A recipe asking for a URL yields nothing when the options hold none,
+// so the finding is reported on its own rather than merged on a guess.
+func rspamdConcern(recipe, params string) string {
+	defect, keyedOnURL := strings.CutSuffix(recipe, concernURLRecipe)
+	if !keyedOnURL {
+		return recipe
+	}
+
+	// The options of a URL symbol name the URL, sometimes among other fields.
+	for field := range strings.FieldsSeq(strings.ReplaceAll(params, ",", " ")) {
+		if concern := concernForURL(defect, field); concern != "" {
+			return concern
+		}
+	}
+
+	return ""
 }

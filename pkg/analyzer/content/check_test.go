@@ -39,16 +39,25 @@ import (
 // issuesOf builds a check reporting one finding per severity given, so that a
 // test states what a check found rather than how it found it.
 func issuesOf(name string, family *reading.Family, severities ...model.ContentIssueSeverity) contentCheck {
+	return concernedIssuesOf(name, family, "", severities...)
+}
+
+// concernedIssuesOf is issuesOf with every finding keyed on one concern, for
+// the tests about merging.
+func concernedIssuesOf(name string, family *reading.Family, concern string, severities ...model.ContentIssueSeverity) contentCheck {
 	return contentCheck{
 		Name:   name,
 		Family: family,
-		Run: func(context.Context, *contentInput) ([]model.ContentIssue, error) {
-			issues := make([]model.ContentIssue, 0, len(severities))
+		Run: func(context.Context, *contentInput) ([]reading.Finding, error) {
+			issues := make([]reading.Finding, 0, len(severities))
 			for _, severity := range severities {
-				issues = append(issues, model.ContentIssue{
-					Type:     model.ContentIssueTypeSuspiciousLink,
-					Severity: severity,
-					Message:  name,
+				issues = append(issues, reading.Finding{
+					ContentIssue: model.ContentIssue{
+						Type:     model.ContentIssueTypeSuspiciousLink,
+						Severity: severity,
+						Message:  name,
+					},
+					Concern: concern,
 				})
 			}
 			return issues, nil
@@ -60,14 +69,14 @@ func issuesOf(name string, family *reading.Family, severities ...model.ContentIs
 // down, the resolver timed out.
 func failingCheck(name string) contentCheck {
 	return contentCheck{
-		Name:   name,
-		Family: nil,
-		Run: func(context.Context, *contentInput) ([]model.ContentIssue, error) {
-			return []model.ContentIssue{{
+		Name:     name,
+		Category: reading.CategorySecurity,
+		Run: func(context.Context, *contentInput) ([]reading.Finding, error) {
+			return []reading.Finding{{ContentIssue: model.ContentIssue{
 				Type:     model.ContentIssueTypeSuspiciousLink,
 				Severity: model.ContentIssueSeverityHigh,
 				Message:  name,
-			}}, errors.New("the service did not answer")
+			}}}, errors.New("the service did not answer")
 		},
 	}
 }
@@ -273,8 +282,9 @@ func TestContentChecksTolerateAnEmptyMessage(t *testing.T) {
 func TestReadRunsTheChecksOnce(t *testing.T) {
 	runs := 0
 	counting := contentCheck{
-		Name: "counting",
-		Run: func(context.Context, *contentInput) ([]model.ContentIssue, error) {
+		Name:     "counting",
+		Category: reading.CategoryContent,
+		Run: func(context.Context, *contentInput) ([]reading.Finding, error) {
 			runs++
 			return nil, nil
 		},
@@ -321,7 +331,7 @@ func TestCheckInputCarriesTheMessageAndItsMarkup(t *testing.T) {
 		t.Fatalf("parsing the message: %v", err)
 	}
 
-	in := NewAnalyzer(time.Second).Analyze(email).checkInput()
+	in := newProbingTestAnalyzer(time.Second).Analyze(email).checkInput()
 
 	if in.Message != email {
 		t.Error("the checks are not handed the message they are asked about")
@@ -375,7 +385,7 @@ func TestChecksAreGivenTheAnalysisDeadline(t *testing.T) {
 	watching := contentCheck{
 		Name:     "watching",
 		Category: reading.CategoryContent,
-		Run: func(ctx context.Context, _ *contentInput) ([]model.ContentIssue, error) {
+		Run: func(ctx context.Context, _ *contentInput) ([]reading.Finding, error) {
 			got = ctx
 			return nil, nil
 		},
@@ -412,9 +422,14 @@ func (c *Analyzer) analysisOf(observed *Results) *model.ContentAnalysis {
 func runCheck(t *testing.T, check contentCheck, results *Results) []model.ContentIssue {
 	t.Helper()
 
-	issues, err := check.Run(context.Background(), results.checkInput())
+	found, err := check.Run(context.Background(), results.checkInput())
 	if err != nil {
 		t.Fatalf("the %q check could not answer: %v", check.Name, err)
+	}
+
+	issues := make([]model.ContentIssue, 0, len(found))
+	for _, finding := range found {
+		issues = append(issues, finding.ContentIssue)
 	}
 
 	return issues

@@ -321,6 +321,16 @@ components:
           type: string
           description: Name of the rspamd symbol the issue was derived from, when source is rspamd
           example: "MIME_BASE64_TEXT"
+        corroborated_by:
+          type: array
+          items:
+            type: string
+          description: >-
+            Other observers that reported this same defect. When happyDeliver
+            and the spam filter both see it, one issue is reported and the
+            others are named here, so the defect is not listed twice while the
+            agreement stays visible.
+          example: ["R_SUSPICIOUS_IMAGES"]
 
     LinkCheck:
       type: object
