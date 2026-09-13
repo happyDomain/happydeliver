@@ -40,6 +40,7 @@ import (
 var missingAltCheck = contentCheck{
 	Name:     "missing_alt",
 	Category: reading.CategoryAccessibility,
+	Reports:  []*reading.Defect{defectMissingAlt},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		missing := 0
 		for _, img := range in.Results.Images {
@@ -51,7 +52,7 @@ var missingAltCheck = contentCheck{
 			return nil, nil
 		}
 
-		return []reading.Finding{{ContentIssue: model.ContentIssue{
+		return []reading.Finding{{Defect: defectMissingAlt, ContentIssue: model.ContentIssue{
 			Type:     model.ContentIssueTypeMissingAlt,
 			Severity: model.ContentIssueSeverityMedium,
 			Message:  fmt.Sprintf("%d image(s) missing alt attributes", missing),
@@ -67,12 +68,14 @@ var missingAltCheck = contentCheck{
 var excessiveImagesCheck = contentCheck{
 	Name:     "excessive_images",
 	Category: reading.CategoryDeliverability,
+	Reports:  []*reading.Defect{defectExcessiveImages},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.ImageTextRatio <= 10.0 {
 			return nil, nil
 		}
 
 		return []reading.Finding{{
+			Defect: defectExcessiveImages,
 			ContentIssue: model.ContentIssue{
 				Type:     model.ContentIssueTypeExcessiveImages,
 				Severity: model.ContentIssueSeverityMedium,
@@ -96,7 +99,7 @@ var excessiveImagesCheck = contentCheck{
 var imageSuspicionCheck = contentCheck{
 	Name:     "image_suspicion",
 	Category: reading.CategorySecurity,
-	Family:   familyURLSuspicion,
+	Reports:  []*reading.Defect{defectSuspiciousURL},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		var issues []reading.Finding
 
@@ -104,6 +107,7 @@ var imageSuspicionCheck = contentCheck{
 			for _, suspicion := range img.Suspicions {
 				location := img.Src
 				issues = append(issues, reading.Finding{
+					Defect: defectSuspiciousURL,
 					ContentIssue: model.ContentIssue{
 						Type:     model.ContentIssueTypeSuspiciousLink,
 						Severity: suspicion.Severity,

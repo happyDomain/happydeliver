@@ -21,7 +21,11 @@
 
 package content
 
-import "git.happydns.org/happyDeliver/pkg/grade"
+import (
+	"git.happydns.org/happyDeliver/pkg/reading"
+
+	"git.happydns.org/happyDeliver/pkg/grade"
+)
 
 // contentCriterion is one of the things the content score weighs. The checks
 // say what is wrong with a message; the criteria say what a good one is made
@@ -40,6 +44,13 @@ type contentCriterion struct {
 	// when the criterion cannot be judged.
 	Weight int
 
+	// Answers names the defects this criterion already charges for, by
+	// withholding points a flawless message would have earned. A check is free
+	// to report them (naming a defect is its job) but none of them may carry
+	// a penalty family on top, which TestEveryDefectIsPricedOnce holds the
+	// vocabulary to.
+	Answers []*reading.Defect
+
 	// Points is what this message earns of Weight, and whether the criterion
 	// could be judged at all. Points above Weight are not expected; points
 	// below zero are, a criterion being free to charge for what it weighs.
@@ -51,9 +62,11 @@ type contentCriterion struct {
 // expressed on that scale, and the penalties the checks deduct are expressed
 // in points of it.
 //
-// A defect already answered for here is not to be charged again by a check.
-// That is why most checks carry no penalty family: a missing alt attribute is
-// answered for by the images criterion, an unreachable link by the links one.
+// A defect already answered for here is not to be charged again on top. That
+// is why most defects carry no penalty family: a missing alt attribute is
+// answered for by the images criterion, a dead link by the links one. Each
+// criterion names what it answers for in its Answers, so that the rule is read
+// off the two registries rather than trusted to a comment.
 var contentCriteria = []contentCriterion{
 	{
 		// Every message starts with ten points. It is named here rather than
@@ -64,8 +77,9 @@ var contentCriteria = []contentCriterion{
 	},
 	{
 		// HTML that parses, or a message that is plain text and says so.
-		Name:   "html_validity",
-		Weight: 10,
+		Name:    "html_validity",
+		Weight:  10,
+		Answers: []*reading.Defect{defectBrokenHTML},
 		Points: func(in *contentInput) (int, bool) {
 			if in.Results.HTMLValid || (!in.Results.IsMultipart && in.Results.HasPlaintext()) {
 				return 10, true
@@ -89,8 +103,9 @@ var contentCriteria = []contentCriterion{
 		// Links that lead somewhere (a destination that answers, and a URL
 		// that designates one at all) and not so many of them that the
 		// message is mostly destinations.
-		Name:   "links",
-		Weight: 25,
+		Name:    "links",
+		Weight:  25,
+		Answers: []*reading.Defect{defectDeadLink, defectUnreplacedTemplate},
 		Points: func(in *contentInput) (int, bool) {
 			if len(in.Results.Links) == 0 {
 				// A truncated body earns no credit for links it does not
@@ -127,8 +142,9 @@ var contentCriteria = []contentCriterion{
 	{
 		// Images that reach the recipient: they load, and the one who cannot
 		// see them is told what they showed.
-		Name:   "images",
-		Weight: 15,
+		Name:    "images",
+		Weight:  15,
+		Answers: []*reading.Defect{defectMissingAlt, defectDeadImage},
 		Points: func(in *contentInput) (int, bool) {
 			if len(in.Results.Images) == 0 {
 				// Same caveat as the links above.
@@ -156,8 +172,9 @@ var contentCriteria = []contentCriterion{
 		// A plain text part that says what the HTML says. A truncated body
 		// cannot be judged on it: the counterpart may simply never have
 		// arrived.
-		Name:   "text_consistency",
-		Weight: 15,
+		Name:    "text_consistency",
+		Weight:  15,
+		Answers: []*reading.Defect{defectTextHTMLMismatch},
 		Points: func(in *contentInput) (int, bool) {
 			if in.Results.BodyTruncated {
 				return 0, false
@@ -170,8 +187,9 @@ var contentCriteria = []contentCriterion{
 	},
 	{
 		// Text a filter can read, rather than a message that is one big image.
-		Name:   "image_ratio",
-		Weight: 15,
+		Name:    "image_ratio",
+		Weight:  15,
+		Answers: []*reading.Defect{defectExcessiveImages},
 		Points: func(in *contentInput) (int, bool) {
 			switch {
 			case in.Results.ImageTextRatio <= 5.0:

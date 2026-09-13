@@ -36,14 +36,19 @@ type message struct{}
 // reports builds a check reporting one issue per severity given, so that a
 // test states what a check found rather than how it found it.
 func reports(name string, family *Family, severities ...model.ContentIssueSeverity) Check[message] {
+	defect := &Defect{Name: name, Family: family}
+
 	return Check[message]{
 		Name:     name,
-		Family:   family,
+		Reports:  []*Defect{defect},
 		Category: CategoryContent,
 		Run: func(context.Context, message) ([]Finding, error) {
 			findings := make([]Finding, 0, len(severities))
 			for _, severity := range severities {
-				findings = append(findings, Finding{ContentIssue: model.ContentIssue{Severity: severity, Message: name}})
+				findings = append(findings, Finding{
+					Defect:       defect,
+					ContentIssue: model.ContentIssue{Severity: severity, Message: name},
+				})
 			}
 			return findings, nil
 		},

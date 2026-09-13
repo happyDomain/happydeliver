@@ -46,6 +46,16 @@ type rspamdFinding struct {
 	// Issue files the finding under one of the report's content families.
 	Issue model.ContentIssueType
 
+	// Defect says what the symbol saw, at the grain at which it is paid for.
+	//
+	// It is left empty for everything no criterion of ours grades, which is
+	// most of the catalogue: those answer under the filter's own cap, as
+	// defectRspamdObservation. A symbol observing something a criterion
+	// already grades names that criterion's defect instead, and so costs
+	// nothing extra: the filter agreeing with a measurement we made
+	// ourselves is worth reading, not worth charging for twice.
+	Defect *reading.Defect
+
 	// Severity is how much this costs the sender, on this report's scale
 	// rather than on rspamd's.
 	Severity model.ContentIssueSeverity
@@ -116,24 +126,28 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 
 	// --- One-big-image newsletters
 	"HTML_SHORT_LINK_IMG_1": {
+		Defect:   defectExcessiveImages,
 		Issue:    model.ContentIssueTypeImageOnlyContent,
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "The HTML part is very short and consists of a linked image.",
 		Advice:   "Put the message in text as well as in the image; a client that blocks images shows nothing, and filters cannot read the image",
 	},
 	"HTML_SHORT_LINK_IMG_2": {
+		Defect:   defectExcessiveImages,
 		Issue:    model.ContentIssueTypeImageOnlyContent,
 		Severity: model.ContentIssueSeverityLow,
 		Message:  "The HTML part is short and largely made of a linked image.",
 		Advice:   "Add real text alongside the image, for clients that block images and for filters that cannot read it",
 	},
 	"HTML_SHORT_LINK_IMG_3": {
+		Defect:   defectExcessiveImages,
 		Issue:    model.ContentIssueTypeImageOnlyContent,
 		Severity: model.ContentIssueSeverityInfo,
 		Message:  "The HTML part leans on a linked image for much of its content.",
 		Advice:   "Keep enough text that the message still reads with images off",
 	},
 	"R_EMPTY_IMAGE": {
+		Defect:   defectExcessiveImages,
 		Issue:    model.ContentIssueTypeImageOnlyContent,
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "The message pairs empty parts with an image.",
@@ -142,6 +156,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 
 	// --- Text and HTML out of sync
 	"R_PARTS_DIFFER": {
+		Defect:   defectTextHTMLMismatch,
 		Issue:    model.ContentIssueTypeBrokenHtml,
 		Severity: model.ContentIssueSeverityLow,
 		Message:  "The text and HTML parts do not say the same thing: %s",
@@ -365,6 +380,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 	// other's agreement noted, when both did. Leaving them out of the catalogue
 	// would mean losing the cases our own check misses.
 	"R_SUSPICIOUS_IMAGES": {
+		Defect:   defectExcessiveImages,
 		Issue:    model.ContentIssueTypeExcessiveImages,
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "The message carries far more image than text.",
@@ -372,6 +388,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Concern:  "excessive_images",
 	},
 	"REDIRECTOR_URL": {
+		Defect:   defectSuspiciousURL,
 		Issue:    model.ContentIssueTypeSuspiciousLink,
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "A link goes through a public redirector rather than straight to its destination: %s",
@@ -379,6 +396,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Concern:  "shortener" + concernURLRecipe,
 	},
 	"URL_USER_PASSWORD": {
+		Defect:   defectSuspiciousURL,
 		Issue:    model.ContentIssueTypeSuspiciousLink,
 		Severity: model.ContentIssueSeverityHigh,
 		Message:  "A URL carries a user field before its host: %s",
@@ -394,6 +412,7 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Advice:   "Remove it and link to the destination; no email client honours a meta refresh, and filters score a redirection hidden in markup as cloaking",
 	},
 	"EXT_CSS": {
+		Defect:   defectHTMLRemark,
 		Issue:    model.ContentIssueTypeClientCompat,
 		Severity: model.ContentIssueSeverityMedium,
 		Message:  "The HTML references an external stylesheet: %s",
@@ -414,7 +433,13 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 var rspamdFindingsCheck = contentCheck{
 	Name:     "rspamd_finding",
 	Category: reading.CategoryDeliverability,
-	Family:   familyRspamd,
+	Reports: []*reading.Defect{
+		defectRspamdObservation,
+		defectExcessiveImages,
+		defectTextHTMLMismatch,
+		defectSuspiciousURL,
+		defectHTMLRemark,
+	},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.Rspamd == nil {
 			return nil, nil
@@ -476,7 +501,15 @@ var rspamdFindingsCheck = contentCheck{
 				issue.Location = utils.PtrTo(m.params)
 			}
 
+			// A symbol the catalogue does not tie to one of our own
+			// measurements answers under the filter's cap.
+			defect := m.finding.Defect
+			if defect == nil {
+				defect = defectRspamdObservation
+			}
+
 			issues = append(issues, reading.Finding{
+				Defect:       defect,
 				ContentIssue: issue,
 				Concern:      rspamdConcern(m.finding.Concern, m.params),
 			})

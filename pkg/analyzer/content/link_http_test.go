@@ -37,6 +37,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
+	"git.happydns.org/happyDeliver/pkg/reading"
 	"git.happydns.org/happyDeliver/pkg/urlprobe"
 )
 
@@ -674,8 +675,10 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 	dead, _ := analyzer.scoreOf(base([]LinkHTTPFinding{notFound}, 404))
 
 	// Ten points for the link that no longer counts among the working ones,
-	// three for the finding itself.
-	if want := clean - 13; dead != want {
+	// and nothing else: the links criterion is the one that grades a dead body
+	// link, so the finding that names it deducts nothing on top. One defect,
+	// one payer.
+	if want := clean - 10; dead != want {
 		t.Errorf("score with a dead link = %d, want %d (clean score is %d)", dead, want, clean)
 	}
 
@@ -684,8 +687,18 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 
 	// A link that never arrives carries no status code, and must still count as
 	// broken rather than as one of the working links.
-	if want := clean - 13; looping != want {
+	if want := clean - 10; looping != want {
 		t.Errorf("score with a looping link = %d, want %d (clean score is %d)", looping, want, clean)
+	}
+
+	// A chain that does end is the one no criterion grades: the link answers,
+	// so it counts among the working ones, and the detour answers under the
+	// probe cap instead.
+	excessive, _ := redirectChainFinding("Link", []string{"a", "b", "c"}, "https://example.com/end")
+	detoured, _ := analyzer.scoreOf(base([]LinkHTTPFinding{excessive}, 200))
+
+	if want := clean - reading.SeverityPenalty(excessive.Severity); detoured != want {
+		t.Errorf("score with a detoured link = %d, want %d (clean score is %d)", detoured, want, clean)
 	}
 }
 
@@ -697,7 +710,10 @@ func TestCalculateContentScoreKeepsPenaltyBudgetsApart(t *testing.T) {
 	var findings []LinkHTTPFinding
 	for range 10 {
 		suspicions = append(suspicions, URLSuspicion{Severity: model.ContentIssueSeverityHigh})
-		findings = append(findings, LinkHTTPFinding{Severity: model.ContentIssueSeverityHigh})
+		// Redirect chains, being the probe findings no criterion grades: what
+		// this test weighs is the probe cap, so it must be a defect that
+		// actually answers under it.
+		findings = append(findings, LinkHTTPFinding{Kind: LinkHTTPExcessiveRedirects, Severity: model.ContentIssueSeverityHigh})
 	}
 
 	// One message per score: results are the finished record of one analysis,
