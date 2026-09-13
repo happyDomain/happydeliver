@@ -289,7 +289,7 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body]
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects]
           description: Type of content issue
           example: "missing_alt"
         severity:
@@ -336,6 +336,10 @@ components:
             type: string
           description: URLs in the redirect chain, if any
           example: ["https://example.com", "https://www.example.com"]
+        final_url:
+          type: string
+          description: Where the link ends once its redirections are followed, when that differs from the URL written in the message
+          example: "https://www.example.com/page"
         is_shortened:
           type: boolean
           description: Whether this is a URL shortener
@@ -361,6 +365,14 @@ components:
         is_tracking_pixel:
           type: boolean
           description: Whether this appears to be a tracking pixel (1x1 image)
+          example: false
+        http_code:
+          type: integer
+          description: HTTP status code the image source answered with
+          example: 200
+        is_broken:
+          type: boolean
+          description: Whether the image source could not be fetched, leaving a hole where the image should render
           example: false
 
     HeaderAnalysis:

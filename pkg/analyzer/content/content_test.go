@@ -27,7 +27,6 @@ import (
 	"net/mail"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -62,8 +61,8 @@ func TestNewContentAnalyzer(t *testing.T) {
 			if analyzer.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", analyzer.Timeout, tt.expectedTimeout)
 			}
-			if analyzer.httpClient == nil {
-				t.Error("httpClient should not be nil")
+			if analyzer.prober == nil {
+				t.Error("the analyzer has nothing to fetch the message's URLs with")
 			}
 		})
 	}
@@ -262,7 +261,7 @@ func TestIsUnsubscribeLink(t *testing.T) {
 				t.Fatal("Failed to parse test HTML")
 			}
 
-			result := analyzer.isUnsubscribeLink(tt.href, linkNode)
+			result := analyzer.isUnsubscribeLink(tt.href, linkNode, nil)
 			if result != tt.expected {
 				t.Errorf("isUnsubscribeLink(%q, %q) = %v, want %v", tt.href, tt.linkText, result, tt.expected)
 			}
@@ -1011,15 +1010,13 @@ func TestIsTemplatePlaceholderURL(t *testing.T) {
 	}
 }
 
-func TestValidateLink_TemplatePlaceholderIsInvalid(t *testing.T) {
-	analyzer := NewAnalyzer(5 * time.Second)
-
-	check := analyzer.validateLink("{unsubscribe}")
+func TestAnalyzeLinkOffline_TemplatePlaceholderIsInvalid(t *testing.T) {
+	check := analyzeLinkOffline("{unsubscribe}")
 	if check.Valid {
-		t.Errorf("validateLink(%q).Valid = true, want false", "{unsubscribe}")
+		t.Errorf("analyzeLinkOffline(%q).Valid = true, want false", "{unsubscribe}")
 	}
 	if check.Error == "" {
-		t.Errorf("validateLink(%q).Error is empty, want a template placeholder error", "{unsubscribe}")
+		t.Errorf("analyzeLinkOffline(%q).Error is empty, want a template placeholder error", "{unsubscribe}")
 	}
 }
 
@@ -1139,77 +1136,6 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	}
 }
 
-// A destination that turns the automated client away (a rate limit, or the
-// 999 LinkedIn answers to anything but a browser) is not a dead link: the
-// recipient who clicks it gets the page. It is reported as unverified, and
-// costs the message nothing.
-func TestValidateLink_RefusedAutomationIsNotBroken(t *testing.T) {
-	for _, status := range []int{http.StatusTooManyRequests, 999} {
-		t.Run(strconv.Itoa(status), func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(status)
-			}))
-			defer server.Close()
-
-			// Reached by name rather than by address, so that the URL is not
-			// suspicious on its own.
-			link := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
-
-			analyzer := NewAnalyzer(5 * time.Second)
-
-			check := analyzer.validateLink(link)
-			if !check.Valid {
-				t.Errorf("validateLink().Valid = false, want true")
-			}
-			if check.Error != "" {
-				t.Errorf("validateLink().Error = %q, want none", check.Error)
-			}
-			if check.Warning == "" {
-				t.Errorf("validateLink().Warning is empty, want the link reported as unverified")
-			}
-
-			results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
-			analysis := analyzer.analysisOf(results)
-			if got := (*analysis.Links)[0].Status; got == model.LinkCheckStatusBroken {
-				t.Errorf("link status = %q, want it not reported as broken", got)
-			}
-
-			// The same link, had the destination answered: what the port it
-			// listens on is suspected of is the same either way.
-			answered := check
-			answered.Status = http.StatusOK
-			answered.Warning = ""
-
-			refused, _ := analyzer.scoreOf(results)
-			reachable, _ := analyzer.scoreOf(&Results{HTMLValid: true, Links: []LinkCheck{answered}})
-			if refused != reachable {
-				t.Errorf("Score() = %d with a link answering %d, want %d, the score of a reachable one", refused, status, reachable)
-			}
-		})
-	}
-}
-
-// A destination that fails on its own side is still a broken link: the
-// recipient sees the same error page the checker did.
-func TestValidateLink_ServerFailureIsBroken(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
-
-	analyzer := NewAnalyzer(5 * time.Second)
-
-	check := analyzer.validateLink(server.URL)
-	if check.Error == "" {
-		t.Errorf("validateLink().Error is empty, want a status error")
-	}
-
-	results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
-	if got := (*analyzer.analysisOf(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
-		t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusBroken)
-	}
-}
-
 // A tracking pixel is told apart from a picture by what it is drawn as: one
 // pixel wide and high, in attributes or in style, or hidden altogether.
 func TestIsTrackingPixel(t *testing.T) {
@@ -1263,7 +1189,12 @@ func TestIsTrackingPixel(t *testing.T) {
 // judged on neither: the pixel is reported for what it is, then left out of
 // the images the recipient is meant to see.
 func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
-	analyzer := NewAnalyzer(5 * time.Second)
+	// The pixel answers, as a real one does: what is tested is how it is
+	// graded, not whether it loads.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer server.Close()
+
+	analyzer := newProbingTestAnalyzer(5 * time.Second)
 
 	email := &mailmsg.Message{
 		Header: make(mail.Header),
@@ -1272,7 +1203,7 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 				ContentType: "text/html",
 				IsHTML:      true,
 				Content: `<html><body><p>Hello there</p>
-					<img src="https://example.com/open.gif" width="1" height="1">
+					<img src="` + server.URL + `/open.gif" width="1" height="1">
 				</body></html>`,
 			},
 		},
@@ -1298,11 +1229,14 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		}
 	}
 
+	// The pixel costs what a described picture at the same address would,
+	// which is to say nothing for its missing alt text.
 	score, _ := analyzer.scoreOf(results)
-	results.Images = nil
-	without, _ := analyzer.scoreOf(results)
-	if score != without {
-		t.Errorf("Score() = %d with a tracking pixel, want %d, the score without it", score, without)
+	results.Images[0].IsTrackingPixel = false
+	results.Images[0].HasAlt = true
+	described, _ := analyzer.scoreOf(results)
+	if score != described {
+		t.Errorf("Score() = %d with a tracking pixel, want %d, the score of a described picture", score, described)
 	}
 }
 
@@ -1453,4 +1387,45 @@ func htmlResults(t *testing.T, body string) *Results {
 		Header: make(mail.Header),
 		Parts:  []mailmsg.Part{{ContentType: "text/html", IsHTML: true, Content: body}},
 	})
+}
+
+func TestAnalyzeLinkOffline_URLThatDoesNotParse(t *testing.T) {
+	check := analyzeLinkOffline("http://exa mple.com/")
+
+	if check.Valid || check.Error == "" {
+		t.Errorf("analyzeLinkOffline of a URL that does not parse = %+v, want it invalid with a reason", check)
+	}
+}
+
+// TestAnalysisLinkStatus pins the status a link is reported under, from what
+// fetching it turned up.
+func TestAnalysisLinkStatus(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	loop := LinkHTTPFinding{Kind: LinkHTTPRedirectLoop}
+
+	tests := []struct {
+		name string
+		link LinkCheck
+		want model.LinkCheckStatus
+	}{
+		{"answers", LinkCheck{URL: "https://example.com/", Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}}, model.LinkCheckStatusValid},
+		{"not found", LinkCheck{URL: "https://example.com/", Valid: true, IsSafe: true, probedURL: probedURL{Status: 404}}, model.LinkCheckStatusBroken},
+		{"redirects forever", LinkCheck{URL: "https://example.com/", Valid: true, IsSafe: true, probedURL: probedURL{HTTPFindings: []LinkHTTPFinding{loop}}}, model.LinkCheckStatusBroken},
+		{"suspicious", LinkCheck{URL: "https://example.com/", Valid: true, IsSafe: false, probedURL: probedURL{Status: 200}}, model.LinkCheckStatusSuspicious},
+		{"could not be verified", LinkCheck{URL: "https://example.com/", Valid: true, IsSafe: true, Warning: "Could not verify link"}, model.LinkCheckStatusTimeout},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analysis := analyzer.analysisOf(&Results{HTMLContent: "<p>x</p>", Links: []LinkCheck{tt.link}})
+
+			if analysis.Links == nil || len(*analysis.Links) != 1 {
+				t.Fatalf("expected 1 link in analysis, got %v", analysis.Links)
+			}
+			if got := (*analysis.Links)[0].Status; got != tt.want {
+				t.Errorf("link status = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

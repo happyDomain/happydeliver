@@ -41,6 +41,8 @@ var contentChecks = []contentCheck{
 	templatePlaceholderCheck,
 	linkSuspicionCheck,
 	imageSuspicionCheck,
+	probeFindingCheck,
+	unprobedURLsCheck,
 
 	harmfulHTMLCheck,
 	htmlRemarkCheck,
