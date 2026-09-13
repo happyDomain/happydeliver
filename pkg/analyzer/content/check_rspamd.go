@@ -104,6 +104,12 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Severity: model.ContentIssueSeverityHigh,
 		Message:  "The message contains text whose colour makes it unreadable against its background.",
 		Advice:   "Give every text a colour that contrasts with what is behind it; filters score text invisible against its background as hidden content",
+		// The same defect lowContrastCheck measures, at its extreme. Where we
+		// found it ourselves, ours is the finding kept: it carries the two
+		// colours and the ratio they measure, and the filter's agreement is
+		// noted on it. Where the colours came from a stylesheet we do not read,
+		// this stands alone and is the only word on it.
+		Concern: "low_contrast",
 	},
 	"ZERO_FONT": {
 		Issue:    model.ContentIssueTypeHiddenText,

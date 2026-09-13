@@ -74,6 +74,20 @@ var (
 	// rendering, so weighing them by severity would say nothing.
 	familyHarmfulHTML = &reading.Family{Name: "harmful_html", Cap: 40, PerItem: 20}
 
+	// familyLowContrast answers for text a reader cannot make out against what
+	// is behind it.
+	//
+	// It is charged where defectClientCompat is not, and the difference is the
+	// whole reason the two are apart: a client dropping a property may or may
+	// not change what the reader sees, while a ratio computed from the two
+	// colours the sender wrote is a measurement, against a bar a standard fixes.
+	// Nothing is held in ambiguity here.
+	//
+	// The cap is ten, like the families around it. A message whose palette is
+	// too pale throughout has made one decision about its palette, and answers
+	// for it once.
+	familyLowContrast = &reading.Family{Name: "low_contrast", Cap: 10}
+
 	// familyRspamd answers for what the spam filter of the receiving MTA
 	// observed about the content. It is capped like the others: a filter with
 	// a lot to say informs the reader, it does not decide the grade.
