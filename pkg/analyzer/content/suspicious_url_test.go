@@ -514,7 +514,7 @@ func TestGenerateContentAnalysis_SuspiciousLinkIssues(t *testing.T) {
 		},
 	}
 
-	analysis := analyzer.Analysis(results)
+	analysis := analyzer.analysisOf(results)
 
 	if analysis.HtmlIssues == nil {
 		t.Fatal("expected suspicious_link issues, got none")
@@ -559,7 +559,7 @@ func TestGenerateContentAnalysis_CleanLinkHasNoIssue(t *testing.T) {
 		Links:       []LinkCheck{{URL: cleanURL, Valid: true, IsSafe: true, Status: 200}},
 	}
 
-	analysis := analyzer.Analysis(results)
+	analysis := analyzer.analysisOf(results)
 
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
@@ -603,7 +603,7 @@ func TestGenerateContentAnalysis_IsShortenedOnlyForShorteners(t *testing.T) {
 		links = append(links, LinkCheck{URL: tt.url, Valid: true, Status: 200, IsSafe: len(suspicions) == 0, Suspicions: suspicions})
 	}
 
-	analysis := analyzer.Analysis(&Results{HTMLContent: "<html></html>", Links: links})
+	analysis := analyzer.analysisOf(&Results{HTMLContent: "<html></html>", Links: links})
 	if analysis.Links == nil || len(*analysis.Links) != len(tests) {
 		t.Fatalf("expected %d links, got %v", len(tests), analysis.Links)
 	}
@@ -633,15 +633,15 @@ func TestCalculateContentScore_SuspiciousLinksPenalty(t *testing.T) {
 		}
 	}
 
-	cleanScore, _ := analyzer.Score(base([]LinkCheck{{URL: "https://example.com/", Valid: true, IsSafe: true}}))
+	cleanScore, _ := analyzer.scoreOf(base([]LinkCheck{{URL: "https://example.com/", Valid: true, IsSafe: true}}))
 
 	lowURL := "https://example.com:8443/"
-	lowScore, _ := analyzer.Score(base([]LinkCheck{
+	lowScore, _ := analyzer.scoreOf(base([]LinkCheck{
 		{URL: lowURL, Valid: true, Suspicions: analyzeURLSuspicions(lowURL)},
 	}))
 
 	highURL := "https://bank.example.com@192.0.2.10/login"
-	highScore, _ := analyzer.Score(base([]LinkCheck{
+	highScore, _ := analyzer.scoreOf(base([]LinkCheck{
 		{URL: highURL, Valid: true, Suspicions: analyzeURLSuspicions(highURL)},
 	}))
 
