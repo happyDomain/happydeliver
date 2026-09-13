@@ -35,6 +35,7 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -43,6 +44,30 @@ import (
 // recognised as the same host.
 func Normalize(hostname string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
+}
+
+// ASCII puts a hostname in the one form two of them can be compared in: its
+// A-labels, the ASCII spelling every internationalised name has exactly one of.
+// "éxample.com" and "xn--xample-9ua.com" are the same host written twice, and
+// only this form says so; a message advertising one while linking to the other
+// advertises where it goes, and is not to be read as deceiving anybody.
+//
+// It is also the form the public suffix list is written in, so a host in
+// Unicode finds no suffix, and no registrable domain, until it is converted.
+//
+// A name the IDNA rules reject is returned normalised but unconverted, since
+// there is nothing else to return and dropping it would silence the comparison
+// rather than settle it: a name no encoder accepts is then as unequal to
+// another as it reads.
+func ASCII(hostname string) string {
+	hostname = Normalize(hostname)
+
+	ascii, err := idna.Lookup.ToASCII(hostname)
+	if err != nil {
+		return hostname
+	}
+
+	return ascii
 }
 
 // Organizational returns the domain a name belongs to, the eTLD+1 the Public
@@ -55,7 +80,9 @@ func Normalize(hostname string) string {
 // everything else; the alternative, refusing to answer, would leave the caller
 // with nothing to compare.
 func Organizational(domain string) string {
-	domain = strings.ToLower(strings.TrimSpace(domain))
+	// In A-labels: the list is written in them, and a host in Unicode has no
+	// suffix in it until converted.
+	domain = ASCII(domain)
 
 	etldPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
 	if err != nil {
