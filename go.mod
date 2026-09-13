@@ -11,6 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/tdewolff/parse/v2 v2.8.16
+	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
 	gorm.io/driver/postgres v1.6.2
 	gorm.io/driver/sqlite v1.6.0
