@@ -157,10 +157,11 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 	// --- Text and HTML out of sync
 	"R_PARTS_DIFFER": {
 		Defect:   defectTextHTMLMismatch,
-		Issue:    model.ContentIssueTypeBrokenHtml,
+		Issue:    model.ContentIssueTypeTextHtmlMismatch,
 		Severity: model.ContentIssueSeverityLow,
 		Message:  "The text and HTML parts do not say the same thing: %s",
 		Advice:   "Generate the text part from the HTML rather than maintaining it by hand; a stale text alternative is what clients that prefer text display",
+		Concern:  "text_html_mismatch",
 	},
 
 	// --- Destination reputation

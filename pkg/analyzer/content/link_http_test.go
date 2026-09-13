@@ -655,10 +655,10 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 
 	base := func(findings []LinkHTTPFinding, status int) *Results {
 		return &Results{
-			HTMLValid:      true,
-			HTMLContent:    "<html><body><p>Newsletter</p></body></html>",
-			TextContent:    "Newsletter",
-			TextPlainRatio: 1,
+			HTMLValid:       true,
+			HTMLContent:     "<html><body><p>Newsletter</p></body></html>",
+			TextContent:     "Newsletter",
+			TextAlternative: textAltOK,
 			Links: []LinkCheck{
 				{URL: "https://example.com/a", Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}},
 				{
@@ -720,10 +720,10 @@ func TestCalculateContentScoreKeepsPenaltyBudgetsApart(t *testing.T) {
 	// read as often as needed but never rewritten between two readings.
 	message := func(suspicions []URLSuspicion) *Results {
 		return &Results{
-			HTMLValid:      true,
-			HTMLContent:    "<html><body><p>Newsletter</p></body></html>",
-			TextContent:    "Newsletter",
-			TextPlainRatio: 1,
+			HTMLValid:       true,
+			HTMLContent:     "<html><body><p>Newsletter</p></body></html>",
+			TextContent:     "Newsletter",
+			TextAlternative: textAltOK,
 			Links: []LinkCheck{{
 				URL: "https://example.com/a", Valid: true, Suspicions: suspicions,
 				probedURL: probedURL{Status: 200, HTTPFindings: findings},
@@ -918,11 +918,11 @@ func TestRepeatedURLIsReportedOnce(t *testing.T) {
 	}
 
 	results := &Results{
-		HTMLValid:      true,
-		HTMLContent:    "<html><body><p>Newsletter</p></body></html>",
-		TextContent:    "Newsletter",
-		TextPlainRatio: 1,
-		Links:          []LinkCheck{dead, dead, dead, dead, dead},
+		HTMLValid:       true,
+		HTMLContent:     "<html><body><p>Newsletter</p></body></html>",
+		TextContent:     "Newsletter",
+		TextAlternative: textAltOK,
+		Links:           []LinkCheck{dead, dead, dead, dead, dead},
 		// The same URL used as an image source is still the same URL.
 		Images: []ImageCheck{{
 			Src: deadURL, HasAlt: true, AltText: "Gone", Valid: true,

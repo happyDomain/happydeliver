@@ -39,9 +39,9 @@ func TestAURLThatNamesNoDestinationCountsAsBroken(t *testing.T) {
 
 	links := func(second LinkCheck) *Results {
 		return &Results{
-			HTMLValid:      true,
-			TextContent:    "Newsletter",
-			TextPlainRatio: 1,
+			HTMLValid:       true,
+			TextContent:     "Newsletter",
+			TextAlternative: textAltOK,
 			Links: []LinkCheck{
 				{URL: "https://example.com/a", Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}},
 				second,
@@ -70,9 +70,9 @@ func TestAnImageThatDoesNotLoadCostsTheImagesCriterion(t *testing.T) {
 
 	images := func(second ImageCheck) *Results {
 		return &Results{
-			HTMLValid:      true,
-			TextContent:    "Newsletter",
-			TextPlainRatio: 1,
+			HTMLValid:       true,
+			TextContent:     "Newsletter",
+			TextAlternative: textAltOK,
 			Images: []ImageCheck{
 				{Src: "https://example.com/a.png", HasAlt: true, AltText: "a"},
 				second,
