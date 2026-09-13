@@ -390,6 +390,7 @@ This project is funded through [NGI Zero Core](https://nlnet.nl/core), a fund es
 
 GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 
-One embedded data file, the URL shortener domain list in
-`pkg/emaildata/shorteners/data/url-shorteners.list`, is third-party material used verbatim
-under CC-BY-SA-4.0. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+The datasets an email is read against, under `pkg/emaildata/`, are third-party
+material used verbatim under their own licenses: the URL shortener domain list
+under CC-BY-SA-4.0, the Can I email client support data under MIT. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
