@@ -1136,6 +1136,84 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	}
 }
 
+// TestContentCriteriaSumToTheScale holds the score to the scale it is
+// expressed on: a criterion added without taking its weight from another would
+// otherwise quietly make a hundred mean something else, and the penalties the
+// checks deduct are expressed in points of that hundred.
+func TestContentCriteriaSumToTheScale(t *testing.T) {
+	total := 0
+	seen := make(map[string]bool, len(contentCriteria))
+
+	for i, criterion := range contentCriteria {
+		if criterion.Name == "" {
+			t.Errorf("criterion %d has no name", i)
+		}
+		if seen[criterion.Name] {
+			t.Errorf("criterion %q is weighed twice", criterion.Name)
+		}
+		seen[criterion.Name] = true
+
+		if criterion.Weight <= 0 {
+			t.Errorf("criterion %q weighs %d, so nothing it judges counts", criterion.Name, criterion.Weight)
+		}
+		total += criterion.Weight
+	}
+
+	if total != 100 {
+		t.Errorf("the criteria weigh %d in all, want 100", total)
+	}
+}
+
+// TestAWithdrawnCriterionIsNotFailed pins how a criterion that cannot be
+// judged is handled: it leaves the scale, and the message is graded on what
+// was readable. Failing it instead would charge the sender for bytes that
+// never arrived.
+func TestAWithdrawnCriterionIsNotFailed(t *testing.T) {
+	analyzer := NewAnalyzer(time.Second)
+
+	whole := &Results{HTMLValid: true, TextContent: "hello", TextPlainRatio: 1}
+	cut := &Results{HTMLValid: true, TextContent: "hello", BodyTruncated: true}
+
+	wholeScore, _ := analyzer.scoreOf(whole)
+	cutScore, _ := analyzer.scoreOf(cut)
+
+	if wholeScore != 100 {
+		t.Fatalf("a message answering every criterion scored %d, want 100", wholeScore)
+	}
+	if cutScore != 100 {
+		t.Errorf("a message whose body was cut short scored %d on the criteria it could still answer, want 100", cutScore)
+	}
+}
+
+// A truncated body must not collect the "no links, no images" credits either:
+// crediting a message for content it does not appear to have is rewarding an
+// absence of evidence, not an absence of links or images. It used to come out
+// around 80/100, no worse than a genuinely empty, fully-read message.
+func TestAnalyzeContent_IncompleteBodyIsNotScoredAsClean(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	incomplete := analyzer.Analyze(&mailmsg.Message{
+		Header:         make(mail.Header),
+		BodyIncomplete: true,
+	})
+	empty := analyzer.Analyze(&mailmsg.Message{
+		Header: make(mail.Header),
+	})
+
+	if incomplete.TextPlainRatio != 0 {
+		t.Errorf("TextPlainRatio = %v, want 0 for a body that could not be read", incomplete.TextPlainRatio)
+	}
+	if empty.TextPlainRatio != 1.0 {
+		t.Errorf("TextPlainRatio = %v, want 1.0 for a genuinely single-part message", empty.TextPlainRatio)
+	}
+
+	incompleteScore, _ := analyzer.scoreOf(incomplete)
+	emptyScore, _ := analyzer.scoreOf(empty)
+	if incompleteScore >= emptyScore {
+		t.Errorf("Unreadable body scored %d, no better than a readable empty one at %d", incompleteScore, emptyScore)
+	}
+}
+
 // htmlResults reads a one-part HTML message, which is what the markup walk is
 // given in production. Nothing is fetched: the fixtures below carry no link
 // and no image.

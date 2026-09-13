@@ -39,7 +39,6 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
 
-	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -843,97 +842,4 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 	}
 
 	return analysis
-}
-
-// Score calculates the content score (0-20 points)
-func (c *Analyzer) Score(results *Results, read Reading) (int, string) {
-	if results == nil {
-		return 0, ""
-	}
-
-	var score int = 10
-
-	// The points a flawless message can reach. A criterion the received bytes
-	// cannot answer is subtracted from it instead of being refused, so that a
-	// body cut short on its way does not cost the sender a grade.
-	attainable := 100
-
-	// HTML validity or text alone (10 points)
-	if results.HTMLValid || (!results.IsMultipart && results.HasPlaintext()) {
-		score += 10
-	}
-
-	// Requires plain text alternative (10 points)
-	if results.HasPlaintext() {
-		score += 10
-	}
-
-	// Links (25 points)
-	if len(results.Links) > 0 {
-		brokenLinks := 0
-		for _, link := range results.Links {
-			if link.Status >= 400 {
-				brokenLinks++
-			}
-		}
-		score += 20 * (len(results.Links) - brokenLinks) / len(results.Links)
-		// Too much links, 10 points penalty
-		if len(results.Links) > 30 {
-			score -= 10
-		}
-	} else {
-		// No links is better, less suspiscous
-		score += 25
-	}
-
-	// Images (15 points)
-	if len(results.Images) > 0 {
-		noAltCount := 0
-		for _, img := range results.Images {
-			if !img.HasAlt {
-				noAltCount++
-			}
-		}
-		score += 15 * (len(results.Images) - noAltCount) / len(results.Images)
-	} else {
-		// No images is Ok
-		score += 15
-	}
-
-	// Text consistency (15 points). A truncated body cannot be judged on it: the
-	// plain text counterpart of the HTML may simply never have arrived. Drop the
-	// criterion rather than award or refuse its points.
-	if results.BodyTruncated {
-		attainable -= 15
-	} else if results.TextPlainRatio >= 0.3 {
-		score += 15
-	}
-
-	// Image ratio (15 points)
-	if results.ImageTextRatio <= 5.0 {
-		score += 15
-	} else if results.ImageTextRatio <= 10.0 {
-		score += 7
-	}
-
-	// Bring the criteria that could be judged back onto the 0-100 scale, before
-	// the penalties below, which are expressed in points of that scale.
-	if attainable != 100 {
-		score = score * 100 / attainable
-	}
-
-	// Answer for what the checks found. Each family of findings is capped on
-	// its own, so that a message with two unrelated defects answers for both
-	// without either deciding the grade by itself.
-	score -= read.Penalty
-
-	// Ensure score is between 0 and 100
-	if score < 0 {
-		score = 0
-	}
-	if score > 100 {
-		score = 100
-	}
-
-	return score, grade.Of(score)
 }
