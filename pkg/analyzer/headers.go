@@ -392,7 +392,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	// Extract From domain
 	fromAddr := email.GetHeaderValue("From")
 	if fromAddr != "" {
-		domain := h.extractDomain(fromAddr)
+		domain := mailmsg.AddressDomain(fromAddr)
 		if domain != "" {
 			alignment.FromDomain = &domain
 			// Extract organizational domain
@@ -404,7 +404,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	// Extract Return-Path domain
 	returnPath := email.GetHeaderValue("Return-Path")
 	if returnPath != "" {
-		domain := h.extractDomain(returnPath)
+		domain := mailmsg.AddressDomain(returnPath)
 		if domain != "" {
 			alignment.ReturnPathDomain = &domain
 			// Extract organizational domain
@@ -527,24 +527,6 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	}
 
 	return alignment
-}
-
-// extractDomain extracts domain from email address
-func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
-	// Remove angle brackets if present
-	emailAddr = strings.Trim(emailAddr, "<> ")
-
-	// Find @ symbol
-	atIndex := strings.LastIndex(emailAddr, "@")
-	if atIndex == -1 {
-		return ""
-	}
-
-	domain := emailAddr[atIndex+1:]
-	// Remove any trailing >
-	domain = strings.TrimRight(domain, ">")
-
-	return domain
 }
 
 // findHeaderIssues identifies issues with headers
