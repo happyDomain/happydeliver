@@ -40,12 +40,31 @@ func reports(name string, family *Family, severities ...model.ContentIssueSeveri
 		Name:     name,
 		Family:   family,
 		Category: CategoryContent,
-		Run: func(context.Context, message) ([]model.ContentIssue, error) {
-			issues := make([]model.ContentIssue, 0, len(severities))
+		Run: func(context.Context, message) ([]Finding, error) {
+			findings := make([]Finding, 0, len(severities))
 			for _, severity := range severities {
-				issues = append(issues, model.ContentIssue{Severity: severity, Message: name})
+				findings = append(findings, Finding{ContentIssue: model.ContentIssue{Severity: severity, Message: name}})
 			}
-			return issues, nil
+			return findings, nil
+		},
+	}
+}
+
+// concerning builds a check whose findings all name one concern, for the tests
+// about two checks seeing one defect.
+func concerning(name string, concern string, severities ...model.ContentIssueSeverity) Check[message] {
+	return Check[message]{
+		Name:     name,
+		Category: CategoryContent,
+		Run: func(context.Context, message) ([]Finding, error) {
+			findings := make([]Finding, 0, len(severities))
+			for _, severity := range severities {
+				findings = append(findings, Finding{
+					Concern:      concern,
+					ContentIssue: model.ContentIssue{Severity: severity, Message: name},
+				})
+			}
+			return findings, nil
 		},
 	}
 }
@@ -139,8 +158,8 @@ func TestRunKeepsRegistryOrder(t *testing.T) {
 func TestACheckThatCouldNotAnswerIsNotReported(t *testing.T) {
 	failing := Check[message]{
 		Name: "scanner",
-		Run: func(context.Context, message) ([]model.ContentIssue, error) {
-			return []model.ContentIssue{{Severity: model.ContentIssueSeverityHigh, Message: "scanner"}},
+		Run: func(context.Context, message) ([]Finding, error) {
+			return []Finding{{ContentIssue: model.ContentIssue{Severity: model.ContentIssueSeverityHigh, Message: "scanner"}}},
 				errors.New("the service did not answer")
 		},
 	}
@@ -152,5 +171,44 @@ func TestACheckThatCouldNotAnswerIsNotReported(t *testing.T) {
 	}
 	if penalty != 0 {
 		t.Errorf("a check that could not answer was charged %d point(s)", penalty)
+	}
+}
+
+// TestADefectSeenTwiceIsReportedOnce holds the merge: two checks describing
+// the same thing about the same object leave one finding, naming the other as
+// having seen it too.
+func TestADefectSeenTwiceIsReportedOnce(t *testing.T) {
+	low := model.ContentIssueSeverityLow
+	checks := []Check[message]{
+		concerning("ours", "dead_link:https://example.com/", low),
+		concerning("filter", "dead_link:https://example.com/", low),
+	}
+
+	issues, _ := Run(context.Background(), checks, message{})
+
+	if len(issues) != 1 {
+		t.Fatalf("reported %d issue(s), want the one they both saw", len(issues))
+	}
+	if issues[0].Message != "ours" {
+		t.Errorf("kept the finding of %q, want the first one reported", issues[0].Message)
+	}
+	if issues[0].CorroboratedBy == nil || len(*issues[0].CorroboratedBy) != 1 || (*issues[0].CorroboratedBy)[0] != "filter" {
+		t.Errorf("corroborated_by reads %v, want the other observer named once", issues[0].CorroboratedBy)
+	}
+}
+
+// TestAnObserverAgreeingWithItselfIsNotACorroboration: the same check reporting
+// one concern twice has found it twice, not had it confirmed.
+func TestAnObserverAgreeingWithItselfIsNotACorroboration(t *testing.T) {
+	low := model.ContentIssueSeverityLow
+	twice := concerning("ours", "dead_link:https://example.com/", low, low)
+
+	issues, _ := Run(context.Background(), []Check[message]{twice}, message{})
+
+	if len(issues) != 1 {
+		t.Fatalf("reported %d issue(s), want one", len(issues))
+	}
+	if issues[0].CorroboratedBy != nil {
+		t.Errorf("corroborated_by reads %v, want nothing at all", *issues[0].CorroboratedBy)
 	}
 }

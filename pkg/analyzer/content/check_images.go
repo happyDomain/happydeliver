@@ -40,7 +40,7 @@ import (
 var missingAltCheck = contentCheck{
 	Name:     "missing_alt",
 	Category: reading.CategoryAccessibility,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		missing := 0
 		for _, img := range in.Results.VisibleImages() {
 			if !img.HasAlt {
@@ -51,12 +51,12 @@ var missingAltCheck = contentCheck{
 			return nil, nil
 		}
 
-		return []model.ContentIssue{{
+		return []reading.Finding{{ContentIssue: model.ContentIssue{
 			Type:     model.ContentIssueTypeMissingAlt,
 			Severity: model.ContentIssueSeverityMedium,
 			Message:  fmt.Sprintf("%d image(s) missing alt attributes", missing),
 			Advice:   utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
-		}}, nil
+		}}}, nil
 	},
 }
 
@@ -67,16 +67,22 @@ var missingAltCheck = contentCheck{
 var excessiveImagesCheck = contentCheck{
 	Name:     "excessive_images",
 	Category: reading.CategoryDeliverability,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.ImageTextRatio <= 10.0 {
 			return nil, nil
 		}
 
-		return []model.ContentIssue{{
-			Type:     model.ContentIssueTypeExcessiveImages,
-			Severity: model.ContentIssueSeverityMedium,
-			Message:  "Email is excessively image-heavy",
-			Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
+		return []reading.Finding{{
+			ContentIssue: model.ContentIssue{
+				Type:     model.ContentIssueTypeExcessiveImages,
+				Severity: model.ContentIssueSeverityMedium,
+				Message:  "Email is excessively image-heavy",
+				Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
+			},
+			// A statement about the whole message, which needs no instance
+			// key: rspamd's R_SUSPICIOUS_IMAGES says the same of the same
+			// message, and there is only ever one of each.
+			Concern: "excessive_images",
 		}}, nil
 	},
 }
@@ -91,18 +97,21 @@ var imageSuspicionCheck = contentCheck{
 	Name:     "image_suspicion",
 	Category: reading.CategorySecurity,
 	Family:   familyURLSuspicion,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
-		var issues []model.ContentIssue
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		var issues []reading.Finding
 
 		for _, img := range in.Results.Images {
 			for _, suspicion := range img.Suspicions {
 				location := img.Src
-				issues = append(issues, model.ContentIssue{
-					Type:     model.ContentIssueTypeSuspiciousLink,
-					Severity: suspicion.Severity,
-					Message:  suspicion.Message,
-					Location: &location,
-					Advice:   utils.PtrTo(suspicion.Advice),
+				issues = append(issues, reading.Finding{
+					ContentIssue: model.ContentIssue{
+						Type:     model.ContentIssueTypeSuspiciousLink,
+						Severity: suspicion.Severity,
+						Message:  suspicion.Message,
+						Location: &location,
+						Advice:   utils.PtrTo(suspicion.Advice),
+					},
+					Concern: suspicionConcern(suspicion.Kind, img.Src),
 				})
 			}
 		}
