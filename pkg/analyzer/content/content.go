@@ -410,17 +410,18 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 	}
 }
 
-// getAttrOf reads an attribute off a node.
+// getAttrOf reads an attribute off a node, case-insensitively on the name.
 //
 // It is a function rather than a Analyzer method because the checks that
 // read the tree afterwards have no analyzer: they are handed the document the
 // analysis already parsed.
 func getAttrOf(n *html.Node, key string) string {
 	for _, attr := range n.Attr {
-		if attr.Key == key {
+		if strings.EqualFold(attr.Key, key) {
 			return attr.Val
 		}
 	}
+
 	return ""
 }
 

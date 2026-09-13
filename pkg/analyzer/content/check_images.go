@@ -55,8 +55,9 @@ var missingAltCheck = contentCheck{
 		return []reading.Finding{{Defect: defectMissingAlt, ContentIssue: model.ContentIssue{
 			Type:     model.ContentIssueTypeMissingAlt,
 			Severity: model.ContentIssueSeverityMedium,
-			Message:  fmt.Sprintf("%d image(s) missing alt attributes", missing),
-			Advice:   utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
+			Message: fmt.Sprintf("%s %s no alt attribute",
+				counted(missing, "One image", "images"), agree(missing, "carries", "carry")),
+			Advice: utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
 		}}}, nil
 	},
 }
