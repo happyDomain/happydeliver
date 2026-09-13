@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
-	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/reading"
 	"golang.org/x/net/html"
 )
@@ -39,6 +38,7 @@ import (
 var brokenHTMLCheck = contentCheck{
 	Name:     "broken_html",
 	Category: reading.CategoryRendering,
+	Reports:  []*reading.Defect{defectBrokenHTML},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.HTMLValid || len(in.Results.HTMLErrors) == 0 {
 			return nil, nil
@@ -46,12 +46,14 @@ var brokenHTMLCheck = contentCheck{
 
 		issues := make([]reading.Finding, 0, len(in.Results.HTMLErrors))
 		for _, errMsg := range in.Results.HTMLErrors {
-			issues = append(issues, reading.Finding{ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeBrokenHtml,
-				Severity: model.ContentIssueSeverityHigh,
-				Message:  errMsg,
-				Advice:   utils.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
-			}})
+			issues = append(issues, reading.NewFinding(
+				defectBrokenHTML,
+				model.ContentIssueTypeBrokenHtml,
+				model.ContentIssueSeverityHigh,
+				"",
+				errMsg,
+				"Fix HTML structure errors to improve email rendering across clients",
+			))
 		}
 
 		return issues, nil
@@ -66,7 +68,7 @@ var brokenHTMLCheck = contentCheck{
 var harmfulHTMLCheck = contentCheck{
 	Name:     "harmful_html",
 	Category: reading.CategorySecurity,
-	Family:   familyHarmfulHTML,
+	Reports:  []*reading.Defect{defectDangerousHTML},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.HTML == nil {
 			return nil, nil
@@ -79,12 +81,14 @@ var harmfulHTMLCheck = contentCheck{
 				return
 			}
 
-			findings = append(findings, reading.Finding{ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeDangerousHtml,
-				Severity: model.ContentIssueSeverityCritical,
-				Message:  message,
-				Advice:   utils.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
-			}})
+			findings = append(findings, reading.NewFinding(
+				defectDangerousHTML,
+				model.ContentIssueTypeDangerousHtml,
+				model.ContentIssueSeverityCritical,
+				"",
+				message,
+				"Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content",
+			))
 		})
 
 		return findings, nil
@@ -150,6 +154,7 @@ func harmfulTagMessage(n *html.Node) string {
 var htmlRemarkCheck = contentCheck{
 	Name:     "html_remark",
 	Category: reading.CategoryRendering,
+	Reports:  []*reading.Defect{defectHTMLRemark},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.HTML == nil {
 			return nil, nil
@@ -172,17 +177,19 @@ var htmlRemarkCheck = contentCheck{
 				return
 			}
 
-			findings = append(findings, reading.Finding{
-				ContentIssue: model.ContentIssue{
-					Type:     model.ContentIssueTypeBrokenHtml,
-					Severity: model.ContentIssueSeverityLow,
-					Message:  fmt.Sprintf("External stylesheet link detected: %s - may cause rendering issues or privacy concerns", href),
-					Advice:   utils.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
-				},
-				// rspamd's EXT_CSS names the same stylesheet: keying on its URL
-				// lets the two be recognised as one finding.
-				Concern: concernForURL("external_css", href),
-			})
+			found := reading.NewFinding(
+				defectHTMLRemark,
+				model.ContentIssueTypeBrokenHtml,
+				model.ContentIssueSeverityLow,
+				"",
+				fmt.Sprintf("External stylesheet link detected: %s - may cause rendering issues or privacy concerns", href),
+				"Use inline CSS instead of external stylesheets for better email compatibility",
+			)
+			// rspamd's EXT_CSS names the same stylesheet: keying on its URL
+			// lets the two be recognised as one finding.
+			found.Concern = concernForURL("external_css", href)
+
+			findings = append(findings, found)
 		})
 
 		return findings, nil
