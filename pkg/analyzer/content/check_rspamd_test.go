@@ -330,11 +330,11 @@ func TestRspamdFindingsReachTheReport(t *testing.T) {
 	// And the score answers for it, once.
 	score, _ := analyzer.scoreOf(results)
 	bare, _ := analyzer.scoreOf(&Results{
-		HTMLValid:      results.HTMLValid,
-		HTMLContent:    results.HTMLContent,
-		TextContent:    results.TextContent,
-		TextPlainRatio: results.TextPlainRatio,
-		IsMultipart:    results.IsMultipart,
+		HTMLValid:       results.HTMLValid,
+		HTMLContent:     results.HTMLContent,
+		TextContent:     results.TextContent,
+		TextAlternative: results.TextAlternative,
+		IsMultipart:     results.IsMultipart,
 	})
 	if score >= bare {
 		t.Errorf("the finding cost nothing: %d with it, %d without", score, bare)

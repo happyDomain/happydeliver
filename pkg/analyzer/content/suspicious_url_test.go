@@ -665,13 +665,13 @@ func TestCalculateContentScore_SuspiciousLinksPenalty(t *testing.T) {
 
 	base := func(links []LinkCheck) *Results {
 		return &Results{
-			IsMultipart:    true,
-			HTMLValid:      true,
-			HTMLContent:    "<html><body>Hello</body></html>",
-			TextContent:    "Hello",
-			HasUnsubscribe: true,
-			TextPlainRatio: 1,
-			Links:          links,
+			IsMultipart:     true,
+			HTMLValid:       true,
+			HTMLContent:     "<html><body>Hello</body></html>",
+			TextContent:     "Hello",
+			HasUnsubscribe:  true,
+			TextAlternative: textAltOK,
+			Links:           links,
 		}
 	}
 
@@ -786,13 +786,13 @@ func TestCalculateContentScore_InsecureImagePenalty(t *testing.T) {
 
 	base := func(src string) *Results {
 		results := &Results{
-			IsMultipart:    true,
-			HTMLValid:      true,
-			HTMLContent:    "<html><body>Hello</body></html>",
-			TextContent:    "Hello",
-			HasUnsubscribe: true,
-			TextPlainRatio: 1,
-			Images:         []ImageCheck{{Src: src, HasAlt: true, AltText: "Logo", Valid: true}},
+			IsMultipart:     true,
+			HTMLValid:       true,
+			HTMLContent:     "<html><body>Hello</body></html>",
+			TextContent:     "Hello",
+			HasUnsubscribe:  true,
+			TextAlternative: textAltOK,
+			Images:          []ImageCheck{{Src: src, HasAlt: true, AltText: "Logo", Valid: true}},
 		}
 		if suspicion := insecureSchemeSuspicion("Image", src); suspicion != nil {
 			results.Images[0].Suspicions = append(results.Images[0].Suspicions, *suspicion)

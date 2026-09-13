@@ -177,20 +177,28 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// A plain text part that says what the HTML says. A truncated body
-		// cannot be judged on it: the counterpart may simply never have
-		// arrived.
+		// A plain text part that says what the HTML says. A message nothing
+		// could be read off, a truncated body first among them, leaves the
+		// scale rather than failing here: the counterpart may simply never
+		// have arrived.
 		Name:    "text_consistency",
 		Weight:  15,
 		Answers: []*reading.Defect{defectTextHTMLMismatch},
 		Points: func(in *contentInput) (int, bool) {
-			if in.Results.BodyTruncated {
+			switch in.Results.TextAlternative {
+			case textAltUnknown, textAltAbsent:
+				// Nothing to compare, and in the case of a message carrying no
+				// text part at all, nothing this criterion answers for either:
+				// the plaintext_alternative criterion above already withholds
+				// its ten points for that absence, and failing this one on top
+				// would charge one absence twice. What is graded here is two
+				// parts that disagree, which takes two parts.
 				return 0, false
-			}
-			if in.Results.TextPlainRatio >= 0.3 {
+			case textAltOK:
 				return 15, true
+			default:
+				return 0, true
 			}
-			return 0, true
 		},
 	},
 	{

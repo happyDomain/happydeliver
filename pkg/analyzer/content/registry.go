@@ -35,6 +35,12 @@ var contentChecks = []contentCheck{
 
 	brokenHTMLCheck,
 
+	// What the message says, before what it is made of: a text alternative
+	// that contradicts the HTML, or offers destinations the HTML does not,
+	// qualifies everything a reader who prefers text ever sees.
+	textAlternativeCheck,
+	textLinkParityCheck,
+
 	missingAltCheck,
 	excessiveImagesCheck,
 
