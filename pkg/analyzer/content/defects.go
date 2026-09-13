@@ -40,6 +40,7 @@ var contentDefects = []*reading.Defect{
 	defectDeadImage,
 	defectDeadUnsubscribe,
 	defectRedirectChain,
+	defectOffDomainLinks,
 	defectUnprobedURLs,
 	defectClientCompat,
 	defectEventHandler,
@@ -128,6 +129,26 @@ var (
 	// defectRedirectChain: a URL that is reached, but only after a detour.
 	// Being reachable, no criterion counts it as broken, so it answers here.
 	defectRedirectChain = &reading.Defect{Name: "redirect_chain", Family: familyHTTPProbe}
+
+	// defectOffDomainLinks: a message not one of whose links leads back to the
+	// domain it is sent from.
+	//
+	// Read on its own, a destination elsewhere says nothing: an ordinary
+	// mailing links to a social network, to a legal notice hosted by someone
+	// else, to a partner. It is the whole of them landing away from the sender
+	// that is a reputation signal, which is why this is counted once over the
+	// message rather than charged link by link.
+	//
+	// And it is not charged at all, for the same reason defectTextLinkMissing
+	// is not: an envelope whose links are entirely rewritten by an ESP's click
+	// tracker has exactly this shape whenever the redirection could not be
+	// followed, and so does a domain standing in front of content hosted
+	// elsewhere. Nothing here tells the two apart, and the sender reads the
+	// finding rather than paying for our inability to.
+	defectOffDomainLinks = &reading.Defect{
+		Name:      "off_domain_links",
+		Uncharged: "a mailing whose links an ESP rewrites has the same shape as one leading away from its sender, and nothing here tells them apart: the sender is shown the destinations and judges them",
+	}
 
 	// defectUnprobedURLs: the URLs one analysis left unfetched.
 	defectUnprobedURLs = &reading.Defect{
