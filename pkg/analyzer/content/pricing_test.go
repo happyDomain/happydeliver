@@ -24,11 +24,13 @@ package content
 import (
 	"context"
 	"net/http"
+	"net/mail"
 	"slices"
 	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
@@ -131,6 +133,10 @@ func speakingResults() *Results {
 	}
 
 	return &Results{
+		// A message sent from a domain none of its links leads back to, which
+		// is what the off-domain check looks for. Every destination below is
+		// under example.com, so the sender's own domain is another one.
+		email:           &mailmsg.Message{From: &mail.Address{Address: "campaign@example.net"}},
 		BodyTruncated:   true,
 		HTMLValid:       false,
 		htmlDocument:    document,
