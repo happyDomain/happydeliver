@@ -23,6 +23,8 @@ package content
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	"golang.org/x/net/html"
 
@@ -99,6 +101,27 @@ func (c *Analyzer) Read(observed *Results) Reading {
 	issues, penalty := reading.Run(ctx, contentChecks, observed.checkInput())
 
 	return Reading{Issues: issues, Penalty: penalty}
+}
+
+// concernForURL keys a defect that is about one URL. Both the check that reads
+// the message and the one that reads the spam filter's symbols go through it,
+// so that they agree on the key whenever they agree on the URL.
+//
+// The URL is normalised only as far as is safe: scheme and host lowercased,
+// surrounding space removed. Anything more (dropping a trailing slash,
+// sorting a query) risks calling two URLs the same when a server does not, and
+// a wrong merge costs a finding while a missed one costs only tidiness. A URL
+// that does not parse gets no key, so it is never merged.
+func concernForURL(defect string, rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.ToLower(parsed.Host)
+
+	return defect + ":" + parsed.String()
 }
 
 // checkInput is what the checks are handed: the facts gathered about the
