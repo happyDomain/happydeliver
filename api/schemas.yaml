@@ -300,7 +300,7 @@ components:
         message:
           type: string
           description: Human-readable description
-          example: "3 images are missing alt attributes"
+          example: "3 images carry no alt attribute"
         location:
           type: string
           description: Where the issue was found

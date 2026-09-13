@@ -42,6 +42,15 @@ var severityOrder = []model.ContentIssueSeverity{
 	model.ContentIssueSeverityCritical,
 }
 
+// lesserSeverity is the more modest of two severities.
+func lesserSeverity(a, b model.ContentIssueSeverity) model.ContentIssueSeverity {
+	if slices.Index(severityOrder, a) <= slices.Index(severityOrder, b) {
+		return a
+	}
+
+	return b
+}
+
 // severityRank orders severities from the gravest down, for sorting only. It
 // is not a weight: what a finding costs is severityPenalty.
 //

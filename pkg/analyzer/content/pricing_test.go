@@ -104,13 +104,15 @@ func speakingResults() *Results {
 	notFound, _ := httpStatusFinding("Link", http.StatusNotFound)
 	detour, _ := redirectChainFinding("Link", []string{"a", "b", "c"}, "https://example.com/end")
 
-	// The markup a check reading the tree looks at: a stylesheet fetched from
-	// elsewhere and a tag no client runs.
-	markup := `<html><head><link rel="stylesheet" href="https://example.com/style.css"></head>` +
-		`<body><script>go()</script><p>Hello</p></body></html>`
+	// The markup a check reading the tree looks at: a downloaded font, a
+	// stylesheet fetched from elsewhere, a tag no client runs, a property
+	// clients drop, an event handler, and no viewport.
+	markup := `<html><head><style>@font-face{font-family:X;src:url(https://fonts.example/x.woff2)}</style>` +
+		`<link rel="stylesheet" href="https://example.com/style.css"></head>` +
+		`<body><script>go()</script><div style="display:flex"><a href="https://example.com" onclick="go()">Go</a></div></body></html>`
 	document, err := parseHTML(markup)
 	if err != nil {
-		panic("the fixture's markup does not parse: " + err.Error())
+		panic("speakingResults: the markup it carries does not parse: " + err.Error())
 	}
 
 	shortened := URLSuspicion{
