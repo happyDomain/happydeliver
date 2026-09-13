@@ -84,3 +84,47 @@ var linkSuspicionCheck = contentCheck{
 		return issues, nil
 	},
 }
+
+// probeFindingCheck reports what fetching the URLs revealed, for links, image
+// sources and the addresses of the List-Unsubscribe header alike. Each
+// distinct URL is reported once, however many times the message writes it.
+//
+// It answers under a cap of its own rather than the URL-suspicion one: a
+// message whose links are at once deceptive and dead has two independent
+// defects, and answers for each.
+var probeFindingCheck = contentCheck{
+	Name:     "probe_finding",
+	Category: reading.CategoryDeliverability,
+	Family:   familyHTTPProbe,
+	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+		var issues []model.ContentIssue
+
+		for _, probed := range in.Results.probedURLs() {
+			issues = append(issues, httpFindingIssues(probed.Location, probed.HTTPFindings)...)
+		}
+
+		return issues, nil
+	},
+}
+
+// unprobedURLsCheck says what was left unfetched, so that the URLs reported
+// above are not read as the whole of what the message carries.
+//
+// It deducts nothing: it describes a limit of the analysis, not a defect of
+// the message. The advice it carries is the only part addressed to the sender.
+var unprobedURLsCheck = contentCheck{
+	Name:     "unprobed_urls",
+	Category: reading.CategoryDeliverability,
+	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+		if in.Results.UnprobedURLs <= 0 {
+			return nil, nil
+		}
+
+		return []model.ContentIssue{{
+			Type:     model.ContentIssueTypeUnreachableLink,
+			Severity: model.ContentIssueSeverityInfo,
+			Message:  fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
+			Advice:   utils.PtrTo("Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same"),
+		}}, nil
+	},
+}

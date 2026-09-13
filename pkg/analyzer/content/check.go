@@ -61,6 +61,10 @@ var (
 	// and image sources alike.
 	familyURLSuspicion = &reading.Family{Name: "url_suspicion", Cap: 10}
 
+	// familyHTTPProbe answers for what fetching the URLs revealed, under a cap
+	// of its own so that a deceptive link and a dead one are charged apart.
+	familyHTTPProbe = &reading.Family{Name: "http_probe", Cap: 10}
+
 	// familyHarmfulHTML answers for markup an email client blocks outright.
 	// Each tag costs a flat twenty points: they are all equally fatal to the
 	// rendering, so weighing them by severity would say nothing.

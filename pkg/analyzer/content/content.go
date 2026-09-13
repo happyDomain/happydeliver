@@ -22,9 +22,7 @@
 package content
 
 import (
-	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -41,14 +39,22 @@ import (
 	"golang.org/x/net/publicsuffix"
 
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
+	"git.happydns.org/happyDeliver/pkg/urlprobe"
 )
 
 // Analyzer analyzes email content (HTML, links, images)
 type Analyzer struct {
-	Timeout                time.Duration
-	httpClient             *http.Client
-	listUnsubscribeURLs    []string // URLs from List-Unsubscribe header
-	hasOneClickUnsubscribe bool     // True if List-Unsubscribe-Post: List-Unsubscribe=One-Click
+	Timeout time.Duration
+
+	// prober fetches the URLs the message carries and says what came back.
+	// What that is worth is read here, from the findings the checks build on
+	// top of it.
+	prober *urlprobe.Prober
+
+	// SkipProbes leaves every URL unfetched. It exists for the tests that must
+	// produce the same report twice, whose fixtures point at domains nobody
+	// controls; nothing else sets it.
+	SkipProbes bool
 }
 
 // NewAnalyzer creates a new content analyzer with configurable timeout
@@ -56,19 +62,7 @@ func NewAnalyzer(timeout time.Duration) *Analyzer {
 	if timeout == 0 {
 		timeout = 10 * time.Second // Default timeout
 	}
-	return &Analyzer{
-		Timeout: timeout,
-		httpClient: &http.Client{
-			Timeout: timeout,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				// Allow up to 10 redirects
-				if len(via) >= 10 {
-					return fmt.Errorf("too many redirects")
-				}
-				return nil
-			},
-		},
-	}
+	return &Analyzer{Timeout: timeout, prober: urlprobe.New(timeout)}
 }
 
 // Results represents content analysis results
@@ -80,10 +74,24 @@ type Results struct {
 	Images           []ImageCheck
 	HasUnsubscribe   bool
 	UnsubscribeLinks []string
-	TextContent      string
-	HTMLContent      string
-	TextPlainRatio   float32 // Ratio of plain text to HTML consistency
-	ImageTextRatio   float32 // Ratio of images to text
+	// UnsubscribeChecks reports what the URLs advertised in the
+	// List-Unsubscribe header answered. They are kept apart from Links: they
+	// are not part of the body, and they are probed under stricter rules.
+	UnsubscribeChecks []LinkCheck
+	// ListUnsubscribeURLs holds the URLs advertised in the List-Unsubscribe
+	// header, and HasOneClickUnsubscribe whether the message also announces
+	// RFC 8058 one-click. They describe this message, so they are read off it
+	// once and carried here: the analyzer itself is shared by every analysis
+	// running at the same time.
+	ListUnsubscribeURLs    []string
+	HasOneClickUnsubscribe bool
+	TextContent            string
+	HTMLContent            string
+	TextPlainRatio         float32 // Ratio of plain text to HTML consistency
+	ImageTextRatio         float32 // Ratio of images to text
+	// UnprobedURLs counts the distinct URLs left unfetched because the message
+	// carried more than one analysis may check.
+	UnprobedURLs int
 
 	// email is the message these results were read off, and htmlDocument the
 	// tree its HTML part parsed into. The checks are handed both: a fact one of
@@ -142,7 +150,6 @@ func (r *Results) VisibleImages() []ImageCheck {
 type LinkCheck struct {
 	URL        string
 	Valid      bool
-	Status     int
 	Error      string
 	IsSafe     bool
 	Warning    string
@@ -150,6 +157,8 @@ type LinkCheck struct {
 	// Suspicions lists the concrete reasons this URL was flagged, if any.
 	// IsSafe is simply "no suspicion was found".
 	Suspicions []URLSuspicion
+	// probedURL reports what fetching the destination returned.
+	probedURL
 }
 
 // ImageCheck represents an image validation result
@@ -168,6 +177,11 @@ type ImageCheck struct {
 	// describe a destination a recipient may click, and an inline "data:"
 	// image would be reported as an active scheme by all of them.
 	Suspicions []URLSuspicion
+	// probedURL reports what fetching the source returned, exactly as for a
+	// link. An image is fetched the moment the message is opened, so a source
+	// that does not answer is a hole in the rendering rather than a click that
+	// fails.
+	probedURL
 }
 
 // Analyze performs content analysis on email message
@@ -177,11 +191,11 @@ func (c *Analyzer) Analyze(email *mailmsg.Message) *Results {
 	results.IsMultipart = len(email.Parts) > 1
 
 	// Parse List-Unsubscribe header URLs for use in link detection
-	c.listUnsubscribeURLs = email.GetListUnsubscribeURLs()
+	results.ListUnsubscribeURLs = email.GetListUnsubscribeURLs()
 
 	// Check for one-click unsubscribe support
 	listUnsubscribePost := email.Header.Get("List-Unsubscribe-Post")
-	c.hasOneClickUnsubscribe = strings.EqualFold(strings.TrimSpace(listUnsubscribePost), "List-Unsubscribe=One-Click")
+	results.HasOneClickUnsubscribe = strings.EqualFold(strings.TrimSpace(listUnsubscribePost), "List-Unsubscribe=One-Click")
 
 	// Get HTML and text parts
 	htmlParts := email.GetHTMLParts()
@@ -202,6 +216,10 @@ func (c *Analyzer) Analyze(email *mailmsg.Message) *Results {
 		// Extract and validate links from plain text
 		c.analyzeTextLinks(results.TextContent, results)
 	}
+
+	// Everything above reads the message; this fetches what it points at, once
+	// per distinct URL and several at a time.
+	c.probeContentURLs(results)
 
 	// Check plain text/HTML consistency. A truncated body may look single-part
 	// while it is not: a perfect ratio would then score the parts that never
@@ -275,7 +293,7 @@ func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 
 		// Only validate if not already checked
 		if !exists {
-			check := c.validateLink(urlStr)
+			check := analyzeLinkOffline(urlStr)
 
 			// The http: scheme of a bare "www.example.com" is ours, not the
 			// sender's: reporting it as a plain-text link would be blaming
@@ -388,13 +406,14 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 			href := strings.TrimSpace(getAttrOf(n, "href"))
 			if href != "" {
 				// Check for unsubscribe links
-				if c.isUnsubscribeLink(href, n) {
+				if c.isUnsubscribeLink(href, n, results.ListUnsubscribeURLs) {
 					results.HasUnsubscribe = true
 					results.UnsubscribeLinks = append(results.UnsubscribeLinks, href)
 				}
 
-				// Validate link
-				linkCheck := c.validateLink(href)
+				// Read the link. What it points at is fetched later, in one
+				// pass over the whole message.
+				linkCheck := analyzeLinkOffline(href)
 
 				// Check for domain misalignment (phishing detection)
 				linkText := strings.TrimSpace(c.getNodeText(n))
@@ -457,7 +476,7 @@ func getAttrOf(n *html.Node, key string) string {
 }
 
 // isUnsubscribeLink checks if a link is an unsubscribe link
-func (c *Analyzer) isUnsubscribeLink(href string, node *html.Node) bool {
+func (c *Analyzer) isUnsubscribeLink(href string, node *html.Node, listUnsubscribeURLs []string) bool {
 	// An href with an unreplaced template placeholder (e.g. "{unsubscribe}") is not a
 	// working link, so it must not count as a valid unsubscribe method even though it
 	// literally contains the word "unsubscribe".
@@ -466,7 +485,7 @@ func (c *Analyzer) isUnsubscribeLink(href string, node *html.Node) bool {
 	}
 
 	// First check: does the href match a URL from the List-Unsubscribe header?
-	if slices.Contains(c.listUnsubscribeURLs, href) {
+	if slices.Contains(listUnsubscribeURLs, href) {
 		return true
 	}
 
@@ -503,8 +522,11 @@ func (c *Analyzer) getNodeText(n *html.Node) string {
 	return text
 }
 
-// validateLink validates a URL and checks if it's accessible
-func (c *Analyzer) validateLink(urlStr string) LinkCheck {
+// analyzeLinkOffline reports everything a URL says about itself: an unreplaced
+// merge field, the suspicions its text raises, and whether it parses at all.
+// It touches no network, so it runs inside the HTML traversal, where fetching
+// would serialize the whole analysis behind the slowest server.
+func analyzeLinkOffline(urlStr string) LinkCheck {
 	check := LinkCheck{
 		URL:    urlStr,
 		IsSafe: true,
@@ -524,64 +546,15 @@ func (c *Analyzer) validateLink(urlStr string) LinkCheck {
 	check.IsSafe = len(check.Suspicions) == 0
 
 	// Parse URL
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
+	if _, err := url.Parse(urlStr); err != nil {
 		check.Valid = false
 		check.Error = fmt.Sprintf("Invalid URL: %v", err)
 		return check
 	}
 
-	// Only check HTTP/HTTPS links
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		check.Valid = true
-		return check
-	}
-
-	// Check if link is accessible (with timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, "HEAD", urlStr, nil)
-	if err != nil {
-		check.Valid = false
-		check.Error = fmt.Sprintf("Failed to create request: %v", err)
-		return check
-	}
-
-	// Set a reasonable user agent
-	req.Header.Set("User-Agent", "happyDeliver/1.0 (Email Deliverability Tester)")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		// Don't fail on timeout/connection errors for external links
-		// Just mark as warning
-		check.Valid = true
-		check.Status = 0
-		check.Warning = fmt.Sprintf("Could not verify link: %v", err)
-		return check
-	}
-	defer resp.Body.Close()
-
-	check.Status = resp.StatusCode
 	check.Valid = true
 
-	// Check for error status codes
-	if refusesAutomatedClients(resp.StatusCode) {
-		check.Warning = fmt.Sprintf("Could not verify link: destination answered %d to the automated request", resp.StatusCode)
-	} else if resp.StatusCode >= 400 {
-		check.Error = fmt.Sprintf("Link returns %d status", resp.StatusCode)
-	}
-
 	return check
-}
-
-// refusesAutomatedClients says whether an HTTP status is one a destination
-// answers to automated clients it does not want, rather than to a recipient
-// following the link: 429 is a rate limit, and 999 is the non-standard code
-// LinkedIn returns to anything that is not a browser. Neither says the page is
-// dead, so neither is held against the message; the link is merely unverified.
-func refusesAutomatedClients(status int) bool {
-	return status == http.StatusTooManyRequests || status == 999
 }
 
 // hasDomainMisalignment checks if the link text contains a different domain than the actual URL
@@ -879,16 +852,29 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 	if len(results.Links) > 0 {
 		links := make([]model.LinkCheck, 0, len(results.Links))
 		for _, link := range results.Links {
-			status := model.LinkCheckStatusValid
-			if !link.Valid {
+			var status model.LinkCheckStatus
+			switch {
+			case !link.Valid:
 				// Link could not be parsed/validated (e.g. unreplaced template placeholder)
 				status = model.LinkCheckStatusBroken
-			} else if link.Status >= 400 && !refusesAutomatedClients(link.Status) {
+			case link.Status >= 400 && !refusesAutomatedClients(link.Status):
 				status = model.LinkCheckStatusBroken
-			} else if !link.IsSafe {
+			case link.hasFinding(LinkHTTPRedirectLoop):
+				// Redirections that never end leave the recipient with nothing,
+				// exactly like a destination that does not exist.
+				status = model.LinkCheckStatusBroken
+			case !link.IsSafe:
 				status = model.LinkCheckStatusSuspicious
-			} else if link.Warning != "" {
+			case link.Warning != "":
 				status = model.LinkCheckStatusTimeout
+			case len(link.RedirectChain) > excessiveRedirectHops:
+				// One or two hops are how the ordinary web works (http: to
+				// https:, apex to www, a click tracker). Calling those
+				// "redirected" would put the label on half the legitimate
+				// links and leave it meaning nothing.
+				status = model.LinkCheckStatusRedirected
+			default:
+				status = model.LinkCheckStatusValid
 			}
 
 			apiLink := model.LinkCheck{
@@ -898,6 +884,13 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 
 			if link.Status > 0 {
 				apiLink.HttpCode = utils.PtrTo(link.Status)
+			}
+
+			if len(link.RedirectChain) > 0 {
+				apiLink.RedirectChain = utils.PtrTo(link.RedirectChain)
+				// Where the chain ends is what the sender actually publishes,
+				// and the one thing about a redirection worth reading first.
+				apiLink.FinalUrl = utils.PtrTo(link.destination(link.URL))
 			}
 
 			// Check if it's a URL shortener
@@ -925,6 +918,15 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 			}
 			apiImg.IsTrackingPixel = utils.PtrTo(img.IsTrackingPixel)
 
+			if img.Status > 0 {
+				apiImg.HttpCode = utils.PtrTo(img.Status)
+			}
+			// An image is fetched on open, with no click involved: whether its
+			// source answers is part of what the recipient will see.
+			if urlprobe.Probeable(img.Src) {
+				apiImg.IsBroken = utils.PtrTo(img.IsBroken)
+			}
+
 			images = append(images, apiImg)
 		}
 		analysis.Images = &images
@@ -935,7 +937,7 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsLink)
 	}
 
-	for _, url := range c.listUnsubscribeURLs {
+	for _, url := range results.ListUnsubscribeURLs {
 		if strings.HasPrefix(url, "mailto:") {
 			*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsMailto)
 		} else if strings.HasPrefix(url, "http:") || strings.HasPrefix(url, "https:") {
@@ -943,7 +945,7 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 		}
 	}
 
-	if slices.Contains(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsListUnsubscribeHeader) && c.hasOneClickUnsubscribe {
+	if slices.Contains(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsListUnsubscribeHeader) && results.HasOneClickUnsubscribe {
 		*analysis.UnsubscribeMethods = append(*analysis.UnsubscribeMethods, model.ContentAnalysisUnsubscribeMethodsOneClick)
 	}
 

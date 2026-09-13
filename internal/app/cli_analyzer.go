@@ -616,15 +616,15 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			for _, link := range *content.Links {
 				status := ""
 				switch link.Status {
-				case "valid":
+				case model.LinkCheckStatusValid:
 					status = "✓"
-				case "broken":
+				case model.LinkCheckStatusBroken:
 					status = "✗"
-				case "suspicious":
+				case model.LinkCheckStatusSuspicious:
 					status = "⚠"
-				case "redirected":
+				case model.LinkCheckStatusRedirected:
 					status = "→"
-				case "timeout":
+				case model.LinkCheckStatusTimeout:
 					status = "⏱"
 				}
 				fmt.Fprintf(writer, "    %s [%s] %s", status, link.Status, link.Url)
@@ -637,6 +637,9 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 					for _, url := range *link.RedirectChain {
 						fmt.Fprintf(writer, "        -> %s\n", url)
 					}
+					if link.FinalUrl != nil {
+						fmt.Fprintf(writer, "      Ends at: %s\n", *link.FinalUrl)
+					}
 				}
 			}
 		}
@@ -646,6 +649,7 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			fmt.Fprintf(writer, "\n  Images (%d total):\n", len(*content.Images))
 			missingAlt := 0
 			trackingPixels := 0
+			var broken []model.ImageCheck
 			for _, img := range *content.Images {
 				if !img.HasAlt {
 					missingAlt++
@@ -653,11 +657,24 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 				if img.IsTrackingPixel != nil && *img.IsTrackingPixel {
 					trackingPixels++
 				}
+				if img.IsBroken != nil && *img.IsBroken {
+					broken = append(broken, img)
+				}
 			}
 			fmt.Fprintf(writer, "    Images with ALT text: %d/%d\n",
 				len(*content.Images)-missingAlt, len(*content.Images))
 			if trackingPixels > 0 {
 				fmt.Fprintf(writer, "    Tracking pixels detected: %d\n", trackingPixels)
+			}
+			for _, img := range broken {
+				fmt.Fprint(writer, "    ✗ Source does not load")
+				if img.HttpCode != nil {
+					fmt.Fprintf(writer, " (HTTP %d)", *img.HttpCode)
+				}
+				if img.Src != nil {
+					fmt.Fprintf(writer, ": %s", *img.Src)
+				}
+				fmt.Fprintln(writer)
 			}
 		}
 
