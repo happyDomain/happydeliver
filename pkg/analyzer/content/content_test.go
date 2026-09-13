@@ -861,6 +861,44 @@ func TestHasDomainMisalignment(t *testing.T) {
 			expected: false,
 			reason:   "Query params don't affect domain matching",
 		},
+
+		// Internationalised domains: the same host has two spellings, and the
+		// message is read on where it goes, not on which of the two it used.
+		{
+			name:     "Host advertised in Unicode, linked in punycode",
+			href:     "https://xn--xample-9ua.org/login",
+			linkText: "Connectez-vous sur éxample.org",
+			expected: false,
+			reason:   "'éxample.org' and 'xn--xample-9ua.org' are the same host written twice",
+		},
+		{
+			name:     "Host advertised in punycode, linked in Unicode",
+			href:     "https://éxample.org/login",
+			linkText: "Connectez-vous sur xn--xample-9ua.org",
+			expected: false,
+			reason:   "Same host again, the two spellings the other way round",
+		},
+		{
+			name:     "Non-Latin host advertised and linked",
+			href:     "https://пример.example.com/page",
+			linkText: "Rendez-vous sur пример.example.com",
+			expected: false,
+			reason:   "A host in another script matches itself once both sides are in A-labels",
+		},
+		{
+			name:     "Unicode host advertised, another domain linked",
+			href:     "https://example.com/login",
+			linkText: "Connectez-vous sur éxample.org",
+			expected: true,
+			reason:   "The text names a host in Unicode that is not where the link goes",
+		},
+		{
+			name:     "Unicode look-alike linked, plain host advertised",
+			href:     "https://xn--xample-9ua.org/login",
+			linkText: "Connectez-vous sur example.org",
+			expected: true,
+			reason:   "The link goes to a look-alike of the domain its text advertises",
+		},
 	}
 
 	analyzer := NewAnalyzer(5 * time.Second)

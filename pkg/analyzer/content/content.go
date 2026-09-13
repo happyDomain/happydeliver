@@ -598,7 +598,14 @@ var genericLinkTexts = []string{
 // textDomainRegex matches a domain-like token inside a link text, preceded by a
 // delimiter so a token glued to a longer word is not extracted. Group 1 is the
 // scheme or "www." prefix, if any; group 2 the token itself.
-var textDomainRegex = regexp.MustCompile(`(?i)(?:^|[^\w.\-])((?:https?://)?(?:www\.)?)((?:[a-z0-9](?:[-a-z0-9]*[a-z0-9])?\.)+[a-z][a-z0-9\-]*)`)
+//
+// A label is read in any script, not in ASCII alone: a domain shown in Unicode
+// is a domain the reader is being sent to, and the one form in which a
+// look-alike host is worth writing. Combining marks count inside a label so
+// that an accented name decomposed by the client ("cafe" + U+0301) reads as
+// the one label it is, and the delimiter excludes them all for the same
+// reason: the token must still be glued to nothing.
+var textDomainRegex = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}\p{M}_.\-])((?:https?://)?(?:www\.)?)((?:[\p{L}\p{N}](?:[-\p{L}\p{N}\p{M}]*[\p{L}\p{N}\p{M}])?\.)+\p{L}[\p{L}\p{N}\p{M}\-]*)`)
 
 // emailAddrRegex matches an email address; the captured group is its domain,
 // which replaces the whole address so the local part's dots are not read as one.
@@ -613,6 +620,10 @@ var fileExtensionLabels = []string{"zip", "mov", "md", "sh", "ai", "ps", "pl", "
 // suffix the public suffix list knows: this is what tells "example.com" apart
 // from a file name ("facture.pdf") or a missing space after a full stop
 // ("maintenant.Livraison").
+//
+// Domains come back in their ASCII form, so that a text naming a host in
+// Unicode and an href naming it in punycode are read as advertising the same
+// destination, which they do.
 func advertisedDomains(linkText string) []string {
 	matches := textDomainRegex.FindAllStringSubmatch(linkText, -1)
 	domains := make([]string, 0, len(matches))
@@ -621,11 +632,14 @@ func advertisedDomains(linkText string) []string {
 		// A scheme or "www." prefix announces a URL; only bare tokens can still
 		// turn out to be prose, so they alone go through the heuristics below.
 		bare := match[1] == ""
-		domain := strings.ToLower(match[2])
 
 		if bare && isMissingSpace(match[2]) {
 			continue
 		}
+
+		// In A-labels, the form the suffix list is written in and the form the
+		// href will be compared in.
+		domain := domainname.ASCII(match[2])
 
 		// A multi-label suffix ("github.io", "s3.amazonaws.com") comes from the
 		// list's private section, which no prose lands on: accept it even

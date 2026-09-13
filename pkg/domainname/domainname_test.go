@@ -63,3 +63,55 @@ func TestOrganizational(t *testing.T) {
 		}
 	}
 }
+
+// TestASCII checks that a hostname comes back in the one form two of
+// them can be compared in, whichever of its spellings it was given in, and
+// that a name no encoder accepts still comes back rather than disappearing.
+func TestASCII(t *testing.T) {
+	tests := []struct {
+		name     string
+		hostname string
+		want     string
+	}{
+		{"ASCII host", "example.com", "example.com"},
+		{"Uppercase and trailing dot", "  Mail.Example.Com.  ", "mail.example.com"},
+		{"Unicode label", "éxample.org", "xn--xample-9ua.org"},
+		{"Already an A-label", "xn--xample-9ua.org", "xn--xample-9ua.org"},
+		{"Decomposed accent", "cafe\u0301.example.com", "xn--caf-dma.example.com"},
+		{"Non-Latin script", "пример.example.com", "xn--e1afmkfd.example.com"},
+		{"Unicode top-level domain", "пример.рф", "xn--e1afmkfd.xn--p1ai"},
+		{"Underscore the rules reject", "_dmarc.example.com", "_dmarc.example.com"},
+		{"Nothing at all", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ASCII(tt.hostname); got != tt.want {
+				t.Errorf("ASCII(%q) = %q, want %q", tt.hostname, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestOrganizationalUnicode checks that a host written in Unicode
+// finds the registrable domain the suffix list holds in A-labels, which it
+// cannot be compared against in any other form.
+func TestOrganizationalUnicode(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+		want   string
+	}{
+		{"Unicode host", "boutique.éxample.org", "xn--xample-9ua.org"},
+		{"Punycode host", "boutique.xn--xample-9ua.org", "xn--xample-9ua.org"},
+		{"Unicode host under a Unicode suffix", "почта.пример.рф", "xn--e1afmkfd.xn--p1ai"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Organizational(tt.domain); got != tt.want {
+				t.Errorf("Organizational(%q) = %q, want %q", tt.domain, got, tt.want)
+			}
+		})
+	}
+}
