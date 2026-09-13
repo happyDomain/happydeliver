@@ -22,6 +22,7 @@
 package content
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -35,6 +36,7 @@ import (
 	"golang.org/x/net/html"
 
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
+	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
 func TestNewContentAnalyzer(t *testing.T) {
@@ -1425,6 +1427,208 @@ func TestAnalysisLinkStatus(t *testing.T) {
 			}
 			if got := (*analysis.Links)[0].Status; got != tt.want {
 				t.Errorf("link status = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestHarmfulHTMLFindsTheMarkupClientsBlock covers the tags the check exists to
+// spot. Each of them is either refused outright by mail clients or a phishing
+// vector, so a message carrying one renders short of what its sender wrote,
+// and this check is the only thing standing between that and a clean report.
+//
+// The expectations quote the markup the finding is asked to name, not the whole
+// sentence it writes: the wording is for a reader and free to change, while
+// naming the offending tag and what it pointed at is the finding itself.
+func TestHarmfulHTMLFindsTheMarkupClientsBlock(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []string // a fragment each expected issue must quote, in order
+	}{
+		{
+			name: "markup a client renders as written draws nothing",
+			body: `<html><body><p>Hello</p><b>World</b></body></html>`,
+		},
+		{
+			name: "a script tag",
+			body: `<html><body><script>alert(1)</script></body></html>`,
+			want: []string{"<script>"},
+		},
+		{
+			name: "an iframe, with what it would have loaded",
+			body: `<html><body><iframe src="https://example.com/embed"></iframe></body></html>`,
+			want: []string{"src='https://example.com/embed'"},
+		},
+		{
+			name: "an iframe with nothing to load is still reported",
+			body: `<html><body><iframe></iframe></body></html>`,
+			want: []string{"<iframe>"},
+		},
+		{
+			name: "the legacy embedding tags, each under its own name",
+			body: `<html><body><object></object><embed><applet></applet></body></html>`,
+			want: []string{"<object>", "<embed>", "<applet>"},
+		},
+		{
+			name: "a form, with where it would have posted",
+			body: `<html><body><form action="https://example.com/login"></form></body></html>`,
+			want: []string{"action='https://example.com/login'"},
+		},
+		{
+			name: "a base tag, which silently moves every relative URL",
+			body: `<html><head><base href="https://example.com/"></head><body></body></html>`,
+			want: []string{"href='https://example.com/'"},
+		},
+		{
+			name: "a meta refresh, with the redirection it hides",
+			body: `<html><head><meta http-equiv="refresh" content="0;url=https://example.com/"></head><body></body></html>`,
+			want: []string{"content='0;url=https://example.com/'"},
+		},
+		{
+			name: "a meta tag that redirects nothing is left alone",
+			body: `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body></body></html>`,
+		},
+		{
+			name: "every offending tag of one message is reported, in the order it is written",
+			body: `<html><head><base href="https://example.com/"></head><body><script></script><form></form></body></html>`,
+			want: []string{"<base>", "<script>", "<form>"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			issues, _ := reading.Run(context.Background(), []contentCheck{harmfulHTMLCheck},
+				htmlResults(t, test.body).checkInput())
+
+			if len(issues) != len(test.want) {
+				t.Fatalf("the check reported %d issue(s), want %d: %v", len(issues), len(test.want), issues)
+			}
+			for i, fragment := range test.want {
+				if !strings.Contains(issues[i].Message, fragment) {
+					t.Errorf("issue %d reads %q, want it to quote %q", i, issues[i].Message, fragment)
+				}
+			}
+		})
+	}
+}
+
+// TestHarmfulMarkupReachesTheReportAtAFlatRate follows what the check found all
+// the way to the report. What is worth pinning here is the tariff: every tag is
+// fatal to the same degree, and no amount of them may decide the grade on its
+// own.
+func TestHarmfulMarkupReachesTheReportAtAFlatRate(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		issues  int
+		penalty int
+	}{
+		{
+			name: "a message a client renders whole is charged nothing",
+			body: `<html><body><p>Hello</p></body></html>`,
+		},
+		{
+			name:    "one tag costs the flat rate",
+			body:    `<html><body><script></script></body></html>`,
+			issues:  1,
+			penalty: 20,
+		},
+		{
+			name:    "a second tag costs as much as the first",
+			body:    `<html><body><script></script><iframe></iframe></body></html>`,
+			issues:  2,
+			penalty: 40,
+		},
+		{
+			name:    "a message made of nothing else is still capped",
+			body:    `<html><body><script></script><iframe></iframe><form></form><object></object></body></html>`,
+			issues:  4,
+			penalty: 40,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results := htmlResults(t, test.body)
+
+			issues, penalty := reading.Run(context.Background(), []contentCheck{harmfulHTMLCheck},
+				results.checkInput())
+
+			if len(issues) != test.issues {
+				t.Fatalf("reported %d finding(s), want %d: %+v", len(issues), test.issues, issues)
+			}
+			if penalty != test.penalty {
+				t.Errorf("charged %d point(s), want %d", penalty, test.penalty)
+			}
+
+			for _, issue := range issues {
+				if issue.Type != model.ContentIssueTypeDangerousHtml {
+					t.Errorf("the finding is typed %q, want %q", issue.Type, model.ContentIssueTypeDangerousHtml)
+				}
+				if issue.Severity != model.ContentIssueSeverityCritical {
+					t.Errorf("the finding is graded %q, want %q", issue.Severity, model.ContentIssueSeverityCritical)
+				}
+				if issue.Advice == nil || *issue.Advice == "" {
+					t.Error("the finding names a defect without saying what to do about it")
+				}
+			}
+		})
+	}
+}
+
+// TestHTMLRemarkOnlyNamesStylesheetsItCanFetch covers the other thing a reading
+// of the markup gathers on its way: a remark about an external stylesheet. It
+// is keyed on the URL it names, so a stylesheet designating nothing to fetch is
+// worth no remark at all: there would be nothing for the spam filter's own
+// reading of it to be recognised against.
+func TestHTMLRemarkOnlyNamesStylesheetsItCanFetch(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string // the URL the remark must quote, or "" for no remark
+	}{
+		{
+			name: "a stylesheet fetched over https",
+			body: `<html><head><link rel="stylesheet" href="https://cdn.example.com/mail.css"></head><body></body></html>`,
+			want: "https://cdn.example.com/mail.css",
+		},
+		{
+			name: "the rel attribute is read whatever its case and company",
+			body: `<html><head><link rel="Alternate StyleSheet" href="http://cdn.example.com/mail.css"></head><body></body></html>`,
+			want: "http://cdn.example.com/mail.css",
+		},
+		{
+			name: "a relative stylesheet designates nothing to fetch",
+			body: `<html><head><link rel="stylesheet" href="/assets/mail.css"></head><body></body></html>`,
+		},
+		{
+			name: "a stylesheet with no href at all",
+			body: `<html><head><link rel="stylesheet"></head><body></body></html>`,
+		},
+		{
+			name: "a link that is not a stylesheet is none of our business",
+			body: `<html><head><link rel="canonical" href="https://example.com/page"></head><body></body></html>`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			issues, _ := reading.Run(context.Background(), []contentCheck{htmlRemarkCheck},
+				htmlResults(t, test.body).checkInput())
+
+			if test.want == "" {
+				if len(issues) != 0 {
+					t.Fatalf("the check remarked %v, want nothing", issues)
+				}
+				return
+			}
+
+			if len(issues) != 1 {
+				t.Fatalf("the check left %d remark(s), want 1: %v", len(issues), issues)
+			}
+			if !strings.Contains(issues[0].Message, test.want) {
+				t.Errorf("the remark reads %q, want it to quote %q", issues[0].Message, test.want)
 			}
 		})
 	}
