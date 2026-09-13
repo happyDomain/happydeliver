@@ -25,6 +25,7 @@ const contentIssueLabels: Record<ContentIssue["type"], string> = {
     homograph_url: "Look-alike URL",
     client_compat: "Client compatibility",
     text_html_mismatch: "Text and HTML out of sync",
+    low_contrast: "Low contrast",
 };
 
 export function contentIssueLabel(type: ContentIssue["type"]): string {

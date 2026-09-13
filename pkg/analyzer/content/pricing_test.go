@@ -106,10 +106,12 @@ func speakingResults() *Results {
 
 	// The markup a check reading the tree looks at: a downloaded font, a
 	// stylesheet fetched from elsewhere, a tag no client runs, a property
-	// clients drop, an event handler, and no viewport.
+	// clients drop, an event handler, no viewport, and a colour pair too pale
+	// to read.
 	markup := `<html><head><style>@font-face{font-family:X;src:url(https://fonts.example/x.woff2)}</style>` +
 		`<link rel="stylesheet" href="https://example.com/style.css"></head>` +
-		`<body><script>go()</script><div style="display:flex"><a href="https://example.com" onclick="go()">Go</a></div></body></html>`
+		`<body><script>go()</script><div style="display:flex"><a href="https://example.com" onclick="go()">Go</a></div>` +
+		`<p style="color:#999999;background-color:#ffffff">Barely there</p></body></html>`
 	document, err := parseHTML(markup)
 	if err != nil {
 		panic("speakingResults: the markup it carries does not parse: " + err.Error())
