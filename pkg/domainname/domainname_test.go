@@ -63,3 +63,29 @@ func TestOrganizational(t *testing.T) {
 		}
 	}
 }
+
+// TestHostOfURL says which URLs name a host at all: one on the web, read in
+// the form hosts are compared under, whatever port or brackets it came with.
+func TestHostOfURL(t *testing.T) {
+	tests := map[string]string{
+		"https://Mail.Example.Com/path?q=1": "mail.example.com",
+		"http://example.com:8080/":          "example.com",
+		"  https://example.com/  ":          "example.com",
+		"https://192.0.2.1/login":           "192.0.2.1",
+		"http://[2001:db8::1]:8080/":        "2001:db8::1",
+		"mailto:sender@example.com":         "",
+		"tel:+33123456789":                  "",
+		"data:text/plain,hello":             "",
+		"cid:image001@example.com":          "",
+		"/relative/path":                    "",
+		"example.com/no-scheme":             "",
+		"http://exa mple.com/":              "",
+		"":                                  "",
+	}
+
+	for rawURL, want := range tests {
+		if got := HostOfURL(rawURL); got != want {
+			t.Errorf("HostOfURL(%q) = %q, want %q", rawURL, got, want)
+		}
+	}
+}
