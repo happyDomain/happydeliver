@@ -55,6 +55,9 @@ const (
 	// URLSuspicionDangerousScheme: the scheme executes code or inlines a
 	// document (javascript:, data:, vbscript:, file:).
 	URLSuspicionDangerousScheme URLSuspicionKind = "dangerous_scheme"
+	// URLSuspicionInsecureScheme: the URL uses http: instead of https:, so
+	// everything it carries travels in clear text.
+	URLSuspicionInsecureScheme URLSuspicionKind = "insecure_scheme"
 	// URLSuspicionEncodedHost: the hostname itself contains percent-escapes,
 	// characters that cannot appear in a hostname, or a stray colon.
 	URLSuspicionEncodedHost URLSuspicionKind = "encoded_host"
@@ -111,6 +114,10 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 			Message:  fmt.Sprintf("Link uses the %q scheme, which runs code or inlines content instead of pointing to a destination", scheme+":"),
 			Advice:   "Only use http: or https: links (plus mailto: and tel:) in emails; mail clients block the other schemes and filters score them as an attack",
 		})
+	}
+
+	if s := insecureSchemeSuspicion("Link", rawURL); s != nil {
+		suspicions = append(suspicions, *s)
 	}
 
 	// Everything below inspects the authority, which only exists for
@@ -222,6 +229,32 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	}
 
 	return suspicions
+}
+
+// insecureSchemeSuspicion reports a URL served over http: as a finding, and
+// returns nil for everything else: https:, the opaque schemes an email
+// legitimately uses (mailto:, tel:, cid:, data: for inline images), relative
+// links, and protocol-relative "//host/path" URLs, which assert no scheme of
+// their own.
+//
+// It is kept separate from analyzeURLSuspicions because image sources need
+// exactly this check and none of the others: an inline "data:" image is
+// ordinary in an email, while analyzeURLSuspicions rightly reports it as an
+// active scheme when it appears as a link destination.
+// The subject names what the URL was found as ("Link", "Image") and opens the
+// message, so that the finding reads the same way as the others.
+func insecureSchemeSuspicion(subject, rawURL string) *URLSuspicion {
+	scheme, _ := splitScheme(strings.TrimSpace(rawURL))
+	if scheme != "http" {
+		return nil
+	}
+
+	return &URLSuspicion{
+		Kind:     URLSuspicionInsecureScheme,
+		Severity: model.ContentIssueSeverityMedium,
+		Message:  subject + " is served over http: instead of https:, so it travels in clear text and can be read or altered on the way",
+		Advice:   "Serve the same URL over https: and use that one; mail clients warn about plain http: URLs, and filters score them as a negative signal",
+	}
 }
 
 // splitScheme splits "scheme:rest" into its lowercased scheme and the rest of

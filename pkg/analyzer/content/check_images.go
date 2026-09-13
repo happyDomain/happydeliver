@@ -80,3 +80,33 @@ var excessiveImagesCheck = contentCheck{
 		}}, nil
 	},
 }
+
+// imageSuspicionCheck reports what the shape of an image source says.
+//
+// Only the insecure-scheme suspicion applies to an image: the other kinds
+// describe a destination a recipient may click. It shares the URL-suspicion
+// cap with the links, the defect being of one nature whether it is written in
+// an href or in a src.
+var imageSuspicionCheck = contentCheck{
+	Name:     "image_suspicion",
+	Category: reading.CategorySecurity,
+	Family:   familyURLSuspicion,
+	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+		var issues []model.ContentIssue
+
+		for _, img := range in.Results.Images {
+			for _, suspicion := range img.Suspicions {
+				location := img.Src
+				issues = append(issues, model.ContentIssue{
+					Type:     model.ContentIssueTypeSuspiciousLink,
+					Severity: suspicion.Severity,
+					Message:  suspicion.Message,
+					Location: &location,
+					Advice:   utils.PtrTo(suspicion.Advice),
+				})
+			}
+		}
+
+		return issues, nil
+	},
+}

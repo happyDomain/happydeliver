@@ -163,6 +163,11 @@ type ImageCheck struct {
 	// IsTrackingPixel says the image is there to be fetched, not seen: a one
 	// pixel or hidden image whose only purpose is to signal the open.
 	IsTrackingPixel bool
+	// Suspicions lists the concrete reasons this image source was flagged.
+	// Only the insecure-scheme check applies to an image: the other kinds
+	// describe a destination a recipient may click, and an inline "data:"
+	// image would be reported as an active scheme by all of them.
+	Suspicions []URLSuspicion
 }
 
 // Analyze performs content analysis on email message
@@ -253,8 +258,10 @@ func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 
 		// Normalize URL (add http:// if missing)
 		urlStr := match
+		schemeSynthesized := false
 		if strings.HasPrefix(strings.ToLower(urlStr), "www.") {
 			urlStr = "http://" + urlStr
+			schemeSynthesized = true
 		}
 
 		// Check if this URL already exists in results.Links (from HTML analysis)
@@ -268,7 +275,20 @@ func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 
 		// Only validate if not already checked
 		if !exists {
-			results.Links = append(results.Links, c.validateLink(urlStr))
+			check := c.validateLink(urlStr)
+
+			// The http: scheme of a bare "www.example.com" is ours, not the
+			// sender's: reporting it as a plain-text link would be blaming
+			// them for a choice they never wrote. That a text link carries no
+			// scheme at all is a different matter, out of scope here.
+			if schemeSynthesized {
+				check.Suspicions = slices.DeleteFunc(check.Suspicions, func(s URLSuspicion) bool {
+					return s.Kind == URLSuspicionInsecureScheme
+				})
+				check.IsSafe = len(check.Suspicions) == 0
+			}
+
+			results.Links = append(results.Links, check)
 		}
 	}
 }
@@ -402,6 +422,10 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 				AltText:         alt,
 				Valid:           src != "",
 				IsTrackingPixel: isTrackingPixel(n),
+			}
+
+			if suspicion := insecureSchemeSuspicion("Image", src); suspicion != nil {
+				imageCheck.Suspicions = append(imageCheck.Suspicions, *suspicion)
 			}
 
 			if src == "" {
