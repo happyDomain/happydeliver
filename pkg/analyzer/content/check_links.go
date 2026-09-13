@@ -26,7 +26,6 @@ import (
 	"fmt"
 
 	"git.happydns.org/happyDeliver/internal/model"
-	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
@@ -38,6 +37,7 @@ import (
 var templatePlaceholderCheck = contentCheck{
 	Name:     "unreplaced_template",
 	Category: reading.CategoryContent,
+	Reports:  []*reading.Defect{defectUnreplacedTemplate},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		var issues []reading.Finding
 
@@ -46,14 +46,14 @@ var templatePlaceholderCheck = contentCheck{
 				continue
 			}
 
-			location := link.URL
-			issues = append(issues, reading.Finding{ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeUnreplacedTemplate,
-				Severity: model.ContentIssueSeverityHigh,
-				Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
-				Location: &location,
-				Advice:   utils.PtrTo("Ensure all merge fields and template placeholders are substituted before sending"),
-			}})
+			issues = append(issues, reading.NewFinding(
+				defectUnreplacedTemplate,
+				model.ContentIssueTypeUnreplacedTemplate,
+				model.ContentIssueSeverityHigh,
+				link.URL,
+				fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
+				"Ensure all merge fields and template placeholders are substituted before sending",
+			))
 		}
 
 		return issues, nil
@@ -65,22 +65,23 @@ var templatePlaceholderCheck = contentCheck{
 var linkSuspicionCheck = contentCheck{
 	Name:     "link_suspicion",
 	Category: reading.CategorySecurity,
-	Family:   familyURLSuspicion,
+	Reports:  []*reading.Defect{defectSuspiciousURL},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		var issues []reading.Finding
 
 		for _, link := range in.Results.Links {
 			for _, suspicion := range link.Suspicions {
-				issues = append(issues, reading.Finding{
-					ContentIssue: model.ContentIssue{
-						Type:     model.ContentIssueTypeSuspiciousLink,
-						Severity: suspicion.Severity,
-						Message:  suspicion.Message,
-						Location: &link.URL,
-						Advice:   utils.PtrTo(suspicion.Advice),
-					},
-					Concern: suspicionConcern(suspicion.Kind, link.URL),
-				})
+				found := reading.NewFinding(
+					defectSuspiciousURL,
+					model.ContentIssueTypeSuspiciousLink,
+					suspicion.Severity,
+					link.URL,
+					suspicion.Message,
+					suspicion.Advice,
+				)
+				found.Concern = suspicionConcern(suspicion.Kind, link.URL)
+
+				issues = append(issues, found)
 			}
 		}
 
@@ -92,19 +93,33 @@ var linkSuspicionCheck = contentCheck{
 // sources and the addresses of the List-Unsubscribe header alike. Each
 // distinct URL is reported once, however many times the message writes it.
 //
-// It answers under a cap of its own rather than the URL-suspicion one: a
-// message whose links are at once deceptive and dead has two independent
-// defects, and answers for each.
+// What it costs depends on what the URL was found as, which is why it reports
+// four defects rather than one: a dead body link and a dead image source are
+// already graded by the links and images criteria, so they deduct nothing
+// twice, while a dead unsubscribe address and a chain of redirections answer
+// under the probe cap, nothing else looking at either.
+//
+// That cap is its own rather than the URL-suspicion one: a message whose links
+// are at once deceptive and dead has two independent defects, and answers for
+// each.
 var probeFindingCheck = contentCheck{
 	Name:     "probe_finding",
 	Category: reading.CategoryDeliverability,
-	Family:   familyHTTPProbe,
+	Reports: []*reading.Defect{
+		defectDeadLink,
+		defectDeadImage,
+		defectDeadUnsubscribe,
+		defectRedirectChain,
+	},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		var issues []reading.Finding
 
 		for _, probed := range in.Results.probedURLs() {
-			for _, issue := range httpFindingIssues(probed.Location, probed.HTTPFindings) {
-				issues = append(issues, reading.Finding{ContentIssue: issue})
+			for _, finding := range probed.HTTPFindings {
+				issues = append(issues, reading.Finding{
+					Defect:       finding.defect(probed.Role),
+					ContentIssue: httpFindingIssue(probed.Location, finding),
+				})
 			}
 		}
 
@@ -120,17 +135,20 @@ var probeFindingCheck = contentCheck{
 var unprobedURLsCheck = contentCheck{
 	Name:     "unprobed_urls",
 	Category: reading.CategoryDeliverability,
+	Reports:  []*reading.Defect{defectUnprobedURLs},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if in.Results.UnprobedURLs <= 0 {
 			return nil, nil
 		}
 
-		return []reading.Finding{{ContentIssue: model.ContentIssue{
-			Type:     model.ContentIssueTypeUnreachableLink,
-			Severity: model.ContentIssueSeverityInfo,
-			Message:  fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
-			Advice:   utils.PtrTo("Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same"),
-		}}}, nil
+		return []reading.Finding{reading.NewFinding(
+			defectUnprobedURLs,
+			model.ContentIssueTypeUnreachableLink,
+			model.ContentIssueSeverityInfo,
+			"",
+			fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
+			"Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same",
+		)}, nil
 	},
 }
 

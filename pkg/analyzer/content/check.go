@@ -63,8 +63,10 @@ var (
 	// and image sources alike.
 	familyURLSuspicion = &reading.Family{Name: "url_suspicion", Cap: 10}
 
-	// familyHTTPProbe answers for what fetching the URLs revealed, under a cap
-	// of its own so that a deceptive link and a dead one are charged apart.
+	// familyHTTPProbe answers for what fetching the URLs revealed and no
+	// criterion grades: a chain of redirections that ends somewhere, an
+	// unsubscribe address that is gone. It keeps a cap of its own so that a
+	// deceptive link and an unreachable one are charged apart.
 	familyHTTPProbe = &reading.Family{Name: "http_probe", Cap: 10}
 
 	// familyHarmfulHTML answers for markup an email client blocks outright.
