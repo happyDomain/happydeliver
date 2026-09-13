@@ -1032,7 +1032,7 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 		HasUnsubscribe: false,
 	}
 
-	analysis := analyzer.Analysis(results)
+	analysis := analyzer.analysisOf(results)
 
 	// The link must be reported as broken, not valid
 	if analysis.Links == nil || len(*analysis.Links) != 1 {
@@ -1091,7 +1091,7 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 	}
 
 	// The truncation must be told, not silently folded into the score.
-	analysis := analyzer.Analysis(results)
+	analysis := analyzer.analysisOf(results)
 	found := false
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
@@ -1117,14 +1117,14 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 		HTMLContent:    "<html><body>Hello</body></html>",
 		TextPlainRatio: 1.0,
 	}
-	want, _ := analyzer.Score(&complete)
+	want, _ := analyzer.scoreOf(&complete)
 
 	// The same message, read from a body that stopped short: no counterpart to
 	// compare the HTML against, hence no ratio.
 	truncated := complete
 	truncated.TextPlainRatio = 0
 	truncated.BodyTruncated = true
-	got, _ := analyzer.Score(&truncated)
+	got, _ := analyzer.scoreOf(&truncated)
 
 	if got != want {
 		t.Errorf("Score() = %d for a truncated body, want %d, the score of the same message read whole", got, want)
@@ -1134,7 +1134,7 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	// loses those points: the exemption is about what we could not read.
 	inconsistent := complete
 	inconsistent.TextPlainRatio = 0
-	if score, _ := analyzer.Score(&inconsistent); score >= want {
+	if score, _ := analyzer.scoreOf(&inconsistent); score >= want {
 		t.Errorf("Score() = %d for a complete body with no consistency, want less than %d", score, want)
 	}
 }
@@ -1169,13 +1169,19 @@ func TestValidateLink_RefusedAutomationIsNotBroken(t *testing.T) {
 			}
 
 			results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
-			analysis := analyzer.Analysis(results)
-			if got := (*analysis.Links)[0].Status; got != model.LinkCheckStatusTimeout {
-				t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusTimeout)
+			analysis := analyzer.analysisOf(results)
+			if got := (*analysis.Links)[0].Status; got == model.LinkCheckStatusBroken {
+				t.Errorf("link status = %q, want it not reported as broken", got)
 			}
 
-			refused, _ := analyzer.Score(results)
-			reachable, _ := analyzer.Score(&Results{HTMLValid: true, Links: []LinkCheck{{URL: link, Valid: true, IsSafe: true, Status: http.StatusOK}}})
+			// The same link, had the destination answered: what the port it
+			// listens on is suspected of is the same either way.
+			answered := check
+			answered.Status = http.StatusOK
+			answered.Warning = ""
+
+			refused, _ := analyzer.scoreOf(results)
+			reachable, _ := analyzer.scoreOf(&Results{HTMLValid: true, Links: []LinkCheck{answered}})
 			if refused != reachable {
 				t.Errorf("Score() = %d with a link answering %d, want %d, the score of a reachable one", refused, status, reachable)
 			}
@@ -1199,7 +1205,7 @@ func TestValidateLink_ServerFailureIsBroken(t *testing.T) {
 	}
 
 	results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
-	if got := (*analyzer.Analysis(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
+	if got := (*analyzer.analysisOf(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
 		t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusBroken)
 	}
 }
@@ -1280,7 +1286,7 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		t.Errorf("ImageTextRatio = %v, want 0: a pixel is not a picture", results.ImageTextRatio)
 	}
 
-	analysis := analyzer.Analysis(results)
+	analysis := analyzer.analysisOf(results)
 	if img := (*analysis.Images)[0]; img.IsTrackingPixel == nil || !*img.IsTrackingPixel {
 		t.Errorf("reported image = %+v, want it flagged as a tracking pixel", img)
 	}
@@ -1292,9 +1298,9 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		}
 	}
 
-	score, _ := analyzer.Score(results)
+	score, _ := analyzer.scoreOf(results)
 	results.Images = nil
-	without, _ := analyzer.Score(results)
+	without, _ := analyzer.scoreOf(results)
 	if score != without {
 		t.Errorf("Score() = %d with a tracking pixel, want %d, the score without it", score, without)
 	}
@@ -1308,7 +1314,7 @@ func TestScoreImageShareFloor(t *testing.T) {
 	analyzer := NewAnalyzer(0)
 
 	score := func(images []ImageCheck) int {
-		got, _ := analyzer.Score(&Results{HTMLValid: true, Images: images})
+		got, _ := analyzer.scoreOf(&Results{HTMLValid: true, Images: images})
 		return got
 	}
 
@@ -1357,4 +1363,16 @@ func TestWithoutSentencePunctuation(t *testing.T) {
 			t.Errorf("withoutSentencePunctuation(%q) = %q, want %q", rawURL, got, want)
 		}
 	}
+}
+
+// htmlResults reads a one-part HTML message, which is what the markup walk is
+// given in production. Nothing is fetched: the fixtures below carry no link
+// and no image.
+func htmlResults(t *testing.T, body string) *Results {
+	t.Helper()
+
+	return NewAnalyzer(time.Second).Analyze(&mailmsg.Message{
+		Header: make(mail.Header),
+		Parts:  []mailmsg.Part{{ContentType: "text/html", IsHTML: true, Content: body}},
+	})
 }
