@@ -53,6 +53,12 @@ var contentChecks = []contentCheck{
 	harmfulHTMLCheck,
 	htmlRemarkCheck,
 
+	// What a client will not render as it was sent. It reads the markup, so it
+	// sits with the other readings of the markup, and last among them: it
+	// qualifies nothing above it, and a message whose HTML does not parse has
+	// been told so before it is told which clients drop its flexbox.
+	clientCompatCheck,
+
 	// What the spam filter observed comes last: it complements the checks
 	// above rather than replacing them, and the reader has met our own
 	// findings by the time they reach it.

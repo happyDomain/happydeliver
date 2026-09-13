@@ -56,7 +56,8 @@ var missingAltCheck = contentCheck{
 			model.ContentIssueTypeMissingAlt,
 			model.ContentIssueSeverityMedium,
 			"",
-			fmt.Sprintf("%d image(s) missing alt attributes", missing),
+			fmt.Sprintf("%s %s no alt attribute",
+				counted(missing, "One image", "images"), agree(missing, "carries", "carry")),
 			"Add descriptive alt text to all images for better accessibility and deliverability",
 		)}, nil
 	},
