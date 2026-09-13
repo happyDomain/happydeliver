@@ -41,6 +41,8 @@ var contentDefects = []*reading.Defect{
 	defectDeadUnsubscribe,
 	defectRedirectChain,
 	defectUnprobedURLs,
+	defectClientCompat,
+	defectEventHandler,
 	defectRspamdObservation,
 }
 
@@ -140,4 +142,29 @@ var (
 	// with a measurement we made ourselves is worth reading, not worth
 	// charging for twice.
 	defectRspamdObservation = &reading.Defect{Name: "rspamd_observation", Family: familyRspamd}
+
+	// defectClientCompat: CSS or markup a client drops, so that the message
+	// reaches the recipient rendered otherwise than it was sent.
+	//
+	// Which clients drop what is not our judgement but Can I email's, embedded
+	// and refreshable. What it costs is nobody's: knowing that a client ignores
+	// a property is not knowing that the reader sees anything different for it,
+	// and a sender is not to lose a grade over a distinction we cannot make.
+	defectClientCompat = &reading.Defect{
+		Name:      "client_compat",
+		Uncharged: "nothing here says whether the unsupported property changes what the reader sees: it is put in front of the sender rather than billed to them",
+	}
+
+	// defectEventHandler: an on* attribute, which no email client runs and
+	// every sanitiser strips.
+	//
+	// It costs nothing for a reason of its own, not by extension of the above:
+	// a stripped handler deprives the message of a behaviour it never had
+	// anywhere, so there is no rendering lost to charge for. That is what parts
+	// it from the <script> tag familyHarmfulHTML charges twenty points for,
+	// which a filter scores the sender on.
+	defectEventHandler = &reading.Defect{
+		Name:      "event_handler",
+		Uncharged: "a handler no client was ever going to run costs the message nothing it had: the sender is told, not charged",
+	}
 )
