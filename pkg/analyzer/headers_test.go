@@ -278,13 +278,12 @@ func TestHeaderAnalyzer_IsValidMessageID(t *testing.T) {
 	}
 }
 
-// TestHeaderAnalyzer_ExtractDomain exercises extractDomain, which returns
-// everything after the last "@" in the input, after trimming leading/
-// trailing '<', '>' and spaces. It tolerates a display name before the
-// address ("User Name <user@example.com>" -> "example.com") and surrounding
-// whitespace, but returns "" when there's no "@" at all (e.g. "not-an-email"
-// or "").
-func TestHeaderAnalyzer_ExtractDomain(t *testing.T) {
+// TestAddressDomain exercises addressDomain, which returns everything after
+// the last "@" in the input, after trimming leading/trailing '<', '>' and
+// spaces. It tolerates a display name before the address ("User Name
+// <user@example.com>" -> "example.com") and surrounding whitespace, but
+// returns "" when there's no "@" at all (e.g. "not-an-email" or "").
+func TestAddressDomain(t *testing.T) {
 	tests := []struct {
 		name     string
 		email    string
@@ -322,13 +321,11 @@ func TestHeaderAnalyzer_ExtractDomain(t *testing.T) {
 		},
 	}
 
-	analyzer := NewHeaderAnalyzer()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.extractDomain(tt.email)
+			result := mailmsg.AddressDomain(tt.email)
 			if result != tt.expected {
-				t.Errorf("extractDomain(%q) = %q, want %q", tt.email, result, tt.expected)
+				t.Errorf("mailmsg.AddressDomain(%q) = %q, want %q", tt.email, result, tt.expected)
 			}
 		})
 	}
