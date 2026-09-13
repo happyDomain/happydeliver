@@ -53,6 +53,12 @@ var contentChecks = []contentCheck{
 	linkSuspicionCheck,
 	imageSuspicionCheck,
 	probeFindingCheck,
+
+	// Where the links lead, once their redirections have been followed: it
+	// reads the destinations the probe above established, and the count of
+	// what went unfetched, which qualifies that reading, follows it.
+	offDomainLinksCheck,
+
 	unprobedURLsCheck,
 
 	harmfulHTMLCheck,
