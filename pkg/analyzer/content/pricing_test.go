@@ -127,15 +127,19 @@ func speakingResults() *Results {
 	}
 
 	return &Results{
-		BodyTruncated:  true,
-		HTMLValid:      false,
-		HTMLErrors:     []string{"unexpected closing tag"},
-		htmlDocument:   document,
-		HTMLContent:    markup,
-		ImageTextRatio: 20,
-		UnprobedURLs:   3,
+		BodyTruncated:   true,
+		HTMLValid:       false,
+		htmlDocument:    document,
+		HTMLContent:     markup,
+		HTMLErrors:      []string{"unexpected closing tag"},
+		ImageTextRatio:  20,
+		UnprobedURLs:    3,
+		TextAlternative: textAltStale,
 		Links: []LinkCheck{
 			{URL: "https://example.com/{{UNSUB}}", IsTemplate: true},
+			// A destination the text part offers alone, which is what the
+			// parity check looks for.
+			{URL: "https://example.com/text-only", Valid: true, InText: true},
 			{
 				URL: "https://short.example/x", Valid: true,
 				Suspicions: []URLSuspicion{shortened},

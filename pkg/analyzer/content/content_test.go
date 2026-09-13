@@ -70,7 +70,7 @@ func TestNewContentAnalyzer(t *testing.T) {
 	}
 }
 
-func TestExtractTextFromHTML(t *testing.T) {
+func TestExtractTextFromNode(t *testing.T) {
 	tests := []struct {
 		name         string
 		html         string
@@ -103,13 +103,15 @@ func TestExtractTextFromHTML(t *testing.T) {
 		},
 	}
 
-	analyzer := NewAnalyzer(5 * time.Second)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			text := analyzer.extractTextFromHTML(tt.html)
-			if text != tt.expectedText {
-				t.Errorf("extractTextFromHTML() = %q, want %q", text, tt.expectedText)
+			doc, err := html.Parse(strings.NewReader(tt.html))
+			if err != nil {
+				t.Fatalf("html.Parse() error = %v", err)
+			}
+
+			if text := extractTextFromNode(doc); text != tt.expectedText {
+				t.Errorf("extractTextFromNode() = %q, want %q", text, tt.expectedText)
 			}
 		})
 	}
@@ -266,97 +268,6 @@ func TestIsUnsubscribeLink(t *testing.T) {
 			result := analyzer.isUnsubscribeLink(tt.href, linkNode, nil)
 			if result != tt.expected {
 				t.Errorf("isUnsubscribeLink(%q, %q) = %v, want %v", tt.href, tt.linkText, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestCalculateTextPlainConsistency(t *testing.T) {
-	tests := []struct {
-		name             string
-		plainText        string
-		htmlText         string
-		expectedMinRatio float32
-		expectedMaxRatio float32
-	}{
-		{
-			name:             "Identical content",
-			plainText:        "Hello World Test",
-			htmlText:         "<p>Hello World Test</p>",
-			expectedMinRatio: 0.8,
-			expectedMaxRatio: 1.0,
-		},
-		{
-			name:             "Similar content",
-			plainText:        "Hello World",
-			htmlText:         "<p>Hello World Extra</p>",
-			expectedMinRatio: 0.3,
-			expectedMaxRatio: 0.8,
-		},
-		{
-			name:             "Different content",
-			plainText:        "Completely different",
-			htmlText:         "<p>Nothing alike here</p>",
-			expectedMinRatio: 0.0,
-			expectedMaxRatio: 0.3,
-		},
-		{
-			name:             "Empty plain text",
-			plainText:        "",
-			htmlText:         "<p>Some text</p>",
-			expectedMinRatio: 0.0,
-			expectedMaxRatio: 0.0,
-		},
-	}
-
-	analyzer := NewAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ratio := analyzer.calculateTextPlainConsistency(tt.plainText, tt.htmlText)
-			if ratio < tt.expectedMinRatio || ratio > tt.expectedMaxRatio {
-				t.Errorf("calculateTextPlainConsistency() = %v, want between %v and %v",
-					ratio, tt.expectedMinRatio, tt.expectedMaxRatio)
-			}
-		})
-	}
-}
-
-func TestNormalizeText(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "Uppercase to lowercase",
-			input:    "Hello WORLD",
-			expected: "hello world",
-		},
-		{
-			name:     "Multiple spaces",
-			input:    "Hello    World",
-			expected: "hello world",
-		},
-		{
-			name:     "Tabs and newlines",
-			input:    "Hello\t\nWorld",
-			expected: "hello world",
-		},
-		{
-			name:     "Leading and trailing spaces",
-			input:    "  Hello World  ",
-			expected: "hello world",
-		},
-	}
-
-	analyzer := NewAnalyzer(5 * time.Second)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.normalizeText(tt.input)
-			if result != tt.expected {
-				t.Errorf("normalizeText(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -1082,11 +993,11 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 
 	analyzer := NewAnalyzer(0)
 	results := analyzer.Analyze(email)
-	if results.TextPlainRatio != 0 {
-		t.Errorf("TextPlainRatio = %v, want 0 for an unreadable body", results.TextPlainRatio)
+	if results.TextAlternative != textAltUnknown {
+		t.Errorf("TextAlternative = %s, want unknown for an unreadable body", results.TextAlternative)
 	}
 	if !results.BodyTruncated {
-		t.Errorf("BodyTruncated = false, want true so the ratio reads as unknown rather than as a failure")
+		t.Errorf("BodyTruncated = false, want true so the parts read as unknown rather than as a failure")
 	}
 
 	// The truncation must be told, not silently folded into the score.
@@ -1111,17 +1022,17 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	analyzer := NewAnalyzer(0)
 
 	complete := Results{
-		HTMLValid:      true,
-		TextContent:    "Hello",
-		HTMLContent:    "<html><body>Hello</body></html>",
-		TextPlainRatio: 1.0,
+		HTMLValid:       true,
+		TextContent:     "Hello",
+		HTMLContent:     "<html><body>Hello</body></html>",
+		TextAlternative: textAltOK,
 	}
 	want, _ := analyzer.scoreOf(&complete)
 
 	// The same message, read from a body that stopped short: no counterpart to
-	// compare the HTML against, hence no ratio.
+	// compare the HTML against, hence no verdict.
 	truncated := complete
-	truncated.TextPlainRatio = 0
+	truncated.TextAlternative = textAltUnknown
 	truncated.BodyTruncated = true
 	got, _ := analyzer.scoreOf(&truncated)
 
@@ -1132,7 +1043,7 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	// A message that did arrive whole and genuinely lacks consistency still
 	// loses those points: the exemption is about what we could not read.
 	inconsistent := complete
-	inconsistent.TextPlainRatio = 0
+	inconsistent.TextAlternative = textAltStale
 	if score, _ := analyzer.scoreOf(&inconsistent); score >= want {
 		t.Errorf("Score() = %d for a complete body with no consistency, want less than %d", score, want)
 	}
@@ -1249,8 +1160,10 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 func TestScoreImageShareFloor(t *testing.T) {
 	analyzer := NewAnalyzer(0)
 
+	// A message answering every criterion, so that the points lost are read
+	// on the scale they are written on.
 	score := func(images []ImageCheck) int {
-		got, _ := analyzer.scoreOf(&Results{HTMLValid: true, Images: images})
+		got, _ := analyzer.scoreOf(&Results{HTMLValid: true, TextContent: "hello", TextAlternative: textAltOK, Images: images})
 		return got
 	}
 
@@ -1336,7 +1249,7 @@ func TestContentCriteriaSumToTheScale(t *testing.T) {
 func TestAWithdrawnCriterionIsNotFailed(t *testing.T) {
 	analyzer := NewAnalyzer(time.Second)
 
-	whole := &Results{HTMLValid: true, TextContent: "hello", TextPlainRatio: 1}
+	whole := &Results{HTMLValid: true, TextContent: "hello", TextAlternative: textAltOK}
 	cut := &Results{HTMLValid: true, TextContent: "hello", BodyTruncated: true}
 
 	wholeScore, _ := analyzer.scoreOf(whole)
@@ -1365,11 +1278,11 @@ func TestAnalyzeContent_IncompleteBodyIsNotScoredAsClean(t *testing.T) {
 		Header: make(mail.Header),
 	})
 
-	if incomplete.TextPlainRatio != 0 {
-		t.Errorf("TextPlainRatio = %v, want 0 for a body that could not be read", incomplete.TextPlainRatio)
+	if incomplete.TextAlternative != textAltUnknown {
+		t.Errorf("TextAlternative = %s, want unknown for a body that could not be read", incomplete.TextAlternative)
 	}
-	if empty.TextPlainRatio != 1.0 {
-		t.Errorf("TextPlainRatio = %v, want 1.0 for a genuinely single-part message", empty.TextPlainRatio)
+	if empty.TextAlternative != textAltUnknown {
+		t.Errorf("TextAlternative = %s, want unknown for a message carrying no part at all: there is nothing to compare, which is not the same as two parts that agree", empty.TextAlternative)
 	}
 
 	incompleteScore, _ := analyzer.scoreOf(incomplete)
