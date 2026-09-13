@@ -86,8 +86,9 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// Links that lead somewhere, and not so many of them that the message
-		// is mostly destinations.
+		// Links that lead somewhere (a destination that answers, and a URL
+		// that designates one at all) and not so many of them that the
+		// message is mostly destinations.
 		Name:   "links",
 		Weight: 25,
 		Points: func(in *contentInput) (int, bool) {
@@ -105,7 +106,12 @@ var contentCriteria = []contentCriterion{
 
 			broken := 0
 			for _, link := range in.Results.Links {
-				if link.Status >= 400 {
+				// A link whose redirections never end is as dead as one
+				// answering 404, though it carries no status code of its own.
+				// So is one that was never fetchable in the first place: a URL
+				// left with an unsubstituted merge field, or one that does not
+				// parse, designates no destination at all.
+				if !link.Valid || link.Status >= 400 || link.hasFinding(LinkHTTPRedirectLoop) {
 					broken++
 				}
 			}
@@ -119,7 +125,8 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// Images a recipient who cannot see them can still be told about.
+		// Images that reach the recipient: they load, and the one who cannot
+		// see them is told what they showed.
 		Name:   "images",
 		Weight: 15,
 		Points: func(in *contentInput) (int, bool) {
@@ -131,14 +138,18 @@ var contentCriteria = []contentCriterion{
 				return 15, true
 			}
 
-			noAlt := 0
+			// An image earns its share when the recipient gets something out
+			// of it: it loads, or it says what it would have shown. One that
+			// does neither is a hole in the message, whether the client blocks
+			// it or the server never answered.
+			lost := 0
 			for _, img := range in.Results.Images {
-				if !img.HasAlt {
-					noAlt++
+				if !img.HasAlt || img.IsBroken {
+					lost++
 				}
 			}
 
-			return 15 * (len(in.Results.Images) - noAlt) / len(in.Results.Images), true
+			return 15 * (len(in.Results.Images) - lost) / len(in.Results.Images), true
 		},
 	},
 	{

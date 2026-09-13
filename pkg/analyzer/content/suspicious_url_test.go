@@ -546,8 +546,8 @@ func TestGenerateContentAnalysis_SuspiciousLinkIssues(t *testing.T) {
 	results := &Results{
 		HTMLContent: "<html><body></body></html>",
 		Links: []LinkCheck{
-			{URL: "https://fr.r.emails.example.com/r/?id=x", Valid: true, IsSafe: true, Status: 200},
-			{URL: badURL, Valid: true, IsSafe: false, Status: 200, Suspicions: analyzeURLSuspicions(badURL)},
+			{URL: "https://fr.r.emails.example.com/r/?id=x", Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}},
+			{URL: badURL, Valid: true, IsSafe: false, Suspicions: analyzeURLSuspicions(badURL), probedURL: probedURL{Status: 200}},
 		},
 	}
 
@@ -593,7 +593,7 @@ func TestGenerateContentAnalysis_CleanLinkHasNoIssue(t *testing.T) {
 	cleanURL := "https://fr.r.emails.example.com/r/?id=h2f29daf0,adcbfc78,95c915a&e=ZW1sLXB1Ymxpc2hlcj1OZW9sYW5l&s=JaSedqApLxbMlohm"
 	results := &Results{
 		HTMLContent: "<html><body></body></html>",
-		Links:       []LinkCheck{{URL: cleanURL, Valid: true, IsSafe: true, Status: 200}},
+		Links:       []LinkCheck{{URL: cleanURL, Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}}},
 	}
 
 	analysis := analyzer.analysisOf(results)
@@ -637,7 +637,7 @@ func TestGenerateContentAnalysis_IsShortenedOnlyForShorteners(t *testing.T) {
 	links := make([]LinkCheck, 0, len(tests))
 	for _, tt := range tests {
 		suspicions := analyzeURLSuspicions(tt.url)
-		links = append(links, LinkCheck{URL: tt.url, Valid: true, Status: 200, IsSafe: len(suspicions) == 0, Suspicions: suspicions})
+		links = append(links, LinkCheck{URL: tt.url, Valid: true, IsSafe: len(suspicions) == 0, Suspicions: suspicions, probedURL: probedURL{Status: 200}})
 	}
 
 	analysis := analyzer.analysisOf(&Results{HTMLContent: "<html></html>", Links: links})

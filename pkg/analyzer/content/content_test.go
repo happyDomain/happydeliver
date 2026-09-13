@@ -59,8 +59,8 @@ func TestNewContentAnalyzer(t *testing.T) {
 			if analyzer.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", analyzer.Timeout, tt.expectedTimeout)
 			}
-			if analyzer.httpClient == nil {
-				t.Error("httpClient should not be nil")
+			if analyzer.prober == nil {
+				t.Error("the analyzer has nothing to fetch the message's URLs with")
 			}
 		})
 	}
@@ -259,7 +259,7 @@ func TestIsUnsubscribeLink(t *testing.T) {
 				t.Fatal("Failed to parse test HTML")
 			}
 
-			result := analyzer.isUnsubscribeLink(tt.href, linkNode)
+			result := analyzer.isUnsubscribeLink(tt.href, linkNode, nil)
 			if result != tt.expected {
 				t.Errorf("isUnsubscribeLink(%q, %q) = %v, want %v", tt.href, tt.linkText, result, tt.expected)
 			}
@@ -1008,15 +1008,13 @@ func TestIsTemplatePlaceholderURL(t *testing.T) {
 	}
 }
 
-func TestValidateLink_TemplatePlaceholderIsInvalid(t *testing.T) {
-	analyzer := NewAnalyzer(5 * time.Second)
-
-	check := analyzer.validateLink("{unsubscribe}")
+func TestAnalyzeLinkOffline_TemplatePlaceholderIsInvalid(t *testing.T) {
+	check := analyzeLinkOffline("{unsubscribe}")
 	if check.Valid {
-		t.Errorf("validateLink(%q).Valid = true, want false", "{unsubscribe}")
+		t.Errorf("analyzeLinkOffline(%q).Valid = true, want false", "{unsubscribe}")
 	}
 	if check.Error == "" {
-		t.Errorf("validateLink(%q).Error is empty, want a template placeholder error", "{unsubscribe}")
+		t.Errorf("analyzeLinkOffline(%q).Error is empty, want a template placeholder error", "{unsubscribe}")
 	}
 }
 
