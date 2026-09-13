@@ -33,9 +33,28 @@ package reading
 import (
 	"context"
 	"log"
+	"slices"
 
 	"git.happydns.org/happyDeliver/internal/model"
 )
+
+// Finding is one thing a check found: the issue as the report will
+// show it, plus the key under which it may be recognised as the same defect
+// another check also found.
+type Finding struct {
+	model.ContentIssue
+
+	// Concern names the defect, not the observation. Two findings sharing a
+	// concern describe the same thing about the same object, so only the first
+	// is reported and the others are named in its corroborated_by.
+	//
+	// It is empty by default, and empty means never merged. That is the safe
+	// default: showing one defect twice is untidy, while merging two distinct
+	// defects loses one of them. A key is therefore declared only where the
+	// two producers can be counted on to agree on it, which for anything
+	// scoped to a URL means agreeing on the URL itself.
+	Concern string
+}
 
 // Category says which reading of a message a check answers, and so which of
 // happyDeliver's readers it is addressed to: the newsletter editor before a
@@ -99,7 +118,7 @@ type Check[In any] struct {
 	// reading of a message is not lost because one service was down. A caveat
 	// the *reader* must see is not an error but a finding, which is how a check
 	// says "I could not verify this" in the report.
-	Run func(ctx context.Context, in In) ([]model.ContentIssue, error)
+	Run func(ctx context.Context, in In) ([]Finding, error)
 }
 
 // Family groups the checks whose findings answer for the same kind of
@@ -152,20 +171,44 @@ type Evaluation struct {
 	Penalty int
 }
 
+// saysTheSame answers whether two findings of one concern are the same
+// observation reported twice, rather than two observations of one kind of
+// defect. What a reader would see is the whole answer: findings reading alike
+// in the same place are the same finding.
+func saysTheSame(a, b Finding) bool {
+	if a.Message != b.Message {
+		return false
+	}
+
+	if a.Location == nil || b.Location == nil {
+		return a.Location == b.Location
+	}
+
+	return *a.Location == *b.Location
+}
+
 // Run runs the given checks and returns what they found, in
 // their order, together with what it costs the content score.
 //
 // The order is part of the report: it puts what qualifies the rest of the
 // reading first, and the remarks that only inform last. A caller hands it its
 // own registry; the tests hand it checks of their own.
+//
+// Findings describing the same defect are merged before anything is charged,
+// so that a defect two checks both saw is reported once and paid for once.
 func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model.ContentIssue, penalty int) {
-	// Each family is totalled before being capped: the cap belongs to the
-	// family, not to the check, so that two checks sharing one may not deduct
-	// twice its bound between them.
-	perFamily := make(map[*Family]int, len(checks))
+	type observed struct {
+		finding Finding
+		family  *Family
+		// source names this observer in another finding's corroborated_by. It
+		// is the rspamd symbol when there is one, and the check's name
+		// otherwise.
+		source string
+	}
 
+	var found []observed
 	for _, check := range checks {
-		found, err := check.Run(ctx, in)
+		reported, err := check.Run(ctx, in)
 		if err != nil {
 			// The check reached no verdict. Saying nothing about it in the
 			// report is the honest answer: a finding would state a defect
@@ -174,23 +217,79 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 			continue
 		}
 
-		if len(found) == 0 {
+		for _, finding := range reported {
+			source := check.Name
+			if finding.Symbol != nil {
+				source = *finding.Symbol
+			}
+			found = append(found, observed{finding: finding, family: check.Family, source: source})
+		}
+	}
+
+	// The first finding of a concern is the one kept, which is why the
+	// registry lists our own checks before the spam filter's: what happyDeliver
+	// read for itself carries a location and advice of its own, and the
+	// filter's agreement is worth noting on it rather than repeating beside it.
+	keptByConcern := make(map[string]int, len(found))
+	kept := make([]observed, 0, len(found))
+
+	for _, o := range found {
+		if o.finding.Concern == "" {
+			kept = append(kept, o)
 			continue
 		}
 
-		issues = append(issues, found...)
+		if at, seen := keptByConcern[o.finding.Concern]; seen {
+			// An observer agreeing with itself is a duplicate, not a
+			// corroboration: the same URL written twice in a message draws the
+			// same suspicion twice, and "also reported by" our own check would
+			// be a strange thing to read. Such a finding is simply dropped.
+			//
+			// It only says the same thing when it reads the same, though: a
+			// check that names one concern for a whole class of defect, as the
+			// contrast reading does for every unreadable colour pair it finds,
+			// reports each of them separately and each is worth keeping.
+			if o.source == kept[at].source {
+				if saysTheSame(o.finding, kept[at].finding) {
+					continue
+				}
 
-		if check.Family == nil {
-			continue
-		}
-
-		for _, issue := range found {
-			if check.Family.PerItem > 0 {
-				perFamily[check.Family] += check.Family.PerItem
+				kept = append(kept, o)
 				continue
 			}
-			perFamily[check.Family] += SeverityPenalty(issue.Severity)
+
+			corroborated := []string{}
+			if existing := kept[at].finding.CorroboratedBy; existing != nil {
+				corroborated = *existing
+			}
+			if !slices.Contains(corroborated, o.source) {
+				corroborated = append(corroborated, o.source)
+			}
+			kept[at].finding.CorroboratedBy = &corroborated
+			continue
 		}
+
+		keptByConcern[o.finding.Concern] = len(kept)
+		kept = append(kept, o)
+	}
+
+	// Each family is totalled before being capped: the cap belongs to the
+	// family, not to the check, so that two checks sharing one may not deduct
+	// twice its bound between them.
+	perFamily := make(map[*Family]int, len(checks))
+
+	issues = make([]model.ContentIssue, 0, len(kept))
+	for _, o := range kept {
+		issues = append(issues, o.finding.ContentIssue)
+
+		if o.family == nil {
+			continue
+		}
+		if o.family.PerItem > 0 {
+			perFamily[o.family] += o.family.PerItem
+			continue
+		}
+		perFamily[o.family] += SeverityPenalty(o.finding.Severity)
 	}
 
 	for family, total := range perFamily {

@@ -37,16 +37,16 @@ import (
 var truncatedBodyCheck = contentCheck{
 	Name:     "truncated_body",
 	Category: reading.CategoryDeliverability,
-	Run: func(_ context.Context, in *contentInput) ([]model.ContentIssue, error) {
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		if !in.Results.BodyTruncated {
 			return nil, nil
 		}
 
-		return []model.ContentIssue{{
+		return []reading.Finding{{ContentIssue: model.ContentIssue{
 			Type:     model.ContentIssueTypeTruncatedBody,
 			Severity: model.ContentIssueSeverityMedium,
 			Message:  "The message body stops before its end: it was cut short in transit, or its MIME structure announces a part that never follows. Only the parts that arrived were analysed.",
 			Advice:   utils.PtrTo("Check the message size against the limits of the relays it goes through, and that the MIME boundaries it declares are all closed"),
-		}}, nil
+		}}}, nil
 	},
 }

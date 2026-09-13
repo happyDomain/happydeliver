@@ -49,10 +49,17 @@ func rspamdWith(symbols map[string]string) *model.RspamdResult {
 	return result
 }
 
-func runRspamdCheck(rspamd *model.RspamdResult) []model.ContentIssue {
-	issues, err := rspamdFindingsCheck.Run(context.Background(), &contentInput{Results: &Results{Rspamd: rspamd}})
+func runRspamdCheck(t *testing.T, rspamd *model.RspamdResult) []model.ContentIssue {
+	t.Helper()
+
+	found, err := rspamdFindingsCheck.Run(context.Background(), &contentInput{Results: &Results{Rspamd: rspamd}})
 	if err != nil {
-		panic(err)
+		t.Fatalf("the rspamd check could not answer: %v", err)
+	}
+
+	issues := make([]model.ContentIssue, 0, len(found))
+	for _, finding := range found {
+		issues = append(issues, finding.ContentIssue)
 	}
 
 	return issues
@@ -108,7 +115,7 @@ func TestRspamdFindings(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			issues := runRspamdCheck(test.rspamd)
+			issues := runRspamdCheck(t, test.rspamd)
 
 			if len(issues) != len(test.want) {
 				t.Fatalf("reported %d finding(s), want %d: %+v", len(issues), len(test.want), issues)
@@ -138,7 +145,7 @@ func TestRspamdFindings(t *testing.T) {
 // TestRspamdFindingCarriesItsProvenance covers what tells a reader this came
 // from the filter rather than from happyDeliver's own reading of the message.
 func TestRspamdFindingCarriesItsProvenance(t *testing.T) {
-	issues := runRspamdCheck(rspamdWith(map[string]string{"ZERO_FONT": ""}))
+	issues := runRspamdCheck(t, rspamdWith(map[string]string{"ZERO_FONT": ""}))
 	if len(issues) != 1 {
 		t.Fatalf("reported %d finding(s), want 1", len(issues))
 	}
@@ -193,7 +200,7 @@ func TestRspamdFindingInterpolatesOptions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			issues := runRspamdCheck(rspamdWith(map[string]string{test.symbol: test.params}))
+			issues := runRspamdCheck(t, rspamdWith(map[string]string{test.symbol: test.params}))
 			if len(issues) != 1 {
 				t.Fatalf("reported %d finding(s), want 1", len(issues))
 			}
