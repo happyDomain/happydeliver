@@ -40,6 +40,7 @@ var contentChecks = []contentCheck{
 
 	templatePlaceholderCheck,
 	linkSuspicionCheck,
+	imageSuspicionCheck,
 
 	harmfulHTMLCheck,
 	htmlRemarkCheck,
