@@ -127,6 +127,11 @@ type AnalysisResults struct {
 	AuthservIDs    []string
 	Authentication *model.AuthenticationResults
 	Content        *content.Results
+	// ContentReading is what the content checks made of the above: the findings
+	// the report shows and what they cost its score. It is read once, after
+	// everything the checks look at has been observed, because a check may
+	// fetch a URL or hand a file to a scanner.
+	ContentReading content.Reading
 	DNS            *model.DNSResults
 	Headers        *model.HeaderAnalysis
 	RBL            *DNSListResults
@@ -182,6 +187,10 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
 
 	results.Content = r.contentAnalyzer.Analyze(email)
+	if results.Content != nil {
+		// Everything the checks read has been observed by now.
+		results.ContentReading = r.contentAnalyzer.Read(results.Content)
+	}
 
 	return results
 }
@@ -229,7 +238,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	contentScore := 0
 	var contentGrade string
 	if results.Content != nil {
-		contentScore, contentGrade = r.contentAnalyzer.Score(results.Content)
+		contentScore, contentGrade = r.contentAnalyzer.Score(results.Content, results.ContentReading)
 	}
 
 	headerScore := 0
@@ -288,7 +297,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Add content analysis
 	if results.Content != nil {
-		contentAnalysis := r.contentAnalyzer.Analysis(results.Content)
+		contentAnalysis := r.contentAnalyzer.Analysis(results.Content, results.ContentReading)
 		report.ContentAnalysis = contentAnalysis
 	}
 

@@ -85,8 +85,13 @@ type Results struct {
 	HTMLContent      string
 	TextPlainRatio   float32 // Ratio of plain text to HTML consistency
 	ImageTextRatio   float32 // Ratio of images to text
-	ContentIssues    []string
-	HarmfullIssues   []string
+
+	// email is the message these results were read off, and htmlDocument the
+	// tree its HTML part parsed into. The checks are handed both: a fact one of
+	// them alone needs is read where it lies rather than added here, and the
+	// document is parsed once for all of them.
+	email        *mailmsg.Message
+	htmlDocument *html.Node
 
 	// BodyTruncated reports that the MIME body stopped short of its end, so the
 	// parts analysed above are only the ones that arrived. What is missing from
@@ -163,7 +168,7 @@ type ImageCheck struct {
 
 // Analyze performs content analysis on email message
 func (c *Analyzer) Analyze(email *mailmsg.Message) *Results {
-	results := &Results{BodyTruncated: email.BodyIncomplete}
+	results := &Results{email: email, BodyTruncated: email.BodyIncomplete}
 
 	results.IsMultipart = len(email.Parts) > 1
 
@@ -282,6 +287,7 @@ func (c *Analyzer) analyzeHTML(htmlContent string, results *Results) {
 	}
 
 	results.HTMLValid = true
+	results.htmlDocument = doc
 
 	// Traverse HTML tree
 	c.traverseHTML(doc, results)
@@ -289,7 +295,7 @@ func (c *Analyzer) analyzeHTML(htmlContent string, results *Results) {
 	// Calculate image-to-text ratio. A tracking pixel shows nothing, so it
 	// does not weigh on how much of the message is pictures.
 	if results.HTMLContent != "" {
-		textLength := len(c.extractTextFromHTML(htmlContent))
+		textLength := len(extractTextFromNode(doc))
 		imageCount := len(results.VisibleImages())
 		if textLength > 0 {
 			results.ImageTextRatio = float32(imageCount) / float32(textLength) * 1000 // Images per 1000 chars
@@ -357,7 +363,10 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 		switch n.Data {
 		case "a":
 			// Extract and validate links
-			href := c.getAttr(n, "href")
+			// The spacing a template or a pretty-printer left around the
+			// address is not part of it: kept, it passes every check that
+			// trims before parsing and then fails the fetch itself.
+			href := strings.TrimSpace(getAttrOf(n, "href"))
 			if href != "" {
 				// Check for unsubscribe links
 				if c.isUnsubscribeLink(href, n) {
@@ -385,8 +394,8 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 
 		case "img":
 			// Extract and validate images
-			src := c.getAttr(n, "src")
-			alt := c.getAttr(n, "alt")
+			src := getAttrOf(n, "src")
+			alt := getAttrOf(n, "alt")
 
 			imageCheck := ImageCheck{
 				Src:             src,
@@ -401,59 +410,6 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 			}
 
 			results.Images = append(results.Images, imageCheck)
-
-		case "script":
-			// JavaScript in emails is a security risk and typically blocked
-			results.HarmfullIssues = append(results.HarmfullIssues, "Dangerous <script> tag detected - JavaScript is blocked by most email clients")
-
-		case "iframe":
-			// Iframes are security risks and blocked by most email clients
-			src := c.getAttr(n, "src")
-			issue := "Dangerous <iframe> tag detected"
-			if src != "" {
-				issue += fmt.Sprintf(" with src='%s'", src)
-			}
-			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - iframes are blocked by most email clients")
-
-		case "object", "embed", "applet":
-			// Legacy embedding tags, security risks
-			results.HarmfullIssues = append(results.HarmfullIssues, fmt.Sprintf("Dangerous <%s> tag detected - legacy embedding tags are security risks and blocked by email clients", n.Data))
-
-		case "form":
-			// Forms in emails can be phishing vectors
-			action := c.getAttr(n, "action")
-			issue := "Suspicious <form> tag detected"
-			if action != "" {
-				issue += fmt.Sprintf(" with action='%s'", action)
-			}
-			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - forms can be phishing vectors and are often blocked")
-
-		case "base":
-			// Base tag can be used for phishing by redirecting relative URLs
-			href := c.getAttr(n, "href")
-			issue := "Potentially dangerous <base> tag detected"
-			if href != "" {
-				issue += fmt.Sprintf(" with href='%s'", href)
-			}
-			results.HarmfullIssues = append(results.HarmfullIssues, issue+" - can redirect all relative URLs")
-
-		case "meta":
-			// Check for suspicious meta redirects
-			httpEquiv := c.getAttr(n, "http-equiv")
-			if strings.ToLower(httpEquiv) == "refresh" {
-				content := c.getAttr(n, "content")
-				results.HarmfullIssues = append(results.HarmfullIssues, fmt.Sprintf("Suspicious <meta http-equiv='refresh'> tag detected with content='%s' - can be used for phishing redirects", content))
-			}
-
-		case "link":
-			// Check for external stylesheet links (potential privacy/tracking concerns)
-			rel := c.getAttr(n, "rel")
-			href := c.getAttr(n, "href")
-			if strings.Contains(strings.ToLower(rel), "stylesheet") && href != "" {
-				if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
-					results.ContentIssues = append(results.ContentIssues, fmt.Sprintf("External stylesheet link detected: %s - may cause rendering issues or privacy concerns", href))
-				}
-			}
 		}
 	}
 
@@ -463,8 +419,12 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 	}
 }
 
-// getAttr gets an attribute value from an HTML node
-func (c *Analyzer) getAttr(n *html.Node, key string) string {
+// getAttrOf reads an attribute off a node.
+//
+// It is a function rather than a Analyzer method because the checks that
+// read the tree afterwards have no analyzer: they are handed the document the
+// analysis already parsed.
+func getAttrOf(n *html.Node, key string) string {
 	for _, attr := range n.Attr {
 		if attr.Key == key {
 			return attr.Val
@@ -765,6 +725,12 @@ func (c *Analyzer) extractTextFromHTML(htmlContent string) string {
 		return ""
 	}
 
+	return extractTextFromNode(doc)
+}
+
+// extractTextFromNode reads the text of an already parsed tree, so that a
+// caller holding the document does not parse its source a second time.
+func extractTextFromNode(doc *html.Node) string {
 	var text strings.Builder
 	var extract func(*html.Node)
 	extract = func(n *html.Node) {
@@ -857,7 +823,7 @@ func (c *Analyzer) normalizeText(text string) string {
 }
 
 // Analysis creates structured content analysis from results
-func (c *Analyzer) Analysis(results *Results) *model.ContentAnalysis {
+func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalysis {
 	if results == nil {
 		return nil
 	}
@@ -878,107 +844,9 @@ func (c *Analyzer) Analysis(results *Results) *model.ContentAnalysis {
 		}
 	}
 
-	// Build HTML issues
-	htmlIssues := []model.ContentIssue{}
-
-	// Report a truncated body first: it qualifies everything the analysis below
-	// says about the content, which only ever saw the parts that arrived.
-	if results.BodyTruncated {
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeTruncatedBody,
-			Severity: model.ContentIssueSeverityMedium,
-			Message:  "The message body stops before its end: it was cut short in transit, or its MIME structure announces a part that never follows. Only the parts that arrived were analysed.",
-			Advice:   utils.PtrTo("Check the message size against the limits of the relays it goes through, and that the MIME boundaries it declares are all closed"),
-		})
-	}
-
-	// Add HTML parsing errors
-	if !results.HTMLValid && len(results.HTMLErrors) > 0 {
-		for _, errMsg := range results.HTMLErrors {
-			htmlIssues = append(htmlIssues, model.ContentIssue{
-				Type:     model.ContentIssueTypeBrokenHtml,
-				Severity: model.ContentIssueSeverityHigh,
-				Message:  errMsg,
-				Advice:   utils.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
-			})
-		}
-	}
-
-	// Add missing alt text issues
-	if visible := results.VisibleImages(); len(visible) > 0 {
-		missingAltCount := 0
-		for _, img := range visible {
-			if !img.HasAlt {
-				missingAltCount++
-			}
-		}
-		if missingAltCount > 0 {
-			htmlIssues = append(htmlIssues, model.ContentIssue{
-				Type:     model.ContentIssueTypeMissingAlt,
-				Severity: model.ContentIssueSeverityMedium,
-				Message:  fmt.Sprintf("%d image(s) missing alt attributes", missingAltCount),
-				Advice:   utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
-			})
-		}
-	}
-
-	// Add excessive images issue
-	if results.ImageTextRatio > 10.0 {
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeExcessiveImages,
-			Severity: model.ContentIssueSeverityMedium,
-			Message:  "Email is excessively image-heavy",
-			Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
-		})
-	}
-
-	// Add unreplaced template placeholder issues
-	for _, link := range results.Links {
-		if !link.IsTemplate {
-			continue
-		}
-		location := link.URL
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeUnreplacedTemplate,
-			Severity: model.ContentIssueSeverityHigh,
-			Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
-			Location: &location,
-			Advice:   utils.PtrTo("Ensure all merge fields and template placeholders are substituted before sending"),
-		})
-	}
-
-	// Add suspicious URL issues
-	for _, link := range results.Links {
-		for _, suspicion := range link.Suspicions {
-			htmlIssues = append(htmlIssues, model.ContentIssue{
-				Type:     model.ContentIssueTypeSuspiciousLink,
-				Severity: suspicion.Severity,
-				Message:  suspicion.Message,
-				Location: &link.URL,
-				Advice:   utils.PtrTo(suspicion.Advice),
-			})
-		}
-	}
-
-	// Add harmful HTML tag issues
-	for _, harmfulIssue := range results.HarmfullIssues {
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeDangerousHtml,
-			Severity: model.ContentIssueSeverityCritical,
-			Message:  harmfulIssue,
-			Advice:   utils.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
-		})
-	}
-
-	// Add general content issues (like external stylesheets)
-	for _, contentIssue := range results.ContentIssues {
-		htmlIssues = append(htmlIssues, model.ContentIssue{
-			Type:     model.ContentIssueTypeBrokenHtml,
-			Severity: model.ContentIssueSeverityLow,
-			Message:  contentIssue,
-			Advice:   utils.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
-		})
-	}
+	// Every check of the registry reports here, in the order their findings
+	// are read. What they cost is read by the score, from this same reading.
+	htmlIssues := read.Issues
 
 	if len(htmlIssues) > 0 {
 		analysis.HtmlIssues = &htmlIssues
@@ -1065,7 +933,7 @@ func (c *Analyzer) Analysis(results *Results) *model.ContentAnalysis {
 const minImagesForShare = 5
 
 // Score calculates the content score (0-20 points)
-func (c *Analyzer) Score(results *Results) (int, string) {
+func (c *Analyzer) Score(results *Results, read Reading) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
@@ -1144,26 +1012,10 @@ func (c *Analyzer) Score(results *Results) (int, string) {
 		score = score * 100 / attainable
 	}
 
-	// Penalize suspicious links, weighted by how serious each finding is
-	suspicionPenalty := 0
-	for _, link := range results.Links {
-		for _, suspicion := range link.Suspicions {
-			switch suspicion.Severity {
-			case model.ContentIssueSeverityCritical, model.ContentIssueSeverityHigh:
-				suspicionPenalty += 3
-			case model.ContentIssueSeverityMedium:
-				suspicionPenalty += 2
-			default:
-				suspicionPenalty++
-			}
-		}
-	}
-	score -= min(suspicionPenalty, 10)
-
-	// Penalize harmful HTML tags (deduct 20 points per harmful tag, max 40 points)
-	if len(results.HarmfullIssues) > 0 {
-		score -= min(len(results.HarmfullIssues)*20, 40)
-	}
+	// Answer for what the checks found. Each family of findings is capped on
+	// its own, so that a message with two unrelated defects answers for both
+	// without either deciding the grade by itself.
+	score -= read.Penalty
 
 	// Ensure score is between 0 and 100
 	if score < 0 {
