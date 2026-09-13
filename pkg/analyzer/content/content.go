@@ -40,7 +40,6 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
 
-	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -925,105 +924,4 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 	}
 
 	return analysis
-}
-
-// minImagesForShare is the smallest count an image's share of the images
-// criterion is taken over, so that a lone faulty image does not cost the whole
-// of it.
-const minImagesForShare = 5
-
-// Score calculates the content score (0-20 points)
-func (c *Analyzer) Score(results *Results, read Reading) (int, string) {
-	if results == nil {
-		return 0, ""
-	}
-
-	var score int = 10
-
-	// The points a flawless message can reach. A criterion the received bytes
-	// cannot answer is subtracted from it instead of being refused, so that a
-	// body cut short on its way does not cost the sender a grade.
-	attainable := 100
-
-	// HTML validity or text alone (10 points)
-	if results.HTMLValid || (!results.IsMultipart && results.HasPlaintext()) {
-		score += 10
-	}
-
-	// Requires plain text alternative (10 points)
-	if results.HasPlaintext() {
-		score += 10
-	}
-
-	// Links (25 points)
-	if len(results.Links) > 0 {
-		brokenLinks := 0
-		for _, link := range results.Links {
-			if link.Status >= 400 && !refusesAutomatedClients(link.Status) {
-				brokenLinks++
-			}
-		}
-		score += 20 * (len(results.Links) - brokenLinks) / len(results.Links)
-		// Too much links, 10 points penalty
-		if len(results.Links) > 30 {
-			score -= 10
-		}
-	} else {
-		// No links is better, less suspiscous
-		score += 25
-	}
-
-	// Images (15 points). Each image without alt text costs its share of the
-	// criterion, over a count of at least five: a message with a single
-	// undescribed picture is short of one description, not of every one, and
-	// loses three points for it rather than fifteen.
-	if visible := results.VisibleImages(); len(visible) > 0 {
-		noAltCount := 0
-		for _, img := range visible {
-			if !img.HasAlt {
-				noAltCount++
-			}
-		}
-		score += 15 - 15*noAltCount/max(len(visible), minImagesForShare)
-	} else {
-		// No images is Ok
-		score += 15
-	}
-
-	// Text consistency (15 points). A truncated body cannot be judged on it: the
-	// plain text counterpart of the HTML may simply never have arrived. Drop the
-	// criterion rather than award or refuse its points.
-	if results.BodyTruncated {
-		attainable -= 15
-	} else if results.TextPlainRatio >= 0.3 {
-		score += 15
-	}
-
-	// Image ratio (15 points)
-	if results.ImageTextRatio <= 5.0 {
-		score += 15
-	} else if results.ImageTextRatio <= 10.0 {
-		score += 7
-	}
-
-	// Bring the criteria that could be judged back onto the 0-100 scale, before
-	// the penalties below, which are expressed in points of that scale.
-	if attainable != 100 {
-		score = score * 100 / attainable
-	}
-
-	// Answer for what the checks found. Each family of findings is capped on
-	// its own, so that a message with two unrelated defects answers for both
-	// without either deciding the grade by itself.
-	score -= read.Penalty
-
-	// Ensure score is between 0 and 100
-	if score < 0 {
-		score = 0
-	}
-	if score > 100 {
-		score = 100
-	}
-
-	return score, grade.Of(score)
 }
