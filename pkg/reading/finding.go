@@ -40,3 +40,31 @@ const (
 	// message under the symbol that raised it.
 	SourceRspamd model.ContentIssueSource = "rspamd"
 )
+
+// NewFinding builds a finding at the place the check was looking. Every check
+// goes through it, so that the vocabulary of an issue (its type, its severity,
+// where it was found, what to do about it) is assembled the same way each
+// time.
+//
+// Location and advice are taken as plain strings and made into pointers here,
+// because that is the whole of the ceremony a check used to repeat: the
+// schema tells apart a field left out from one set to nothing, and empty means
+// left out.
+//
+// What a finding carries beyond this is set on the answer: a Concern, when the
+// check knows the key another check would recognise the same defect under.
+func NewFinding(defect *Defect, issueType model.ContentIssueType, severity model.ContentIssueSeverity, location, message, advice string) Finding {
+	issue := model.ContentIssue{
+		Type:     issueType,
+		Severity: severity,
+		Message:  message,
+	}
+	if location != "" {
+		issue.Location = &location
+	}
+	if advice != "" {
+		issue.Advice = &advice
+	}
+
+	return Finding{ContentIssue: issue, Defect: defect}
+}

@@ -37,7 +37,9 @@ import (
 )
 
 // issuesOf builds a check reporting one finding per severity given, so that a
-// test states what a check found rather than how it found it.
+// test states what a check found rather than how it found it. The family given
+// is the one its findings are charged to, through a defect of its own so that
+// tuning a real one does not rewrite what these tests assert.
 func issuesOf(name string, family *reading.Family, severities ...model.ContentIssueSeverity) contentCheck {
 	return concernedIssuesOf(name, family, "", severities...)
 }
@@ -45,13 +47,16 @@ func issuesOf(name string, family *reading.Family, severities ...model.ContentIs
 // concernedIssuesOf is issuesOf with every finding keyed on one concern, for
 // the tests about merging.
 func concernedIssuesOf(name string, family *reading.Family, concern string, severities ...model.ContentIssueSeverity) contentCheck {
+	defect := &reading.Defect{Name: name, Family: family}
+
 	return contentCheck{
-		Name:   name,
-		Family: family,
+		Name:    name,
+		Reports: []*reading.Defect{defect},
 		Run: func(context.Context, *contentInput) ([]reading.Finding, error) {
 			issues := make([]reading.Finding, 0, len(severities))
 			for _, severity := range severities {
 				issues = append(issues, reading.Finding{
+					Defect: defect,
 					ContentIssue: model.ContentIssue{
 						Type:     model.ContentIssueTypeSuspiciousLink,
 						Severity: severity,
@@ -252,8 +257,17 @@ func TestContentRegistryIsWellFormed(t *testing.T) {
 			t.Errorf("check %q says nothing about which reading it answers", check.Name)
 		}
 
-		if check.Family != nil && check.Family.Cap <= 0 {
-			t.Errorf("check %q belongs to family %q, whose cap of %d would silence it", check.Name, check.Family.Name, check.Family.Cap)
+		if len(check.Reports) == 0 {
+			t.Errorf("check %q declares no defect, so nothing says what its findings cost", check.Name)
+		}
+
+		for _, defect := range check.Reports {
+			if !slices.Contains(contentDefects, defect) {
+				t.Errorf("check %q reports %q, which the defect vocabulary does not hold", check.Name, defect.Name)
+			}
+			if defect.Family != nil && defect.Family.Cap <= 0 {
+				t.Errorf("defect %q belongs to family %q, whose cap of %d would silence it", defect.Name, defect.Family.Name, defect.Family.Cap)
+			}
 		}
 	}
 }
@@ -548,8 +562,8 @@ func TestHTMLRemarkCheckReportsWithoutCharging(t *testing.T) {
 	})
 
 	t.Run("a remark costs the message nothing", func(t *testing.T) {
-		if htmlRemarkCheck.Family != nil {
-			t.Errorf("the remarks belong to family %q, so they deduct points for a message that reads fine", htmlRemarkCheck.Family.Name)
+		if defectHTMLRemark.Family != nil {
+			t.Errorf("the remarks belong to family %q, so they deduct points for a message that reads fine", defectHTMLRemark.Family.Name)
 		}
 
 		_, penalty := reading.Run(context.Background(), []contentCheck{htmlRemarkCheck},

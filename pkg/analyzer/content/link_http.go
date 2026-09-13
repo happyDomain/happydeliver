@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/reading"
 	"git.happydns.org/happyDeliver/pkg/urlprobe"
 	"net/http"
 	"slices"
@@ -74,6 +75,30 @@ func (f LinkHTTPFinding) IssueType() model.ContentIssueType {
 		return model.ContentIssueTypeExcessiveRedirects
 	default:
 		return model.ContentIssueTypeUnreachableLink
+	}
+}
+
+// defect says which defect this finding is, and so who pays for it. The role
+// decides: a link that does not answer is already graded by the links
+// criterion, an image source by the images one, while nothing yet grades the
+// address a recipient unsubscribes at.
+//
+// A chain of redirections that ends somewhere is the one finding no criterion
+// counts as broken, the URL being reached after all, so it answers under the
+// probe cap whatever its role. A chain that never ends does count as broken,
+// both criteria reading it that way, and is filed with the dead URLs.
+func (f LinkHTTPFinding) defect(role urlRole) *reading.Defect {
+	if f.Kind == LinkHTTPExcessiveRedirects {
+		return defectRedirectChain
+	}
+
+	switch role {
+	case urlRoleImage:
+		return defectDeadImage
+	case urlRoleUnsubscribe:
+		return defectDeadUnsubscribe
+	default:
+		return defectDeadLink
 	}
 }
 
@@ -145,10 +170,24 @@ func (p probedURL) hasFinding(kind LinkHTTPFindingKind) bool {
 	})
 }
 
-// probedLocation pairs what a fetch returned with the URL it belongs to.
+// urlRole says what a fetched URL was found as. What a URL that does not
+// answer costs depends on it: a body link is graded by the links criterion, an
+// image source by the images one, while nothing yet grades the address a
+// recipient unsubscribes at.
+type urlRole string
+
+const (
+	urlRoleLink        urlRole = "link"
+	urlRoleImage       urlRole = "image"
+	urlRoleUnsubscribe urlRole = "unsubscribe"
+)
+
+// probedLocation pairs what a fetch returned with the URL it belongs to, and
+// with the role it was first found under.
 type probedLocation struct {
 	probedURL
 	Location string
+	Role     urlRole
 }
 
 // destination is where this URL finally leads, as probedURL.destination reads
@@ -169,22 +208,26 @@ func (r *Results) probedURLs() []probedLocation {
 	probed := make([]probedLocation, 0, len(r.Links)+len(r.Images)+len(r.UnsubscribeChecks))
 	seen := make(map[string]bool, cap(probed))
 
-	add := func(location string, result probedURL) {
+	// The role kept is the first one the URL was found under, as the entry
+	// itself is: a URL written both as a link and as an image source is
+	// reported once, and the role it is reported under is what decides which
+	// defect that one finding is.
+	add := func(location string, role urlRole, result probedURL) {
 		if location == "" || seen[location] {
 			return
 		}
 		seen[location] = true
-		probed = append(probed, probedLocation{probedURL: result, Location: location})
+		probed = append(probed, probedLocation{probedURL: result, Location: location, Role: role})
 	}
 
 	for _, link := range r.Links {
-		add(link.URL, link.probedURL)
+		add(link.URL, urlRoleLink, link.probedURL)
 	}
 	for _, image := range r.Images {
-		add(image.Src, image.probedURL)
+		add(image.Src, urlRoleImage, image.probedURL)
 	}
 	for _, check := range r.UnsubscribeChecks {
-		add(check.URL, check.probedURL)
+		add(check.URL, urlRoleUnsubscribe, check.probedURL)
 	}
 
 	return probed
@@ -453,20 +496,14 @@ func (i *ImageCheck) applyProbe(probe urlprobe.Answer) {
 	i.IsBroken = i.Status >= 400 || i.hasFinding(LinkHTTPRedirectLoop)
 }
 
-// httpFindingIssues turns the findings of one URL into the issues the report
-// shows, the way the suspicions of a URL become issues of their own.
-func httpFindingIssues(location string, findings []LinkHTTPFinding) []model.ContentIssue {
-	issues := make([]model.ContentIssue, 0, len(findings))
-
-	for _, finding := range findings {
-		issues = append(issues, model.ContentIssue{
-			Type:     finding.IssueType(),
-			Severity: finding.Severity,
-			Message:  finding.Message,
-			Location: utils.PtrTo(location),
-			Advice:   utils.PtrTo(finding.Advice),
-		})
+// httpFindingIssue turns what fetching a URL revealed into the issue the
+// report shows, the way a suspicion of a URL becomes an issue of its own.
+func httpFindingIssue(location string, finding LinkHTTPFinding) model.ContentIssue {
+	return model.ContentIssue{
+		Type:     finding.IssueType(),
+		Severity: finding.Severity,
+		Message:  finding.Message,
+		Location: utils.PtrTo(location),
+		Advice:   utils.PtrTo(finding.Advice),
 	}
-
-	return issues
 }
