@@ -50,7 +50,6 @@ func TestAnalyzeURLSuspicions_LegitimateURLs(t *testing.T) {
 		url  string
 	}{
 		{"Plain HTTPS", "https://example.com/page"},
-		{"Plain HTTP", "http://example.com/"},
 		{"Single subdomain", "https://mail.example.com/page"},
 		{"Deep but ordinary subdomains (ESP click tracker)", "https://fr.r.emails.example.com/r/?id=h2f29daf0"},
 		{"Very deep subdomains", "https://a.b.c.d.e.example.com/page"},
@@ -62,7 +61,6 @@ func TestAnalyzeURLSuspicions_LegitimateURLs(t *testing.T) {
 		{"Hyphenated host", "https://my-shop-online.example.com/deals"},
 		{"Uppercase host", "https://WWW.EXAMPLE.COM/Page"},
 		{"Explicit standard HTTPS port", "https://example.com:443/page"},
-		{"Explicit standard HTTP port", "http://example.com:80/page"},
 		{"Country second level domain", "https://shop.example.co.uk/basket"},
 		{"Australian style com.au domain", "https://www.example.com.au/"},
 		{"Mailto", "mailto:support@example.com"},
@@ -313,6 +311,49 @@ func TestAnalyzeURLSuspicions_HostObfuscation(t *testing.T) {
 	}
 }
 
+// TestAnalyzeURLSuspicions_InsecureScheme: a link served over http: carries
+// its content in clear text, so it is reported whatever the host is. Only an
+// explicit http: scheme counts: a protocol-relative URL, a relative link or an
+// opaque scheme asserts nothing about the transport, and an http: URL quoted
+// inside a query string is a value, not the destination.
+func TestAnalyzeURLSuspicions_InsecureScheme(t *testing.T) {
+	for _, u := range []string{
+		"http://example.com/",
+		"http://example.com:80/page",
+		"http://www.example.com/newsletter/2026-09",
+		"HTTP://example.com/",
+		// No slashes after the scheme: mail clients go to example.com all the
+		// same, over http:.
+		"http:example.com/page",
+	} {
+		t.Run(u, func(t *testing.T) {
+			got := kindsOf(analyzeURLSuspicions(u))
+			if !slices.Contains(got, URLSuspicionInsecureScheme) {
+				t.Errorf("analyzeURLSuspicions(%q) = %v, want a %q finding", u, got, URLSuspicionInsecureScheme)
+			}
+		})
+	}
+
+	for _, u := range []string{
+		"https://example.com/",
+		"https://example.com:8443/page",
+		"mailto:support@example.com",
+		"tel:+33123456789",
+		"cid:logo@example",
+		"/preferences/unsubscribe",
+		"#content",
+		"//example.com/page",
+		"https://example.com/?r=http%3A%2F%2Fother.example%2F",
+	} {
+		t.Run("not/"+u, func(t *testing.T) {
+			got := kindsOf(analyzeURLSuspicions(u))
+			if slices.Contains(got, URLSuspicionInsecureScheme) {
+				t.Errorf("analyzeURLSuspicions(%q) = %v, want no %q finding", u, got, URLSuspicionInsecureScheme)
+			}
+		})
+	}
+}
+
 // TestAnalyzeURLSuspicions_NonStandardPort: web links in email are served on
 // 80/443; anything else is worth a low-severity note.
 func TestAnalyzeURLSuspicions_NonStandardPort(t *testing.T) {
@@ -423,6 +464,7 @@ func TestAnalyzeURLSuspicions_FindingsAreActionable(t *testing.T) {
 		"http://exa%6dple.com/",
 		"https://example.com:8443/",
 		"https://bank.example.com.login.example/",
+		"http://example.com/",
 	}
 
 	genericMessage := "obfuscated, shortened, or unusual"
@@ -648,6 +690,160 @@ func TestCalculateContentScore_SuspiciousLinksPenalty(t *testing.T) {
 	}
 	if cleanScore-highScore > 10 {
 		t.Errorf("penalty of %d points is unbounded, want at most 10", cleanScore-highScore)
+	}
+}
+
+// TestAnalyzeHTML_InsecureImageSource: an image loaded over http: is reported
+// like an insecure link, while the schemes an email legitimately uses for an
+// image (https:, an inline data: URI, a cid: attachment) are not. Only the
+// insecure-scheme check applies to an image source: a data: URI must never be
+// reported as an active scheme here.
+func TestAnalyzeHTML_InsecureImageSource(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"Plain HTTP image", "http://cdn.example.com/logo.png", true},
+		{"HTTPS image", "https://cdn.example.com/logo.png", false},
+		{"Inline data URI", "data:image/png;base64,iVBORw0KGgo=", false},
+		{"Attached image", "cid:logo@example", false},
+		{"Relative source", "/images/logo.png", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewAnalyzer(5 * time.Second)
+			results := &Results{}
+			analyzer.analyzeHTML(`<html><body><img src="`+tt.src+`" alt="Logo"></body></html>`, results)
+
+			if len(results.Images) != 1 {
+				t.Fatalf("got %d images, want 1", len(results.Images))
+			}
+			got := slices.ContainsFunc(results.Images[0].Suspicions, func(s URLSuspicion) bool {
+				return s.Kind == URLSuspicionInsecureScheme
+			})
+			if got != tt.want {
+				t.Errorf("image %q: insecure scheme reported = %v, want %v (findings: %v)", tt.src, got, tt.want, kindsOf(results.Images[0].Suspicions))
+			}
+			if len(results.Images[0].Suspicions) > 1 {
+				t.Errorf("image %q reported %v, want the insecure scheme finding at most", tt.src, kindsOf(results.Images[0].Suspicions))
+			}
+		})
+	}
+}
+
+// TestGenerateContentAnalysis_InsecureImageIssue: an insecure image source
+// surfaces as its own issue, located on the src, exactly like a link does.
+func TestGenerateContentAnalysis_InsecureImageIssue(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	src := "http://cdn.example.com/logo.png"
+	results := &Results{
+		HTMLContent: "<html><body></body></html>",
+		Images: []ImageCheck{
+			{Src: src, HasAlt: true, AltText: "Logo", Valid: true, Suspicions: []URLSuspicion{*insecureSchemeSuspicion("Image", src)}},
+			{Src: "https://cdn.example.com/banner.png", HasAlt: true, AltText: "Banner", Valid: true},
+		},
+	}
+
+	analysis := analyzer.analysisOf(results)
+
+	if analysis.HtmlIssues == nil {
+		t.Fatal("expected an issue for the insecure image, got none")
+	}
+
+	var suspicious []model.ContentIssue
+	for _, issue := range *analysis.HtmlIssues {
+		if issue.Type == model.ContentIssueTypeSuspiciousLink {
+			suspicious = append(suspicious, issue)
+		}
+	}
+
+	if len(suspicious) != 1 {
+		t.Fatalf("got %d suspicious issues, want 1 (only the http: image)", len(suspicious))
+	}
+	if suspicious[0].Location == nil || *suspicious[0].Location != src {
+		t.Errorf("issue location = %v, want %q", suspicious[0].Location, src)
+	}
+	if suspicious[0].Severity != model.ContentIssueSeverityMedium {
+		t.Errorf("issue severity = %q, want %q", suspicious[0].Severity, model.ContentIssueSeverityMedium)
+	}
+	if suspicious[0].Advice == nil || !strings.Contains(*suspicious[0].Advice, "https:") {
+		t.Errorf("issue advice = %v, want it to point at https:", suspicious[0].Advice)
+	}
+}
+
+// TestCalculateContentScore_InsecureImagePenalty: image findings weigh on the
+// score too, under the same bounded penalty as links.
+func TestCalculateContentScore_InsecureImagePenalty(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	base := func(src string) *Results {
+		results := &Results{
+			IsMultipart:    true,
+			HTMLValid:      true,
+			HTMLContent:    "<html><body>Hello</body></html>",
+			TextContent:    "Hello",
+			HasUnsubscribe: true,
+			TextPlainRatio: 1,
+			Images:         []ImageCheck{{Src: src, HasAlt: true, AltText: "Logo", Valid: true}},
+		}
+		if suspicion := insecureSchemeSuspicion("Image", src); suspicion != nil {
+			results.Images[0].Suspicions = append(results.Images[0].Suspicions, *suspicion)
+		}
+		return results
+	}
+
+	secureScore, _ := analyzer.scoreOf(base("https://cdn.example.com/logo.png"))
+	insecureScore, _ := analyzer.scoreOf(base("http://cdn.example.com/logo.png"))
+
+	if insecureScore >= secureScore {
+		t.Errorf("score with an http: image = %d, want below the https: score %d", insecureScore, secureScore)
+	}
+	if secureScore-insecureScore > 10 {
+		t.Errorf("penalty of %d points is unbounded, want at most 10", secureScore-insecureScore)
+	}
+}
+
+// TestAnalyzeTextLinks_SynthesizedSchemeIsNotReported: a plain-text body may
+// write a link as a bare "www.example.com". The analyzer prefixes it with
+// "http://" to be able to check it, and that scheme is its own doing: blaming
+// the sender for it would report a problem they never wrote.
+func TestAnalyzeTextLinks_SynthesizedSchemeIsNotReported(t *testing.T) {
+	// A timeout short enough that no link is actually fetched: only the
+	// findings computed before the request matter here.
+	analyzer := NewAnalyzer(time.Millisecond)
+
+	tests := []struct {
+		name string
+		text string
+		want bool
+	}{
+		{"Bare www link", "Visit www.example.com for more", false},
+		{"Explicit http link", "Visit http://www.example.com for more", true},
+		{"Explicit https link", "Visit https://www.example.com for more", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := &Results{}
+			analyzer.analyzeTextLinks(tt.text, results)
+
+			if len(results.Links) != 1 {
+				t.Fatalf("got %d links, want 1", len(results.Links))
+			}
+			link := results.Links[0]
+			got := slices.ContainsFunc(link.Suspicions, func(s URLSuspicion) bool {
+				return s.Kind == URLSuspicionInsecureScheme
+			})
+			if got != tt.want {
+				t.Errorf("text %q: insecure scheme reported = %v, want %v", tt.text, got, tt.want)
+			}
+			if link.IsSafe != (len(link.Suspicions) == 0) {
+				t.Errorf("IsSafe = %v with findings %v, want them to agree", link.IsSafe, kindsOf(link.Suspicions))
+			}
+		})
 	}
 }
 
