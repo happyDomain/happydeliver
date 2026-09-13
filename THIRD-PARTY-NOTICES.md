@@ -27,6 +27,27 @@ service.
 go generate -tags refresh_shorteners ./pkg/emaildata/shorteners/
 ```
 
+## Email client support data
+
+- **File**: `pkg/emaildata/caniemail/data/caniemail.json`
+- **Upstream**: [Can I email…](https://www.caniemail.com/api/data.json),
+  [hteumeuleu/caniemail](https://github.com/hteumeuleu/caniemail), by Rémi
+  Parmentier and contributors
+- **License**: MIT, full text in `pkg/emaildata/caniemail/data/caniemail.LICENSE`
+- **Modified**: no (embedded exactly as published; which of its features
+  happyDeliver looks for, and what it advises a sender to do instead, live as Go
+  code in `pkg/analyzer/content_clientcompat.go`, outside the package holding
+  the data)
+
+Used to tell a sender which email clients will not render the CSS their message
+is built with, by name rather than in general.
+
+**To refresh the data**, re-download it (and its license text) with:
+
+```sh
+go generate -tags refresh_caniemail ./pkg/emaildata/caniemail/
+```
+
 ## rspamd symbol descriptions
 
 - **File**: `pkg/rspamd/data/rspamd-symbols.json`

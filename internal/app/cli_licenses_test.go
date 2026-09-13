@@ -51,7 +51,12 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		"CC-BY-SA-4.0",
 		"https://creativecommons.org/licenses/by-sa/4.0/",
 		"Attribution-ShareAlike 4.0 International",
-		// An attribution says what was changed, which is what it is for.
+		// The email client support data, MIT.
+		"Rémi Parmentier",
+		"https://github.com/hteumeuleu/caniemail",
+		"MIT",
+		"Permission is hereby granted",
+		// Both say what was changed, which is what an attribution is for.
 		"Changes:",
 		// The rspamd symbol descriptions, Apache-2.0.
 		"Vsevolod Stakhov",
@@ -80,7 +85,7 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 	}
 
 	// The full license texts must be printed, not just links to them.
-	if len(text) < 5000 {
+	if len(text) < 6000 {
 		t.Errorf("the notices are only %d bytes long, a license text looks truncated", len(text))
 	}
 }
