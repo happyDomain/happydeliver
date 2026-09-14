@@ -36,6 +36,135 @@ export function contentIssueLabel(type: ContentIssue["type"]): string {
 }
 
 /**
+ * Readable name for the reading an issue answers.
+ *
+ * The category is what the report groups by, so this is a section heading rather than a
+ * label on an alert: it names what the reader is about to be shown, not the enum the API
+ * sent.
+ */
+const contentCategoryLabels: Record<ContentIssue["category"], string> = {
+    security: "Security",
+    deliverability: "Deliverability",
+    content: "Content",
+    rendering: "Rendering",
+    accessibility: "Accessibility",
+};
+
+export function contentCategoryLabel(category: ContentIssue["category"]): string {
+    return contentCategoryLabels[category] ?? String(category).replace(/_/g, " ");
+}
+
+/**
+ * The order the groups are read in, which is an editorial decision and not the alphabet:
+ * what may harm whoever opens the message first, then what keeps it out of the inbox, then
+ * what it says, then what it looks like, then the recipients it leaves out.
+ *
+ * A category absent from this list is not dropped: it is shown after the ones that are, so
+ * that a reading the API adds before the front end catches up still reaches a reader.
+ */
+const contentCategoryOrder: ContentIssue["category"][] = [
+    "security",
+    "deliverability",
+    "content",
+    "rendering",
+    "accessibility",
+];
+
+/**
+ * How grave a finding is, as a number, so that the list can be put in that order.
+ *
+ * The alert's colour says the same thing, but only three ways: critical and high share one
+ * red, low and info one blue. The order is what separates them, which is the other half of
+ * why the severity is no longer named in a badge of its own.
+ */
+const severityRank: Record<ContentIssue["severity"], number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+    info: 4,
+};
+
+/** Anything the report shows in an alert: a content issue, a header one. */
+type Severe = { severity: ContentIssue["severity"] };
+
+/**
+ * Orders findings gravest first, leaving those the severity does not separate in the order
+ * they were given. A severity this front end does not know sorts last rather than first, so
+ * that a level the API adds cannot quietly take the top of every list.
+ */
+export function compareBySeverity(a: Severe, b: Severe): number {
+    return (
+        (severityRank[a.severity] ?? Number.MAX_SAFE_INTEGER) -
+        (severityRank[b.severity] ?? Number.MAX_SAFE_INTEGER)
+    );
+}
+
+/** One issue together with its position in html_issues, which is what its anchor is made of. */
+export type PlacedContentIssue = { issue: ContentIssue; index: number };
+
+/**
+ * The issues of one reading, in the order the checks reported them.
+ *
+ * The category is optional because a report is read long after it was produced: one written
+ * before the analysis recorded a category carries none, and nothing can be recomputed for it
+ * afterwards. The category comes from the check that reported the finding, and a stored issue
+ * keeps only its type, which deliberately does not map onto one reading. Such issues are shown
+ * as they always were, in one run under no heading.
+ */
+export type ContentIssueGroup = {
+    category?: ContentIssue["category"];
+    issues: PlacedContentIssue[];
+};
+
+/**
+ * The issues grouped by the reading they answer, ready to be shown section by section.
+ *
+ * Each issue keeps the index it had in html_issues. That is not a convenience: the anchor of
+ * an issue is made of that index (see contentIssueAnchor), and the rspamd symbol table links
+ * to it through adviceAnchorsBySymbol. Grouping by position in the group instead would point
+ * every one of those links at the wrong advice.
+ *
+ * Within a group the gravest findings come first: a reader opening a section is looking for
+ * what to fix, and a section that opens on an informational remark buries it. Findings of
+ * equal gravity keep the order the analysis produced them in, which is itself deliberate:
+ * the checks run in the order their findings are meant to be read.
+ *
+ * A severity the front end does not know sorts last rather than first, so that a level the
+ * API adds cannot quietly take the top of every section.
+ */
+export function groupIssuesByCategory(issues?: ContentIssue[]): ContentIssueGroup[] {
+    const groups = new Map<ContentIssue["category"] | undefined, PlacedContentIssue[]>();
+
+    issues?.forEach((issue, index) => {
+        // A report produced before the analysis recorded a reading carries none. It is
+        // keyed under undefined rather than under a reading invented for it, and comes out
+        // last, unheaded: the alternative is filing findings under a heading nobody
+        // measured them against.
+        const category = issue.category || undefined;
+
+        const group = groups.get(category);
+        if (group) group.push({ issue, index });
+        else groups.set(category, [{ issue, index }]);
+    });
+
+    const known = contentCategoryOrder.filter((category) => groups.has(category));
+    const unknown = [...groups.keys()].filter(
+        (category) => category !== undefined && !contentCategoryOrder.includes(category),
+    );
+    const uncategorised = groups.has(undefined) ? [undefined] : [];
+
+    return [...known, ...unknown, ...uncategorised].map((category) => ({
+        category,
+        // Array.prototype.sort is stable, which is what keeps the analysis's own order
+        // between findings the severity does not separate.
+        issues: (groups.get(category) ?? [])
+            .slice()
+            .sort((a, b) => compareBySeverity(a.issue, b.issue)),
+    }));
+}
+
+/**
  * Who observed an issue, phrased for a reader.
  *
  * An issue with no source is one happyDeliver found by reading the message itself, which is

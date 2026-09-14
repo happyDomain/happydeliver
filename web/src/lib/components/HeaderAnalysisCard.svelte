@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { DmarcRecord, HeaderAnalysis } from "$lib/api/types.gen";
+    import { compareBySeverity } from "$lib/issues";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -13,6 +14,10 @@
     }
 
     let { dmarcRecord, headerAnalysis, headerGrade, headerScore }: Props = $props();
+
+    // Gravest first, as in the content card. The alert's colour no longer competes with a
+    // badge naming the level, so the order is what tells a reader where to start.
+    const issues = $derived((headerAnalysis.issues ?? []).slice().sort(compareBySeverity));
 </script>
 
 <div class="card shadow-sm" id="header-details">
@@ -35,10 +40,10 @@
         </h4>
     </div>
     <div class="card-body">
-        {#if headerAnalysis.issues && headerAnalysis.issues.length > 0}
+        {#if issues.length > 0}
             <div class="mb-3">
                 <h5>Issues</h5>
-                {#each headerAnalysis.issues as issue, i (i)}
+                {#each issues as issue, i (i)}
                     <IssueAlert
                         title={issue.header}
                         severity={issue.severity}
