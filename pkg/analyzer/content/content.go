@@ -19,7 +19,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+package content
 
 import (
 	"context"
@@ -45,20 +45,20 @@ import (
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
-// ContentAnalyzer analyzes email content (HTML, links, images)
-type ContentAnalyzer struct {
+// Analyzer analyzes email content (HTML, links, images)
+type Analyzer struct {
 	Timeout                time.Duration
 	httpClient             *http.Client
 	listUnsubscribeURLs    []string // URLs from List-Unsubscribe header
 	hasOneClickUnsubscribe bool     // True if List-Unsubscribe-Post: List-Unsubscribe=One-Click
 }
 
-// NewContentAnalyzer creates a new content analyzer with configurable timeout
-func NewContentAnalyzer(timeout time.Duration) *ContentAnalyzer {
+// NewAnalyzer creates a new content analyzer with configurable timeout
+func NewAnalyzer(timeout time.Duration) *Analyzer {
 	if timeout == 0 {
 		timeout = 10 * time.Second // Default timeout
 	}
-	return &ContentAnalyzer{
+	return &Analyzer{
 		Timeout: timeout,
 		httpClient: &http.Client{
 			Timeout: timeout,
@@ -73,8 +73,8 @@ func NewContentAnalyzer(timeout time.Duration) *ContentAnalyzer {
 	}
 }
 
-// ContentResults represents content analysis results
-type ContentResults struct {
+// Results represents content analysis results
+type Results struct {
 	IsMultipart      bool
 	HTMLValid        bool
 	HTMLErrors       []string
@@ -120,13 +120,13 @@ func isTemplatePlaceholderURL(urlStr string) bool {
 }
 
 // HasPlaintext returns true if the email has plain text content
-func (r *ContentResults) HasPlaintext() bool {
+func (r *Results) HasPlaintext() bool {
 	return r.TextContent != ""
 }
 
 // VisibleImages returns the images the recipient is meant to see, leaving
 // out the tracking pixels: what those show, or fail to describe, is nothing.
-func (r *ContentResults) VisibleImages() []ImageCheck {
+func (r *Results) VisibleImages() []ImageCheck {
 	var visible []ImageCheck
 	for _, img := range r.Images {
 		if !img.IsTrackingPixel {
@@ -160,9 +160,9 @@ type ImageCheck struct {
 	IsTrackingPixel bool
 }
 
-// AnalyzeContent performs content analysis on email message
-func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults {
-	results := &ContentResults{BodyTruncated: email.BodyIncomplete}
+// Analyze performs content analysis on email message
+func (c *Analyzer) Analyze(email *mailmsg.Message) *Results {
+	results := &Results{BodyTruncated: email.BodyIncomplete}
 
 	results.IsMultipart = len(email.Parts) > 1
 
@@ -196,7 +196,7 @@ func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults
 	// Check plain text/HTML consistency. A truncated body may look single-part
 	// while it is not: a perfect ratio would then score the parts that never
 	// arrived rather than the message that was sent. It is left at zero, which
-	// CalculateContentScore and GenerateContentAnalysis read as "unknown" rather
+	// Score and Analysis read as "unknown" rather
 	// than as a failure, BodyTruncated telling the two apart.
 	if !results.BodyTruncated {
 		if len(htmlParts) > 0 && len(textParts) > 0 {
@@ -209,6 +209,27 @@ func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults
 	return results
 }
 
+// withoutSentencePunctuation takes off a URL written in prose the punctuation
+// that ended the sentence rather than the address. "Voir https://example.com/x."
+// carries a full stop no browser would follow, and keeping it would leave the
+// plain text part naming a destination the HTML part does not.
+//
+// A closing bracket is only sentence punctuation when nothing opened it, since
+// a URL may well carry a pair of its own.
+func withoutSentencePunctuation(rawURL string) string {
+	for {
+		trimmed := strings.TrimRight(rawURL, ".,;:!?'\"")
+		if last := len(trimmed) - 1; last >= 0 && trimmed[last] == ')' && !strings.Contains(trimmed, "(") {
+			trimmed = trimmed[:last]
+		}
+
+		if trimmed == rawURL {
+			return rawURL
+		}
+		rawURL = trimmed
+	}
+}
+
 // textURLRegex matches the URLs a plain text part writes out: those naming
 // their scheme, and those a reader recognises by the "www." their sender left
 // the scheme off of. It stops at the characters no URL may carry unescaped, so
@@ -216,10 +237,15 @@ func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults
 var textURLRegex = regexp.MustCompile(`(?i)\b(?:https?://|www\.)[^\s<>"{}|\\^\[\]` + "`" + `]+`)
 
 // analyzeTextLinks extracts and validates URLs from plain text
-func (c *ContentAnalyzer) analyzeTextLinks(textContent string, results *ContentResults) {
+func (c *Analyzer) analyzeTextLinks(textContent string, results *Results) {
 	matches := textURLRegex.FindAllString(textContent, -1)
 
 	for _, match := range matches {
+		match = withoutSentencePunctuation(match)
+		if match == "" {
+			continue
+		}
+
 		// Normalize URL (add http:// if missing)
 		urlStr := match
 		if strings.HasPrefix(strings.ToLower(urlStr), "www.") {
@@ -249,7 +275,7 @@ func (c *ContentAnalyzer) analyzeTextLinks(textContent string, results *ContentR
 }
 
 // analyzeHTML parses and analyzes HTML content
-func (c *ContentAnalyzer) analyzeHTML(htmlContent string, results *ContentResults) {
+func (c *Analyzer) analyzeHTML(htmlContent string, results *Results) {
 	results.HTMLContent = htmlContent
 
 	// Parse HTML
@@ -331,7 +357,7 @@ func isPixelDimension(dimension string) bool {
 }
 
 // traverseHTML recursively traverses HTML nodes
-func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
+func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 	if n.Type == html.ElementNode {
 		switch n.Data {
 		case "a":
@@ -447,7 +473,7 @@ func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
 }
 
 // getAttr gets an attribute value from an HTML node
-func (c *ContentAnalyzer) getAttr(n *html.Node, key string) string {
+func (c *Analyzer) getAttr(n *html.Node, key string) string {
 	for _, attr := range n.Attr {
 		if attr.Key == key {
 			return attr.Val
@@ -457,7 +483,7 @@ func (c *ContentAnalyzer) getAttr(n *html.Node, key string) string {
 }
 
 // isUnsubscribeLink checks if a link is an unsubscribe link
-func (c *ContentAnalyzer) isUnsubscribeLink(href string, node *html.Node) bool {
+func (c *Analyzer) isUnsubscribeLink(href string, node *html.Node) bool {
 	// An href with an unreplaced template placeholder (e.g. "{unsubscribe}") is not a
 	// working link, so it must not count as a valid unsubscribe method even though it
 	// literally contains the word "unsubscribe".
@@ -492,7 +518,7 @@ func (c *ContentAnalyzer) isUnsubscribeLink(href string, node *html.Node) bool {
 }
 
 // getNodeText extracts text content from a node
-func (c *ContentAnalyzer) getNodeText(n *html.Node) string {
+func (c *Analyzer) getNodeText(n *html.Node) string {
 	if n.Type == html.TextNode {
 		return n.Data
 	}
@@ -504,7 +530,7 @@ func (c *ContentAnalyzer) getNodeText(n *html.Node) string {
 }
 
 // validateLink validates a URL and checks if it's accessible
-func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
+func (c *Analyzer) validateLink(urlStr string) LinkCheck {
 	check := LinkCheck{
 		URL:    urlStr,
 		IsSafe: true,
@@ -588,7 +614,7 @@ func refusesAutomatedClients(status int) bool {
 
 // hasDomainMisalignment checks if the link text contains a different domain than the actual URL
 // This is a common phishing technique (e.g., text shows "bank.example.com" but links to "evil.example.net")
-func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
+func (c *Analyzer) hasDomainMisalignment(href, linkText string) bool {
 	// Parse the actual URL
 	parsedURL, err := url.Parse(href)
 	if err != nil {
@@ -668,7 +694,7 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 }
 
 // isSuspiciousURL checks if a URL looks suspicious
-func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) bool {
+func (c *Analyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) bool {
 	// Skip checks for mailto: URLs
 	if parsedURL.Scheme == "mailto" {
 		return false
@@ -710,7 +736,7 @@ func (c *ContentAnalyzer) isSuspiciousURL(urlStr string, parsedURL *url.URL) boo
 // isIPAddress reports whether a URL host names an IP address literally rather
 // than through a domain. It accepts a raw Host, port and IPv6 brackets included,
 // as well as a Hostname().
-func (c *ContentAnalyzer) isIPAddress(host string) bool {
+func (c *Analyzer) isIPAddress(host string) bool {
 	if hostname, _, err := net.SplitHostPort(host); err == nil {
 		host = hostname
 	}
@@ -798,7 +824,7 @@ func isMissingSpace(token string) bool {
 }
 
 // extractTextFromHTML extracts plain text from HTML
-func (c *ContentAnalyzer) extractTextFromHTML(htmlContent string) string {
+func (c *Analyzer) extractTextFromHTML(htmlContent string) string {
 	doc, err := html.Parse(strings.NewReader(htmlContent))
 	if err != nil {
 		return ""
@@ -824,7 +850,7 @@ func (c *ContentAnalyzer) extractTextFromHTML(htmlContent string) string {
 }
 
 // calculateTextPlainConsistency compares plain text and HTML versions
-func (c *ContentAnalyzer) calculateTextPlainConsistency(plainText, htmlText string) float32 {
+func (c *Analyzer) calculateTextPlainConsistency(plainText, htmlText string) float32 {
 	// Extract text from HTML
 	htmlPlainText := c.extractTextFromHTML(htmlText)
 
@@ -884,7 +910,7 @@ func (c *ContentAnalyzer) calculateTextPlainConsistency(plainText, htmlText stri
 }
 
 // normalizeText normalizes text for comparison
-func (c *ContentAnalyzer) normalizeText(text string) string {
+func (c *Analyzer) normalizeText(text string) string {
 	// Convert to lowercase
 	text = strings.ToLower(text)
 
@@ -895,8 +921,8 @@ func (c *ContentAnalyzer) normalizeText(text string) string {
 	return text
 }
 
-// GenerateContentAnalysis creates structured content analysis from results
-func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *model.ContentAnalysis {
+// Analysis creates structured content analysis from results
+func (c *Analyzer) Analysis(results *Results) *model.ContentAnalysis {
 	if results == nil {
 		return nil
 	}
@@ -1116,8 +1142,8 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 // of it.
 const minImagesForShare = 5
 
-// CalculateContentScore calculates the content score (0-20 points)
-func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, string) {
+// Score calculates the content score (0-20 points)
+func (c *Analyzer) Score(results *Results) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
