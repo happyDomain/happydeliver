@@ -406,3 +406,61 @@ func LocalPart(address string) string {
 	}
 	return address[:at]
 }
+
+// AddressDomain extracts the domain of an address header, the part after the
+// '@'. It is the symmetric of LocalPart, and as forgiving: an address a strict
+// parser rejects still yields what it plainly holds. It returns an empty string
+// when there is no domain to read.
+func AddressDomain(address string) string {
+	if addr, err := mail.ParseAddress(address); err == nil {
+		address = addr.Address
+	} else {
+		address = strings.Trim(address, "<> ")
+	}
+
+	at := strings.LastIndex(address, "@")
+	if at == -1 {
+		return ""
+	}
+
+	return strings.TrimRight(address[at+1:], ">")
+}
+
+// DKIMSignature holds the domain, selector and signing algorithm from a DKIM-Signature header.
+type DKIMSignature struct {
+	Domain    string
+	Selector  string
+	Algorithm string // from a= tag (e.g. rsa-sha256, ed25519-sha256)
+}
+
+// DKIMSignatures reads what each DKIM-Signature header of the message claims:
+// the domain it signs for, the selector naming the key, and the algorithm. It
+// reports what is written, and says nothing about whether any of it verifies.
+func (e *Message) DKIMSignatures() []DKIMSignature {
+	signatures := e.Header["Dkim-Signature"]
+
+	var results []DKIMSignature
+	for _, sig := range signatures {
+		var domain, selector, algorithm string
+		for _, part := range strings.Split(sig, ";") {
+			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(kv) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(kv[0])
+			val := strings.TrimSpace(kv[1])
+			switch key {
+			case "d":
+				domain = val
+			case "s":
+				selector = val
+			case "a":
+				algorithm = val
+			}
+		}
+		if domain != "" && selector != "" {
+			results = append(results, DKIMSignature{Domain: domain, Selector: selector, Algorithm: algorithm})
+		}
+	}
+	return results
+}

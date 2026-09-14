@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // InboundHopIndex returns the position in the received chain of the hop the
@@ -76,7 +77,7 @@ func InboundHopIndex(chain []model.ReceivedHop, source model.ReportSource) int {
 		}
 
 		// First externally-addressed hop below the internal ones.
-		if isPublicIP(ip) {
+		if utils.IsPublicIP(ip) {
 			return i
 		}
 	}

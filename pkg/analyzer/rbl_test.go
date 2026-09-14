@@ -28,6 +28,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 
+	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -186,9 +187,9 @@ func TestIsPublicIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isPublicIPAddr(tt.ip)
+			result := utils.IsPublicIPAddr(tt.ip)
 			if result != tt.expected {
-				t.Errorf("isPublicIPAddr(%q) = %v, want %v", tt.ip, result, tt.expected)
+				t.Errorf("utils.IsPublicIPAddr(%q) = %v, want %v", tt.ip, result, tt.expected)
 			}
 		})
 	}

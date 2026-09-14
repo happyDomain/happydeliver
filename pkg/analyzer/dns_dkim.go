@@ -30,42 +30,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
-
-// DKIMHeader holds the domain, selector and signing algorithm from a DKIM-Signature header.
-type DKIMHeader struct {
-	Domain    string
-	Selector  string
-	Algorithm string // from a= tag (e.g. rsa-sha256, ed25519-sha256)
-}
-
-// parseDKIMSignatures extracts domain, selector and algorithm from DKIM-Signature header values.
-func parseDKIMSignatures(signatures []string) []DKIMHeader {
-	var results []DKIMHeader
-	for _, sig := range signatures {
-		var domain, selector, algorithm string
-		for _, part := range strings.Split(sig, ";") {
-			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
-			if len(kv) != 2 {
-				continue
-			}
-			key := strings.TrimSpace(kv[0])
-			val := strings.TrimSpace(kv[1])
-			switch key {
-			case "d":
-				domain = val
-			case "s":
-				selector = val
-			case "a":
-				algorithm = val
-			}
-		}
-		if domain != "" && selector != "" {
-			results = append(results, DKIMHeader{Domain: domain, Selector: selector, Algorithm: algorithm})
-		}
-	}
-	return results
-}
 
 // parseDKIMTags splits a DKIM DNS record into a tag→value map.
 func parseDKIMTags(record string) map[string]string {
@@ -109,7 +75,7 @@ func parseKeySize(keyType, p string) *int {
 }
 
 // checkDKIMRecord looks up and validates DKIM record for a domain and selector.
-func (d *DNSAnalyzer) checkDKIMRecord(h DKIMHeader) *model.DKIMRecord {
+func (d *DNSAnalyzer) checkDKIMRecord(h mailmsg.DKIMSignature) *model.DKIMRecord {
 	dkimDomain := fmt.Sprintf("%s._domainkey.%s", h.Selector, h.Domain)
 
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)

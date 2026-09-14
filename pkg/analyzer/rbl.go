@@ -180,7 +180,7 @@ func (r *DNSListChecker) CheckEmail(email *mailmsg.Message) *DNSListResults {
 
 // CheckIP checks a single IP address against all configured lists in parallel
 func (r *DNSListChecker) CheckIP(ip string) ([]model.BlacklistCheck, int, error) {
-	if !isPublicIPAddr(ip) {
+	if !utils.IsPublicIPAddr(ip) {
 		return nil, 0, fmt.Errorf("invalid or non-public IP address: %s", ip)
 	}
 
@@ -220,7 +220,7 @@ func (r *DNSListChecker) extractIPs(email *mailmsg.Message) []string {
 			candidate = candidate[5:]
 		}
 		ip := net.ParseIP(candidate)
-		if ip == nil || !isPublicIPAddr(candidate) {
+		if ip == nil || !utils.IsPublicIPAddr(candidate) {
 			return
 		}
 		// Key on the canonical form so equivalent spellings (e.g. the
