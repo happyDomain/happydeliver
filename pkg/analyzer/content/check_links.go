@@ -118,7 +118,7 @@ var probeFindingCheck = contentCheck{
 			for _, finding := range probed.HTTPFindings {
 				issues = append(issues, reading.Finding{
 					Defect:       finding.defect(probed.Role),
-					ContentIssue: httpFindingIssue(probed.Location, finding),
+					ContentIssue: httpFindingIssue(probed.Location, probed.Role, finding),
 				})
 			}
 		}

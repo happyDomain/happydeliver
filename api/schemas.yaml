@@ -284,6 +284,7 @@ components:
       type: object
       required:
         - type
+        - category
         - severity
         - message
       properties:
@@ -292,6 +293,16 @@ components:
           enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch]
           description: Type of content issue
           example: "missing_alt"
+        category:
+          type: string
+          enum: [content, deliverability, accessibility, rendering, security]
+          description: >-
+            Which reading of the message the issue answers, and so which reader
+            it is addressed to. It is declared by the check that produced the
+            issue, which a finding may narrow for itself: the same type serves
+            several readings, a suspicious link being a security finding and a
+            link nobody can reach a deliverability one.
+          example: "accessibility"
         severity:
           type: string
           enum: [critical, high, medium, low, info]

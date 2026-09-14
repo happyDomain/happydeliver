@@ -217,3 +217,30 @@ func TestAnObserverAgreeingWithItselfIsNotACorroboration(t *testing.T) {
 		t.Errorf("corroborated_by reads %v, want nothing at all", *issues[0].CorroboratedBy)
 	}
 }
+
+// TestAFindingAnswersItsCheckReading: a finding that names no reading answers
+// the one its check does, which is the answer for all but a handful.
+func TestAFindingAnswersItsCheckReading(t *testing.T) {
+	named := Check[message]{
+		Name:     "mixed",
+		Category: CategoryDeliverability,
+		Run: func(context.Context, message) ([]Finding, error) {
+			return []Finding{
+				{ContentIssue: model.ContentIssue{Message: "silent"}},
+				{ContentIssue: model.ContentIssue{Message: "spoken", Category: CategorySecurity}},
+			}, nil
+		},
+	}
+
+	issues, _ := Run(context.Background(), []Check[message]{named}, message{})
+
+	if len(issues) != 2 {
+		t.Fatalf("reported %d issue(s), want 2", len(issues))
+	}
+	if issues[0].Category != CategoryDeliverability {
+		t.Errorf("a finding naming no reading answers %q, want its check's", issues[0].Category)
+	}
+	if issues[1].Category != CategorySecurity {
+		t.Errorf("a finding naming its own reading answers %q, want the one it named", issues[1].Category)
+	}
+}
