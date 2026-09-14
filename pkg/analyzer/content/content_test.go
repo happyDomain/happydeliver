@@ -19,7 +19,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+package content
 
 import (
 	"net/http"
@@ -58,7 +58,7 @@ func TestNewContentAnalyzer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewContentAnalyzer(tt.timeout)
+			analyzer := NewAnalyzer(tt.timeout)
 			if analyzer.Timeout != tt.expectedTimeout {
 				t.Errorf("Timeout = %v, want %v", analyzer.Timeout, tt.expectedTimeout)
 			}
@@ -102,7 +102,7 @@ func TestExtractTextFromHTML(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestIsUnsubscribeLink(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -338,7 +338,7 @@ func TestIsSuspiciousURL(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -413,7 +413,7 @@ func TestIsIPAddress(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -463,7 +463,7 @@ func TestCalculateTextPlainConsistency(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -504,7 +504,7 @@ func TestNormalizeText(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -590,11 +590,11 @@ func TestAnalyzeContent_HTMLParsing(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := analyzer.AnalyzeContent(tt.email)
+			results := analyzer.Analyze(tt.email)
 
 			if results == nil {
 				t.Fatal("Expected results, got nil")
@@ -651,7 +651,7 @@ func TestAnalyzeContent_UnsubscribeDetection(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -666,7 +666,7 @@ func TestAnalyzeContent_UnsubscribeDetection(t *testing.T) {
 				},
 			}
 
-			results := analyzer.AnalyzeContent(email)
+			results := analyzer.Analyze(email)
 
 			if results.HasUnsubscribe != tt.expectUnsubscribe {
 				t.Errorf("HasUnsubscribe = %v, want %v", results.HasUnsubscribe, tt.expectUnsubscribe)
@@ -715,7 +715,7 @@ func TestAnalyzeContent_ImageAltAttributes(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -730,7 +730,7 @@ func TestAnalyzeContent_ImageAltAttributes(t *testing.T) {
 				},
 			}
 
-			results := analyzer.AnalyzeContent(email)
+			results := analyzer.Analyze(email)
 
 			if len(results.Images) != tt.expectImages {
 				t.Errorf("Got %d images, want %d", len(results.Images), tt.expectImages)
@@ -1108,7 +1108,7 @@ func TestHasDomainMisalignment(t *testing.T) {
 		},
 	}
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1167,7 +1167,7 @@ func TestIsTemplatePlaceholderURL(t *testing.T) {
 }
 
 func TestValidateLink_TemplatePlaceholderIsInvalid(t *testing.T) {
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	check := analyzer.validateLink("{unsubscribe}")
 	if check.Valid {
@@ -1179,15 +1179,15 @@ func TestValidateLink_TemplatePlaceholderIsInvalid(t *testing.T) {
 }
 
 func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
-	results := &ContentResults{
+	results := &Results{
 		HTMLContent:    "<html><body><a href=\"{unsubscribe}\">Unsubscribe</a></body></html>",
 		Links:          []LinkCheck{{URL: "{unsubscribe}", Valid: false, IsTemplate: true, IsSafe: true, Error: "template"}},
 		HasUnsubscribe: false,
 	}
 
-	analysis := analyzer.GenerateContentAnalysis(results)
+	analysis := analyzer.Analysis(results)
 
 	// The link must be reported as broken, not valid
 	if analysis.Links == nil || len(*analysis.Links) != 1 {
@@ -1236,8 +1236,8 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 		t.Fatalf("BodyIncomplete = false, want true for a boundary that never appears")
 	}
 
-	analyzer := NewContentAnalyzer(0)
-	results := analyzer.AnalyzeContent(email)
+	analyzer := NewAnalyzer(0)
+	results := analyzer.Analyze(email)
 	if results.TextPlainRatio != 0 {
 		t.Errorf("TextPlainRatio = %v, want 0 for an unreadable body", results.TextPlainRatio)
 	}
@@ -1246,7 +1246,7 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 	}
 
 	// The truncation must be told, not silently folded into the score.
-	analysis := analyzer.GenerateContentAnalysis(results)
+	analysis := analyzer.Analysis(results)
 	found := false
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
@@ -1264,33 +1264,33 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 // total rather than failed: the message loses no point for bytes that went
 // missing on their way to us.
 func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
-	analyzer := NewContentAnalyzer(0)
+	analyzer := NewAnalyzer(0)
 
-	complete := ContentResults{
+	complete := Results{
 		HTMLValid:      true,
 		TextContent:    "Hello",
 		HTMLContent:    "<html><body>Hello</body></html>",
 		TextPlainRatio: 1.0,
 	}
-	want, _ := analyzer.CalculateContentScore(&complete)
+	want, _ := analyzer.Score(&complete)
 
 	// The same message, read from a body that stopped short: no counterpart to
 	// compare the HTML against, hence no ratio.
 	truncated := complete
 	truncated.TextPlainRatio = 0
 	truncated.BodyTruncated = true
-	got, _ := analyzer.CalculateContentScore(&truncated)
+	got, _ := analyzer.Score(&truncated)
 
 	if got != want {
-		t.Errorf("CalculateContentScore() = %d for a truncated body, want %d, the score of the same message read whole", got, want)
+		t.Errorf("Score() = %d for a truncated body, want %d, the score of the same message read whole", got, want)
 	}
 
 	// A message that did arrive whole and genuinely lacks consistency still
 	// loses those points: the exemption is about what we could not read.
 	inconsistent := complete
 	inconsistent.TextPlainRatio = 0
-	if score, _ := analyzer.CalculateContentScore(&inconsistent); score >= want {
-		t.Errorf("CalculateContentScore() = %d for a complete body with no consistency, want less than %d", score, want)
+	if score, _ := analyzer.Score(&inconsistent); score >= want {
+		t.Errorf("Score() = %d for a complete body with no consistency, want less than %d", score, want)
 	}
 }
 
@@ -1310,7 +1310,7 @@ func TestValidateLink_RefusedAutomationIsNotBroken(t *testing.T) {
 			// suspicious on its own.
 			link := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
 
-			analyzer := NewContentAnalyzer(5 * time.Second)
+			analyzer := NewAnalyzer(5 * time.Second)
 
 			check := analyzer.validateLink(link)
 			if !check.Valid {
@@ -1323,16 +1323,16 @@ func TestValidateLink_RefusedAutomationIsNotBroken(t *testing.T) {
 				t.Errorf("validateLink().Warning is empty, want the link reported as unverified")
 			}
 
-			results := &ContentResults{HTMLValid: true, Links: []LinkCheck{check}}
-			analysis := analyzer.GenerateContentAnalysis(results)
+			results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
+			analysis := analyzer.Analysis(results)
 			if got := (*analysis.Links)[0].Status; got != model.LinkCheckStatusTimeout {
 				t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusTimeout)
 			}
 
-			refused, _ := analyzer.CalculateContentScore(results)
-			reachable, _ := analyzer.CalculateContentScore(&ContentResults{HTMLValid: true, Links: []LinkCheck{{URL: link, Valid: true, IsSafe: true, Status: http.StatusOK}}})
+			refused, _ := analyzer.Score(results)
+			reachable, _ := analyzer.Score(&Results{HTMLValid: true, Links: []LinkCheck{{URL: link, Valid: true, IsSafe: true, Status: http.StatusOK}}})
 			if refused != reachable {
-				t.Errorf("CalculateContentScore() = %d with a link answering %d, want %d, the score of a reachable one", refused, status, reachable)
+				t.Errorf("Score() = %d with a link answering %d, want %d, the score of a reachable one", refused, status, reachable)
 			}
 		})
 	}
@@ -1346,15 +1346,15 @@ func TestValidateLink_ServerFailureIsBroken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	check := analyzer.validateLink(server.URL)
 	if check.Error == "" {
 		t.Errorf("validateLink().Error is empty, want a status error")
 	}
 
-	results := &ContentResults{HTMLValid: true, Links: []LinkCheck{check}}
-	if got := (*analyzer.GenerateContentAnalysis(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
+	results := &Results{HTMLValid: true, Links: []LinkCheck{check}}
+	if got := (*analyzer.Analysis(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
 		t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusBroken)
 	}
 }
@@ -1412,7 +1412,7 @@ func TestIsTrackingPixel(t *testing.T) {
 // judged on neither: the pixel is reported for what it is, then left out of
 // the images the recipient is meant to see.
 func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
-	analyzer := NewContentAnalyzer(5 * time.Second)
+	analyzer := NewAnalyzer(5 * time.Second)
 
 	email := &mailmsg.Message{
 		Header: make(mail.Header),
@@ -1427,7 +1427,7 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		},
 	}
 
-	results := analyzer.AnalyzeContent(email)
+	results := analyzer.Analyze(email)
 	if len(results.Images) != 1 || !results.Images[0].IsTrackingPixel {
 		t.Fatalf("Images = %+v, want one tracking pixel", results.Images)
 	}
@@ -1435,7 +1435,7 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		t.Errorf("ImageTextRatio = %v, want 0: a pixel is not a picture", results.ImageTextRatio)
 	}
 
-	analysis := analyzer.GenerateContentAnalysis(results)
+	analysis := analyzer.Analysis(results)
 	if img := (*analysis.Images)[0]; img.IsTrackingPixel == nil || !*img.IsTrackingPixel {
 		t.Errorf("reported image = %+v, want it flagged as a tracking pixel", img)
 	}
@@ -1447,11 +1447,11 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		}
 	}
 
-	score, _ := analyzer.CalculateContentScore(results)
+	score, _ := analyzer.Score(results)
 	results.Images = nil
-	without, _ := analyzer.CalculateContentScore(results)
+	without, _ := analyzer.Score(results)
 	if score != without {
-		t.Errorf("CalculateContentScore() = %d with a tracking pixel, want %d, the score without it", score, without)
+		t.Errorf("Score() = %d with a tracking pixel, want %d, the score without it", score, without)
 	}
 }
 
@@ -1459,11 +1459,11 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 // count of at least five: one undescribed picture among few is three points
 // short, not fifteen, and a message whose every picture is undescribed still
 // loses the criterion once there are five of them.
-func TestCalculateContentScoreImageShareFloor(t *testing.T) {
-	analyzer := NewContentAnalyzer(0)
+func TestScoreImageShareFloor(t *testing.T) {
+	analyzer := NewAnalyzer(0)
 
 	score := func(images []ImageCheck) int {
-		got, _ := analyzer.CalculateContentScore(&ContentResults{HTMLValid: true, Images: images})
+		got, _ := analyzer.Score(&Results{HTMLValid: true, Images: images})
 		return got
 	}
 
@@ -1490,5 +1490,26 @@ func TestCalculateContentScoreImageShareFloor(t *testing.T) {
 				t.Errorf("lost %d points, want %d", got, tt.lost)
 			}
 		})
+	}
+}
+
+// TestWithoutSentencePunctuation takes the prose off the end of a URL written
+// in a sentence, and leaves a URL what is its own.
+func TestWithoutSentencePunctuation(t *testing.T) {
+	tests := map[string]string{
+		"https://example.com/x.":         "https://example.com/x",
+		"https://example.com/x?a=1!?":    "https://example.com/x?a=1",
+		"https://example.com/x).":        "https://example.com/x",
+		"https://example.com/x.)":        "https://example.com/x",
+		"https://example.com/(x)":        "https://example.com/(x)",
+		"https://example.com/(x).":       "https://example.com/(x)",
+		"https://example.com/x":          "https://example.com/x",
+		"https://example.com/\"quoted\"": "https://example.com/\"quoted",
+	}
+
+	for rawURL, want := range tests {
+		if got := withoutSentencePunctuation(rawURL); got != want {
+			t.Errorf("withoutSentencePunctuation(%q) = %q, want %q", rawURL, got, want)
+		}
 	}
 }
