@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import type { ContentIssue } from "$lib/api/types.gen";
-import { adviceAnchorsBySymbol, contentIssueAnchor, contentIssueLabel } from "$lib/issues";
+import {
+    adviceAnchorsBySymbol,
+    contentCategoryLabel,
+    contentIssueAnchor,
+    contentIssueLabel,
+    groupIssuesByCategory,
+} from "$lib/issues";
 
 /** A content issue with only the fields these tests care about. */
 function issue(fields: Partial<ContentIssue>): ContentIssue {
     return {
         type: "suspicious_link",
+        category: "security",
         severity: "medium",
         message: "something",
         ...fields,
@@ -64,5 +71,194 @@ describe("contentIssueLabel", () => {
         // Not reachable through the type, but reachable from an older front end
         // talking to a newer server.
         expect(contentIssueLabel("some_new_kind" as ContentIssue["type"])).toBe("some new kind");
+    });
+});
+
+describe("contentCategoryLabel", () => {
+    it("names a reading rather than printing the enum", () => {
+        expect(contentCategoryLabel("deliverability")).toBe("Deliverability");
+    });
+
+    it("still reads as something for a reading the API added and we have not", () => {
+        expect(contentCategoryLabel("some_new_reading" as ContentIssue["category"])).toBe(
+            "some new reading",
+        );
+    });
+});
+
+describe("groupIssuesByCategory", () => {
+    it("shows the groups in the order they are meant to be read", () => {
+        const groups = groupIssuesByCategory([
+            issue({ category: "accessibility" }),
+            issue({ category: "security" }),
+            issue({ category: "content" }),
+        ]);
+
+        expect(groups.map((group) => group.category)).toEqual([
+            "security",
+            "content",
+            "accessibility",
+        ]);
+    });
+
+    it("keeps every issue at the index its anchor is made of", () => {
+        const issues = [
+            issue({ category: "accessibility", message: "pale" }),
+            issue({ category: "security", message: "look-alike" }),
+            issue({ category: "accessibility", message: "no alt" }),
+        ];
+
+        const groups = groupIssuesByCategory(issues);
+
+        // The security group comes first, but its issue is still the second of html_issues,
+        // which is what the rspamd symbol table links to.
+        expect(groups[0].issues).toEqual([{ issue: issues[1], index: 1 }]);
+        expect(groups[1].issues).toEqual([
+            { issue: issues[0], index: 0 },
+            { issue: issues[2], index: 2 },
+        ]);
+    });
+
+    it("leaves the issues the severity does not separate in the order the analysis reported them", () => {
+        const issues = [
+            issue({ category: "rendering", message: "first" }),
+            issue({ category: "rendering", message: "second" }),
+        ];
+
+        expect(
+            groupIssuesByCategory(issues)[0].issues.map((placed) => placed.issue.message),
+        ).toEqual(["first", "second"]);
+    });
+
+    it("opens a group on its gravest finding", () => {
+        const issues = [
+            issue({ category: "rendering", severity: "info", message: "a remark" }),
+            issue({ category: "rendering", severity: "critical", message: "a real problem" }),
+            issue({ category: "rendering", severity: "medium", message: "something between" }),
+            issue({ category: "rendering", severity: "high", message: "nearly as bad" }),
+            issue({ category: "rendering", severity: "low", message: "a detail" }),
+        ];
+
+        expect(
+            groupIssuesByCategory(issues)[0].issues.map((placed) => placed.issue.severity),
+        ).toEqual(["critical", "high", "medium", "low", "info"]);
+    });
+
+    it("keeps the anchors pointing at the right advice once the findings are reordered", () => {
+        const issues = [
+            issue({ category: "rendering", severity: "low", message: "a detail" }),
+            issue({ category: "rendering", severity: "critical", message: "a real problem" }),
+        ];
+
+        const placed = groupIssuesByCategory(issues)[0].issues;
+
+        expect(placed[0]).toEqual({ issue: issues[1], index: 1 });
+        expect(placed[1]).toEqual({ issue: issues[0], index: 0 });
+    });
+
+    it("sorts a severity it does not know last rather than first", () => {
+        const issues = [
+            issue({
+                category: "rendering",
+                severity: "some_new_level" as unknown as ContentIssue["severity"],
+            }),
+            issue({ category: "rendering", severity: "info" }),
+        ];
+
+        expect(
+            groupIssuesByCategory(issues)[0].issues.map((placed) => placed.issue.severity),
+        ).toEqual(["info", "some_new_level"]);
+    });
+
+    it("does not reorder the caller's array", () => {
+        const issues = [
+            issue({ category: "rendering", severity: "low" }),
+            issue({ category: "rendering", severity: "critical" }),
+        ];
+
+        groupIssuesByCategory(issues);
+
+        expect(issues.map((entry) => entry.severity)).toEqual(["low", "critical"]);
+    });
+
+    it("shows a reading we do not know rather than dropping it", () => {
+        const groups = groupIssuesByCategory([
+            issue({ category: "some_new_reading" as ContentIssue["category"] }),
+            issue({ category: "content" }),
+        ]);
+
+        expect(groups.map((group) => group.category)).toEqual(["content", "some_new_reading"]);
+    });
+
+    it("survives a report with no content issues at all", () => {
+        expect(groupIssuesByCategory(undefined)).toEqual([]);
+        expect(groupIssuesByCategory([])).toEqual([]);
+    });
+
+    // A stored report is served back exactly as it was written, so one produced before the
+    // analysis recorded a reading reaches the browser with no category at all. It has to
+    // read as it always did rather than throw on the way to a heading.
+    it("shows a report written before categories existed as one unheaded run", () => {
+        const issues = [
+            issue({ category: undefined as unknown as ContentIssue["category"] }),
+            issue({ category: undefined as unknown as ContentIssue["category"] }),
+        ];
+
+        const groups = groupIssuesByCategory(issues);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].category).toBeUndefined();
+        expect(groups[0].issues).toEqual([
+            { issue: issues[0], index: 0 },
+            { issue: issues[1], index: 1 },
+        ]);
+    });
+
+    it("keeps an issue that carries an empty category out of the headed groups", () => {
+        const groups = groupIssuesByCategory([
+            issue({ category: "" as unknown as ContentIssue["category"] }),
+        ]);
+
+        expect(groups[0].category).toBeUndefined();
+    });
+
+    // Taken from a report the stored database actually holds, addresses aside: a stored
+    // report is served back byte for byte, so this is the exact shape the browser receives
+    // for one written before the analysis recorded a reading.
+    it("groups a report as it is really stored, with no category on any issue", () => {
+        const stored = [
+            {
+                type: "missing_alt",
+                severity: "medium",
+                message: "1 image(s) missing alt attributes",
+                advice: "Add descriptive alt text to all images for better accessibility and deliverability",
+            },
+            {
+                type: "suspicious_link",
+                severity: "high",
+                message: "Suspicious URL detected",
+                location: "mailto:someone@example.com",
+                advice: "Avoid URL shorteners, IP addresses, and obfuscated URLs in emails",
+            },
+        ] as unknown as ContentIssue[];
+
+        const groups = groupIssuesByCategory(stored);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].category).toBeUndefined();
+        // The high one first, though it was written second, and each still carrying the
+        // index its anchor is made of.
+        expect(groups[0].issues.map((placed) => placed.index)).toEqual([1, 0]);
+    });
+
+    // A report half migrated does not exist today, but a reader of one must still find the
+    // findings that do name their reading under their heading.
+    it("shows the uncategorised findings after the ones that name a reading", () => {
+        const groups = groupIssuesByCategory([
+            issue({ category: undefined as unknown as ContentIssue["category"] }),
+            issue({ category: "security" }),
+        ]);
+
+        expect(groups.map((group) => group.category)).toEqual(["security", undefined]);
     });
 });
