@@ -206,6 +206,14 @@ func TestACheckOnlyReportsWhatItDeclares(t *testing.T) {
 			}
 
 			for _, finding := range findings {
+				// A finding is free to answer a reading other than its
+				// check's, and several do. What it may not do is name a
+				// reading the schema does not offer, which would reach the
+				// report as a group no reader can be shown.
+				if finding.Category != "" && !finding.Category.Valid() {
+					t.Errorf("%q answers %q, which the schema does not offer a reader", finding.Message, finding.Category)
+				}
+
 				if finding.Defect == nil {
 					t.Errorf("%q is reported with no defect, so nothing says what it costs", finding.Message)
 					continue
@@ -215,5 +223,28 @@ func TestACheckOnlyReportsWhatItDeclares(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestEveryIssueAnswersAReading holds the whole pipeline to filing every
+// finding under one of the readings the report groups by.
+//
+// It is the invariant the web report rests on: issues are shown by category
+// there, so an issue carrying none would be a finding a reader is never shown,
+// lost in a group that has no heading. The check's own category answers for
+// most of them, which is why this passes today without a check having to think
+// about it; what it guards is the check added tomorrow whose findings are
+// built by hand and skip that default.
+func TestEveryIssueAnswersAReading(t *testing.T) {
+	issues, _ := reading.Run(context.Background(), contentChecks, speakingResults().checkInput())
+
+	if len(issues) == 0 {
+		t.Fatal("the checks reported nothing on a message built to make every check speak")
+	}
+
+	for _, issue := range issues {
+		if !issue.Category.Valid() {
+			t.Errorf("%q is filed under %q, which is not a reading the report groups by", issue.Message, issue.Category)
+		}
 	}
 }

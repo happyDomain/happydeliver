@@ -627,6 +627,63 @@ func TestGenerateContentAnalysisReportsHTTPFindings(t *testing.T) {
 	}
 }
 
+// TestHTTPFindingsAnswerTheirRole covers the one place the probe check departs
+// from its own category: what a URL that does not answer costs a reader
+// depends on what the URL was found as.
+//
+// A dead image leaves a hole the recipient sees the moment the message opens,
+// which is a matter of rendering. A dead link and a dead unsubscribe address
+// cost a destination, not a rendering, and stay with the deliverability
+// findings. A chain that merely ends late is reached after all, so the image
+// does render and it stays there too.
+func TestHTTPFindingsAnswerTheirRole(t *testing.T) {
+	dead, _ := httpStatusFinding("Image", http.StatusNotFound)
+	late, _ := redirectChainFinding("Image", []string{"a", "b", "c"}, "https://example.com/end")
+
+	for _, tc := range []struct {
+		name    string
+		finding LinkHTTPFinding
+		role    urlRole
+		want    reading.Category
+	}{
+		{"a dead image", dead, urlRoleImage, reading.CategoryRendering},
+		{"a dead link", dead, urlRoleLink, ""},
+		{"a dead unsubscribe address", dead, urlRoleUnsubscribe, ""},
+		{"an image reached late", late, urlRoleImage, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			issue := httpFindingIssue("https://example.com/thing", tc.role, tc.finding)
+			if issue.Category != tc.want {
+				t.Errorf("Category = %q, want %q", issue.Category, tc.want)
+			}
+		})
+	}
+}
+
+// And the whole way through: a dead image source reaches the report filed
+// under rendering, the check's own deliverability notwithstanding.
+func TestGenerateContentAnalysisFilesADeadImageUnderRendering(t *testing.T) {
+	analyzer := newProbingTestAnalyzer(5 * time.Second)
+
+	notFound, _ := httpStatusFinding("Image", http.StatusNotFound)
+
+	analysis := analyzer.analysisOf(&Results{
+		HTMLContent: "<html><body></body></html>",
+		Images: []ImageCheck{{
+			Src: "https://example.com/logo.png", HasAlt: true,
+			probedURL: probedURL{Status: 404, HTTPFindings: []LinkHTTPFinding{notFound}},
+		}},
+	})
+
+	issues := *analysis.HtmlIssues
+	if len(issues) != 1 {
+		t.Fatalf("HtmlIssues = %+v, want exactly one", issues)
+	}
+	if issues[0].Category != reading.CategoryRendering {
+		t.Errorf("Category = %q, want %q", issues[0].Category, reading.CategoryRendering)
+	}
+}
+
 func TestGenerateContentAnalysisFilesRedirectFindingsApart(t *testing.T) {
 	analyzer := newProbingTestAnalyzer(5 * time.Second)
 
