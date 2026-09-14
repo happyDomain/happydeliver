@@ -41,6 +41,12 @@ import (
 // Finding is one thing a check found: the issue as the report will
 // show it, plus the key under which it may be recognised as the same defect
 // another check also found.
+//
+// The issue's Category is the one field a check may leave to the machinery:
+// left empty, Run fills it with the category of the check that reported it,
+// which is the answer for most findings. A check whose findings do not all
+// answer the same reading sets it on the finding instead, and that is what is
+// kept.
 type Finding struct {
 	model.ContentIssue
 
@@ -76,27 +82,32 @@ type Finding struct {
 // It is declared per check rather than derived from the issue type, because
 // the same type serves several readings: a suspicious link is a security
 // finding, a link nobody can reach is a deliverability one.
-type Category string
+//
+// It travels to the report on every issue, which is what lets a reader take
+// the findings by the reading they answer rather than in the order the checks
+// happened to run. It is therefore an alias of the schema's own type rather
+// than a second vocabulary kept in step with it by hand.
+type Category = model.ContentIssueCategory
 
 const (
 	// CategoryContent answers for what the message says and whether it says it
 	// coherently: a merge field never substituted, a text alternative that does
 	// not match its HTML.
-	CategoryContent Category = "content"
+	CategoryContent = model.ContentIssueCategoryContent
 
 	// CategoryDeliverability answers for what will keep the message out of the
 	// inbox: what filters read, what reputation follows.
-	CategoryDeliverability Category = "deliverability"
+	CategoryDeliverability = model.ContentIssueCategoryDeliverability
 
 	// CategoryAccessibility answers for the recipients a message can leave out.
-	CategoryAccessibility Category = "accessibility"
+	CategoryAccessibility = model.ContentIssueCategoryAccessibility
 
 	// CategoryRendering answers for what an email client will not render as the
 	// sender saw it.
-	CategoryRendering Category = "rendering"
+	CategoryRendering = model.ContentIssueCategoryRendering
 
 	// CategorySecurity answers for what a message may do to whoever opens it.
-	CategorySecurity Category = "security"
+	CategorySecurity = model.ContentIssueCategorySecurity
 )
 
 // Check[In] is what a check file exposes. It is a value rather than an
@@ -266,6 +277,14 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 			if finding.Symbol != nil {
 				source = *finding.Symbol
 			}
+			// A finding that named no category answers the reading its check
+			// does. This is settled before the merge below, so that the
+			// category travels with the finding that is kept rather than
+			// depending on which check happened to report it first.
+			if finding.Category == "" {
+				finding.Category = check.Category
+			}
+
 			found = append(found, observed{finding: finding, source: source})
 		}
 	}

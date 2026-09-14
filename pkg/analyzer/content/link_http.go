@@ -102,6 +102,29 @@ func (f LinkHTTPFinding) defect(role urlRole) *reading.Defect {
 	}
 }
 
+// category says which reading of the message this finding answers, where that
+// is not the deliverability one the probe check answers as a whole.
+//
+// An image source that never answers is the one case: it leaves a hole the
+// recipient sees the moment the message opens, which is a matter of what the
+// message looks like rather than of whether it arrives. A link that never
+// answers costs the reader a destination, not a rendering, and the address a
+// recipient unsubscribes at is read by nobody looking at the message.
+//
+// A chain of redirections that merely ends late is excluded for the reason it
+// is excluded above: the URL is reached after all, so the image does render.
+func (f LinkHTTPFinding) category(role urlRole) reading.Category {
+	if f.Kind == LinkHTTPExcessiveRedirects {
+		return ""
+	}
+
+	if role == urlRoleImage {
+		return reading.CategoryRendering
+	}
+
+	return ""
+}
+
 const (
 	// probeBudget caps how long the whole fetching pass may take, however many
 	// URLs it has left. Without it, a message full of links pointing at servers
@@ -498,9 +521,14 @@ func (i *ImageCheck) applyProbe(probe urlprobe.Answer) {
 
 // httpFindingIssue turns what fetching a URL revealed into the issue the
 // report shows, the way a suspicion of a URL becomes an issue of its own.
-func httpFindingIssue(location string, finding LinkHTTPFinding) model.ContentIssue {
+//
+// The role is read for the same reason defect reads it: what a URL that does
+// not answer costs, and which reading of the message it answers, both depend
+// on what the URL was found as.
+func httpFindingIssue(location string, role urlRole, finding LinkHTTPFinding) model.ContentIssue {
 	return model.ContentIssue{
 		Type:     finding.IssueType(),
+		Category: finding.category(role),
 		Severity: finding.Severity,
 		Message:  finding.Message,
 		Location: utils.PtrTo(location),

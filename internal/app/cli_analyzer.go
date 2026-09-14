@@ -683,8 +683,11 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 		if content.HtmlIssues != nil && len(*content.HtmlIssues) > 0 {
 			fmt.Fprintln(writer, "\n  Content Issues:")
 			for _, issue := range *content.HtmlIssues {
-				fmt.Fprintf(writer, "    [%s] %s: %s\n",
-					strings.ToUpper(string(issue.Severity)), issue.Type, issue.Message)
+				// The category is printed beside the type so that the text
+				// report says what the web one shows by grouping: which
+				// reading of the message the finding answers.
+				fmt.Fprintf(writer, "    [%s] %s/%s: %s\n",
+					strings.ToUpper(string(issue.Severity)), issue.Category, issue.Type, issue.Message)
 				// Say when a finding comes from the spam filter rather than
 				// from happyDeliver's own reading, and name the symbol so the
 				// reader can look it up.
