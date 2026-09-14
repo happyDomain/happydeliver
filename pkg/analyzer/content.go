@@ -193,13 +193,15 @@ func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults
 	return results
 }
 
+// textURLRegex matches the URLs a plain text part writes out: those naming
+// their scheme, and those a reader recognises by the "www." their sender left
+// the scheme off of. It stops at the characters no URL may carry unescaped, so
+// that a link ends where the prose around it resumes.
+var textURLRegex = regexp.MustCompile(`(?i)\b(?:https?://|www\.)[^\s<>"{}|\\^\[\]` + "`" + `]+`)
+
 // analyzeTextLinks extracts and validates URLs from plain text
 func (c *ContentAnalyzer) analyzeTextLinks(textContent string, results *ContentResults) {
-	// Regular expression to match URLs in plain text
-	// Matches http://, https://, and www. URLs
-	urlRegex := regexp.MustCompile(`(?i)\b(?:https?://|www\.)[^\s<>"{}|\\^\[\]` + "`" + `]+`)
-
-	matches := urlRegex.FindAllString(textContent, -1)
+	matches := textURLRegex.FindAllString(textContent, -1)
 
 	for _, match := range matches {
 		// Normalize URL (add http:// if missing)
