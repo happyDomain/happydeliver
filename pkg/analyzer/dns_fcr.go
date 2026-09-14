@@ -25,6 +25,7 @@ import (
 	"context"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/domainname"
 )
 
 // checkPTRAndForward performs reverse DNS lookup (PTR) and forward confirmation (A/AAAA)
@@ -65,12 +66,12 @@ func (d *DNSAnalyzer) checkPTRAndForward(ip string) ([]string, []string) {
 // checkHeloPtrMatch reports whether the announced HELO hostname matches one of
 // the sender's PTR records (case-insensitive, trailing dot ignored).
 func checkHeloPtrMatch(helo string, ptrRecords []string) bool {
-	helo = normalizeHostname(helo)
+	helo = domainname.Normalize(helo)
 	if helo == "" {
 		return false
 	}
 	for _, ptr := range ptrRecords {
-		if normalizeHostname(ptr) == helo {
+		if domainname.Normalize(ptr) == helo {
 			return true
 		}
 	}

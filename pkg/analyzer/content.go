@@ -36,6 +36,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/domainname"
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
 )
@@ -536,7 +537,7 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 
 		// Hostname() drops the port and the brackets of an IPv6 literal, which
 		// a manual cut at the last colon would slice in half.
-		actualDomain = normalizeHostname(parsedURL.Hostname())
+		actualDomain = domainname.Normalize(parsedURL.Hostname())
 	default:
 		// Skip checks for other URL schemes (tel, etc.)
 		return false
@@ -566,11 +567,11 @@ func (c *ContentAnalyzer) hasDomainMisalignment(href, linkText string) bool {
 
 	// Compare on registrable domains ("example.co.uk", not "co.uk"), so that any
 	// subdomain of the advertised domain is accepted.
-	actualRegistrable := getOrganizationalDomain(actualDomain)
+	actualRegistrable := domainname.Organizational(actualDomain)
 
 	// Check each domain-like pattern found in the text
 	for _, textDomain := range textDomains {
-		if getOrganizationalDomain(textDomain) != actualRegistrable {
+		if domainname.Organizational(textDomain) != actualRegistrable {
 			return true // Domain mismatch detected!
 		}
 	}

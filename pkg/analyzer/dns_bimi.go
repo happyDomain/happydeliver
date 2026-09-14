@@ -30,6 +30,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
+	"git.happydns.org/happyDeliver/pkg/domainname"
 )
 
 // DefaultBIMIAssetsTimeout caps the wall time the logo and VMC downloads may
@@ -67,7 +68,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string, dmarc 
 		// is allowed to name it rather than the exact sender: both must
 		// agree with the notion DMARC alignment uses elsewhere in the
 		// report, including for the names the PSL cannot resolve.
-		OrganizationalDomain: getOrganizationalDomain,
+		OrganizationalDomain: domainname.Organizational,
 		VMCRoots:             d.VMCRoots,
 	}
 

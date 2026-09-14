@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
 )
 
@@ -143,10 +144,10 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	// Verify the sender domains can actually receive replies/bounces (MX, with
 	// A/AAAA fallback), mirroring the ReturnOK milter check.
 	results.ReturnOk = &model.ReturnOK{
-		From: d.checkReturnOKDomain(fromDomain, orgDomainOrEmpty(headersResults.DomainAlignment.FromOrgDomain)),
+		From: d.checkReturnOKDomain(fromDomain, utils.Deref(headersResults.DomainAlignment.FromOrgDomain)),
 	}
 	if results.RpDomain != nil && *results.RpDomain != "" {
-		results.ReturnOk.ReturnPath = d.checkReturnOKDomain(*results.RpDomain, orgDomainOrEmpty(headersResults.DomainAlignment.ReturnPathOrgDomain))
+		results.ReturnOk.ReturnPath = d.checkReturnOKDomain(*results.RpDomain, utils.Deref(headersResults.DomainAlignment.ReturnPathOrgDomain))
 	}
 
 	// Check SPF records (for Return-Path domain - this is the envelope sender)

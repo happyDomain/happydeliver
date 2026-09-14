@@ -32,6 +32,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/domainname"
 )
 
 // HeaderAnalyzer analyzes email header quality and structure
@@ -393,7 +394,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		if domain != "" {
 			alignment.FromDomain = &domain
 			// Extract organizational domain
-			orgDomain := getOrganizationalDomain(domain)
+			orgDomain := domainname.Organizational(domain)
 			alignment.FromOrgDomain = &orgDomain
 		}
 	}
@@ -405,7 +406,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		if domain != "" {
 			alignment.ReturnPathDomain = &domain
 			// Extract organizational domain
-			orgDomain := getOrganizationalDomain(domain)
+			orgDomain := domainname.Organizational(domain)
 			alignment.ReturnPathOrgDomain = &orgDomain
 		}
 	}
@@ -416,7 +417,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults
 		for _, dkim := range *authResults.Dkim {
 			if dkim.Domain != nil && *dkim.Domain != "" {
 				domain := *dkim.Domain
-				orgDomain := getOrganizationalDomain(domain)
+				orgDomain := domainname.Organizational(domain)
 				dkimDomains = append(dkimDomains, model.DKIMDomainInfo{
 					Domain:    domain,
 					OrgDomain: orgDomain,

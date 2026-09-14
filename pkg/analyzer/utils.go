@@ -32,8 +32,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"golang.org/x/net/publicsuffix"
 )
 
 // parseFloat32 parses a header field as a float32, reporting whether it held a
@@ -83,13 +81,6 @@ func pluralize(count int) string {
 	return "ies"
 }
 
-// normalizeHostname puts a hostname in comparable form: lowercased, trimmed,
-// and without the root dot, so that "Mail.Example.Com." and "mail.example.com"
-// are recognised as the same host.
-func normalizeHostname(hostname string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
-}
-
 // localPartOf extracts the local-part of an address header, the part before
 // the '@'. It parses the header properly first, so that a display name and a
 // quoted local-part are handled, and falls back to cutting at the last '@' the
@@ -108,35 +99,6 @@ func localPartOf(address string) string {
 		return ""
 	}
 	return address[:at]
-}
-
-// getOrganizationalDomain extracts the organizational domain from a fully qualified domain name
-// using the Public Suffix List (PSL) to correctly handle multi-level TLDs.
-// For example: mail.example.com -> example.com, mail.example.co.uk -> example.co.uk
-func getOrganizationalDomain(domain string) string {
-	domain = strings.ToLower(strings.TrimSpace(domain))
-
-	// Use golang.org/x/net/publicsuffix to get the eTLD+1 (organizational domain)
-	// This correctly handles cases like .co.uk, .com.au, etc.
-	etldPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
-	if err != nil {
-		// Fallback to simple two-label extraction if PSL lookup fails
-		labels := strings.Split(domain, ".")
-		if len(labels) <= 2 {
-			return domain
-		}
-		return strings.Join(labels[len(labels)-2:], ".")
-	}
-
-	return etldPlusOne
-}
-
-// orgDomainOrEmpty dereferences an optional organizational domain pointer.
-func orgDomainOrEmpty(orgDomain *string) string {
-	if orgDomain == nil {
-		return ""
-	}
-	return *orgDomain
 }
 
 // cgnatRange is the RFC 6598 shared address space: carrier-grade NAT addresses
