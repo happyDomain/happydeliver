@@ -32,6 +32,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // DNSListChecker checks IP addresses against DNS-based block/allow lists.
@@ -143,7 +145,7 @@ type DNSListResults struct {
 }
 
 // CheckEmail checks all IPs found in the email headers against the configured lists
-func (r *DNSListChecker) CheckEmail(email *EmailMessage) *DNSListResults {
+func (r *DNSListChecker) CheckEmail(email *mailmsg.Message) *DNSListResults {
 	results := &DNSListResults{
 		Checks: make(map[string][]model.BlacklistCheck),
 	}
@@ -204,7 +206,7 @@ func (r *DNSListChecker) CheckIP(ip string) ([]model.BlacklistCheck, int, error)
 }
 
 // extractIPs extracts IP addresses from Received headers
-func (r *DNSListChecker) extractIPs(email *EmailMessage) []string {
+func (r *DNSListChecker) extractIPs(email *mailmsg.Message) []string {
 	var ips []string
 	seenIPs := make(map[string]bool)
 

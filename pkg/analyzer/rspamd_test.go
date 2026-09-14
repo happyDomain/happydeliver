@@ -27,6 +27,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // reportedThreshold reads back the threshold rspamd reported for a message. It
@@ -41,7 +43,7 @@ func reportedThreshold(result *model.RspamdResult) float32 {
 
 func TestAnalyzeRspamdNoHeaders(t *testing.T) {
 	analyzer := NewRspamdAnalyzer(nil)
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 
 	result := analyzer.AnalyzeRspamd(spamHeadersOf(email, ScannerRspamd))
 
@@ -257,7 +259,7 @@ func TestAnalyzeRspamd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{Header: make(mail.Header)}
+			email := &mailmsg.Message{Header: make(mail.Header)}
 			for k, v := range tt.headers {
 				email.Header[k] = []string{v}
 			}
@@ -397,7 +399,7 @@ Content-Type: text/plain
 Hello world`
 
 func TestAnalyzeRspamdRealEmail(t *testing.T) {
-	email, err := ParseEmail([]byte(sampleEmailWithRspamdHeaders))
+	email, err := mailmsg.Parse([]byte(sampleEmailWithRspamdHeaders))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -437,7 +439,7 @@ func TestAnalyzeRspamdRealEmail(t *testing.T) {
 // TestAnalyzeRspamdSpamStatus checks the SpamAssassin-shaped X-Spam-Status rspamd
 // emits when it runs alongside one, picked out of several X-Spam-Status headers.
 func TestAnalyzeRspamdSpamStatus(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{
 		"No, rspamdscore=-4.78, required=10.00",
 		"No, score=0.00, required=95.00",
@@ -467,7 +469,7 @@ func TestAnalyzeRspamdSpamStatus(t *testing.T) {
 // X-Spamd-Result header wins over rspamd's X-Spam-Status variant when both carry a
 // score and threshold, since X-Spam-Status is only meant as a fallback.
 func TestAnalyzeRspamdSpamStatusIgnoredWhenSpamdResultPresent(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spamd-Result"] = []string{"default: False [-3.91 / 15.00]; BAYES_HAM(-1.0)"}
 	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=-4.78, required=10.00"}
 
@@ -490,7 +492,7 @@ func TestAnalyzeRspamdSpamStatusIgnoredWhenSpamdResultPresent(t *testing.T) {
 // substituted value is not published: only a threshold the instance actually
 // reported is.
 func TestAnalyzeRspamdSpamStatusZeroRequired(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=2.5, required=0.00"}
 
 	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(spamHeadersOf(email, ScannerRspamd))
@@ -512,7 +514,7 @@ func TestAnalyzeRspamdSpamStatusZeroRequired(t *testing.T) {
 // TestAnalyzeRspamdSpamStatusCaseInsensitive checks that an X-Spam-Status header is
 // still recognized and parsed as rspamd's even when its markers are not lowercase.
 func TestAnalyzeRspamdSpamStatusCaseInsensitive(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{"No, RspamdScore=-1.5, Required=5.00"}
 
 	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(spamHeadersOf(email, ScannerRspamd))
@@ -533,7 +535,7 @@ func TestAnalyzeRspamdSpamStatusCaseInsensitive(t *testing.T) {
 // attributed to it, and must be read by it, or the verdict is lost by both
 // analyzers.
 func TestAnalyzeRspamdShapedHeadersOnly(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam"] = []string{"Yes"}
 	email.Header["X-Rspamd-Server"] = []string{"rspamd15"}
 	email.Header["X-Spam-Score"] = []string{"7.5"}
@@ -560,7 +562,7 @@ func TestAnalyzeRspamdShapedHeadersOnly(t *testing.T) {
 // kept when no header of the message carries a score: deriving IsSpam from an
 // absent score would silently turn a spam verdict into ham.
 func TestAnalyzeRspamdShapedFlagWithoutScore(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam"] = []string{"Yes"}
 	email.Header["X-Spam-Flag"] = []string{"YES"}
 
@@ -577,7 +579,7 @@ func TestAnalyzeRspamdShapedFlagWithoutScore(t *testing.T) {
 // TestAnalyzeRspamdShapedHeadersAreOnlyFallbacks checks that the shaped headers
 // never override what rspamd's own headers already reported.
 func TestAnalyzeRspamdShapedHeadersAreOnlyFallbacks(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spamd-Result"] = []string{"default: False [-3.91 / 15.00]; BAYES_HAM(-1.0)"}
 	email.Header["X-Spam-Score"] = []string{"9.0"}
 	email.Header["X-Spam-Flag"] = []string{"YES"}
@@ -598,7 +600,7 @@ func TestAnalyzeRspamdShapedHeadersAreOnlyFallbacks(t *testing.T) {
 // TestAnalyzeRspamdStampsOnly checks that headers rspamd stamps on every message
 // it touches, carrying no verdict, do not produce an empty report scored 0.
 func TestAnalyzeRspamdStampsOnly(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Rspamd-Server"] = []string{"rspamd15"}
 	email.Header["X-Rspamd-Queue-Id"] = []string{"4A2B3C4D5E"}
 

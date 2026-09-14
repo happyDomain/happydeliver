@@ -33,6 +33,8 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/domainname"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // HeaderAnalyzer analyzes email header quality and structure
@@ -244,7 +246,7 @@ func (h *HeaderAnalyzer) formatAddress(addr *mail.Address) string {
 }
 
 // GenerateHeaderAnalysis creates structured header analysis from email
-func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults *model.AuthenticationResults) *model.HeaderAnalysis {
+func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *mailmsg.Message, authResults *model.AuthenticationResults) *model.HeaderAnalysis {
 	if email == nil {
 		return nil
 	}
@@ -309,7 +311,7 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *EmailMessage, authResults
 }
 
 // checkHeader checks if a header is present and valid
-func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, importance string) *model.HeaderCheck {
+func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, importance string) *model.HeaderCheck {
 	value := email.GetHeaderValue(headerName)
 	present := email.HasHeader(headerName) && value != ""
 
@@ -381,7 +383,7 @@ func (h *HeaderAnalyzer) checkHeader(email *EmailMessage, headerName string, imp
 }
 
 // analyzeDomainAlignment checks domain alignment between headers and DKIM signatures
-func (h *HeaderAnalyzer) analyzeDomainAlignment(email *EmailMessage, authResults *model.AuthenticationResults) *model.DomainAlignment {
+func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResults *model.AuthenticationResults) *model.DomainAlignment {
 	alignment := &model.DomainAlignment{
 		Aligned:        utils.PtrTo(true),
 		RelaxedAligned: utils.PtrTo(true),
@@ -546,7 +548,7 @@ func (h *HeaderAnalyzer) extractDomain(emailAddr string) string {
 }
 
 // findHeaderIssues identifies issues with headers
-func (h *HeaderAnalyzer) findHeaderIssues(email *EmailMessage) []model.HeaderIssue {
+func (h *HeaderAnalyzer) findHeaderIssues(email *mailmsg.Message) []model.HeaderIssue {
 	var issues []model.HeaderIssue
 
 	// Check for missing required headers
@@ -626,7 +628,7 @@ func (h *HeaderAnalyzer) hasReplyPrefix(subject string) bool {
 }
 
 // parseReceivedChain extracts the chain of Received headers from an email
-func (h *HeaderAnalyzer) parseReceivedChain(email *EmailMessage) []model.ReceivedHop {
+func (h *HeaderAnalyzer) parseReceivedChain(email *mailmsg.Message) []model.ReceivedHop {
 	if email == nil || email.Header == nil {
 		return nil
 	}

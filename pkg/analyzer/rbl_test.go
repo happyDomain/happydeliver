@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestNewRBLChecker(t *testing.T) {
@@ -317,7 +319,7 @@ func TestExtractIPs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: mail.Header(tt.headers),
 			}
 

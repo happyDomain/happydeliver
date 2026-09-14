@@ -24,6 +24,8 @@ package analyzer
 import (
 	"regexp"
 	"strings"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // SpamScanner names a spam filter able to leave a verdict in a message's
@@ -138,7 +140,7 @@ func (s SpamHeaderSet) For(scanner SpamScanner) ScannerHeaders {
 	return s[scanner]
 }
 
-// SpamScannerHeaders routes every spam-related header of the message to its
+// spamScannerHeaders routes every spam-related header of the message to its
 // author:
 //
 //  1. a header only one scanner ever writes goes to that scanner;
@@ -146,7 +148,7 @@ func (s SpamHeaderSet) For(scanner SpamScanner) ScannerHeaders {
 //  3. any other shared header goes to the scanner that borrows these names when
 //     it reported a verdict of its own, and to the convention's owner
 //     otherwise.
-func (e *EmailMessage) SpamScannerHeaders() SpamHeaderSet {
+func spamScannerHeaders(e *mailmsg.Message) SpamHeaderSet {
 	set := SpamHeaderSet{}
 
 	for _, profile := range spamScannerProfiles {
@@ -154,7 +156,7 @@ func (e *EmailMessage) SpamScannerHeaders() SpamHeaderSet {
 		set[profile.scanner] = headers
 
 		for _, name := range profile.ownHeaders {
-			if value := e.firstSpamHeader(name); value != "" {
+			if value := firstSpamHeader(e, name); value != "" {
 				headers[name] = value
 			}
 		}
@@ -198,13 +200,13 @@ func (e *EmailMessage) SpamScannerHeaders() SpamHeaderSet {
 
 // reportedVerdict reports whether the scanner did more than pass by: a header
 // of its own carrying a verdict, or its signature in a shared one.
-func (p spamScannerProfile) reportedVerdict(e *EmailMessage, own ScannerHeaders) bool {
+func (p spamScannerProfile) reportedVerdict(e *mailmsg.Message, own ScannerHeaders) bool {
 	if own.Has(p.verdictHeaders...) {
 		return true
 	}
 
 	for name, signature := range p.signatures {
-		if signature.MatchString(e.firstSpamHeader(name)) {
+		if signature.MatchString(firstSpamHeader(e, name)) {
 			return true
 		}
 	}
@@ -229,7 +231,7 @@ func spamHeaderSigner(name, value string) (SpamScanner, bool) {
 
 // firstSpamHeader returns the topmost non-blank occurrence of a header, the one
 // the last hop wrote.
-func (e *EmailMessage) firstSpamHeader(name string) string {
+func firstSpamHeader(e *mailmsg.Message, name string) string {
 	for _, value := range e.Header[name] {
 		if strings.TrimSpace(value) != "" {
 			return value

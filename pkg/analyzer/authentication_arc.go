@@ -29,6 +29,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // parseARCResult parses ARC result from Authentication-Results
@@ -50,7 +52,7 @@ func (a *AuthenticationAnalyzer) parseARCResult(part string) *model.ARCResult {
 
 // parseARCHeaders parses ARC headers from email message
 // ARC consists of three headers per hop: ARC-Authentication-Results, ARC-Message-Signature, ARC-Seal
-func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *model.ARCResult {
+func (a *AuthenticationAnalyzer) parseARCHeaders(email *mailmsg.Message) *model.ARCResult {
 	// Get all ARC-related headers
 	arcAuthResults := email.Header[textprotoCanonical("ARC-Authentication-Results")]
 	arcMessageSig := email.Header[textprotoCanonical("ARC-Message-Signature")]
@@ -92,7 +94,7 @@ func (a *AuthenticationAnalyzer) parseARCHeaders(email *EmailMessage) *model.ARC
 }
 
 // enhanceARCResult enhances an existing ARC result with chain information
-func (a *AuthenticationAnalyzer) enhanceARCResult(email *EmailMessage, arcResult *model.ARCResult) {
+func (a *AuthenticationAnalyzer) enhanceARCResult(email *mailmsg.Message, arcResult *model.ARCResult) {
 	if arcResult == nil {
 		return
 	}

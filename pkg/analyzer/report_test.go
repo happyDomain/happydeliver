@@ -30,6 +30,8 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestNewReportGenerator(t *testing.T) {
@@ -199,7 +201,7 @@ func TestGenerateReportExcludesCategoriesThatDidNotRun(t *testing.T) {
 
 // Helper functions
 
-func createTestEmail() *EmailMessage {
+func createTestEmail() *mailmsg.Message {
 	header := make(mail.Header)
 	header[textproto.CanonicalMIMEHeaderKey("From")] = []string{"sender@example.com"}
 	header[textproto.CanonicalMIMEHeaderKey("To")] = []string{"recipient@example.com"}
@@ -207,14 +209,14 @@ func createTestEmail() *EmailMessage {
 	header[textproto.CanonicalMIMEHeaderKey("Date")] = []string{"Mon, 01 Jan 2024 12:00:00 +0000"}
 	header[textproto.CanonicalMIMEHeaderKey("Message-ID")] = []string{"<test123@example.com>"}
 
-	return &EmailMessage{
+	return &mailmsg.Message{
 		Header:    header,
 		From:      &mail.Address{Address: "sender@example.com"},
 		To:        []*mail.Address{{Address: "recipient@example.com"}},
 		Subject:   "Test Email",
 		MessageID: "<test123@example.com>",
 		Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-		Parts: []MessagePart{
+		Parts: []mailmsg.Part{
 			{
 				ContentType: "text/plain",
 				Content:     "This is a test email",
@@ -225,7 +227,7 @@ func createTestEmail() *EmailMessage {
 	}
 }
 
-func createTestEmailWithSpamAssassin() *EmailMessage {
+func createTestEmailWithSpamAssassin() *mailmsg.Message {
 	email := createTestEmail()
 	email.Header[textproto.CanonicalMIMEHeaderKey("X-Spam-Status")] = []string{"No, score=2.3 required=5.0"}
 	email.Header[textproto.CanonicalMIMEHeaderKey("X-Spam-Score")] = []string{"2.3"}
@@ -237,7 +239,7 @@ func createTestEmailWithSpamAssassin() *EmailMessage {
 // where the message comes from: our own receiver hostname for a message we received, the
 // topmost Authentication-Results header for a file the user supplied.
 func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
-	newEmail := func() *EmailMessage {
+	newEmail := func() *mailmsg.Message {
 		email := createTestEmail()
 		email.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")] = []string{
 			"mx.example.org; spf=pass smtp.mailfrom=sender@example.com",

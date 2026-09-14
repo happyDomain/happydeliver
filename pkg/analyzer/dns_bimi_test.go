@@ -32,6 +32,8 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // Record parsing and asset validation are covered by the reusable pkg/bimi
@@ -163,8 +165,8 @@ func TestLocalPartOf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := localPartOf(tt.address); got != tt.want {
-			t.Errorf("localPartOf(%q) = %q, want %q", tt.address, got, tt.want)
+		if got := mailmsg.LocalPart(tt.address); got != tt.want {
+			t.Errorf("mailmsg.LocalPart(%q) = %q, want %q", tt.address, got, tt.want)
 		}
 	}
 }

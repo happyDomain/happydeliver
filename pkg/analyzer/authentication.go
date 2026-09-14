@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // AuthenticationAnalyzer analyzes email authentication results
@@ -41,7 +43,7 @@ func NewAuthenticationAnalyzer(receiverHostname string) *AuthenticationAnalyzer 
 //
 // Only the headers written by authservID are trusted; an empty authservID trusts every
 // Authentication-Results header found in the message.
-func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *EmailMessage, authservID string) *model.AuthenticationResults {
+func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *mailmsg.Message, authservID string) *model.AuthenticationResults {
 	results := &model.AuthenticationResults{}
 
 	// Parse Authentication-Results headers

@@ -29,6 +29,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // EmailAnalyzer provides high-level email analysis functionality
@@ -57,7 +59,7 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 
 // AnalysisResult contains the complete analysis result
 type AnalysisResult struct {
-	Email   *EmailMessage
+	Email   *mailmsg.Message
 	Results *AnalysisResults
 	Report  *model.Report
 }
@@ -65,7 +67,7 @@ type AnalysisResult struct {
 // AnalyzeEmailBytes performs complete email analysis from raw bytes
 func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, opts AnalysisOptions) (*AnalysisResult, error) {
 	// Parse the email
-	emailMsg, err := ParseEmail(rawEmail)
+	emailMsg, err := mailmsg.Parse(rawEmail)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse email: %w", err)
 	}

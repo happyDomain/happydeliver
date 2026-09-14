@@ -39,6 +39,8 @@ import (
 	"git.happydns.org/happyDeliver/pkg/domainname"
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // ContentAnalyzer analyzes email content (HTML, links, images)
@@ -142,7 +144,7 @@ type ImageCheck struct {
 }
 
 // AnalyzeContent performs content analysis on email message
-func (c *ContentAnalyzer) AnalyzeContent(email *EmailMessage) *ContentResults {
+func (c *ContentAnalyzer) AnalyzeContent(email *mailmsg.Message) *ContentResults {
 	results := &ContentResults{BodyTruncated: email.BodyIncomplete}
 
 	results.IsMultipart = len(email.Parts) > 1

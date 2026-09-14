@@ -19,7 +19,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+package mailmsg
 
 import (
 	"encoding/base64"
@@ -37,7 +37,7 @@ Date: Mon, 15 Oct 2025 12:00:00 +0000
 This is a plain text email body.
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -82,7 +82,7 @@ Content-Type: text/html; charset=utf-8
 --boundary123--
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -116,7 +116,7 @@ Authentication-Results: example.com; dkim=pass header.d=example.com
 Body content.
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -136,7 +136,7 @@ Message-ID: <test123@example.com>
 Body content.
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -228,7 +228,7 @@ Authentication-Results: relay.example.org 1; dmarc=fail header.from=example.net
 Body
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -257,7 +257,7 @@ Authentication-Results: relay.example.org; spf=fail smtp.mailfrom=sender@example
 Body
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestParseEmail_QuotedPrintableBody(t *testing.T) {
 		"<a href=3D=22https://example.com/subscription/4bdad7fe-ef=\r\n" +
 		"36-4abc=22>Unsub</a>\r\n"
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestParseEmail_Base64Body(t *testing.T) {
 		"Content-Transfer-Encoding: base64\r\n" +
 		"\r\n" + encoded + "\r\n"
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestParseEmail_CharsetISO88591(t *testing.T) {
 		"\r\n" +
 		"Caf\xe9 cr\xe8me\r\n"
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -365,9 +365,9 @@ func TestParseEmail_CharsetISO88591(t *testing.T) {
 }
 
 // singlePartEmail builds a one-part message with the given encoding, charset
-// and body, so a decoding behaviour can be asserted through ParseEmail rather
+// and body, so a decoding behaviour can be asserted through Parse rather
 // than against an internal helper.
-func singlePartEmail(t *testing.T, encoding, charset, body string) MessagePart {
+func singlePartEmail(t *testing.T, encoding, charset, body string) Part {
 	t.Helper()
 
 	contentType := "text/plain"
@@ -382,9 +382,9 @@ func singlePartEmail(t *testing.T, encoding, charset, body string) MessagePart {
 		"Content-Transfer-Encoding: " + encoding + "\r\n" +
 		"\r\n" + body
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 	if len(email.Parts) != 1 {
 		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
@@ -459,9 +459,9 @@ func TestParseEmail_DecodesEncodedWords(t *testing.T) {
 		"\r\n" +
 		"body\r\n"
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if want := "Re: déjà vu"; email.Subject != want {
@@ -489,9 +489,9 @@ func TestParseEmail_RawHeadersKeepWireForm(t *testing.T) {
 		"\r\n" +
 		"body\r\n"
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	wantHeaders := strings.TrimSuffix(raw, "body\r\n")
@@ -521,9 +521,9 @@ Content-Type: text/plain; charset=utf-8
 
 This one was cut off half`
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if len(email.Parts) != 2 {
@@ -553,9 +553,9 @@ Content-Type: multipart/mixed; boundary="boundary123"
 This body was never split along the boundary declared above.
 `
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if len(email.Parts) != 0 {
@@ -590,9 +590,9 @@ Content-Type: text/html; charset=utf-8
 --outer--
 `
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if email.BodyIncomplete {
@@ -618,9 +618,9 @@ The inner boundary is nowhere to be seen.
 --outer--
 `
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if !email.BodyIncomplete {
@@ -640,9 +640,9 @@ Content-Type: application/pdf; name=Rapport contexte.pdf
 %PDF-1.4 binary payload
 `
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail returned error: %v", err)
+		t.Fatalf("Parse returned error: %v", err)
 	}
 
 	if len(email.Parts) != 1 {

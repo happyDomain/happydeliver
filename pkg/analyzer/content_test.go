@@ -31,6 +31,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"golang.org/x/net/html"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestNewContentAnalyzer(t *testing.T) {
@@ -514,16 +516,16 @@ func TestNormalizeText(t *testing.T) {
 func TestAnalyzeContent_HTMLParsing(t *testing.T) {
 	tests := []struct {
 		name         string
-		email        *EmailMessage
+		email        *mailmsg.Message
 		expectValid  bool
 		expectLinks  int
 		expectImages int
 	}{
 		{
 			name: "Valid HTML with links and images",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: make(mail.Header),
-				Parts: []MessagePart{
+				Parts: []mailmsg.Part{
 					{
 						ContentType: "text/html",
 						IsHTML:      true,
@@ -545,9 +547,9 @@ func TestAnalyzeContent_HTMLParsing(t *testing.T) {
 		},
 		{
 			name: "Multiple links",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: make(mail.Header),
-				Parts: []MessagePart{
+				Parts: []mailmsg.Part{
 					{
 						ContentType: "text/html",
 						IsHTML:      true,
@@ -569,9 +571,9 @@ func TestAnalyzeContent_HTMLParsing(t *testing.T) {
 		},
 		{
 			name: "Plain text only",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: make(mail.Header),
-				Parts: []MessagePart{
+				Parts: []mailmsg.Part{
 					{
 						ContentType: "text/plain",
 						IsText:      true,
@@ -650,9 +652,9 @@ func TestAnalyzeContent_UnsubscribeDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: make(mail.Header),
-				Parts: []MessagePart{
+				Parts: []mailmsg.Part{
 					{
 						ContentType: "text/html",
 						IsHTML:      true,
@@ -714,9 +716,9 @@ func TestAnalyzeContent_ImageAltAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: make(mail.Header),
-				Parts: []MessagePart{
+				Parts: []mailmsg.Part{
 					{
 						ContentType: "text/html",
 						IsHTML:      true,
@@ -1223,9 +1225,9 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 		"\r\n" +
 		"<html><body>Hello</body></html>\r\n"
 
-	email, err := ParseEmail([]byte(raw))
+	email, err := mailmsg.Parse([]byte(raw))
 	if err != nil {
-		t.Fatalf("ParseEmail() error = %v", err)
+		t.Fatalf("mailmsg.Parse() error = %v", err)
 	}
 	if !email.BodyIncomplete {
 		t.Fatalf("BodyIncomplete = false, want true for a boundary that never appears")

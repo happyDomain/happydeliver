@@ -19,7 +19,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+// Package mailmsg reads a raw message into the shape everything else looks at:
+// its headers, the addresses they name, and the parts its body is made of.
+//
+// It parses and it reports what it parsed; it judges nothing. What a header
+// means, whether a part is what it claims to be, which of them a reader will
+// ever see: those are readings, and they belong to whoever makes them.
+package mailmsg
 
 import (
 	"bytes"
@@ -37,8 +43,8 @@ import (
 	gomail "github.com/emersion/go-message/mail"
 )
 
-// EmailMessage represents a parsed email message
-type EmailMessage struct {
+// Message is a message as it was received, parsed.
+type Message struct {
 	Header     mail.Header
 	From       *mail.Address
 	To         []*mail.Address
@@ -46,7 +52,7 @@ type EmailMessage struct {
 	MessageID  string
 	Date       string
 	ReturnPath string
-	Parts      []MessagePart
+	Parts      []Part
 
 	// BodyIncomplete reports that the MIME body could not be read through to its
 	// end: cut short before its closing delimiter, or a declared boundary that
@@ -59,27 +65,27 @@ type EmailMessage struct {
 	RawHeaders string
 }
 
-// MessagePart represents a MIME part of an email
-type MessagePart struct {
+// Part represents a MIME part of an email
+type Part struct {
 	ContentType string
 	Content     string
 	IsHTML      bool
 	IsText      bool
-	Parts       []MessagePart // For nested multipart messages
+	Parts       []Part // For nested multipart messages
 }
 
-// ParseEmail parses a raw email message.
+// Parse parses a raw email message.
 //
 // go-message decodes transfer encodings and charsets, so every text part comes
 // out as UTF-8. An unknown encoding or charset is not an error: the payload is
 // left untouched and the rest of the message is analysed.
-func ParseEmail(raw []byte) (*EmailMessage, error) {
+func Parse(raw []byte) (*Message, error) {
 	entity, err := message.Read(bytes.NewReader(raw))
 	if err != nil && !isDecodeError(err) {
 		return nil, fmt.Errorf("failed to parse email message: %w", err)
 	}
 
-	email := &EmailMessage{
+	email := &Message{
 		Header:     mail.Header(entity.Header.Map()),
 		MessageID:  entity.Header.Get("Message-ID"),
 		Date:       entity.Header.Get("Date"),
@@ -114,24 +120,24 @@ func isDecodeError(err error) bool {
 
 // messageParts returns the parts of a whole message: the children of the root
 // entity when it is multipart, or the message itself as a single part. The
-// second result is EmailMessage.BodyIncomplete.
+// second result is Message.BodyIncomplete.
 //
 // The root is unwrapped rather than reported as a part of its own, so that a
 // message declaring a boundary never found in its body comes out with no part
 // at all rather than with an empty root.
-func messageParts(e *message.Entity) ([]MessagePart, bool) {
+func messageParts(e *message.Entity) ([]Part, bool) {
 	if mr := e.MultipartReader(); mr != nil {
 		return readMultipart(mr)
 	}
 
 	part, _ := entityPart(e)
 
-	return []MessagePart{part}, false
+	return []Part{part}, false
 }
 
-// entityPart turns one entity into a MessagePart, recursing into it when it is
+// entityPart turns one entity into a Part, recursing into it when it is
 // itself multipart. The second result is whether a nested body was truncated.
-func entityPart(e *message.Entity) (MessagePart, bool) {
+func entityPart(e *message.Entity) (Part, bool) {
 	part := describePart(e)
 
 	if mr := e.MultipartReader(); mr != nil {
@@ -154,13 +160,13 @@ func entityPart(e *message.Entity) (MessagePart, bool) {
 	return part, false
 }
 
-// readMultipart turns every part of a multipart body into a MessagePart,
+// readMultipart turns every part of a multipart body into a Part,
 // recursing into the ones that are themselves multipart. A malformed body is
 // reported as far as it could be read: a message truncated before its closing
 // delimiter still says plenty about deliverability through the parts that did
 // arrive. The second result keeps "no parts found" distinguishable from "body
 // unreadable", which would otherwise look alike to the report.
-func readMultipart(mr message.MultipartReader) (parts []MessagePart, incomplete bool) {
+func readMultipart(mr message.MultipartReader) (parts []Part, incomplete bool) {
 	for {
 		child, err := mr.NextPart()
 		if err != nil && !isDecodeError(err) {
@@ -180,7 +186,7 @@ func readMultipart(mr message.MultipartReader) (parts []MessagePart, incomplete 
 
 // describePart fills in everything about a part that can be told from its
 // header alone.
-func describePart(e *message.Entity) MessagePart {
+func describePart(e *message.Entity) Part {
 	contentType := e.Header.Get("Content-Type")
 	if contentType == "" {
 		// A part without a Content-Type is text/plain per RFC 2045 section 5.2.
@@ -202,7 +208,7 @@ func describePart(e *message.Entity) MessagePart {
 	// read back as text here: its body would come through undecoded.
 	isText := strings.HasPrefix(mediaType, "text/")
 
-	return MessagePart{
+	return Part{
 		ContentType: contentType,
 		IsHTML:      mediaType == "text/html",
 		IsText:      isText,
@@ -278,7 +284,7 @@ scan:
 
 // GetAuthenticationResults extracts Authentication-Results headers
 // If receiverHostname is provided, only returns headers whose authserv-id is that hostname
-func (e *EmailMessage) GetAuthenticationResults(receiverHostname string) []string {
+func (e *Message) GetAuthenticationResults(receiverHostname string) []string {
 	allResults := e.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")]
 
 	// If no hostname specified, return all results
@@ -303,7 +309,7 @@ func (e *EmailMessage) GetAuthenticationResults(receiverHostname string) []strin
 // This is how the authority to trust is picked for messages this instance did not receive
 // itself, such as an uploaded EML file: the topmost header was written by the last server
 // that handled the message, usually the recipient's own MTA.
-func (e *EmailMessage) AuthservIDs() []string {
+func (e *Message) AuthservIDs() []string {
 	allResults := e.Header[textproto.CanonicalMIMEHeaderKey("Authentication-Results")]
 
 	var ids []string
@@ -327,22 +333,22 @@ func (e *EmailMessage) AuthservIDs() []string {
 }
 
 // GetTextParts returns all text/plain parts
-func (e *EmailMessage) GetTextParts() []MessagePart {
-	return filterParts(e.Parts, func(p MessagePart) bool {
+func (e *Message) GetTextParts() []Part {
+	return filterParts(e.Parts, func(p Part) bool {
 		return p.IsText && !p.IsHTML
 	})
 }
 
 // GetHTMLParts returns all text/html parts
-func (e *EmailMessage) GetHTMLParts() []MessagePart {
-	return filterParts(e.Parts, func(p MessagePart) bool {
+func (e *Message) GetHTMLParts() []Part {
+	return filterParts(e.Parts, func(p Part) bool {
 		return p.IsHTML
 	})
 }
 
 // filterParts recursively filters message parts
-func filterParts(parts []MessagePart, predicate func(MessagePart) bool) []MessagePart {
-	var result []MessagePart
+func filterParts(parts []Part, predicate func(Part) bool) []Part {
+	var result []Part
 	for _, part := range parts {
 		if len(part.Parts) > 0 {
 			// Recursively filter nested parts
@@ -355,18 +361,18 @@ func filterParts(parts []MessagePart, predicate func(MessagePart) bool) []Messag
 }
 
 // GetHeaderValue safely gets a header value
-func (e *EmailMessage) GetHeaderValue(key string) string {
+func (e *Message) GetHeaderValue(key string) string {
 	return e.Header.Get(key)
 }
 
 // HasHeader checks if a header exists
-func (e *EmailMessage) HasHeader(key string) bool {
+func (e *Message) HasHeader(key string) bool {
 	return e.Header.Get(key) != ""
 }
 
 // GetListUnsubscribeURLs parses the List-Unsubscribe header and returns all URLs.
 // The header format is: <url1>, <url2>, ...
-func (e *EmailMessage) GetListUnsubscribeURLs() []string {
+func (e *Message) GetListUnsubscribeURLs() []string {
 	value := e.Header.Get("List-Unsubscribe")
 	if value == "" {
 		return nil
@@ -379,4 +385,24 @@ func (e *EmailMessage) GetListUnsubscribeURLs() []string {
 		}
 	}
 	return urls
+}
+
+// LocalPart extracts the local-part of an address header, the part before
+// the '@'. It parses the header properly first, so that a display name and a
+// quoted local-part are handled, and falls back to cutting at the last '@' the
+// way the domain is extracted, so that an address a strict parser rejects
+// still yields what it plainly holds. It returns an empty string when there is
+// no address to read.
+func LocalPart(address string) string {
+	if addr, err := mail.ParseAddress(address); err == nil {
+		address = addr.Address
+	} else {
+		address = strings.Trim(address, "<> ")
+	}
+
+	at := strings.LastIndex(address, "@")
+	if at <= 0 {
+		return ""
+	}
+	return address[:at]
 }

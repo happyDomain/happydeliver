@@ -28,6 +28,8 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // ReportGenerator generates comprehensive deliverability reports
@@ -88,7 +90,7 @@ func (o AnalysisOptions) sourceOrDefault() model.ReportSource {
 
 // AnalysisResults contains all intermediate analysis results
 type AnalysisResults struct {
-	Email          *EmailMessage
+	Email          *mailmsg.Message
 	Source         model.ReportSource
 	AuthservID     string
 	AuthservIDs    []string
@@ -103,7 +105,7 @@ type AnalysisResults struct {
 }
 
 // AnalyzeEmail performs complete email analysis
-func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions) *AnalysisResults {
+func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOptions) *AnalysisResults {
 	results := &AnalysisResults{
 		Email:       email,
 		Source:      opts.sourceOrDefault(),
@@ -144,7 +146,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *EmailMessage, opts AnalysisOptions
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 
-	spamHeaders := email.SpamScannerHeaders()
+	spamHeaders := spamScannerHeaders(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(spamHeaders.For(ScannerSpamAssassin))
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
 

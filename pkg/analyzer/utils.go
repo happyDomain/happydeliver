@@ -28,7 +28,6 @@ package analyzer
 
 import (
 	"net"
-	"net/mail"
 	"regexp"
 	"strconv"
 	"strings"
@@ -79,26 +78,6 @@ func pluralize(count int) string {
 		return "y"
 	}
 	return "ies"
-}
-
-// localPartOf extracts the local-part of an address header, the part before
-// the '@'. It parses the header properly first, so that a display name and a
-// quoted local-part are handled, and falls back to cutting at the last '@' the
-// way the domain is extracted, so that an address a strict parser rejects
-// still yields what it plainly holds. It returns an empty string when there is
-// no address to read.
-func localPartOf(address string) string {
-	if addr, err := mail.ParseAddress(address); err == nil {
-		address = addr.Address
-	} else {
-		address = strings.Trim(address, "<> ")
-	}
-
-	at := strings.LastIndex(address, "@")
-	if at <= 0 {
-		return ""
-	}
-	return address[:at]
 }
 
 // cgnatRange is the RFC 6598 shared address space: carrier-grade NAT addresses

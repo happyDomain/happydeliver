@@ -26,6 +26,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestParseSPFResult(t *testing.T) {
@@ -204,7 +206,7 @@ func TestParseLegacySPF(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock email message with Received-SPF header
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: make(map[string][]string),
 			}
 			if tt.receivedSPF != "" {
@@ -493,7 +495,7 @@ func TestParseAuthenticationResultsHeader_SPFTopmostHeaderWins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := NewAuthenticationAnalyzer(authserv)
-			email := &EmailMessage{Header: map[string][]string{"Authentication-Results": tt.headers}}
+			email := &mailmsg.Message{Header: map[string][]string{"Authentication-Results": tt.headers}}
 
 			results := analyzer.AnalyzeAuthentication(email, authserv)
 
@@ -685,7 +687,7 @@ func TestParseLegacySPFIdentities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{Header: map[string][]string{"Received-Spf": tt.headers}}
+			email := &mailmsg.Message{Header: map[string][]string{"Received-Spf": tt.headers}}
 
 			mailfrom, helo := analyzer.parseLegacySPF(email, "")
 
@@ -700,7 +702,7 @@ func TestParseLegacySPFIdentities(t *testing.T) {
 func TestParseLegacySPFUntrustedReceiver(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("mx.example.org")
 
-	email := &EmailMessage{Header: map[string][]string{"Received-Spf": {
+	email := &mailmsg.Message{Header: map[string][]string{"Received-Spf": {
 		`Fail (sender SPF not authorized) identity=helo; helo=relay.example.net; receiver=mx.elsewhere.example`,
 		`Pass (sender SPF authorized) identity=mailfrom; envelope-from=user@example.com; receiver=mx.example.org`,
 	}}}
@@ -716,7 +718,7 @@ func TestParseLegacySPFUntrustedReceiver(t *testing.T) {
 func TestParseLegacySPFQuotedReceiver(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("mx.example.org")
 
-	email := &EmailMessage{Header: map[string][]string{"Received-Spf": {
+	email := &mailmsg.Message{Header: map[string][]string{"Received-Spf": {
 		`Pass (sender SPF authorized) identity=mailfrom; envelope-from=user@example.com; receiver="mx.example.org"`,
 	}}}
 
@@ -732,7 +734,7 @@ func TestParseLegacySPFQuotedReceiver(t *testing.T) {
 func TestAnalyzeAuthenticationLegacyHeloOnly(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("")
 
-	email := &EmailMessage{Header: map[string][]string{"Received-Spf": {
+	email := &mailmsg.Message{Header: map[string][]string{"Received-Spf": {
 		`Pass (sender SPF authorized) identity=helo; client-ip=192.0.2.1; ` +
 			`helo=relay.example.net; envelope-from=user@example.com; receiver=mx.example.org`,
 	}}}
@@ -758,7 +760,7 @@ func TestAnalyzeAuthenticationLegacyHeloOnly(t *testing.T) {
 func TestAnalyzeAuthenticationLegacyNotConsultedWhenSpfKnown(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("")
 
-	email := &EmailMessage{Header: map[string][]string{
+	email := &mailmsg.Message{Header: map[string][]string{
 		"Authentication-Results": {"mx.example.org; spf=pass smtp.mailfrom=user@example.com"},
 		"Received-Spf": {
 			`Fail (sender SPF not authorized) identity=helo; helo=relay.example.net; receiver=mx.example.org`,
@@ -778,7 +780,7 @@ func TestAnalyzeAuthenticationLegacyNotConsultedWhenSpfKnown(t *testing.T) {
 func TestAnalyzeAuthenticationLegacyCompletesHeloOnlyHeader(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("")
 
-	email := &EmailMessage{Header: map[string][]string{
+	email := &mailmsg.Message{Header: map[string][]string{
 		"Authentication-Results": {"mx.example.org; spf=none smtp.helo=relay.example.net"},
 		"Received-Spf": {
 			`Pass (sender SPF authorized) identity=mailfrom; envelope-from=user@example.com; receiver=mx.example.org`,

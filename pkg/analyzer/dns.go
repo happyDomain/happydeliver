@@ -29,6 +29,8 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // DNSAnalyzer analyzes DNS records for email domains
@@ -105,7 +107,7 @@ func (d *DNSAnalyzer) populateInboundHopResults(results *model.DNSResults, inbou
 //
 // inboundHop, as picked by InboundHop, provides the sender IP used for
 // PTR/FCrDNS verification and the announced HELO name. It may be nil.
-func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.HeaderAnalysis, inboundHop *model.ReceivedHop) *model.DNSResults {
+func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.HeaderAnalysis, inboundHop *model.ReceivedHop) *model.DNSResults {
 	// Extract domain from From address
 	if headersResults.DomainAlignment.FromDomain == nil || *headersResults.DomainAlignment.FromDomain == "" {
 		results := &model.DNSResults{
@@ -184,7 +186,7 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *EmailMessage, headersResults *model.Head
 	// distinct Indicator for the mailboxes it names, so discovery must know
 	// which mailbox sent this message to land on the record a receiver would
 	// act on.
-	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default", localPartOf(email.GetHeaderValue("From")), results.DmarcRecord)
+	results.BimiRecord = d.checkBIMIRecord(fromDomain, "default", mailmsg.LocalPart(email.GetHeaderValue("From")), results.DmarcRecord)
 
 	return results
 }

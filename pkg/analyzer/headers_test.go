@@ -29,12 +29,14 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestCalculateHeaderScore(t *testing.T) {
 	tests := []struct {
 		name     string
-		email    *EmailMessage
+		email    *mailmsg.Message
 		minScore int
 		maxScore int
 	}{
@@ -46,7 +48,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		},
 		{
 			name: "Perfect headers",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"From":       "sender@example.com",
 					"To":         "recipient@example.com",
@@ -57,14 +59,14 @@ func TestCalculateHeaderScore(t *testing.T) {
 				}),
 				MessageID: "<abc123@example.com>",
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
+				Parts:     []mailmsg.Part{{ContentType: "text/plain", Content: "test"}},
 			},
 			minScore: 70,
 			maxScore: 100,
 		},
 		{
 			name: "Missing required headers",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"Subject": "Test",
 				}),
@@ -74,7 +76,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		},
 		{
 			name: "Required only, no recommended",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"From":       "sender@example.com",
 					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
@@ -82,14 +84,14 @@ func TestCalculateHeaderScore(t *testing.T) {
 				}),
 				MessageID: "<abc123@example.com>",
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
+				Parts:     []mailmsg.Part{{ContentType: "text/plain", Content: "test"}},
 			},
 			minScore: 80,
 			maxScore: 90,
 		},
 		{
 			name: "Invalid Message-ID format",
-			email: &EmailMessage{
+			email: &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"From":       "sender@example.com",
 					"Date":       "Mon, 01 Jan 2024 12:00:00 +0000",
@@ -100,7 +102,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 				}),
 				MessageID: "invalid-message-id",
 				Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-				Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
+				Parts:     []mailmsg.Part{{ContentType: "text/plain", Content: "test"}},
 			},
 			minScore: 70,
 			maxScore: 100,
@@ -182,7 +184,7 @@ func TestCheckHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					tt.headerName: tt.headerValue,
 				}),
@@ -367,7 +369,7 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"From":        tt.fromHeader,
 					"Return-Path": tt.returnPath,
@@ -426,7 +428,7 @@ func TestParseReceivedChain(t *testing.T) {
 		name            string
 		receivedHeaders []string
 		expectedHops    int
-		validateFirst   func(*testing.T, *EmailMessage, []model.ReceivedHop)
+		validateFirst   func(*testing.T, *mailmsg.Message, []model.ReceivedHop)
 	}{
 		{
 			name:            "No Received headers",
@@ -439,7 +441,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail.example.com (mail.example.com [192.0.2.1]) by mx.receiver.com (Postfix) with ESMTPS id ABC123 for <user@receiver.com>; Mon, 01 Jan 2024 12:00:00 +0000",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *mailmsg.Message, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -472,7 +474,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail2.example.com (mail2.example.com [192.0.2.2]) by mx2.receiver.com with SMTP id 222; Mon, 01 Jan 2024 11:59:00 +0000",
 			},
 			expectedHops: 2,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *mailmsg.Message, hops []model.ReceivedHop) {
 				if len(hops) != 2 {
 					t.Fatalf("Expected 2 hops, got %d", len(hops))
 				}
@@ -494,7 +496,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from mail.example.com (unknown [IPv6:2607:5300:203:2818::1]) by mx.receiver.com with ESMTPS; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *mailmsg.Message, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -521,7 +523,7 @@ func TestParseReceivedChain(t *testing.T) {
 	for <test-9a9ce364-c394-4fa9-acef-d46ff2f482bf@deliver.happydomain.org>; Sun, 19 Oct 2025 09:40:33 +0000 (UTC)`,
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *mailmsg.Message, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -549,7 +551,7 @@ func TestParseReceivedChain(t *testing.T) {
 				"from unknown by localhost",
 			},
 			expectedHops: 1,
-			validateFirst: func(t *testing.T, email *EmailMessage, hops []model.ReceivedHop) {
+			validateFirst: func(t *testing.T, email *mailmsg.Message, hops []model.ReceivedHop) {
 				if len(hops) == 0 {
 					t.Fatal("Expected at least one hop")
 				}
@@ -574,7 +576,7 @@ func TestParseReceivedChain(t *testing.T) {
 				header["Received"] = tt.receivedHeaders
 			}
 
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: header,
 			}
 
@@ -778,7 +780,7 @@ func TestParseReceivedTLS(t *testing.T) {
 func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 	analyzer := NewHeaderAnalyzer()
 
-	email := &EmailMessage{
+	email := &mailmsg.Message{
 		Header: createHeaderWithFields(map[string]string{
 			"From":       "sender@example.com",
 			"To":         "recipient@example.com",
@@ -788,7 +790,7 @@ func TestGenerateHeaderAnalysis_WithReceivedChain(t *testing.T) {
 		}),
 		MessageID: "<abc123@example.com>",
 		Date:      "Mon, 01 Jan 2024 12:00:00 +0000",
-		Parts:     []MessagePart{{ContentType: "text/plain", Content: "test"}},
+		Parts:     []mailmsg.Part{{ContentType: "text/plain", Content: "test"}},
 	}
 
 	// Add Received headers
@@ -986,7 +988,7 @@ func TestCheckHeader_DateValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"Date": tt.dateValue,
 				}),
@@ -1129,7 +1131,7 @@ func TestFindHeaderIssues_FakeReply(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: createHeaderWithFields(tt.headers),
 			}
 
@@ -1254,7 +1256,7 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: createHeaderWithFields(map[string]string{
 					"From":        tt.fromHeader,
 					"Return-Path": tt.returnPath,

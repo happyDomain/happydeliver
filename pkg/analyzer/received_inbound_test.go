@@ -27,6 +27,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // hop builds a ReceivedHop with the fields InboundHopIndex looks at. An empty ip
@@ -298,9 +300,9 @@ func TestInboundHopIndexFromParsedChain(t *testing.T) {
 		"\r\n" +
 		"body\r\n"
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := mailmsg.Parse([]byte(rawEmail))
 	if err != nil {
-		t.Fatalf("ParseEmail() error = %v", err)
+		t.Fatalf("mailmsg.Parse() error = %v", err)
 	}
 
 	chain := NewHeaderAnalyzer().parseReceivedChain(email)
@@ -364,9 +366,9 @@ func TestInboundHopIndexAddresslessLMTP(t *testing.T) {
 		"\r\n" +
 		"body\r\n"
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := mailmsg.Parse([]byte(rawEmail))
 	if err != nil {
-		t.Fatalf("ParseEmail() error = %v", err)
+		t.Fatalf("mailmsg.Parse() error = %v", err)
 	}
 
 	chain := NewHeaderAnalyzer().parseReceivedChain(email)

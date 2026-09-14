@@ -24,12 +24,14 @@ package analyzer
 import (
 	"net/mail"
 	"testing"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // spamHeadersOf attributes a message's spam headers and returns one scanner's
 // bucket, as the report generator does before calling an analyzer.
-func spamHeadersOf(email *EmailMessage, scanner SpamScanner) ScannerHeaders {
-	return email.SpamScannerHeaders().For(scanner)
+func spamHeadersOf(email *mailmsg.Message, scanner SpamScanner) ScannerHeaders {
+	return spamScannerHeaders(email).For(scanner)
 }
 
 func TestSpamScannerHeaders(t *testing.T) {
@@ -144,8 +146,8 @@ func TestSpamScannerHeaders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email := &EmailMessage{Header: tt.headers}
-			set := email.SpamScannerHeaders()
+			email := &mailmsg.Message{Header: tt.headers}
+			set := spamScannerHeaders(email)
 
 			assertHeaderMap(t, "SpamAssassin", set.For(ScannerSpamAssassin), tt.wantSpamAssassin)
 			assertHeaderMap(t, "Rspamd", set.For(ScannerRspamd), tt.wantRspamd)
@@ -181,12 +183,12 @@ X-Spam-Flag: NO
 Body content.
 `
 
-	email, err := ParseEmail([]byte(rawEmail))
+	email, err := mailmsg.Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
 
-	set := email.SpamScannerHeaders()
+	set := spamScannerHeaders(email)
 
 	assertHeaderMap(t, "SpamAssassin", set.For(ScannerSpamAssassin), map[string]string{
 		"X-Spam-Status": "No, score=2.3 required=5.0",
@@ -201,7 +203,7 @@ Body content.
 // name no author, used to be read as SpamAssassin's and surfaced as a phantom
 // section scored 0.
 func TestAnalyzeSpamAssassinRspamdOnlyHost(t *testing.T) {
-	email := &EmailMessage{Header: mail.Header{
+	email := &mailmsg.Message{Header: mail.Header{
 		"X-Spam-Status":  {"No, rspamdscore=-4.78, required=10.00"},
 		"X-Spam-Flag":    {"NO"},
 		"X-Spam-Score":   {"-4.78"},
@@ -225,7 +227,7 @@ func TestAnalyzeSpamAssassinRspamdOnlyHost(t *testing.T) {
 // present and X-Spam-Score names neither, SpamAssassin is reported without it
 // rather than with a score that may be rspamd's.
 func TestAnalyzeSpamAssassinBothScannersMuteScore(t *testing.T) {
-	email := &EmailMessage{Header: mail.Header{
+	email := &mailmsg.Message{Header: mail.Header{
 		"X-Spam-Status":  {"Yes, score=6.10, required=5.00"},
 		"X-Spamd-Result": {"default: False [-4.78 / 15.00];"},
 		"X-Spam-Score":   {"-4.78"},

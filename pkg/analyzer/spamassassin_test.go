@@ -28,6 +28,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 func TestParseSpamStatus(t *testing.T) {
@@ -281,7 +283,7 @@ func TestAnalyzeSpamAssassin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create email message with headers
-			email := &EmailMessage{
+			email := &mailmsg.Message{
 				Header: make(mail.Header),
 			}
 			for key, value := range tt.headers {
@@ -309,7 +311,7 @@ func TestAnalyzeSpamAssassin(t *testing.T) {
 
 func TestAnalyzeSpamAssassinNoHeaders(t *testing.T) {
 	analyzer := NewSpamAssassinAnalyzer()
-	email := &EmailMessage{
+	email := &mailmsg.Message{
 		Header: make(mail.Header),
 	}
 
@@ -361,7 +363,7 @@ BODY`
 // TestAnalyzeRealEmailExample tests the analyzer with the real example email file
 func TestAnalyzeRealEmailExample(t *testing.T) {
 	// Parse the email using the standard net/mail package
-	email, err := ParseEmail([]byte(sampleEmailWithSpamassassinHeader))
+	email, err := mailmsg.Parse([]byte(sampleEmailWithSpamassassinHeader))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -481,7 +483,7 @@ func stringSliceEqual(a, b []string) bool {
 // rspamd and SpamAssassin, each emitting its own X-Spam-Status, reports SpamAssassin's
 // verdict and not rspamd's.
 func TestAnalyzeSpamAssassinIgnoresRspamdStatus(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{
 		"No, rspamdscore=-4.78, required=10.00",
 		"No, score=0.00, required=95.00",
@@ -503,7 +505,7 @@ func TestAnalyzeSpamAssassinIgnoresRspamdStatus(t *testing.T) {
 // TestAnalyzeSpamAssassinRspamdStatusOnly checks that rspamd's X-Spam-Status alone
 // does not produce a SpamAssassin report.
 func TestAnalyzeSpamAssassinRspamdStatusOnly(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{"No, rspamdscore=-4.78, required=10.00"}
 
 	if result := NewSpamAssassinAnalyzer().AnalyzeSpamAssassin(spamHeadersOf(email, ScannerSpamAssassin)); result != nil {
@@ -516,7 +518,7 @@ func TestAnalyzeSpamAssassinRspamdStatusOnly(t *testing.T) {
 // X-Spam-Status did not already provide a score. Otherwise a score of exactly 0.00
 // lets the rspamd-written X-Spam-Score take its place.
 func TestAnalyzeSpamAssassinIgnoresRspamdScore(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{
 		"No, rspamdscore=-4.78, required=10.00",
 		"No, score=0.00, required=95.00",
@@ -536,7 +538,7 @@ func TestAnalyzeSpamAssassinIgnoresRspamdScore(t *testing.T) {
 // TestAnalyzeSpamAssassinStatusVerdictWinsOverFlag checks that X-Spam-Flag, which is
 // likewise unattributable, does not overwrite the verdict X-Spam-Status stated.
 func TestAnalyzeSpamAssassinStatusVerdictWinsOverFlag(t *testing.T) {
-	email := &EmailMessage{Header: make(mail.Header)}
+	email := &mailmsg.Message{Header: make(mail.Header)}
 	email.Header["X-Spam-Status"] = []string{"Yes, score=9.00, required=5.00"}
 	email.Header["X-Spam-Flag"] = []string{"NO"}
 

@@ -28,6 +28,8 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 var (
@@ -209,7 +211,7 @@ func (a *AuthenticationAnalyzer) parseLegacySPFHeader(receivedSPF, authservID st
 // A receiver may report one header per identity checked, so both are collected
 // in a single pass. For each identity the first header wins, as headers come
 // most recent first and the closest hop is the one we trust.
-func (a *AuthenticationAnalyzer) parseLegacySPF(email *EmailMessage, authservID string) (mailfrom, helo *model.AuthResult) {
+func (a *AuthenticationAnalyzer) parseLegacySPF(email *mailmsg.Message, authservID string) (mailfrom, helo *model.AuthResult) {
 	for _, receivedSPF := range email.Header[textproto.CanonicalMIMEHeaderKey("Received-SPF")] {
 		if receivedSPF == "" {
 			continue
