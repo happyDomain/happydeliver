@@ -1,6 +1,12 @@
 <script lang="ts">
     import type { ContentAnalysis } from "$lib/api/types.gen";
-    import { contentIssueAnchor, contentIssueLabel, issueObserver } from "$lib/issues";
+    import {
+        contentCategoryLabel,
+        contentIssueAnchor,
+        contentIssueLabel,
+        groupIssuesByCategory,
+        issueObserver,
+    } from "$lib/issues";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -13,6 +19,11 @@
     }
 
     let { contentAnalysis, contentGrade, contentScore }: Props = $props();
+
+    // The findings are shown by the reading they answer rather than in one run: a sender
+    // fixing what a filter reads and a developer fixing what a client renders are looking
+    // for different things in the same list.
+    const issueGroups = $derived(groupIssuesByCategory(contentAnalysis.html_issues));
 </script>
 
 <div class="card shadow-sm" id="content-details">
@@ -84,21 +95,31 @@
             </div>
         </div>
 
-        {#if contentAnalysis.html_issues && contentAnalysis.html_issues.length > 0}
+        {#if issueGroups.length > 0}
             <div class="mt-3">
                 <h5>Content Issues</h5>
-                {#each contentAnalysis.html_issues as issue, i (i)}
-                    <IssueAlert
-                        id={contentIssueAnchor(i)}
-                        title={contentIssueLabel(issue.type)}
-                        severity={issue.severity}
-                        message={issue.message}
-                        location={issue.location}
-                        advice={issue.advice}
-                        observer={issueObserver(issue)}
-                        symbol={issue.symbol}
-                        corroboratedBy={issue.corroborated_by}
-                    />
+                {#each issueGroups as group (group.category ?? "")}
+                    <!-- A report from before the analysis recorded a reading has no heading
+                         to show: its findings are listed as they always were. -->
+                    {#if group.category}
+                        <h6 class="text-muted text-uppercase small mt-3 mb-2">
+                            {contentCategoryLabel(group.category)}
+                            <span class="badge bg-secondary ms-1">{group.issues.length}</span>
+                        </h6>
+                    {/if}
+                    {#each group.issues as placed (placed.index)}
+                        <IssueAlert
+                            id={contentIssueAnchor(placed.index)}
+                            title={contentIssueLabel(placed.issue.type)}
+                            severity={placed.issue.severity}
+                            message={placed.issue.message}
+                            location={placed.issue.location}
+                            advice={placed.issue.advice}
+                            observer={issueObserver(placed.issue)}
+                            symbol={placed.issue.symbol}
+                            corroboratedBy={placed.issue.corroborated_by}
+                        />
+                    {/each}
                 {/each}
             </div>
         {/if}
