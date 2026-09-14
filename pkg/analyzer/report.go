@@ -29,6 +29,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -234,7 +235,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		spamGrade = saGrade
 	default:
 		spamScore = (saScore + rspamdScore) / 2
-		spamGrade = MinGrade(saGrade, rspamdGrade)
+		spamGrade = grade.Min(saGrade, rspamdGrade)
 	}
 
 	report.Summary = &model.ScoreSummary{
@@ -243,7 +244,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		AuthenticationScore: authScore,
 		AuthenticationGrade: model.ScoreSummaryAuthenticationGrade(authGrade),
 		BlacklistScore:      blacklistScore,
-		BlacklistGrade:      model.ScoreSummaryBlacklistGrade(MinGrade(blacklistGrade, whitelistGrade)),
+		BlacklistGrade:      model.ScoreSummaryBlacklistGrade(grade.Min(blacklistGrade, whitelistGrade)),
 		ContentScore:        contentScore,
 		ContentGrade:        model.ScoreSummaryContentGrade(contentGrade),
 		HeaderScore:         headerScore,
@@ -335,7 +336,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		report.Score = 0
 	}
 
-	report.Grade = ScoreToReportGrade(report.Score)
+	report.Grade = grade.Report(report.Score)
 	if report.Score >= 100 {
 		hasLessThanA := false
 

@@ -33,6 +33,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -369,7 +370,7 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bo
 	}
 
 	percentage := max(0, 100-results.RelevantListedCount*100/scoringListCount-informationalPenalty)
-	return percentage, ScoreToGrade(percentage)
+	return percentage, grade.Of(percentage)
 }
 
 // GetUniqueListedIPs returns a list of unique IPs that are listed on at least one entry

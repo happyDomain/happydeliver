@@ -28,6 +28,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/grade"
 )
 
 // Default rspamd action thresholds (rspamd built-in defaults)
@@ -227,5 +228,5 @@ func (a *RspamdAnalyzer) CalculateRspamdScore(result *model.RspamdResult) (int, 
 	}
 
 	// Linear scale between 0 and threshold
-	return percentage, ScoreToGrade(percentage)
+	return percentage, grade.Of(percentage)
 }

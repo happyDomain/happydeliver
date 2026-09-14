@@ -320,7 +320,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 				Score:     0,
 				Threshold: utils.PtrTo[float32](15.00),
 			},
-			// 100 - round(0*100/30) = 100 → hits ScoreToGrade(100) = "A"
+			// 100 - round(0*100/30) = 100 → hits grade.Of(100) = "A"
 			expectedScore: 100,
 			expectedGrade: "A",
 		},

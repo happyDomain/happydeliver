@@ -40,6 +40,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -1121,5 +1122,5 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		score = 100
 	}
 
-	return score, ScoreToGrade(score)
+	return score, grade.Of(score)
 }

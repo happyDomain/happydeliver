@@ -30,6 +30,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -281,7 +282,7 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 		score = 0
 	}
 
-	return score, ScoreToGradeKind(score)
+	return score, grade.Kind(score)
 }
 
 // CalculateDNSScore calculates the DNS score from records results
@@ -331,5 +332,5 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		score = 0
 	}
 
-	return score, ScoreToGrade(score)
+	return score, grade.Of(score)
 }

@@ -26,6 +26,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -239,5 +240,5 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 		score = 0
 	}
 
-	return score, ScoreToGrade(score)
+	return score, grade.Of(score)
 }

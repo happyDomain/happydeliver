@@ -28,6 +28,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/grade"
 )
 
 // SpamAssassin's X-Spam-Status header, e.g.
@@ -227,6 +228,6 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *model.SpamAssa
 	} else {
 		// Linear scale between 0 and required threshold
 		percentage := 100 - int(math.Round(float64(score*100/(2*result.RequiredScore))))
-		return percentage, ScoreToGrade(percentage - 5)
+		return percentage, grade.Of(percentage - 5)
 	}
 }

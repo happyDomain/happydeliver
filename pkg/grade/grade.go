@@ -19,14 +19,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package analyzer
+// Package grade turns a score out of a hundred into the letter a reader takes
+// away from a report, and says which of two letters is the graver.
+//
+// The scale is one for the whole report: what an A means for the content of a
+// message is what it means for its authentication, so the thresholds live here
+// rather than in each analysis that grades something.
+package grade
 
 import (
 	"git.happydns.org/happyDeliver/internal/model"
 )
 
-// ScoreToGrade converts a percentage score (0-100) to a letter grade
-func ScoreToGrade(score int) string {
+// Of converts a percentage score (0-100) to a letter grade
+func Of(score int) string {
 	switch {
 	case score > 100:
 		return "A+"
@@ -45,8 +51,8 @@ func ScoreToGrade(score int) string {
 	}
 }
 
-// ScoreToGradeKind converts a percentage score (0-100) to a letter grade, be kind in gradation
-func ScoreToGradeKind(score int) string {
+// Kind converts a percentage score (0-100) to a letter grade, be kind in gradation
+func Kind(score int) string {
 	switch {
 	case score > 100:
 		return "A+"
@@ -65,9 +71,9 @@ func ScoreToGradeKind(score int) string {
 	}
 }
 
-// ScoreToReportGrade converts a percentage score to an model.ReportGrade
-func ScoreToReportGrade(score int) model.ReportGrade {
-	return model.ReportGrade(ScoreToGrade(score))
+// Report converts a percentage score to an model.ReportGrade
+func Report(score int) model.ReportGrade {
+	return model.ReportGrade(Of(score))
 }
 
 // gradeRank returns a numeric rank for a grade (lower = worse)
@@ -92,8 +98,8 @@ func gradeRank(grade string) int {
 	}
 }
 
-// MinGrade returns the minimal (worse) grade between the two given grades
-func MinGrade(a, b string) string {
+// Min returns the minimal (worse) grade between the two given grades
+func Min(a, b string) string {
 	if gradeRank(a) <= gradeRank(b) {
 		return a
 	}
