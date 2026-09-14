@@ -52,7 +52,8 @@ const (
 // left out.
 //
 // What a finding carries beyond this is set on the answer: a Concern, when the
-// check knows the key another check would recognise the same defect under.
+// check knows the key another check would recognise the same defect under, and
+// a Category, when a check's findings do not all answer the same reading.
 func NewFinding(defect *Defect, issueType model.ContentIssueType, severity model.ContentIssueSeverity, location, message, advice string) Finding {
 	issue := model.ContentIssue{
 		Type:     issueType,

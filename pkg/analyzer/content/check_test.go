@@ -255,6 +255,8 @@ func TestContentRegistryIsWellFormed(t *testing.T) {
 
 		if check.Category == "" {
 			t.Errorf("check %q says nothing about which reading it answers", check.Name)
+		} else if !check.Category.Valid() {
+			t.Errorf("check %q answers %q, which the schema does not offer a reader", check.Name, check.Category)
 		}
 
 		if len(check.Reports) == 0 {

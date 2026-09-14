@@ -263,6 +263,13 @@ func TestRspamdCatalogIsWellFormed(t *testing.T) {
 		if !finding.Severity.Valid() {
 			t.Errorf("%q carries the severity %q, which does not exist", symbol, finding.Severity)
 		}
+		// Empty is the ordinary answer: the symbol observes what the filter is
+		// there to observe, and answers the check's own reading. What is
+		// refused is a reading the schema does not offer, which would reach
+		// the report as a group no reader is shown.
+		if finding.Category != "" && !finding.Category.Valid() {
+			t.Errorf("%q answers %q, which is not a reading the report groups by", symbol, finding.Category)
+		}
 		if finding.Message == "" {
 			t.Errorf("%q states nothing", symbol)
 		}

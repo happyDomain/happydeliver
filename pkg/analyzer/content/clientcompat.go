@@ -1248,7 +1248,7 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 		return nil
 	}
 
-	finding := func(severity model.ContentIssueSeverity, message, advice string) *reading.Finding {
+	finding := func(category reading.Category, severity model.ContentIssueSeverity, message, advice string) *reading.Finding {
 		found := reading.NewFinding(
 			defectClientCompat,
 			model.ContentIssueTypeClientCompat,
@@ -1257,6 +1257,7 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 			message,
 			advice,
 		)
+		found.Category = category
 
 		return &found
 	}
@@ -1265,17 +1266,21 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 
 	switch {
 	case !harvest.HasViewport || len(directives) == 0:
-		return finding(model.ContentIssueSeverityLow,
+		return finding("", model.ContentIssueSeverityLow,
 			"The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
 			`Add <meta name="viewport" content="width=device-width, initial-scale=1"> to the head; without it a mobile client renders at desktop width and scales the result down`)
 
+	// A viewport that forbids zooming is not a rendering remark like the two
+	// around it: the message renders, and the recipients it shuts out are the
+	// ones who cannot read it at the size it was written. It answers to the
+	// same reading as the missing alt text and the pale palette.
 	case forbidsZooming(directives):
-		return finding(model.ContentIssueSeverityMedium,
+		return finding(reading.CategoryAccessibility, model.ContentIssueSeverityMedium,
 			"The viewport forbids zooming, which a recipient who needs to enlarge the text cannot override.",
 			"Drop user-scalable=no and maximum-scale from the viewport so the recipient can enlarge the text")
 
 	case directives["width"] != "device-width":
-		return finding(model.ContentIssueSeverityLow,
+		return finding("", model.ContentIssueSeverityLow,
 			fmt.Sprintf("The viewport is set to %q, which does not adapt the message to the width of the screen it is read on.", harvest.Viewport),
 			"Set the viewport to width=device-width so the layout follows the screen rather than a width fixed when the message was written")
 	}
