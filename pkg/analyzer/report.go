@@ -29,6 +29,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 
+	"git.happydns.org/happyDeliver/pkg/analyzer/content"
 	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
@@ -41,7 +42,7 @@ type ReportGenerator struct {
 	dnsAnalyzer     *DNSAnalyzer
 	rblChecker      *DNSListChecker
 	dnswlChecker    *DNSListChecker
-	contentAnalyzer *ContentAnalyzer
+	contentAnalyzer *content.Analyzer
 	headerAnalyzer  *HeaderAnalyzer
 }
 
@@ -63,7 +64,7 @@ func NewReportGenerator(
 		dnsAnalyzer:     NewDNSAnalyzer(dnsTimeout, vmcRoots),
 		rblChecker:      NewRBLChecker(dnsTimeout, rbls, checkAllIPs),
 		dnswlChecker:    NewDNSWLChecker(dnsTimeout, dnswls, checkAllIPs),
-		contentAnalyzer: NewContentAnalyzer(httpTimeout),
+		contentAnalyzer: content.NewAnalyzer(httpTimeout),
 		headerAnalyzer:  NewHeaderAnalyzer(),
 	}
 }
@@ -96,7 +97,7 @@ type AnalysisResults struct {
 	AuthservID     string
 	AuthservIDs    []string
 	Authentication *model.AuthenticationResults
-	Content        *ContentResults
+	Content        *content.Results
 	DNS            *model.DNSResults
 	Headers        *model.HeaderAnalysis
 	RBL            *DNSListResults
@@ -151,7 +152,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(spamHeaders.For(ScannerSpamAssassin))
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
 
-	results.Content = r.contentAnalyzer.AnalyzeContent(email)
+	results.Content = r.contentAnalyzer.Analyze(email)
 
 	return results
 }
@@ -199,7 +200,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	contentScore := 0
 	var contentGrade string
 	if results.Content != nil {
-		contentScore, contentGrade = r.contentAnalyzer.CalculateContentScore(results.Content)
+		contentScore, contentGrade = r.contentAnalyzer.Score(results.Content)
 	}
 
 	headerScore := 0
@@ -258,7 +259,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 
 	// Add content analysis
 	if results.Content != nil {
-		contentAnalysis := r.contentAnalyzer.GenerateContentAnalysis(results.Content)
+		contentAnalysis := r.contentAnalyzer.Analysis(results.Content)
 		report.ContentAnalysis = contentAnalysis
 	}
 
