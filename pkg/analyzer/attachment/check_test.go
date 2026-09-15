@@ -45,7 +45,7 @@ func observed(filename, declaredType string, data []byte) *Attachment {
 		Location:          filename,
 		Data:              data,
 	}
-	attachment.facts = fileinspect.InspectHeader(data)
+	attachment.facts = fileinspect.Inspect(filename, attachment.DeclaredMediaType, data)
 	attachment.DetectedType = attachment.facts.Type.Detected
 
 	return attachment
@@ -61,8 +61,11 @@ func observed(filename, declaredType string, data []byte) *Attachment {
 func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	t.Helper()
 
+	// A file too large to look at: what was kept of it is what Analyze keeps,
+	// its name and its type, and none of the reading of its content.
 	oversize := observed("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
 	oversize.Data = nil
+	oversize.facts = fileinspect.InspectHeader(oversize.Filename, oversize.DeclaredMediaType, nil)
 
 	recognised := observed("sample.bin", "application/octet-stream", []byte("sample"))
 	recognised.Scans = []Scan{
@@ -78,6 +81,7 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 
 	inputs := map[string]*Attachment{
 		"oversize":   oversize,
+		"disguised":  observed("invoice.pdf.exe", "application/pdf", mzStub),
 		"recognised": recognised,
 		"unanswered": unanswered,
 	}
@@ -261,19 +265,64 @@ func TestASuspiciousVerdictCostsLessThanARecognisedSample(t *testing.T) {
 }
 
 // TestAScannerThatCouldNotAnswerLeavesTheReportStanding checks that a scanner
-// being down is reported as the caveat it is, and costs nothing.
+// being down is reported as a caveat, costs nothing, and does not silence the
+// rest of the registry.
 func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
-	attachment := observed("unknown.bin", "application/octet-stream", []byte("unknown"))
+	attachment := observed("invoice.pdf.exe", "application/pdf", mzStub)
 	attachment.Scans = []Scan{
 		{Scanner: "clamav", Status: model.ScanResultStatusError, Detail: "connection refused"},
 	}
 
 	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
 
-	if types := issueTypes(issues); types[model.IssueTypeScanError] == 0 {
+	types := issueTypes(issues)
+	if types[model.IssueTypeScanError] == 0 {
 		t.Errorf("Expected the reader to be told the file went unverified, got %+v", issues)
 	}
-	if penalty != 0 {
+	if types[model.IssueTypeDangerousExtension] == 0 {
+		t.Errorf("Expected what we read for ourselves to stand, got %+v", issues)
+	}
+
+	// The deceptive name and the type it lies about, and nothing for the
+	// scanner.
+	if penalty != 40+40 {
 		t.Errorf("Expected a scanner being down to cost nothing, got a penalty of %d", penalty)
+	}
+}
+
+// TestAMalformedContentTypeStillDeclaresSomething holds the type check to
+// reading a header no parser agrees on. An unquoted filename with a space in
+// it defeats mime.ParseMediaType, and a file whose declared type is thrown
+// away for that is a file free to lie about what it is: the header most worth
+// distrusting would be the one nothing is compared against.
+func TestAMalformedContentTypeStillDeclaresSomething(t *testing.T) {
+	// The name agrees with the content, so the header is the only thing left
+	// that can reveal the disagreement.
+	attachment := observed("report.pdf", "text/plain; name=Rapport contexte.txt", []byte("%PDF-1.4 harmless"))
+
+	issues, _ := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	if types := issueTypes(issues); types[model.IssueTypeTypeMismatch] == 0 {
+		t.Errorf("Expected the declared type to be compared against the content, got %+v", issues)
+	}
+}
+
+// TestOneDeceptiveNameIsChargedOnce holds a family to answering once: a
+// filename written to be misread is a single decision, however many findings
+// name it.
+func TestOneDeceptiveNameIsChargedOnce(t *testing.T) {
+	attachment := observed("invoice.pdf.exe", "application/octet-stream", []byte("harmless"))
+
+	findings, err := filenameCheck.check().Run(context.Background(), &attachmentInput{Attachment: attachment})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) < 2 {
+		t.Fatalf("Expected the name to be read two ways, got %+v", findings)
+	}
+
+	_, penalty := reading.Run(context.Background(), []attachmentCheck{filenameCheck.check()}, &attachmentInput{Attachment: attachment})
+	if penalty != 40 {
+		t.Errorf("Expected one answer for one name, got a penalty of %d", penalty)
 	}
 }

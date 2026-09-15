@@ -22,19 +22,22 @@
 package attachment
 
 // attachmentChecks is every check the attachment analysis runs on one file, in
-// the order their findings are read.
-//
-// To add a check, write its file and name it here; the scanner checks differ
-// only by which engine they read, so they are derived from knownScanners
-// instead. Where a check sits is where its findings sit in the report: what
-// qualifies the whole reading of a file comes first, what merely informs
-// comes last.
-var attachmentChecks = append([]attachmentCheck{
-	// A file nobody opened qualifies everything said below it, which only ever
-	// saw its name and its size. It is read first for that reason.
-	sizeCheck,
+// the order their findings are read: what qualifies the whole reading of a
+// file comes first, what merely informs comes last. To add a check, write its
+// file and name it here, or in staticChecks when it reads the facts of a file
+// alone; the scanner checks are derived from knownScanners.
+var attachmentChecks = registry()
 
-	// What the engines made of the whole file comes last, in the order of
-	// knownScanners, so that a sample two of them recognise is reported under
-	// the one listed first.
-}, scannerChecks()...)
+func registry() (checks []attachmentCheck) {
+	// A file nobody opened qualifies everything said below it.
+	checks = append(checks, sizeCheck)
+
+	// What the file says it is, and what its content turns out to be.
+	for _, c := range staticChecks {
+		checks = append(checks, c.check())
+	}
+
+	// What the engines made of it, in the order of knownScanners, so that a
+	// sample two of them recognise is reported under the one listed first.
+	return append(checks, scannerChecks()...)
+}
