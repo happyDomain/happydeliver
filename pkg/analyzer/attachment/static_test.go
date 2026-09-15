@@ -22,7 +22,9 @@
 package attachment
 
 import (
+	"archive/zip"
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -131,5 +133,62 @@ func TestEveryWayOfDisguisingANameIsReported(t *testing.T) {
 
 	if findings := deceptiveNameFindings(fileinspect.Name{}, "attachment #1"); findings != nil {
 		t.Errorf("Expected nothing said of a file with no name, got %+v", findings)
+	}
+}
+
+func TestMacrosEstablishedAndMacrosMerelyAllowed(t *testing.T) {
+	var carried bytes.Buffer
+	writer := zip.NewWriter(&carried)
+	for _, name := range []string{"[Content_Types].xml", "word/vbaProject.bin"} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Write([]byte("content"))
+	}
+	writer.Close()
+
+	for name, file := range map[string]struct {
+		filename string
+		data     []byte
+		expected model.IssueSeverity
+	}{
+		"carried": {"macro.docm", carried.Bytes(), model.IssueSeverityHigh},
+		"allowed": {"unreadable.xlsm", []byte("not an office document"), model.IssueSeverityMedium},
+	} {
+		t.Run(name, func(t *testing.T) {
+			found := false
+			for _, f := range readFile(file.filename, "", file.data) {
+				if f.Type != model.IssueTypeMacroDetected {
+					continue
+				}
+				found = true
+				if f.Severity != file.expected {
+					t.Errorf("Expected severity %s, got %s", file.expected, f.Severity)
+				}
+			}
+			if !found {
+				t.Error("Expected a macro_detected finding")
+			}
+		})
+	}
+}
+
+// TestALegacyDocumentWithMacroMarkersIsReportedAsAHeuristic: markers in a
+// compound file are reported as likely macros, and worth the same as
+// established ones.
+func TestALegacyDocumentWithMacroMarkersIsReportedAsAHeuristic(t *testing.T) {
+	document := append([]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}, []byte("some content with VBA inside")...)
+	attachment := observed("report.doc", "application/msword", document)
+
+	findings, err := macroCheck.check().Run(context.Background(), &attachmentInput{Attachment: attachment})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("Expected one macro finding, got %+v", findings)
+	}
+	if findings[0].Issue.Severity != model.IssueSeverityHigh || !strings.Contains(findings[0].Issue.Message, "heuristic") {
+		t.Errorf("Expected a high finding said to be heuristic, got %+v", findings[0].Issue)
 	}
 }

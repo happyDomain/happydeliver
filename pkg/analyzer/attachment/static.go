@@ -57,6 +57,7 @@ var staticChecks = []staticCheck{
 
 	// What its content turns out to be.
 	executableCheck,
+	macroCheck,
 }
 
 // check is the static check as the registry runs it, over the attachment.

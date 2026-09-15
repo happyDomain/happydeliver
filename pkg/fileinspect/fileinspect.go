@@ -43,6 +43,9 @@ type Facts struct {
 	// Executable names the executable format the first bytes are in, empty
 	// when they are not a program.
 	Executable string
+
+	// Macro says what, if anything, betrayed VBA macros in an Office document.
+	Macro MacroEvidence
 }
 
 // InspectHeader reads what can be read of a file without reading it through:
@@ -74,6 +77,7 @@ func Inspect(filename, declaredMediaType string, data []byte) Facts {
 		Name:       name,
 		Type:       inspectType(name, declaredMediaType, mtype),
 		Executable: detectExecutable(data),
+		Macro:      detectMacro(name, data),
 	}
 }
 
