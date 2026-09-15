@@ -24,6 +24,7 @@ package fileinspect
 import (
 	"archive/zip"
 	"bytes"
+	"slices"
 	"testing"
 )
 
@@ -185,13 +186,36 @@ func TestDetectMacroFallsBackOnTheExtension(t *testing.T) {
 	}
 }
 
+func TestInspectPDFActiveContent(t *testing.T) {
+	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\nendobj")
+
+	features := inspectPDF(pdf)
+	for _, expected := range []PDFFeature{PDFJavaScript, PDFAutoAction} {
+		if !slices.Contains(features, expected) {
+			t.Errorf("Expected %q among the features, got %v", expected, features)
+		}
+	}
+}
+
+func TestInspectPDFTokenIsNotAPrefix(t *testing.T) {
+	if features := inspectPDF([]byte("%PDF-1.4 << /JSFoo (bar) >>")); len(features) != 0 {
+		t.Errorf("Expected /JSFoo not to match the /JS token, got %v", features)
+	}
+}
+
+func TestInspectPDFOfSomethingElse(t *testing.T) {
+	if features := inspectPDF([]byte("just plain text")); features != nil {
+		t.Errorf("Expected nothing to be read of a file that is not a PDF, got %v", features)
+	}
+}
+
 func TestInspectHeaderReadsNoContent(t *testing.T) {
 	facts := InspectHeader("invoice.pdf.exe", "application/pdf", mzStub)
 
 	if !facts.Name.Dangerous || !facts.Type.DeclaredMismatch {
 		t.Errorf("Expected the name and the type to be read, got %+v", facts)
 	}
-	if facts.Executable != "" || facts.Macro != MacroNone {
+	if facts.Executable != "" || facts.Macro != MacroNone || len(facts.PDF) != 0 {
 		t.Errorf("Expected the content to be left unread, got %+v", facts)
 	}
 }
@@ -323,5 +347,74 @@ func TestDetectMacroOLE2EachMarker(t *testing.T) {
 func TestDetectMacroOfAnOrdinaryFile(t *testing.T) {
 	if evidence := detectMacro(inspectName("notes.txt"), []byte("nothing to see")); evidence != MacroNone {
 		t.Errorf("Expected nothing to be said of an ordinary file, got %q", evidence)
+	}
+}
+
+// TestInspectPDFEachFeature reads every feature on its own, under every
+// spelling it is looked for.
+func TestInspectPDFEachFeature(t *testing.T) {
+	for token, expected := range map[string]PDFFeature{
+		"/JavaScript":   PDFJavaScript,
+		"/JS":           PDFJavaScript,
+		"/Launch":       PDFLaunch,
+		"/OpenAction":   PDFAutoAction,
+		"/AA":           PDFAutoAction,
+		"/EmbeddedFile": PDFEmbeddedFile,
+	} {
+		t.Run(token, func(t *testing.T) {
+			pdf := []byte("%PDF-1.7\n1 0 obj\n<< " + token + " 2 0 R >>\nendobj")
+
+			if features := inspectPDF(pdf); !slices.Equal(features, []PDFFeature{expected}) {
+				t.Errorf("Expected %s to be read as %q alone, got %v", token, expected, features)
+			}
+		})
+	}
+}
+
+// TestInspectPDFFeaturesComeInOrder: the order the features come back in is
+// the order they are looked for, not the order they appear in.
+func TestInspectPDFFeaturesComeInOrder(t *testing.T) {
+	pdf := []byte("%PDF-1.7\n<< /EmbeddedFile 1 0 R /AA 2 0 R /Launch 3 0 R /JS (x) >>")
+
+	expected := []PDFFeature{PDFJavaScript, PDFLaunch, PDFAutoAction, PDFEmbeddedFile}
+	if features := inspectPDF(pdf); !slices.Equal(features, expected) {
+		t.Errorf("Expected %v, got %v", expected, features)
+	}
+}
+
+// TestInspectPDFTokenDelimiters: a name token ends at the delimiters the
+// syntax knows, and at the end of the file.
+func TestInspectPDFTokenDelimiters(t *testing.T) {
+	for name, pdf := range map[string]string{
+		"space":        "%PDF-1.4 /JS (x)",
+		"newline":      "%PDF-1.4 /JS\n(x)",
+		"slash":        "%PDF-1.4 /JS/Foo",
+		"dict open":    "%PDF-1.4 /JS<<>>",
+		"dict close":   "%PDF-1.4 <</S /JS>>",
+		"array":        "%PDF-1.4 [/JS]",
+		"end of file":  "%PDF-1.4 /JS",
+		"after a miss": "%PDF-1.4 /JSFoo /JS (x)",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if features := inspectPDF([]byte(pdf)); !slices.Contains(features, PDFJavaScript) {
+				t.Errorf("Expected the /JS token to be found, got %v", features)
+			}
+		})
+	}
+}
+
+// TestInspectPDFHeaderWindow: readers accept a preamble before the header,
+// within reason.
+func TestInspectPDFHeaderWindow(t *testing.T) {
+	body := []byte("%PDF-1.4\n<< /Launch (cmd) >>")
+
+	if features := inspectPDF(append(bytes.Repeat([]byte("."), 512), body...)); len(features) != 1 {
+		t.Errorf("Expected a PDF behind a short preamble to be read, got %v", features)
+	}
+	if features := inspectPDF(append(bytes.Repeat([]byte("."), 2048), body...)); features != nil {
+		t.Errorf("Expected a header past the window not to be looked for, got %v", features)
+	}
+	if features := inspectPDF(nil); features != nil {
+		t.Errorf("Expected nothing to be read of an empty file, got %v", features)
 	}
 }

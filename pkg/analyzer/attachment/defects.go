@@ -35,6 +35,7 @@ var attachmentDefects = []*reading.Defect{
 	defectDoubleExtension,
 	defectTypeMismatch,
 	defectMacro,
+	defectPDFActiveContent,
 	defectScanSkipped,
 	defectScanError,
 }
@@ -82,6 +83,19 @@ var (
 
 	// familyMacro answers for an Office document carrying VBA macros.
 	familyMacro = &reading.Family{Name: "macro", Cap: 30, PerItem: 30}
+
+	// familyActiveContent answers for a document that does something when it
+	// is opened. It is priced by gravity because the same defect covers what
+	// runs by itself and what merely could: an embedded file inside a PDF is
+	// worth telling the sender about and worth nothing on the scale.
+	familyActiveContent = &reading.Family{
+		Name: "active_content",
+		Cap:  30,
+		PerSeverity: map[model.IssueSeverity]int{
+			model.IssueSeverityHigh:   30,
+			model.IssueSeverityMedium: 15,
+		},
+	}
 )
 
 var (
@@ -105,6 +119,9 @@ var (
 
 	// defectMacro: an Office document carrying VBA macros.
 	defectMacro = &reading.Defect{Name: "macro_detected", Family: familyMacro}
+
+	// defectPDFActiveContent: a PDF that runs something when it is opened.
+	defectPDFActiveContent = &reading.Defect{Name: "pdf_active_content", Family: familyActiveContent}
 
 	// defectScanSkipped: something was not looked at, and the reader is told so
 	// rather than left to read silence as a clean bill.

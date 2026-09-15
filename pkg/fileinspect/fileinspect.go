@@ -46,6 +46,10 @@ type Facts struct {
 
 	// Macro says what, if anything, betrayed VBA macros in an Office document.
 	Macro MacroEvidence
+
+	// PDF is what a PDF would do when opened, in the order the features are
+	// looked for. Empty when the file is not a PDF, or is an inert one.
+	PDF []PDFFeature
 }
 
 // InspectHeader reads what can be read of a file without reading it through:
@@ -78,6 +82,7 @@ func Inspect(filename, declaredMediaType string, data []byte) Facts {
 		Type:       inspectType(name, declaredMediaType, mtype),
 		Executable: detectExecutable(data),
 		Macro:      detectMacro(name, data),
+		PDF:        inspectPDF(data),
 	}
 }
 

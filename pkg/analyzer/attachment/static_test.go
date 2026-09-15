@@ -192,3 +192,20 @@ func TestALegacyDocumentWithMacroMarkersIsReportedAsAHeuristic(t *testing.T) {
 		t.Errorf("Expected a high finding said to be heuristic, got %+v", findings[0].Issue)
 	}
 }
+
+func TestEachActiveFeatureOfAPDFIsReported(t *testing.T) {
+	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\nendobj")
+
+	if types := findingTypes(readFile("active.pdf", "application/pdf", pdf)); types[model.IssueTypePdfActiveContent] < 2 {
+		t.Errorf("Expected the JavaScript and the automatic action to be reported apart, got %v", types)
+	}
+}
+
+// TestAPDFFeatureTheCheckDoesNotPriceIsPassedOver: a feature fileinspect
+// learns to see tomorrow is not reported with a blank message.
+func TestAPDFFeatureTheCheckDoesNotPriceIsPassedOver(t *testing.T) {
+	findings := pdfActiveContentFindings([]fileinspect.PDFFeature{"holograms", fileinspect.PDFEmbeddedFile}, "doc.pdf")
+	if len(findings) != 1 || findings[0].Issue.Severity != model.IssueSeverityInfo {
+		t.Errorf("Expected only the known feature reported, got %+v", findings)
+	}
+}
