@@ -31,15 +31,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"mime"
 	"net/mail"
 	"net/textproto"
 	"strings"
 
 	"github.com/emersion/go-message"
-	// Importing the charset package registers a decoder covering the IANA
-	// charset registry, so a part announcing e.g. ISO-8859-15 or Shift_JIS is
-	// converted to UTF-8 rather than read as if it were ASCII.
-	_ "github.com/emersion/go-message/charset"
+	"github.com/emersion/go-message/charset"
 	gomail "github.com/emersion/go-message/mail"
 
 	"git.happydns.org/happyDeliver/pkg/authresults"
@@ -80,9 +78,76 @@ type Message struct {
 type Part struct {
 	ContentType string
 	Content     string
-	IsHTML      bool
-	IsText      bool
-	Parts       []Part // For nested multipart messages
+
+	// MediaType is the type the Content-Type header names, without its
+	// parameters and lowercased: "application/pdf", "multipart/mixed".
+	MediaType string
+
+	// Filename is what the part calls itself: the Content-Disposition
+	// filename= parameter, falling back to the deprecated Content-Type name=.
+	// RFC 2047 encoded words and RFC 2231 continuations are already decoded.
+	Filename string
+
+	// Disposition is the Content-Disposition type, lowercased: "attachment",
+	// "inline", or empty when the part carries no such header.
+	Disposition string
+
+	// ContentID is the Content-ID header with its angle brackets stripped, the
+	// name an HTML body refers to an embedded resource by (cid:...).
+	ContentID string
+
+	// Body is the payload of a leaf part with its transfer encoding undone
+	// and nothing else: the bytes of the file as the sender attached it. A
+	// text part also has Content, the same payload converted to UTF-8.
+	Body []byte
+
+	IsHTML bool
+	IsText bool
+	Parts  []Part // For nested multipart messages
+}
+
+// DecodedBytes returns the payload of the part as the sender attached it,
+// transfer encoding undone but charset untouched: a text file declared in
+// windows-1252 comes back in windows-1252, so that its hash and size are the
+// file's own.
+func (p *Part) DecodedBytes() []byte {
+	if p.Body != nil {
+		return p.Body
+	}
+
+	return []byte(p.Content)
+}
+
+// go-message converts the body of every text part to UTF-8 through this
+// package-level hook, before the part is handed out. The conversion is wanted
+// for reading the body; it is not for hashing an attached text file or
+// handing it to a scanner, which need the bytes that were actually sent. The
+// hook is thus wrapped so that the input it consumes is kept alongside the
+// conversion, for messageParts to pick up once the part has been read.
+func init() {
+	message.CharsetReader = func(name string, input io.Reader) (io.Reader, error) {
+		kept := &keptInput{}
+		converted, err := charset.Reader(name, io.TeeReader(input, &kept.raw))
+		if err != nil {
+			return nil, err
+		}
+		kept.Reader = converted
+
+		return kept, nil
+	}
+}
+
+// keptInput is a charset-converting reader that remembers what it read from
+// its input.
+type keptInput struct {
+	io.Reader
+	raw bytes.Buffer
+}
+
+// IsInline reports whether the part is an inline resource (e.g. an image
+// embedded in the HTML body) rather than a regular attachment.
+func (p *Part) IsInline() bool {
+	return p.Disposition == "inline" || (p.Disposition == "" && p.ContentID != "")
 }
 
 // Parse parses a raw email message.
@@ -158,15 +223,23 @@ func entityPart(e *message.Entity) (Part, bool) {
 		return part, incomplete
 	}
 
-	// Only text parts are ever read back, by GetTextParts and GetHTMLParts:
-	// decoding an attachment would allocate and throw away its whole payload.
-	// NextPart() skips over whatever is left unconsumed.
+	// Every leaf part is read back: the text ones by GetTextParts and
+	// GetHTMLParts, the others by whoever analyses the attachments. A part is
+	// read once, here, because e.Body is a stream NextPart() would otherwise
+	// skip past.
 	//
 	// Best-effort: ReadAll returns the bytes decoded so far alongside any error,
 	// so a part malformed partway through still contributes its valid prefix.
+	content, _ := io.ReadAll(e.Body)
+	part.Body = content
 	if part.IsText || part.IsHTML {
-		content, _ := io.ReadAll(e.Body)
 		part.Content = string(content)
+		// A body that went through a charset conversion had its original
+		// bytes kept along the way; one that did not (no charset, UTF-8 or
+		// US-ASCII, or a charset nobody knows) was read as sent already.
+		if kept, ok := e.Body.(*keptInput); ok {
+			part.Body = kept.raw.Bytes()
+		}
 	}
 
 	return part, false
@@ -196,6 +269,22 @@ func readMultipart(mr message.MultipartReader) (parts []Part, incomplete bool) {
 	}
 }
 
+// MediaType is the type a Content-Type value names, without its parameters
+// and lowercased.
+//
+// A header too malformed to parse still names its type in the token before the
+// first parameter, and that token is kept: an unquoted filename such as
+// "Rapport contexte.pdf" must not be allowed to turn an attachment into
+// something else.
+func MediaType(contentType string) string {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType, _, _ = strings.Cut(contentType, ";")
+	}
+
+	return strings.ToLower(strings.TrimSpace(mediaType))
+}
+
 // describePart fills in everything about a part that can be told from its
 // header alone.
 func describePart(e *message.Entity) Part {
@@ -206,25 +295,47 @@ func describePart(e *message.Entity) Part {
 	}
 
 	// A header ContentType cannot parse comes back verbatim, parameters
-	// included, so keep only what precedes the first one: otherwise an unquoted
-	// filename such as "Rapport contexte.pdf" would make the attachment look
-	// like text. Casing is not normalised either, hence the fold.
-	mediaType, _, err := e.Header.ContentType()
+	// included, and MediaType keeps only what precedes the first one. The
+	// header is parsed here rather than from contentType above, because its
+	// parameters are wanted alongside the type.
+	mediaType, ctParams, err := e.Header.ContentType()
 	if err != nil {
-		mediaType, _, _ = strings.Cut(mediaType, ";")
+		mediaType = MediaType(mediaType)
 	}
-	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
 
 	// go-message only applies charset decoding to a strict "text/" media type
 	// (see its entity.go), so a type such as application/xhtml+xml must not be
 	// read back as text here: its body would come through undecoded.
 	isText := strings.HasPrefix(mediaType, "text/")
 
+	disposition, dispParams, err := e.Header.ContentDisposition()
+	if err != nil {
+		// A header too malformed to parse still names its type in the token
+		// before the first parameter.
+		disposition, _, _ = strings.Cut(e.Header.Get("Content-Disposition"), ";")
+	}
+	disposition = strings.ToLower(strings.TrimSpace(disposition))
+
 	return Part{
 		ContentType: contentType,
+		MediaType:   mediaType,
+		Filename:    partFilename(dispParams, ctParams),
+		Disposition: disposition,
+		ContentID:   strings.Trim(e.Header.Get("Content-Id"), "<>"),
 		IsHTML:      mediaType == "text/html",
 		IsText:      isText,
 	}
+}
+
+// partFilename returns the name a part gives itself: the Content-Disposition
+// filename= parameter, or the Content-Type name= one deprecated by RFC 2183
+// but still emitted by older senders.
+func partFilename(dispParams, ctParams map[string]string) string {
+	if filename := dispParams["filename"]; filename != "" {
+		return filename
+	}
+
+	return ctParams["name"]
 }
 
 // rawHeaderBlock returns the header block of a raw message, stopping before the
@@ -320,6 +431,27 @@ func (e *Message) GetTextParts() []Part {
 func (e *Message) GetHTMLParts() []Part {
 	return filterParts(e.Parts, func(p Part) bool {
 		return p.IsHTML
+	})
+}
+
+// GetAttachments returns every part carrying a payload to analyze: explicit
+// attachments, parts naming a file, inline resources such as embedded images,
+// and any leaf part that is not a text body. A text part is a body unless it
+// is declared an attachment or named: a Content-ID alone does not make it
+// one, since multipart/related designates its root body that way (start=).
+func (e *Message) GetAttachments() []Part {
+	return filterParts(e.Parts, func(p Part) bool {
+		if p.Disposition == "attachment" || p.Filename != "" {
+			return true
+		}
+		if p.ContentID != "" && !p.IsText && !p.IsHTML {
+			return true
+		}
+
+		return p.MediaType != "" &&
+			!strings.HasPrefix(p.MediaType, "text/") &&
+			!strings.HasPrefix(p.MediaType, "multipart/") &&
+			!strings.HasPrefix(p.MediaType, "message/")
 	})
 }
 

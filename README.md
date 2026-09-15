@@ -187,6 +187,12 @@ If the value is misconfigured, happyDeliver will log a warning when the last `Re
 
 This setting only applies to messages delivered to happyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
 
+#### Attachment Analysis
+
+happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report.
+
+Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread.
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.

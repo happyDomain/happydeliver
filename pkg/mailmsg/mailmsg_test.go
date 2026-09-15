@@ -365,6 +365,53 @@ func TestParseEmail_CharsetISO88591(t *testing.T) {
 	}
 }
 
+func TestParseEmail_TextAttachmentKeepsSentBytes(t *testing.T) {
+	// A text attachment is read as a body, converted to UTF-8, and as a file,
+	// whose hash must be the one of the bytes actually sent: 0xE9 encoded in
+	// quoted-printable, in the sender's charset, not the UTF-8 form.
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: Attachment Test\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"b\"\r\n" +
+		"\r\n" +
+		"--b\r\n" +
+		"Content-Type: text/plain; charset=\"utf-8\"\r\n" +
+		"\r\n" +
+		"See attached.\r\n" +
+		"--b\r\n" +
+		"Content-Type: text/html; charset=\"windows-1252\"\r\n" +
+		"Content-Transfer-Encoding: quoted-printable\r\n" +
+		"Content-Disposition: attachment; filename=\"facture.html\"\r\n" +
+		"\r\n" +
+		"<p>Caf=E9</p>\r\n" +
+		"--b--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got: %d", len(attachments))
+	}
+	if got, want := attachments[0].Content, "<p>Café</p>"; got != want {
+		t.Errorf("Expected UTF-8 content %q, got: %q", want, got)
+	}
+	if got, want := string(attachments[0].DecodedBytes()), "<p>Caf\xe9</p>"; got != want {
+		t.Errorf("Expected the bytes as sent %q, got: %q", want, got)
+	}
+
+	// A body sent in UTF-8 goes through no conversion, and is the same either way.
+	bodies := email.GetTextParts()
+	if len(bodies) != 1 {
+		t.Fatalf("Expected 1 text part, got: %d", len(bodies))
+	}
+	if got, want := string(bodies[0].DecodedBytes()), bodies[0].Content; got != want {
+		t.Errorf("Expected identical bytes for an unconverted body, got %q vs %q", got, want)
+	}
+}
+
 // singlePartEmail builds a one-part message with the given encoding, charset
 // and body, so a decoding behaviour can be asserted through Parse rather
 // than against an internal helper.
@@ -652,6 +699,13 @@ Content-Type: application/pdf; name=Rapport contexte.pdf
 	if email.Parts[0].IsText || email.Parts[0].IsHTML {
 		t.Errorf("PDF attachment reported as text=%v html=%v", email.Parts[0].IsText, email.Parts[0].IsHTML)
 	}
+
+	// The part still names its type, which is what every reader of the message
+	// asks it for: a header no parser agrees on is not a part that declares
+	// nothing.
+	if email.Parts[0].MediaType != "application/pdf" {
+		t.Errorf("Expected the part to still name its type, got %q", email.Parts[0].MediaType)
+	}
 }
 
 func TestDKIMSignatures(t *testing.T) {
@@ -869,5 +923,269 @@ func TestDKIMSignatures(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetAttachments_Base64Attachment(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: Attachment test\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"BOUNDARY\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"See attached.\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: application/pdf; name=\"report.pdf\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"Content-Disposition: attachment; filename=\"report.pdf\"\r\n" +
+		"\r\n" +
+		"JVBERi0xLjQK\r\n" +
+		"JeLjz9MK\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(attachments))
+	}
+
+	att := attachments[0]
+	if att.Filename != "report.pdf" {
+		t.Errorf("Expected filename report.pdf, got %q", att.Filename)
+	}
+	if att.Disposition != "attachment" {
+		t.Errorf("Expected disposition attachment, got %q", att.Disposition)
+	}
+	if att.IsInline() {
+		t.Error("Attachment should not be inline")
+	}
+	if decoded := string(att.DecodedBytes()); !strings.HasPrefix(decoded, "%PDF-1.4") {
+		t.Errorf("Decoded content should start with %%PDF-1.4, got %q", decoded)
+	}
+}
+
+func TestGetAttachments_QuotedPrintableAttachment(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: QP test\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"BOUNDARY\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/csv; charset=utf-8\r\n" +
+		"Content-Transfer-Encoding: quoted-printable\r\n" +
+		"Content-Disposition: attachment; filename=\"data.csv\"\r\n" +
+		"\r\n" +
+		"col1;col2\r\n" +
+		"caf=C3=A9;42\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(attachments))
+	}
+
+	if decoded := string(attachments[0].DecodedBytes()); !strings.Contains(decoded, "café;42") {
+		t.Errorf("Decoded content should contain café;42, got %q", decoded)
+	}
+}
+
+func TestGetAttachments_FilenameFromContentTypeName(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: name= fallback\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"BOUNDARY\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: application/octet-stream; name=\"legacy.bin\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"\r\n" +
+		"AAAA\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(attachments))
+	}
+	if attachments[0].Filename != "legacy.bin" {
+		t.Errorf("Expected filename legacy.bin, got %q", attachments[0].Filename)
+	}
+}
+
+func TestGetAttachments_InlineImageWithContentID(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: inline image\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/related; boundary=\"BOUNDARY\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/html\r\n" +
+		"\r\n" +
+		"<html><img src=\"cid:logo@example.com\"></html>\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: image/png\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"Content-Disposition: inline\r\n" +
+		"Content-ID: <logo@example.com>\r\n" +
+		"\r\n" +
+		"iVBORw0KGgo=\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment (the inline image), got %d", len(attachments))
+	}
+
+	att := attachments[0]
+	if att.ContentID != "logo@example.com" {
+		t.Errorf("Expected ContentID logo@example.com, got %q", att.ContentID)
+	}
+	if !att.IsInline() {
+		t.Error("Part with inline disposition should be inline")
+	}
+}
+
+func TestGetAttachments_RelatedRootBodyWithContentID(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: related root\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/related; boundary=\"BOUNDARY\"; type=\"text/html\"; start=\"<body@example.com>\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/html\r\n" +
+		"Content-ID: <body@example.com>\r\n" +
+		"\r\n" +
+		"<html><script>x()</script><img src=\"cid:logo@example.com\"></html>\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: image/png\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"Content-ID: <logo@example.com>\r\n" +
+		"\r\n" +
+		"iVBORw0KGgo=\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment (the inline image), got %d", len(attachments))
+	}
+	if attachments[0].MediaType != "image/png" {
+		t.Errorf("Expected the image to be the attachment, got %q", attachments[0].MediaType)
+	}
+	if got := email.GetHTMLParts(); len(got) != 1 {
+		t.Errorf("Expected the Content-ID root to stay the HTML body, got %d html parts", len(got))
+	}
+}
+
+func TestGetAttachments_SinglePartPDF(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: bare pdf\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: application/pdf; name=\"doc.pdf\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"Content-Disposition: attachment; filename=\"doc.pdf\"\r\n" +
+		"\r\n" +
+		"JVBERi0xLjQK\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(attachments))
+	}
+
+	att := attachments[0]
+	if att.Filename != "doc.pdf" {
+		t.Errorf("Expected filename doc.pdf, got %q", att.Filename)
+	}
+	if decoded := string(att.DecodedBytes()); !strings.HasPrefix(decoded, "%PDF") {
+		t.Errorf("Expected decoded PDF magic, got %q", decoded)
+	}
+}
+
+func TestGetAttachments_NoAttachments(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"Subject: text only\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/alternative; boundary=\"BOUNDARY\"\r\n" +
+		"\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"Hello\r\n" +
+		"--BOUNDARY\r\n" +
+		"Content-Type: text/html\r\n" +
+		"\r\n" +
+		"<p>Hello</p>\r\n" +
+		"--BOUNDARY--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if attachments := email.GetAttachments(); len(attachments) != 0 {
+		t.Errorf("Expected no attachments, got %d", len(attachments))
+	}
+}
+
+// TestParseEmail_UnknownCharsetKeepsTheBytes: a charset no decoder knows is
+// not a reason to lose the part; its bytes are read as they came.
+func TestParseEmail_UnknownCharsetKeepsTheBytes(t *testing.T) {
+	rawEmail := "From: sender@example.com\r\n" +
+		"To: recipient@example.com\r\n" +
+		"Subject: Charset Test\r\n" +
+		"Content-Type: text/plain; charset=\"x-nobody-knows\"\r\n" +
+		"\r\n" +
+		"Plain enough.\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if len(email.Parts) != 1 {
+		t.Fatalf("Expected 1 part, got: %d", len(email.Parts))
+	}
+	if got := email.Parts[0].Content; !strings.Contains(got, "Plain enough.") {
+		t.Errorf("Expected the body to be kept as sent, got: %q", got)
+	}
+}
+
+// TestDecodedBytesOfAPartWithoutABody: a part that kept no raw bytes answers
+// with its content, which is all there is of it.
+func TestDecodedBytesOfAPartWithoutABody(t *testing.T) {
+	part := Part{Content: "hello"}
+
+	if got := string(part.DecodedBytes()); got != "hello" {
+		t.Errorf("Expected the content to stand in for the bytes, got %q", got)
 	}
 }

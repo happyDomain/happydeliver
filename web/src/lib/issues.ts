@@ -27,6 +27,8 @@ const issueLabels: Record<Issue["type"], string> = {
     text_html_mismatch: "Text and HTML out of sync",
     low_contrast: "Low contrast",
     sender_domain_mismatch: "Links off the sender's domain",
+    // What a message carries alongside its body.
+    scan_skipped: "Not fully scanned",
 };
 
 export function issueLabel(type: Issue["type"]): string {
