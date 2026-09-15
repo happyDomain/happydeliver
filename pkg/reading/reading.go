@@ -163,6 +163,12 @@ type Family struct {
 	// severity instead, which is the usual case: a family charges a flat rate
 	// only when its findings are of one kind and of one gravity.
 	PerItem int
+
+	// PerSeverity is what one finding costs at each severity, for families
+	// whose gaps between gravities are wider than SeverityPenalty spreads. A
+	// severity the map does not name costs nothing. Nil falls back to PerItem,
+	// and then to SeverityPenalty.
+	PerSeverity map[model.IssueSeverity]int
 }
 
 // Defect names one thing that can be wrong with a message, at the
@@ -353,11 +359,14 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 		}
 
 		family := o.finding.Defect.Family
-		if family.PerItem > 0 {
+		switch {
+		case family.PerSeverity != nil:
+			perFamily[family] += family.PerSeverity[o.finding.Severity]
+		case family.PerItem > 0:
 			perFamily[family] += family.PerItem
-			continue
+		default:
+			perFamily[family] += SeverityPenalty(o.finding.Severity)
 		}
-		perFamily[family] += SeverityPenalty(o.finding.Severity)
 	}
 
 	for family, total := range perFamily {

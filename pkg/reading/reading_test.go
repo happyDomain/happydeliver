@@ -24,6 +24,7 @@ package reading
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -80,6 +81,10 @@ func TestRunCharges(t *testing.T) {
 	family := &Family{Name: "test", Cap: 10}
 	other := &Family{Name: "test_other", Cap: 10}
 	flat := &Family{Name: "test_flat", Cap: 40, PerItem: 20}
+	graded := &Family{Name: "test_graded", Cap: 60, PerSeverity: map[model.IssueSeverity]int{
+		model.IssueSeverityCritical: 40,
+		model.IssueSeverityMedium:   15,
+	}}
 
 	critical := model.IssueSeverityCritical
 
@@ -119,6 +124,21 @@ func TestRunCharges(t *testing.T) {
 			"a flat family ignores severity, and is capped too",
 			[]Check[message]{reports("flat", flat, model.IssueSeverityLow, critical, critical)},
 			3, 40,
+		},
+		{
+			"a graded family reads what a finding costs off its gravity",
+			[]Check[message]{reports("graded", graded, critical, model.IssueSeverityMedium)},
+			2, 55,
+		},
+		{
+			"a gravity a graded family does not name costs nothing",
+			[]Check[message]{reports("graded", graded, model.IssueSeverityLow, model.IssueSeverityInfo)},
+			2, 0,
+		},
+		{
+			"a graded family is capped like any other",
+			[]Check[message]{reports("graded", graded, critical, critical)},
+			2, 60,
 		},
 	}
 
@@ -242,5 +262,102 @@ func TestAFindingAnswersItsCheckReading(t *testing.T) {
 	}
 	if issues[1].Category != CategorySecurity {
 		t.Errorf("a finding naming its own reading answers %q, want the one it named", issues[1].Category)
+	}
+}
+
+// TestSaysTheSame pins when two findings of one concern are one observation:
+// when a reader would see the same thing in the same place.
+func TestSaysTheSame(t *testing.T) {
+	at := func(message, location string) Finding {
+		finding := Finding{Issue: model.Issue{Message: message}}
+		if location != "" {
+			finding.Location = &location
+		}
+		return finding
+	}
+
+	tests := []struct {
+		name string
+		a, b Finding
+		same bool
+	}{
+		{"same words in the same place", at("unreadable", "p:1"), at("unreadable", "p:1"), true},
+		{"same words nowhere in particular", at("unreadable", ""), at("unreadable", ""), true},
+		{"same words in two places", at("unreadable", "p:1"), at("unreadable", "p:2"), false},
+		{"same words, one of them placed", at("unreadable", "p:1"), at("unreadable", ""), false},
+		{"different words in the same place", at("unreadable", "p:1"), at("too small", "p:1"), false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := saysTheSame(test.a, test.b); got != test.same {
+				t.Errorf("saysTheSame = %v, want %v", got, test.same)
+			}
+		})
+	}
+}
+
+// TestOneCheckReportingAConcernInSeveralPlacesKeepsEachOfThem: a check naming
+// one concern for a whole class of defect still gets every place it found it
+// reported, the merge only dropping what reads the same.
+func TestOneCheckReportingAConcernInSeveralPlacesKeepsEachOfThem(t *testing.T) {
+	placed := Check[message]{
+		Name:     "contrast",
+		Category: CategoryContent,
+		Run: func(context.Context, message) ([]Finding, error) {
+			first, second := "p:1", "p:2"
+			return []Finding{
+				{Concern: "low_contrast", Issue: model.Issue{Message: "unreadable", Location: &first}},
+				{Concern: "low_contrast", Issue: model.Issue{Message: "unreadable", Location: &second}},
+				{Concern: "low_contrast", Issue: model.Issue{Message: "unreadable", Location: &first}},
+			}, nil
+		},
+	}
+
+	issues, _ := Run(context.Background(), []Check[message]{placed}, message{})
+
+	if len(issues) != 2 {
+		t.Fatalf("reported %d issue(s), want the two places and not the repeat", len(issues))
+	}
+	for _, issue := range issues {
+		if issue.CorroboratedBy != nil {
+			t.Errorf("a check agreeing with itself was read as a corroboration: %v", *issue.CorroboratedBy)
+		}
+	}
+}
+
+// TestACorroborationNamesTheSymbolThatSawIt: the spam filter is named on a
+// finding by the symbol that raised it, which is what a sender can look up.
+func TestACorroborationNamesTheSymbolThatSawIt(t *testing.T) {
+	low := model.IssueSeverityLow
+	symbol := "R_SUSPICIOUS_URL"
+	filter := Check[message]{
+		Name:     "rspamd",
+		Category: CategoryContent,
+		Run: func(context.Context, message) ([]Finding, error) {
+			return []Finding{{Concern: "suspicious:https://example.com/", Issue: model.Issue{Severity: low, Symbol: &symbol}}}, nil
+		},
+	}
+
+	issues, _ := Run(context.Background(), []Check[message]{concerning("ours", "suspicious:https://example.com/", low), filter}, message{})
+
+	if len(issues) != 1 || issues[0].CorroboratedBy == nil || !slices.Equal(*issues[0].CorroboratedBy, []string{symbol}) {
+		t.Errorf("reported %+v, want the one finding corroborated by %q", issues, symbol)
+	}
+}
+
+// TestAnObserverIsNamedOnceHoweverOftenItAgrees: a filter that saw the defect
+// twice is named once on the finding.
+func TestAnObserverIsNamedOnceHoweverOftenItAgrees(t *testing.T) {
+	low := model.IssueSeverityLow
+	checks := []Check[message]{
+		concerning("ours", "dead_link:https://example.com/", low),
+		concerning("filter", "dead_link:https://example.com/", low, low),
+	}
+
+	issues, _ := Run(context.Background(), checks, message{})
+
+	if len(issues) != 1 || issues[0].CorroboratedBy == nil || !slices.Equal(*issues[0].CorroboratedBy, []string{"filter"}) {
+		t.Errorf("reported %+v, want the one finding corroborated by the filter once", issues)
 	}
 }
