@@ -21,11 +21,11 @@
 
 // Package attachment reads what a message carries alongside its body.
 //
-// It is built like the content analysis next door, and for the same reason:
-// what is observed about a file (its bytes, its name, what a scanner said) is
-// gathered once, and what that is worth is read off a registry of checks, so
-// that adding a way of being suspicious is writing a check rather than
-// threading a verdict through a pipeline.
+// It is built like the content analysis: what is observed about a file is
+// gathered once, and what that is worth is read off a registry of checks.
+// Reading the formats themselves is fileinspect's business, which answers
+// facts and prices none of them; this package says which of those facts is a
+// defect, how grave it is, and what a sender is to do about it.
 package attachment
 
 import (
@@ -134,26 +134,22 @@ type Attachment struct {
 	Inline       bool
 
 	// Location names this attachment in a finding. It is settled here, once,
-	// so that every check names the same file the same way, whether or not the
-	// part bothered to give itself a filename.
+	// so that every check names the same file the same way.
 	Location string
 
 	// Data is the decoded payload, and nil when the attachment was too large
-	// to look at: that is what a check reading bytes tests before reading any.
+	// to look at.
 	Data []byte
 
 	// Scans is what the engines said about this file: one entry per scanner
 	// the analysis knows of, including the ones this instance does not run and
 	// the ones not asked about this file, so that a reader never reads our
 	// silence as a clean bill.
-	//
-	// They are observed here rather than in a check because the report shows
-	// them whether or not they raised a finding.
 	Scans []Scan
 
 	// facts are what reading the file offline turned up. The file is read
-	// once, here, and every reader of it reads its own part off them rather
-	// than scanning the bytes again with a question of its own.
+	// once, here, and every check reads its own part off it. A file too large
+	// to look at carries only its name and its type.
 	facts fileinspect.Facts
 }
 
@@ -203,20 +199,19 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 		attachment.SHA256 = hex.EncodeToString(checksum[:])
 		attachment.Size = int64(len(data))
 		attachment.Location = attachmentLocation(i, part)
-		attachment.facts = fileinspect.InspectHeader(data)
+
+		// A file too large to look at is still named, sized and typed in the
+		// report; leaving Data nil tells the checks its content was not read.
+		if attachment.tooLarge(a.maxSize) {
+			attachment.facts = fileinspect.InspectHeader(part.Filename, part.MediaType, data)
+		} else {
+			attachment.Data = data
+			attachment.facts = fileinspect.Inspect(part.Filename, part.MediaType, data)
+		}
 		attachment.DetectedType = attachment.facts.Type.Detected
 
-		// A file nobody will look at is still named, sized and typed in the
-		// report: what is withheld is the reading of its content, which is
-		// what leaving Data nil says to the checks.
-		if !attachment.tooLarge(a.maxSize) {
-			attachment.Data = data
-		}
-
-		// Only the scanners this instance runs get an entry, before any of
-		// them is asked, so that the file carries a complete answer whatever
-		// happens next: an engine the reader never hears of is one that was
-		// never in the picture.
+		// Only the scanners this instance runs get an entry: an engine the
+		// reader never hears of is one that was never in the picture.
 		attachment.Scans = make([]Scan, len(a.scanners))
 
 		for j, engine := range a.scanners {

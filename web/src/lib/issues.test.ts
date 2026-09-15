@@ -72,7 +72,7 @@ describe("issueLabel", () => {
         // One vocabulary, two readings: an attachment finding is labelled by
         // the same table as a body one.
         expect(issueLabel("malware_detected")).toBe("Malware detected");
-        expect(issueLabel("scan_skipped")).toBe("Not fully scanned");
+        expect(issueLabel("double_extension")).toBe("Deceptive double extension");
     });
 
     it("still reads as something for a type the API added and we have not", () => {

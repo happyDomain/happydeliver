@@ -20,31 +20,75 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package fileinspect reads a file for what it is, and for what it would do
-// when opened.
-//
-// It knows nothing of email, of reports, or of what any of it costs. What it
-// answers are facts about bytes: the format the first of them name, the
-// extension the file gives itself against the content behind it, the macros an
-// Office document carries, the actions a PDF would take, the members hidden
-// inside an archive. Pricing those facts and showing them to a reader is the
-// caller's business.
+// when opened. It answers facts about bytes and knows nothing of email or
+// reports: pricing those facts is the caller's business.
 package fileinspect
 
-// Facts is what reading one file offline turned up.
-//
-// Every field is a fact about the file, never a verdict about it. A zero Facts
-// is what a file nobody could read leaves behind, and every field of it reads
-// as "nothing found".
+import (
+	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
+)
+
+// Facts is what reading one file offline turned up. Every field is a fact
+// about the file, never a verdict about it. A zero Facts is what a file nobody
+// could read leaves behind.
 type Facts struct {
-	// Type is what the file turns out to be.
+	// Name is what the file's own name says about it.
+	Name Name
+
+	// Type is what the file turns out to be, against what it claimed.
 	Type Type
 }
 
-// InspectHeader reads what can be read of a file without reading it through,
-// which for now is the type its first bytes are in.
+// InspectHeader reads what can be read of a file without reading it through:
+// the name it gives itself, and the type its first bytes are in. The content
+// fields of the Facts are left empty.
+func InspectHeader(filename, declaredMediaType string, data []byte) Facts {
+	name := inspectName(filename)
+
+	return Facts{
+		Name: name,
+		Type: inspectType(name, declaredMediaType, mimetype.Detect(data)),
+	}
+}
+
+// Inspect reads one file: the name it gives itself, the type it claims against
+// the type its bytes are in, and what its content turns out to be.
 //
-// It is for the caller that declines to look at a payload, for its size or for
-// its price, and still owes a reader something about it.
-func InspectHeader(data []byte) Facts {
-	return Facts{Type: inspectType(data)}
+// declaredMediaType is what the file was announced as by whoever carried it,
+// already reduced to a media type; empty when nobody announced anything, which
+// is the case of a file found inside an archive.
+//
+// It reads the bytes it is handed and nothing else: no file is opened, no
+// service is asked.
+func Inspect(filename, declaredMediaType string, data []byte) Facts {
+	mtype := mimetype.Detect(data)
+	name := inspectName(filename)
+
+	return Facts{
+		Name: name,
+		Type: inspectType(name, declaredMediaType, mtype),
+	}
+}
+
+// mimeMatches walks the detected type's parent hierarchy looking for expected
+// (e.g. text/html matches an expected text/plain parent). Structured-suffix
+// equivalences like docx (zip) are handled by the hierarchy too.
+func mimeMatches(mtype *mimetype.MIME, expected string) bool {
+	for m := mtype; m != nil; m = m.Parent() {
+		if m.Is(expected) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// mediaTypeOf reduces a Content-Type from the standard library's extension
+// table to the media type it names, dropping the charset that may follow it.
+func mediaTypeOf(contentType string) string {
+	mediaType, _, _ := strings.Cut(contentType, ";")
+
+	return strings.ToLower(strings.TrimSpace(mediaType))
 }

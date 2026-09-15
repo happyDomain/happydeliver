@@ -22,20 +22,85 @@
 package fileinspect
 
 import (
+	"mime"
+
 	"github.com/gabriel-vasile/mimetype"
 )
 
-// Type is what a file turns out to be.
+// executableMediaTypes are the types a program is detected as, whichever
+// system it was built for.
+var executableMediaTypes = []string{
+	"application/vnd.microsoft.portable-executable",
+	"application/x-msdownload",
+	"application/x-elf",
+	"application/x-executable",
+	"application/x-mach-binary",
+	"application/x-sharedlib",
+}
+
+// noClaimMediaType is the type that declares nothing: a file announced as a
+// stream of bytes has made no claim about itself, and so cannot have
+// contradicted one.
+const noClaimMediaType = "application/octet-stream"
+
+// Type is what a file turns out to be, against what it claimed to be.
 type Type struct {
 	// Detected is the media type the content is in, as sniffed from its first
 	// bytes.
 	Detected string
+
+	// Declared is the media type the file was announced as, empty when nobody
+	// announced anything.
+	Declared string
+
+	// Executable says the detected type is a program. It is read off the type
+	// hierarchy rather than off a magic number, and so covers formats
+	// DetectExecutable does not name one by one.
+	Executable bool
+
+	// DeclaredMismatch says the announced type and the content disagree. A
+	// file announced as a plain stream of bytes never sets it: it claimed
+	// nothing.
+	DeclaredMismatch bool
+
+	// ExtensionMismatch says the type the extension implies and the content
+	// disagree. An extension the standard library knows no type for never sets
+	// it: nothing was implied to disagree with.
+	ExtensionMismatch bool
 }
 
-// inspectType reads what the first bytes of a file say it is.
-//
-// What a file claims to be, in whatever carried it and in its own name, is not
-// compared against it here: there is nothing yet to compare it with.
-func inspectType(data []byte) Type {
-	return Type{Detected: mimetype.Detect(data).String()}
+// inspectType compares what a file claims to be, in whatever carried it and in
+// its own name, against what its first bytes say it is.
+func inspectType(name Name, declared string, mtype *mimetype.MIME) Type {
+	fileType := Type{
+		Detected:   mtype.String(),
+		Declared:   declared,
+		Executable: isExecutableMediaType(mtype),
+	}
+
+	if declared != "" && declared != noClaimMediaType && !mimeMatches(mtype, declared) {
+		fileType.DeclaredMismatch = true
+	}
+
+	if name.Extension != "" {
+		if expected := mime.TypeByExtension("." + name.Extension); expected != "" {
+			if expectedMediaType := mediaTypeOf(expected); expectedMediaType != "" && !mimeMatches(mtype, expectedMediaType) {
+				fileType.ExtensionMismatch = true
+			}
+		}
+	}
+
+	return fileType
+}
+
+// isExecutableMediaType reports whether the detected type is an executable
+// format.
+func isExecutableMediaType(mtype *mimetype.MIME) bool {
+	for _, executable := range executableMediaTypes {
+		if mimeMatches(mtype, executable) {
+			return true
+		}
+	}
+
+	return false
 }
