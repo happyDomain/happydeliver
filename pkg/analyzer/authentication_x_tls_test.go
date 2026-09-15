@@ -32,7 +32,7 @@ import (
 func TestParseXTLSResult(t *testing.T) {
 	analyzer := NewAuthenticationAnalyzer("")
 
-	result := analyzer.parseXTLSResult("x-tls=pass smtp.version=TLSv1.3 smtp.cipher=TLS_AES_256_GCM_SHA384 smtp.bits=256")
+	result := analyzer.parseXTLSResult(readMethod(t, "x-tls=pass smtp.version=TLSv1.3 smtp.cipher=TLS_AES_256_GCM_SHA384 smtp.bits=256"))
 
 	if result.Result != model.AuthResultResultPass {
 		t.Errorf("Result = %v, want pass", result.Result)

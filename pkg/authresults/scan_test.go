@@ -152,6 +152,19 @@ func TestParseFieldsAsReceiversWriteThem(t *testing.T) {
 			},
 		},
 		{
+			name:  "an empty value written as a quoted string",
+			field: `mx.example.com; spf=pass smtp.mailfrom="" smtp.helo=relay.example.org`,
+			check: func(t *testing.T, h Header) {
+				method, _ := h.Find("spf")
+				if got := method.Property("smtp.mailfrom"); got != "" {
+					t.Errorf("envelope sender is %q, want the empty value that was written", got)
+				}
+				if got := method.Property("smtp.helo"); got != "relay.example.org" {
+					t.Errorf("announced hostname is %q, want relay.example.org", got)
+				}
+			},
+		},
+		{
 			name:  "a comment the receiver forgot to space",
 			field: "mx.example.com; dkim=pass(2048-bit key) header.d=example.com",
 			check: func(t *testing.T, h Header) {

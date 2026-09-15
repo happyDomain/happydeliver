@@ -22,40 +22,28 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseXGoogleDKIMResult parses Google DKIM result from Authentication-Results
 // Example: x-google-dkim=pass (2048-bit rsa key) header.d=1e100.net header.i=@1e100.net header.b=fauiPVZ6
-func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
-
-	// Extract result (pass, fail, etc.)
-	re := regexp.MustCompile(`x-google-dkim=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(method authresults.Method) *model.AuthResult {
+	result := &model.AuthResult{
+		Result:  model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract domain (header.d or d)
-	domainRe := regexp.MustCompile(`(?:header\.)?d=([^\s;]+)`)
-	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
-		domain := matches[1]
+	if domain := method.Property("header.d", "d"); domain != "" {
 		result.Domain = &domain
 	}
 
-	// Extract selector (header.s or s) - though not always present in x-google-dkim
-	selectorRe := regexp.MustCompile(`(?:header\.)?s=([^\s;]+)`)
-	if matches := selectorRe.FindStringSubmatch(part); len(matches) > 1 {
-		selector := matches[1]
+	// The selector, which Google does not always name.
+	if selector := method.Property("header.s", "s"); selector != "" {
 		result.Selector = &selector
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "x-google-dkim="))
 
 	return result
 }

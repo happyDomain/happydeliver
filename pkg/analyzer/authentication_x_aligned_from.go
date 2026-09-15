@@ -22,29 +22,21 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseXAlignedFromResult parses X-Aligned-From result from Authentication-Results
 // Example: x-aligned-from=pass (Address match)
-func (a *AuthenticationAnalyzer) parseXAlignedFromResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
+func (a *AuthenticationAnalyzer) parseXAlignedFromResult(method authresults.Method) *model.AuthResult {
+	return &model.AuthResult{
+		Result: model.AuthResultResult(method.Result),
 
-	// Extract result (pass, fail, etc.)
-	re := regexp.MustCompile(`x-aligned-from=([\w]+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+		// Everything after the result, as the receiver worded it.
+		Details: utils.PtrTo(methodDetails(method)),
 	}
-
-	// Extract details (everything after the result)
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "x-aligned-from="))
-
-	return result
 }
 
 func (a *AuthenticationAnalyzer) calculateXAlignedFromScore(results *model.AuthenticationResults) (score int) {

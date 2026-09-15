@@ -22,40 +22,26 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseBIMIResult parses BIMI result from Authentication-Results
 // Example: bimi=pass header.d=example.com header.selector=default
-func (a *AuthenticationAnalyzer) parseBIMIResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
-
-	// Extract result (pass, fail, etc.)
-	re := regexp.MustCompile(`bimi=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseBIMIResult(method authresults.Method) *model.AuthResult {
+	result := &model.AuthResult{
+		Result:  model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract domain (header.d or d)
-	domainRe := regexp.MustCompile(`(?:header\.)?d=([^\s;]+)`)
-	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
-		domain := matches[1]
+	if domain := method.Property("header.d", "d"); domain != "" {
 		result.Domain = &domain
 	}
-
-	// Extract selector (header.selector or selector)
-	selectorRe := regexp.MustCompile(`(?:header\.)?selector=([^\s;]+)`)
-	if matches := selectorRe.FindStringSubmatch(part); len(matches) > 1 {
-		selector := matches[1]
+	if selector := method.Property("header.selector", "selector"); selector != "" {
 		result.Selector = &selector
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "bimi="))
 
 	return result
 }

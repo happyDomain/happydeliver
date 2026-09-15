@@ -22,40 +22,28 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseDKIMResult parses DKIM result from Authentication-Results
 // Example: dkim=pass header.d=example.com header.s=selector1
-func (a *AuthenticationAnalyzer) parseDKIMResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
-
-	// Extract result (pass, fail, etc.)
-	re := regexp.MustCompile(`dkim=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseDKIMResult(method authresults.Method) *model.AuthResult {
+	result := &model.AuthResult{
+		Result:  model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract domain (header.d or d)
-	domainRe := regexp.MustCompile(`(?:header\.)?d=([^\s;]+)`)
-	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
-		domain := matches[1]
+	// The signing domain and the selector, under the ptype RFC 7601 asks for
+	// and under the bare spelling receivers write instead.
+	if domain := method.Property("header.d", "d"); domain != "" {
 		result.Domain = &domain
 	}
-
-	// Extract selector (header.s or s)
-	selectorRe := regexp.MustCompile(`(?:header\.)?s=([^\s;]+)`)
-	if matches := selectorRe.FindStringSubmatch(part); len(matches) > 1 {
-		selector := matches[1]
+	if selector := method.Property("header.s", "s"); selector != "" {
 		result.Selector = &selector
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "dkim="))
 
 	return result
 }

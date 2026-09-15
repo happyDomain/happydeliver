@@ -62,7 +62,7 @@ func TestParseDKIMResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.parseDKIMResult(tt.part)
+			result := analyzer.parseDKIMResult(readMethod(t, tt.part))
 
 			if result.Result != tt.expectedResult {
 				t.Errorf("Result = %v, want %v", result.Result, tt.expectedResult)
@@ -82,5 +82,31 @@ func TestParseDKIMResult(t *testing.T) {
 				t.Errorf("Selector = %v, want %v", gotSelector, tt.expectedSelector)
 			}
 		})
+	}
+}
+
+// TestParseAuthenticationResultsHeaderReadsACommentHoldingASemicolon covers a
+// field two senders in the stored reports actually wrote: the comment naming
+// the key carries a semicolon, and a reader cutting the field on semicolons
+// alone loses the signing domain and the selector written after it.
+func TestParseAuthenticationResultsHeaderReadsACommentHoldingASemicolon(t *testing.T) {
+	analyzer := NewAuthenticationAnalyzer("mx.example.com")
+	results := &model.AuthenticationResults{}
+
+	analyzer.parseAuthenticationResultsHeader(
+		"mx.example.com; dkim=pass (1024-bit key; unprotected) header.d=example.com header.s=selector1",
+		results,
+	)
+
+	if results.Dkim == nil || len(*results.Dkim) != 1 {
+		t.Fatalf("the field reports %v dkim methods, want one", results.Dkim)
+	}
+
+	dkim := (*results.Dkim)[0]
+	if dkim.Domain == nil || *dkim.Domain != "example.com" {
+		t.Errorf("signing domain is %v, want example.com", dkim.Domain)
+	}
+	if dkim.Selector == nil || *dkim.Selector != "selector1" {
+		t.Errorf("selector is %v, want selector1", dkim.Selector)
 	}
 }

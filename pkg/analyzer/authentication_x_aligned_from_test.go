@@ -70,7 +70,7 @@ func TestParseXAlignedFromResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.parseXAlignedFromResult(tt.part)
+			result := analyzer.parseXAlignedFromResult(readMethod(t, tt.part))
 
 			if result.Result != tt.expectedResult {
 				t.Errorf("Result = %v, want %v", result.Result, tt.expectedResult)

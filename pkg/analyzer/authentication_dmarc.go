@@ -22,33 +22,23 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseDMARCResult parses DMARC result from Authentication-Results
 // Example: dmarc=pass action=none header.from=example.com
-func (a *AuthenticationAnalyzer) parseDMARCResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
-
-	// Extract result (pass, fail, etc.)
-	re := regexp.MustCompile(`dmarc=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseDMARCResult(method authresults.Method) *model.AuthResult {
+	result := &model.AuthResult{
+		Result:  model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract domain (header.from)
-	domainRe := regexp.MustCompile(`header\.from=([^\s;]+)`)
-	if matches := domainRe.FindStringSubmatch(part); len(matches) > 1 {
-		domain := matches[1]
+	if domain := method.Property("header.from"); domain != "" {
 		result.Domain = &domain
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "dmarc="))
 
 	return result
 }

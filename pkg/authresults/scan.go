@@ -26,9 +26,20 @@ import "strings"
 // segment is one piece of the field between two semicolons: the words it is
 // written with, the comments written among them, and the text itself.
 type segment struct {
-	words    []string
+	words    []word
 	comments []string
 	raw      string
+}
+
+// word is one word of the field, and whether a quoted string is what ended it.
+//
+// The distinction matters once only, and matters a lot: a property whose value
+// is an empty quoted string, "smtp.mailfrom=\"\"", is written exactly like one
+// still waiting for the value that follows its equals sign, and binding it to
+// the next word would make the next property its value.
+type word struct {
+	text   string
+	quoted bool
 }
 
 // glueChars are the characters that bind two words into one element of the
@@ -47,7 +58,8 @@ func scan(value string) []segment {
 	var (
 		segments []segment
 		current  segment
-		word     strings.Builder
+		read     strings.Builder
+		quoted   bool
 		comment  strings.Builder
 		depth    int
 		start    int
@@ -55,9 +67,11 @@ func scan(value string) []segment {
 
 	// endWord ends the word being read, if one is.
 	endWord := func() {
-		if word.Len() > 0 {
-			current.words = append(current.words, word.String())
-			word.Reset()
+		if read.Len() > 0 || quoted {
+			current.words = append(current.words, word{text: read.String(), quoted: quoted})
+			read.Reset()
+
+			quoted = false
 		}
 	}
 
@@ -93,7 +107,7 @@ func scan(value string) []segment {
 			endWord()
 
 		case c == '"':
-			i = readQuoted(value, i, &word)
+			i, quoted = readQuoted(value, i, &read), true
 
 		case c == ';':
 			endWord()
@@ -106,7 +120,7 @@ func scan(value string) []segment {
 			endWord()
 
 		default:
-			word.WriteByte(c)
+			read.WriteByte(c)
 		}
 	}
 
@@ -126,7 +140,7 @@ func scan(value string) []segment {
 // every method written after the next semicolon. A semicolon inside a string
 // that is closed is part of the value, so the whole string is read before
 // either answer is given.
-func readQuoted(value string, open int, word *strings.Builder) int {
+func readQuoted(value string, open int, read *strings.Builder) int {
 	var (
 		content strings.Builder
 		cut     = -1
@@ -136,7 +150,7 @@ func readQuoted(value string, open int, word *strings.Builder) int {
 	for i := open + 1; i < len(value); i++ {
 		switch c := value[i]; c {
 		case '"':
-			word.WriteString(content.String())
+			read.WriteString(content.String())
 			return i
 		case '\\':
 			if i++; i < len(value) {
@@ -151,13 +165,13 @@ func readQuoted(value string, open int, word *strings.Builder) int {
 	}
 
 	if cut < 0 {
-		word.WriteString(content.String())
+		read.WriteString(content.String())
 		return len(value)
 	}
 
 	// The semicolon itself is left to the caller to read as the separator
 	// it is.
-	word.WriteString(content.String()[:cut])
+	read.WriteString(content.String()[:cut])
 
 	return end - 1
 }
@@ -171,24 +185,24 @@ func readQuoted(value string, open int, word *strings.Builder) int {
 // its result. A word that already carries its value waits for nothing, so
 // "header.b=Zm9v==" and "header.d=example.com." are properties that are
 // finished, whatever character they end on.
-func glue(words []string) []string {
+func glue(words []word) []string {
 	var items []string
 
 	bindNext := false
-	for i, word := range words {
+	for i, w := range words {
 		switch {
-		case (bindNext || bindsToPrevious(word)) && len(items) > 0:
-			items[len(items)-1] += word
+		case (bindNext || bindsToPrevious(w)) && len(items) > 0:
+			items[len(items)-1] += w.text
 		default:
-			items = append(items, word)
+			items = append(items, w.text)
 		}
 
-		var next string
+		var next word
 		if i+1 < len(words) {
 			next = words[i+1]
 		}
 
-		bindNext = bindsToNext(word, next)
+		bindNext = bindsToNext(w, next)
 	}
 
 	return items
@@ -196,25 +210,27 @@ func glue(words []string) []string {
 
 // bindsToPrevious says whether a word opens with a character that binds it to
 // the word before it.
-func bindsToPrevious(word string) bool {
-	return word != "" && strings.IndexByte(glueChars, word[0]) >= 0
+func bindsToPrevious(w word) bool {
+	return w.text != "" && strings.IndexByte(glueChars, w.text[0]) >= 0
 }
 
 // bindsToNext says whether a word ends waiting for the word after it.
-func bindsToNext(word string, next string) bool {
-	if word == "" {
+func bindsToNext(w word, next word) bool {
+	// A word a quoted string ended carries its value, however empty that
+	// value is.
+	if w.quoted || w.text == "" {
 		return false
 	}
 
-	switch last := word[len(word)-1]; last {
+	switch last := w.text[len(w.text)-1]; last {
 	case '.', '/':
 		// A dot and a slash join a ptype to its property and a method to
 		// its version, both of which are written before the equals sign.
 		// After it they are part of a value: a domain written down to its
 		// root, or a URL.
-		return strings.IndexByte(word, '=') < 0
+		return strings.IndexByte(w.text, '=') < 0
 	case '=':
-		if strings.IndexByte(word, '=') != len(word)-1 {
+		if strings.IndexByte(w.text, '=') != len(w.text)-1 {
 			return false
 		}
 
@@ -230,11 +246,11 @@ func bindsToNext(word string, next string) bool {
 
 // startsProperty says whether a word opens a propspec of its own, written with
 // the ptype the grammar asks for: "header.d=example.com".
-func startsProperty(word string) bool {
-	equals := strings.IndexByte(word, '=')
+func startsProperty(w word) bool {
+	equals := strings.IndexByte(w.text, '=')
 	if equals < 0 {
 		return false
 	}
 
-	return strings.IndexByte(word[:equals], '.') >= 0
+	return strings.IndexByte(w.text[:equals], '.') >= 0
 }

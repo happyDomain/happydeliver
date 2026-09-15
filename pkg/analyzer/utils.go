@@ -51,14 +51,6 @@ func extractFloatField(header string, re *regexp.Regexp) (float32, bool) {
 	return parseFloat32(matches[1])
 }
 
-// submatch returns the first capture group of pattern in s, or "".
-func submatch(s, pattern string) string {
-	if matches := regexp.MustCompile(pattern).FindStringSubmatch(s); len(matches) > 1 {
-		return matches[1]
-	}
-	return ""
-}
-
 // textprotoCanonical converts a header name to canonical form
 func textprotoCanonical(s string) string {
 	// Simple implementation - capitalize each word

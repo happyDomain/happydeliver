@@ -123,15 +123,28 @@ type Property struct {
 // property twice has already contradicted itself, and the reading that follows
 // is the one a receiver reading its own field would take.
 func (m Method) Property(names ...string) string {
+	value, _ := m.Lookup(names...)
+
+	return value
+}
+
+// Lookup answers the value of the first property written under any of the given
+// names, and whether the method wrote one at all.
+//
+// A property written with an empty value says something that a property nobody
+// wrote does not. An SPF check reporting smtp.mailfrom="" was run against the
+// envelope sender of a bounce, which is empty by definition: the check knows
+// which identity it looked at, and only the presence of the property says so.
+func (m Method) Lookup(names ...string) (string, bool) {
 	for _, property := range m.Properties {
 		for _, name := range names {
 			if strings.EqualFold(property.key(), name) {
-				return property.Value
+				return property.Value, true
 			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 // Comment answers the first comment written inside the method, or "" when it

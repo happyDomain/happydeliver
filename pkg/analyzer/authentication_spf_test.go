@@ -100,7 +100,7 @@ func TestParseSPFResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := analyzer.parseSPFResult(tt.part)
+			result := analyzer.parseSPFResult(readMethod(t, tt.part))
 
 			assertSPFResult(t, "spf", result, tt.expectedResult, tt.expectedDomain, tt.expectedIdentity)
 		})

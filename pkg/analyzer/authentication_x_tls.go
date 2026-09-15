@@ -23,31 +23,25 @@ package analyzer
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseXTLSResult parses the x-tls result from Authentication-Results.
 // Example: x-tls=pass smtp.version=TLSv1.3 smtp.cipher=TLS_AES_256_GCM_SHA384 smtp.bits=256
-func (a *AuthenticationAnalyzer) parseXTLSResult(part string) *model.AuthResult {
-	result := &model.AuthResult{}
-
-	// Extract result (pass, fail, none, ...)
-	re := regexp.MustCompile(`x-tls=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		result.Result = model.AuthResultResult(strings.ToLower(matches[1]))
+func (a *AuthenticationAnalyzer) parseXTLSResult(method authresults.Method) *model.AuthResult {
+	return &model.AuthResult{
+		Result: model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(formatTLSDetails(
+			method.Property("smtp.version"),
+			method.Property("smtp.cipher"),
+			method.Property("smtp.bits"),
+		)),
 	}
-
-	result.Details = utils.PtrTo(formatTLSDetails(
-		submatch(part, `smtp\.version=([^\s;()]+)`),
-		submatch(part, `smtp\.cipher=([^\s;()]+)`),
-		submatch(part, `smtp\.bits=(\d+)`),
-	))
-
-	return result
 }
 
 // calculateXTLSScore returns a penalty for a negative transport-TLS result.

@@ -26,7 +26,23 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
+
+// readMethod reads one method of an Authentication-Results header the way the
+// analyzer receives it, so that a test may go on naming the method as a
+// receiver writes it.
+func readMethod(t *testing.T, part string) authresults.Method {
+	t.Helper()
+
+	method, read := authresults.ParseMethod(part)
+	if !read {
+		t.Fatalf("%q is not a method", part)
+	}
+
+	return method
+}
 
 func TestGetAuthenticationScore(t *testing.T) {
 	tests := []struct {

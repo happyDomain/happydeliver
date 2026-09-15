@@ -29,14 +29,11 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 
+	"git.happydns.org/happyDeliver/pkg/authresults"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 var (
-	spfResultRe   = regexp.MustCompile(`spf=(\w+)`)
-	spfMailFromRe = regexp.MustCompile(`smtp\.mailfrom=("[^"]*"|[^\s;]+)`)
-	spfHeloRe     = regexp.MustCompile(`smtp\.helo=("[^"]*"|[^\s;()]+)`)
-
 	// Keys of the legacy Received-SPF header (RFC 7208 section 7.2). Each of them
 	// is anchored on a key boundary, as a key is only ever introduced by the start
 	// of the header, a semicolon or whitespace: without it `helo=` would also
@@ -58,14 +55,18 @@ const (
 // spfPartIdentity tells which identity an "spf=" method applies to, or nil when
 // the method reports no ptype at all.
 //
+// It turns on which property the receiver wrote, not on what it wrote in it: a
+// check reporting an empty envelope sender checked the envelope sender of a
+// bounce, and is not a check that said nothing.
+//
 // Some MTAs report both the HELO and the MAIL FROM checks in the
 // same header (RFC 8601 §2.7.2). They describe different things and are kept
 // apart: only the MAIL FROM one authenticates the envelope sender.
-func spfPartIdentity(part string) *model.AuthResultIdentity {
+func spfPartIdentity(reportsMailFrom, reportsHelo bool) *model.AuthResultIdentity {
 	switch {
-	case spfMailFromRe.MatchString(part):
+	case reportsMailFrom:
 		return utils.PtrTo(model.AuthResultIdentityMailfrom)
-	case spfHeloRe.MatchString(part):
+	case reportsHelo:
 		return utils.PtrTo(model.AuthResultIdentityHelo)
 	default:
 		return nil
@@ -127,24 +128,23 @@ func spfHeloName(value string) *string {
 
 // parseSPFResult parses SPF result from Authentication-Results
 // Example: spf=pass smtp.mailfrom=sender@example.com
-func (a *AuthenticationAnalyzer) parseSPFResult(part string) *model.AuthResult {
-	result := &model.AuthResult{Identity: spfPartIdentity(part)}
+func (a *AuthenticationAnalyzer) parseSPFResult(method authresults.Method) *model.AuthResult {
+	mailfrom, reportsMailFrom := method.Lookup("smtp.mailfrom")
+	helo, reportsHelo := method.Lookup("smtp.helo")
 
-	// Extract result (pass, fail, etc.)
-	if matches := spfResultRe.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.AuthResultResult(resultStr)
+	result := &model.AuthResult{
+		Result:   model.AuthResultResult(method.Result),
+		Identity: spfPartIdentity(reportsMailFrom, reportsHelo),
+		Details:  utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract the authenticated domain: the envelope sender for a MAIL FROM
-	// check, the announced hostname for a HELO one
-	if matches := spfMailFromRe.FindStringSubmatch(part); len(matches) > 1 {
-		result.Domain = spfMailFromDomain(matches[1])
-	} else if matches := spfHeloRe.FindStringSubmatch(part); len(matches) > 1 {
-		result.Domain = spfHeloName(matches[1])
+	// The authenticated domain: the envelope sender for a MAIL FROM check, the
+	// announced hostname for a HELO one
+	if reportsMailFrom {
+		result.Domain = spfMailFromDomain(mailfrom)
+	} else if reportsHelo {
+		result.Domain = spfHeloName(helo)
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "spf="))
 
 	return result
 }

@@ -25,29 +25,21 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 
+	"git.happydns.org/happyDeliver/pkg/authresults"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
 // parseARCResult parses ARC result from Authentication-Results
 // Example: arc=pass
-func (a *AuthenticationAnalyzer) parseARCResult(part string) *model.ARCResult {
-	result := &model.ARCResult{}
-
-	// Extract result (pass, fail, none)
-	re := regexp.MustCompile(`arc=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.ARCResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseARCResult(method authresults.Method) *model.ARCResult {
+	return &model.ARCResult{
+		Result:  model.ARCResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "arc="))
-
-	return result
 }
 
 // parseARCHeaders parses ARC headers from email message

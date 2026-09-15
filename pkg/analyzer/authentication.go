@@ -26,6 +26,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 
+	"git.happydns.org/happyDeliver/pkg/authresults"
 	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
@@ -81,9 +82,8 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *mailmsg.Message, a
 // parseAuthenticationResultsHeader parses an Authentication-Results header
 // Format: example.com; spf=pass smtp.mailfrom=sender@example.com; dkim=pass header.d=example.com
 func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string, results *model.AuthenticationResults) {
-	// Split by semicolon to get individual results
-	parts := strings.Split(header, ";")
-	if len(parts) < 2 {
+	field, read := authresults.Parse(header)
+	if !read {
 		return
 	}
 
@@ -94,18 +94,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 	// it, and must never supersede the verdict it gave.
 	var headerSpf *model.AuthResult
 
-	// Skip the authserv-id (first part)
-	for i := 1; i < len(parts); i++ {
-		part := strings.TrimSpace(parts[i])
-		if part == "" {
-			continue
-		}
-
-		// Parse SPF. A header may carry several spf= methods, one per identity
-		// checked: route each of them to the field describing that identity, so a
-		// HELO verdict never stands in for the envelope sender one.
-		if strings.HasPrefix(part, "spf=") {
-			spfResult := a.parseSPFResult(part)
+	for _, method := range field.Methods {
+		switch method.Name {
+		// A header may carry several spf= methods, one per identity checked:
+		// route each of them to the field describing that identity, so a HELO
+		// verdict never stands in for the envelope sender one.
+		case "spf":
+			spfResult := a.parseSPFResult(method)
 
 			if spfResult.Identity != nil && *spfResult.Identity == model.AuthResultIdentityHelo {
 				if results.SpfHelo == nil {
@@ -115,74 +110,54 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				// An explicit smtp.mailfrom method supersedes one with no ptype
 				headerSpf = spfResult
 			}
-		}
 
-		// Parse DKIM
-		if strings.HasPrefix(part, "dkim=") {
-			dkimResult := a.parseDKIMResult(part)
-			if dkimResult != nil {
-				if results.Dkim == nil {
-					dkimList := []model.AuthResult{*dkimResult}
-					results.Dkim = &dkimList
-				} else {
-					*results.Dkim = append(*results.Dkim, *dkimResult)
-				}
+		case "dkim":
+			dkimResult := a.parseDKIMResult(method)
+			if results.Dkim == nil {
+				dkimList := []model.AuthResult{*dkimResult}
+				results.Dkim = &dkimList
+			} else {
+				*results.Dkim = append(*results.Dkim, *dkimResult)
 			}
-		}
 
-		// Parse DMARC
-		if strings.HasPrefix(part, "dmarc=") {
+		case "dmarc":
 			if results.Dmarc == nil {
-				results.Dmarc = a.parseDMARCResult(part)
+				results.Dmarc = a.parseDMARCResult(method)
 			}
-		}
 
-		// Parse BIMI
-		if strings.HasPrefix(part, "bimi=") {
+		case "bimi":
 			if results.Bimi == nil {
-				results.Bimi = a.parseBIMIResult(part)
+				results.Bimi = a.parseBIMIResult(method)
 			}
-		}
 
-		// Parse ARC
-		if strings.HasPrefix(part, "arc=") {
+		case "arc":
 			if results.Arc == nil {
-				results.Arc = a.parseARCResult(part)
+				results.Arc = a.parseARCResult(method)
 			}
-		}
 
-		// Parse IPRev
-		if strings.HasPrefix(part, "iprev=") {
+		case "iprev":
 			if results.Iprev == nil {
-				results.Iprev = a.parseIPRevResult(part)
+				results.Iprev = a.parseIPRevResult(method)
 			}
-		}
 
-		// Parse x-google-dkim
-		if strings.HasPrefix(part, "x-google-dkim=") {
+		case "x-google-dkim":
 			if results.XGoogleDkim == nil {
-				results.XGoogleDkim = a.parseXGoogleDKIMResult(part)
+				results.XGoogleDkim = a.parseXGoogleDKIMResult(method)
 			}
-		}
 
-		// Parse x-aligned-from
-		if strings.HasPrefix(part, "x-aligned-from=") {
+		case "x-aligned-from":
 			if results.XAlignedFrom == nil {
-				results.XAlignedFrom = a.parseXAlignedFromResult(part)
+				results.XAlignedFrom = a.parseXAlignedFromResult(method)
 			}
-		}
 
-		// Parse x-ptr
-		if strings.HasPrefix(part, "x-ptr=") {
+		case "x-ptr":
 			if results.XPtr == nil {
-				results.XPtr = a.parseXPtrResult(part)
+				results.XPtr = a.parseXPtrResult(method)
 			}
-		}
 
-		// Parse x-tls
-		if strings.HasPrefix(part, "x-tls=") {
+		case "x-tls":
 			if results.XTls == nil {
-				results.XTls = a.parseXTLSResult(part)
+				results.XTls = a.parseXTLSResult(method)
 			}
 		}
 	}
@@ -191,6 +166,18 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 	if results.Spf == nil {
 		results.Spf = headerSpf
 	}
+}
+
+// methodDetails is the method as the receiver wrote it, without the name it
+// wrote it under: what the report quotes back to a sender is the verdict and
+// what was read to reach it, not a repetition of the method's own name.
+func methodDetails(method authresults.Method) string {
+	_, details, written := strings.Cut(method.Raw, "=")
+	if !written {
+		return method.Raw
+	}
+
+	return strings.TrimSpace(details)
 }
 
 // CalculateAuthenticationScore calculates the authentication score from auth results

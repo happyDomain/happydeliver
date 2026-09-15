@@ -22,40 +22,26 @@
 package analyzer
 
 import (
-	"regexp"
-	"strings"
-
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // parseXPtrResult parses the x-ptr result from Authentication-Results.
 // Example: x-ptr=fail smtp.helo=relay.example.org policy.ptr=mail.example.com
-func (a *AuthenticationAnalyzer) parseXPtrResult(part string) *model.XPtrResult {
-	result := &model.XPtrResult{}
-
-	// Extract result (pass, fail, none, temperror, permerror)
-	re := regexp.MustCompile(`x-ptr=(\w+)`)
-	if matches := re.FindStringSubmatch(part); len(matches) > 1 {
-		resultStr := strings.ToLower(matches[1])
-		result.Result = model.XPtrResultResult(resultStr)
+func (a *AuthenticationAnalyzer) parseXPtrResult(method authresults.Method) *model.XPtrResult {
+	result := &model.XPtrResult{
+		Result:  model.XPtrResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 
-	// Extract announced HELO hostname (smtp.helo)
-	heloRe := regexp.MustCompile(`smtp\.helo=([^\s;()]+)`)
-	if matches := heloRe.FindStringSubmatch(part); len(matches) > 1 {
-		helo := matches[1]
+	if helo := method.Property("smtp.helo"); helo != "" {
 		result.Helo = &helo
 	}
-
-	// Extract reverse DNS hostname (policy.ptr)
-	ptrRe := regexp.MustCompile(`policy\.ptr=([^\s;()]+)`)
-	if matches := ptrRe.FindStringSubmatch(part); len(matches) > 1 {
-		ptr := matches[1]
-		result.Ptr = &ptr
+	if name := method.Property("policy.ptr"); name != "" {
+		result.Ptr = &name
 	}
-
-	result.Details = utils.PtrTo(strings.TrimPrefix(part, "x-ptr="))
 
 	return result
 }

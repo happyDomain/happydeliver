@@ -63,7 +63,7 @@ func TestParseXPtrResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := a.parseXPtrResult(tt.part)
+			result := a.parseXPtrResult(readMethod(t, tt.part))
 			if result == nil {
 				t.Fatal("expected non-nil result")
 			}
