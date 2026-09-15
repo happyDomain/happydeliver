@@ -71,6 +71,7 @@ func TestOneFileAnswersForEachThingWrongWithIt(t *testing.T) {
 		model.IssueTypeDangerousExtension,
 		model.IssueTypeDoubleExtension,
 		model.IssueTypeTypeMismatch,
+		model.IssueTypeExecutableContent,
 	} {
 		if types[expected] == 0 {
 			t.Errorf("Expected a %s finding, got %v", expected, types)
