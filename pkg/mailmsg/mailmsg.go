@@ -41,6 +41,8 @@ import (
 	// converted to UTF-8 rather than read as if it were ASCII.
 	_ "github.com/emersion/go-message/charset"
 	gomail "github.com/emersion/go-message/mail"
+
+	"git.happydns.org/happyDeliver/pkg/authresults"
 )
 
 // Message is a message as it was received, parsed.
@@ -237,49 +239,14 @@ func rawHeaderBlock(raw []byte) string {
 //
 // Per RFC 8601 section 2.2 the value opens with the authserv-id, optionally followed by a
 // version number, then the results separated by semicolons. CFWS comments may appear
-// anywhere, so they are stripped before the identifier is isolated.
+// anywhere, which is one of the reasons the field is read by a package of its own.
 func parseAuthservID(value string) string {
-	var head strings.Builder
-	depth := 0
-	inQuotes := false
-
-scan:
-	for i := 0; i < len(value); i++ {
-		c := value[i]
-		switch {
-		case inQuotes:
-			if c == '\\' && i+1 < len(value) {
-				i++
-				head.WriteByte(value[i])
-			} else if c == '"' {
-				inQuotes = false
-			} else {
-				head.WriteByte(c)
-			}
-		case c == '(':
-			depth++
-		case c == ')':
-			if depth > 0 {
-				depth--
-			}
-		case depth > 0:
-			// Inside a comment: ignored.
-		case c == '"':
-			inQuotes = true
-		case c == ';':
-			break scan
-		default:
-			head.WriteByte(c)
-		}
-	}
-
-	// What remains is "authserv-id [version]": keep the first token.
-	fields := strings.Fields(head.String())
-	if len(fields) == 0 {
+	header, read := authresults.Parse(value)
+	if !read {
 		return ""
 	}
 
-	return fields[0]
+	return header.AuthservID
 }
 
 // GetAuthenticationResults extracts Authentication-Results headers
