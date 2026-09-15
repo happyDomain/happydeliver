@@ -134,10 +134,10 @@ func TestProbeReportsExcessiveRedirects(t *testing.T) {
 	tests := []struct {
 		name     string
 		hops     int
-		severity model.ContentIssueSeverity
+		severity model.IssueSeverity
 	}{
-		{name: "three hops are a detour", hops: 3, severity: model.ContentIssueSeverityMedium},
-		{name: "five hops are a chain out of hand", hops: 5, severity: model.ContentIssueSeverityHigh},
+		{name: "three hops are a detour", hops: 3, severity: model.IssueSeverityMedium},
+		{name: "five hops are a chain out of hand", hops: 5, severity: model.IssueSeverityHigh},
 	}
 
 	for _, tt := range tests {
@@ -214,14 +214,14 @@ func TestProbeClassifiesStatusCodes(t *testing.T) {
 	tests := []struct {
 		status   int
 		kind     LinkHTTPFindingKind
-		severity model.ContentIssueSeverity
+		severity model.IssueSeverity
 	}{
-		{status: 404, kind: LinkHTTPNotFound, severity: model.ContentIssueSeverityHigh},
-		{status: 410, kind: LinkHTTPNotFound, severity: model.ContentIssueSeverityHigh},
-		{status: 401, kind: LinkHTTPProtected, severity: model.ContentIssueSeverityHigh},
-		{status: 403, kind: LinkHTTPProtected, severity: model.ContentIssueSeverityHigh},
-		{status: 500, kind: LinkHTTPServerFailure, severity: model.ContentIssueSeverityMedium},
-		{status: 503, kind: LinkHTTPServerFailure, severity: model.ContentIssueSeverityMedium},
+		{status: 404, kind: LinkHTTPNotFound, severity: model.IssueSeverityHigh},
+		{status: 410, kind: LinkHTTPNotFound, severity: model.IssueSeverityHigh},
+		{status: 401, kind: LinkHTTPProtected, severity: model.IssueSeverityHigh},
+		{status: 403, kind: LinkHTTPProtected, severity: model.IssueSeverityHigh},
+		{status: 500, kind: LinkHTTPServerFailure, severity: model.IssueSeverityMedium},
+		{status: 503, kind: LinkHTTPServerFailure, severity: model.IssueSeverityMedium},
 	}
 
 	for _, tt := range tests {
@@ -449,8 +449,8 @@ func TestAnalyzeContentReportsBrokenImages(t *testing.T) {
 	}
 
 	analysis := analyzer.analysisOf(results)
-	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.ContentIssue) bool {
-		return i.Type == model.ContentIssueTypeUnreachableLink && i.Location != nil && strings.HasSuffix(*i.Location, "/missing.png")
+	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+		return i.Type == model.IssueTypeUnreachableLink && i.Location != nil && strings.HasSuffix(*i.Location, "/missing.png")
 	}) {
 		t.Error("no unreachable_link issue was raised for the broken image")
 	}
@@ -526,12 +526,12 @@ func TestAnalyzeContentChecksListUnsubscribeURLs(t *testing.T) {
 				if !slices.Contains(findingKinds(findings), LinkHTTPNotFound) {
 					t.Fatalf("HTTPFindings = %v, want not_found", findingKinds(findings))
 				}
-				if findings[0].Severity != model.ContentIssueSeverityHigh {
+				if findings[0].Severity != model.IssueSeverityHigh {
 					t.Errorf("Severity = %q, want high", findings[0].Severity)
 				}
 				analysis := analyzer.analysisOf(results)
-				if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.ContentIssue) bool {
-					return i.Type == model.ContentIssueTypeUnreachableLink
+				if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+					return i.Type == model.IssueTypeUnreachableLink
 				}) {
 					t.Error("the dead unsubscribe endpoint raised no issue")
 				}
@@ -637,8 +637,8 @@ func TestGenerateContentAnalysisReportsHTTPFindings(t *testing.T) {
 	if len(issues) != 1 {
 		t.Fatalf("HtmlIssues = %+v, want exactly one", issues)
 	}
-	if issues[0].Type != model.ContentIssueTypeUnreachableLink {
-		t.Errorf("Type = %q, want %q", issues[0].Type, model.ContentIssueTypeUnreachableLink)
+	if issues[0].Type != model.IssueTypeUnreachableLink {
+		t.Errorf("Type = %q, want %q", issues[0].Type, model.IssueTypeUnreachableLink)
 	}
 	if issues[0].Location == nil || *issues[0].Location != deadURL {
 		t.Errorf("Location = %v, want %q", issues[0].Location, deadURL)
@@ -746,7 +746,7 @@ func TestGenerateContentAnalysisFilesRedirectFindingsApart(t *testing.T) {
 	})
 
 	issues := *analysis.HtmlIssues
-	if len(issues) != 1 || issues[0].Type != model.ContentIssueTypeExcessiveRedirects {
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeExcessiveRedirects {
 		t.Errorf("HtmlIssues = %+v, want a single excessive_redirects issue", issues)
 	}
 }
@@ -783,7 +783,7 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 		t.Errorf("score with a dead link = %d, want %d (clean score is %d)", dead, want, clean)
 	}
 
-	loop := LinkHTTPFinding{Kind: LinkHTTPRedirectLoop, Severity: model.ContentIssueSeverityHigh}
+	loop := LinkHTTPFinding{Kind: LinkHTTPRedirectLoop, Severity: model.IssueSeverityHigh}
 	looping, _ := analyzer.scoreOf(base([]LinkHTTPFinding{loop}, 0))
 
 	// A link that never arrives carries no status code, and must still count as
@@ -810,11 +810,11 @@ func TestCalculateContentScoreKeepsPenaltyBudgetsApart(t *testing.T) {
 	var suspicions []URLSuspicion
 	var findings []LinkHTTPFinding
 	for range 10 {
-		suspicions = append(suspicions, URLSuspicion{Severity: model.ContentIssueSeverityHigh})
+		suspicions = append(suspicions, URLSuspicion{Severity: model.IssueSeverityHigh})
 		// Redirect chains, being the probe findings no criterion grades: what
 		// this test weighs is the probe cap, so it must be a defect that
 		// actually answers under it.
-		findings = append(findings, LinkHTTPFinding{Kind: LinkHTTPExcessiveRedirects, Severity: model.ContentIssueSeverityHigh})
+		findings = append(findings, LinkHTTPFinding{Kind: LinkHTTPExcessiveRedirects, Severity: model.IssueSeverityHigh})
 	}
 
 	// One message per score: results are the finished record of one analysis,
@@ -998,8 +998,8 @@ func TestAnalyzeContentCapsTheURLsItFetches(t *testing.T) {
 
 	// What was left out has to be said, not passed off as checked.
 	analysis := analyzer.analysisOf(results)
-	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.ContentIssue) bool {
-		return i.Severity == model.ContentIssueSeverityInfo && strings.Contains(i.Message, "left unchecked")
+	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+		return i.Severity == model.IssueSeverityInfo && strings.Contains(i.Message, "left unchecked")
 	}) {
 		t.Error("the URLs left unfetched were not reported")
 	}
@@ -1034,7 +1034,7 @@ func TestRepeatedURLIsReportedOnce(t *testing.T) {
 	issues := *analyzer.analysisOf(results).HtmlIssues
 	unreachable := 0
 	for _, issue := range issues {
-		if issue.Type == model.ContentIssueTypeUnreachableLink {
+		if issue.Type == model.IssueTypeUnreachableLink {
 			unreachable++
 		}
 	}

@@ -496,7 +496,7 @@ func TestAnalyzeURLSuspicions_FindingsAreActionable(t *testing.T) {
 				if !s.Severity.Valid() {
 					t.Errorf("finding %q has an invalid severity %q", s.Kind, s.Severity)
 				}
-				if s.Severity == model.ContentIssueSeverityInfo {
+				if s.Severity == model.IssueSeverityInfo {
 					t.Errorf("finding %q reported with severity info, want low or above", s.Kind)
 				}
 			}
@@ -562,9 +562,9 @@ func TestGenerateContentAnalysis_SuspiciousLinkIssues(t *testing.T) {
 		t.Fatal("expected suspicious_link issues, got none")
 	}
 
-	var suspicious []model.ContentIssue
+	var suspicious []model.Issue
 	for _, issue := range *analysis.HtmlIssues {
-		if issue.Type == model.ContentIssueTypeSuspiciousLink {
+		if issue.Type == model.IssueTypeSuspiciousLink {
 			suspicious = append(suspicious, issue)
 		}
 	}
@@ -605,7 +605,7 @@ func TestGenerateContentAnalysis_CleanLinkHasNoIssue(t *testing.T) {
 
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
-			if issue.Type == model.ContentIssueTypeSuspiciousLink {
+			if issue.Type == model.IssueTypeSuspiciousLink {
 				t.Errorf("unexpected suspicious_link issue: %s", issue.Message)
 			}
 		}
@@ -758,9 +758,9 @@ func TestGenerateContentAnalysis_InsecureImageIssue(t *testing.T) {
 		t.Fatal("expected an issue for the insecure image, got none")
 	}
 
-	var suspicious []model.ContentIssue
+	var suspicious []model.Issue
 	for _, issue := range *analysis.HtmlIssues {
-		if issue.Type == model.ContentIssueTypeSuspiciousLink {
+		if issue.Type == model.IssueTypeSuspiciousLink {
 			suspicious = append(suspicious, issue)
 		}
 	}
@@ -771,8 +771,8 @@ func TestGenerateContentAnalysis_InsecureImageIssue(t *testing.T) {
 	if suspicious[0].Location == nil || *suspicious[0].Location != src {
 		t.Errorf("issue location = %v, want %q", suspicious[0].Location, src)
 	}
-	if suspicious[0].Severity != model.ContentIssueSeverityMedium {
-		t.Errorf("issue severity = %q, want %q", suspicious[0].Severity, model.ContentIssueSeverityMedium)
+	if suspicious[0].Severity != model.IssueSeverityMedium {
+		t.Errorf("issue severity = %q, want %q", suspicious[0].Severity, model.IssueSeverityMedium)
 	}
 	if suspicious[0].Advice == nil || !strings.Contains(*suspicious[0].Advice, "https:") {
 		t.Errorf("issue advice = %v, want it to point at https:", suspicious[0].Advice)

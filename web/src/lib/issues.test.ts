@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContentIssue } from "$lib/api/types.gen";
+import type { Issue } from "$lib/api/types.gen";
 import {
     adviceAnchorsBySymbol,
-    contentCategoryLabel,
+    categoryLabel,
     contentIssueAnchor,
-    contentIssueLabel,
+    issueLabel,
     groupIssuesByCategory,
 } from "$lib/issues";
 
 /** A content issue with only the fields these tests care about. */
-function issue(fields: Partial<ContentIssue>): ContentIssue {
+function issue(fields: Partial<Issue>): Issue {
     return {
         type: "suspicious_link",
         category: "security",
@@ -61,28 +61,26 @@ describe("adviceAnchorsBySymbol", () => {
     });
 });
 
-describe("contentIssueLabel", () => {
+describe("issueLabel", () => {
     it("names a type rather than printing the enum", () => {
-        expect(contentIssueLabel("missing_alt")).toBe("Missing alt text");
-        expect(contentIssueLabel("homograph_url")).toBe("Look-alike URL");
+        expect(issueLabel("missing_alt")).toBe("Missing alt text");
+        expect(issueLabel("homograph_url")).toBe("Look-alike URL");
     });
 
     it("still reads as something for a type the API added and we have not", () => {
         // Not reachable through the type, but reachable from an older front end
         // talking to a newer server.
-        expect(contentIssueLabel("some_new_kind" as ContentIssue["type"])).toBe("some new kind");
+        expect(issueLabel("some_new_kind" as Issue["type"])).toBe("some new kind");
     });
 });
 
-describe("contentCategoryLabel", () => {
+describe("categoryLabel", () => {
     it("names a reading rather than printing the enum", () => {
-        expect(contentCategoryLabel("deliverability")).toBe("Deliverability");
+        expect(categoryLabel("deliverability")).toBe("Deliverability");
     });
 
     it("still reads as something for a reading the API added and we have not", () => {
-        expect(contentCategoryLabel("some_new_reading" as ContentIssue["category"])).toBe(
-            "some new reading",
-        );
+        expect(categoryLabel("some_new_reading" as Issue["category"])).toBe("some new reading");
     });
 });
 
@@ -160,7 +158,7 @@ describe("groupIssuesByCategory", () => {
         const issues = [
             issue({
                 category: "rendering",
-                severity: "some_new_level" as unknown as ContentIssue["severity"],
+                severity: "some_new_level" as unknown as Issue["severity"],
             }),
             issue({ category: "rendering", severity: "info" }),
         ];
@@ -183,7 +181,7 @@ describe("groupIssuesByCategory", () => {
 
     it("shows a reading we do not know rather than dropping it", () => {
         const groups = groupIssuesByCategory([
-            issue({ category: "some_new_reading" as ContentIssue["category"] }),
+            issue({ category: "some_new_reading" as Issue["category"] }),
             issue({ category: "content" }),
         ]);
 
@@ -200,8 +198,8 @@ describe("groupIssuesByCategory", () => {
     // read as it always did rather than throw on the way to a heading.
     it("shows a report written before categories existed as one unheaded run", () => {
         const issues = [
-            issue({ category: undefined as unknown as ContentIssue["category"] }),
-            issue({ category: undefined as unknown as ContentIssue["category"] }),
+            issue({ category: undefined as unknown as Issue["category"] }),
+            issue({ category: undefined as unknown as Issue["category"] }),
         ];
 
         const groups = groupIssuesByCategory(issues);
@@ -216,7 +214,7 @@ describe("groupIssuesByCategory", () => {
 
     it("keeps an issue that carries an empty category out of the headed groups", () => {
         const groups = groupIssuesByCategory([
-            issue({ category: "" as unknown as ContentIssue["category"] }),
+            issue({ category: "" as unknown as Issue["category"] }),
         ]);
 
         expect(groups[0].category).toBeUndefined();
@@ -240,7 +238,7 @@ describe("groupIssuesByCategory", () => {
                 location: "mailto:someone@example.com",
                 advice: "Avoid URL shorteners, IP addresses, and obfuscated URLs in emails",
             },
-        ] as unknown as ContentIssue[];
+        ] as unknown as Issue[];
 
         const groups = groupIssuesByCategory(stored);
 
@@ -255,7 +253,7 @@ describe("groupIssuesByCategory", () => {
     // findings that do name their reading under their heading.
     it("shows the uncategorised findings after the ones that name a reading", () => {
         const groups = groupIssuesByCategory([
-            issue({ category: undefined as unknown as ContentIssue["category"] }),
+            issue({ category: undefined as unknown as Issue["category"] }),
             issue({ category: "security" }),
         ]);
 

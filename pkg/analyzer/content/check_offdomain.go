@@ -83,8 +83,8 @@ var offDomainLinksCheck = contentCheck{
 		// everything read off the parts that arrived.
 		return []reading.Finding{reading.NewFinding(
 			defectOffDomainLinks,
-			model.ContentIssueTypeSenderDomainMismatch,
-			model.ContentIssueSeverityLow,
+			model.IssueTypeSenderDomainMismatch,
+			model.IssueSeverityLow,
 			"",
 			fmt.Sprintf(
 				"None of the %d destinations this message links to belongs to %s: %s",

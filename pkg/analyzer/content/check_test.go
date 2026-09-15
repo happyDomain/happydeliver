@@ -40,13 +40,13 @@ import (
 // test states what a check found rather than how it found it. The family given
 // is the one its findings are charged to, through a defect of its own so that
 // tuning a real one does not rewrite what these tests assert.
-func issuesOf(name string, family *reading.Family, severities ...model.ContentIssueSeverity) contentCheck {
+func issuesOf(name string, family *reading.Family, severities ...model.IssueSeverity) contentCheck {
 	return concernedIssuesOf(name, family, "", severities...)
 }
 
 // concernedIssuesOf is issuesOf with every finding keyed on one concern, for
 // the tests about merging.
-func concernedIssuesOf(name string, family *reading.Family, concern string, severities ...model.ContentIssueSeverity) contentCheck {
+func concernedIssuesOf(name string, family *reading.Family, concern string, severities ...model.IssueSeverity) contentCheck {
 	defect := &reading.Defect{Name: name, Family: family}
 
 	return contentCheck{
@@ -57,8 +57,8 @@ func concernedIssuesOf(name string, family *reading.Family, concern string, seve
 			for _, severity := range severities {
 				issues = append(issues, reading.Finding{
 					Defect: defect,
-					ContentIssue: model.ContentIssue{
-						Type:     model.ContentIssueTypeSuspiciousLink,
+					Issue: model.Issue{
+						Type:     model.IssueTypeSuspiciousLink,
 						Severity: severity,
 						Message:  name,
 					},
@@ -77,9 +77,9 @@ func failingCheck(name string) contentCheck {
 		Name:     name,
 		Category: reading.CategorySecurity,
 		Run: func(context.Context, *contentInput) ([]reading.Finding, error) {
-			return []reading.Finding{{ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeSuspiciousLink,
-				Severity: model.ContentIssueSeverityHigh,
+			return []reading.Finding{{Issue: model.Issue{
+				Type:     model.IssueTypeSuspiciousLink,
+				Severity: model.IssueSeverityHigh,
 				Message:  name,
 			}}}, errors.New("the service did not answer")
 		},
@@ -108,10 +108,10 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "each severity has its weight",
 			checks: []contentCheck{issuesOf("weighed", family,
-				model.ContentIssueSeverityCritical, // 3
-				model.ContentIssueSeverityHigh,     // 3
-				model.ContentIssueSeverityMedium,   // 2
-				model.ContentIssueSeverityLow,      // 1
+				model.IssueSeverityCritical, // 3
+				model.IssueSeverityHigh,     // 3
+				model.IssueSeverityMedium,   // 2
+				model.IssueSeverityLow,      // 1
 			)},
 			issues:  4,
 			penalty: 9,
@@ -119,7 +119,7 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "info weighs the same as low",
 			checks: []contentCheck{issuesOf("informed", family,
-				model.ContentIssueSeverityInfo,
+				model.IssueSeverityInfo,
 			)},
 			issues:  1,
 			penalty: 1,
@@ -127,8 +127,8 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "a check without a family reports without charging",
 			checks: []contentCheck{issuesOf("reporter", nil,
-				model.ContentIssueSeverityCritical,
-				model.ContentIssueSeverityCritical,
+				model.IssueSeverityCritical,
+				model.IssueSeverityCritical,
 			)},
 			issues:  2,
 			penalty: 0,
@@ -136,10 +136,10 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "a family is capped however much it found",
 			checks: []contentCheck{issuesOf("noisy", family,
-				model.ContentIssueSeverityCritical, // 3
-				model.ContentIssueSeverityCritical, // 3
-				model.ContentIssueSeverityCritical, // 3
-				model.ContentIssueSeverityCritical, // 3, past the cap of 10
+				model.IssueSeverityCritical, // 3
+				model.IssueSeverityCritical, // 3
+				model.IssueSeverityCritical, // 3
+				model.IssueSeverityCritical, // 3, past the cap of 10
 			)},
 			issues:  4,
 			penalty: 10,
@@ -148,12 +148,12 @@ func TestRunContentChecksPenalty(t *testing.T) {
 			name: "two checks share one cap",
 			checks: []contentCheck{
 				issuesOf("first", family,
-					model.ContentIssueSeverityCritical, // 3
-					model.ContentIssueSeverityCritical, // 3
+					model.IssueSeverityCritical, // 3
+					model.IssueSeverityCritical, // 3
 				),
 				issuesOf("second", family,
-					model.ContentIssueSeverityCritical, // 3
-					model.ContentIssueSeverityCritical, // 3, past the shared cap
+					model.IssueSeverityCritical, // 3
+					model.IssueSeverityCritical, // 3, past the shared cap
 				),
 			},
 			issues:  4,
@@ -163,16 +163,16 @@ func TestRunContentChecksPenalty(t *testing.T) {
 			name: "two families are capped apart",
 			checks: []contentCheck{
 				issuesOf("one", family,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
 				),
 				issuesOf("other", other,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
-					model.ContentIssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
+					model.IssueSeverityCritical,
 				),
 			},
 			issues:  8,
@@ -181,8 +181,8 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "a flat family ignores severity",
 			checks: []contentCheck{issuesOf("flat", flat,
-				model.ContentIssueSeverityLow, // 20 all the same
-				model.ContentIssueSeverityLow, // 20
+				model.IssueSeverityLow, // 20 all the same
+				model.IssueSeverityLow, // 20
 			)},
 			issues:  2,
 			penalty: 40,
@@ -190,9 +190,9 @@ func TestRunContentChecksPenalty(t *testing.T) {
 		{
 			name: "a flat family is capped too",
 			checks: []contentCheck{issuesOf("flat", flat,
-				model.ContentIssueSeverityCritical,
-				model.ContentIssueSeverityCritical,
-				model.ContentIssueSeverityCritical, // 60, past the cap of 40
+				model.IssueSeverityCritical,
+				model.IssueSeverityCritical,
+				model.IssueSeverityCritical, // 60, past the cap of 40
 			)},
 			issues:  3,
 			penalty: 40,
@@ -218,9 +218,9 @@ func TestRunContentChecksPenalty(t *testing.T) {
 // remark after everything it comments on.
 func TestRunContentChecksOrder(t *testing.T) {
 	checks := []contentCheck{
-		issuesOf("first", nil, model.ContentIssueSeverityLow),
-		issuesOf("second", nil, model.ContentIssueSeverityLow),
-		issuesOf("third", nil, model.ContentIssueSeverityLow),
+		issuesOf("first", nil, model.IssueSeverityLow),
+		issuesOf("second", nil, model.IssueSeverityLow),
+		issuesOf("third", nil, model.IssueSeverityLow),
 	}
 
 	issues, _ := reading.Run(context.Background(), checks, &contentInput{Results: &Results{}})
@@ -381,7 +381,7 @@ func TestCheckInputCarriesTheMessageAndItsMarkup(t *testing.T) {
 func TestACheckThatCouldNotAnswerIsNotReported(t *testing.T) {
 	checks := []contentCheck{
 		failingCheck("scanner"),
-		issuesOf("reader", nil, model.ContentIssueSeverityLow),
+		issuesOf("reader", nil, model.IssueSeverityLow),
 	}
 
 	issues, penalty := reading.Run(context.Background(), checks, &contentInput{Results: &Results{}})
@@ -435,7 +435,7 @@ func (c *Analyzer) analysisOf(observed *Results) *model.ContentAnalysis {
 
 // runCheck asks one check what it makes of the facts given, so that a test
 // about a check states the finding rather than the plumbing around it.
-func runCheck(t *testing.T, check contentCheck, results *Results) []model.ContentIssue {
+func runCheck(t *testing.T, check contentCheck, results *Results) []model.Issue {
 	t.Helper()
 
 	found, err := check.Run(context.Background(), results.checkInput())
@@ -443,9 +443,9 @@ func runCheck(t *testing.T, check contentCheck, results *Results) []model.Conten
 		t.Fatalf("the %q check could not answer: %v", check.Name, err)
 	}
 
-	issues := make([]model.ContentIssue, 0, len(found))
+	issues := make([]model.Issue, 0, len(found))
 	for _, finding := range found {
-		issues = append(issues, finding.ContentIssue)
+		issues = append(issues, finding.Issue)
 	}
 
 	return issues
@@ -506,13 +506,13 @@ func TestBrokenHTMLCheckReportsWhatTheReaderGaveUpOn(t *testing.T) {
 			}
 
 			for _, issue := range issues {
-				if issue.Type != model.ContentIssueTypeBrokenHtml {
-					t.Errorf("the finding is typed %q, want %q", issue.Type, model.ContentIssueTypeBrokenHtml)
+				if issue.Type != model.IssueTypeBrokenHtml {
+					t.Errorf("the finding is typed %q, want %q", issue.Type, model.IssueTypeBrokenHtml)
 				}
 				// High, not critical: the message still reaches the reader,
 				// it is what it looks like on arrival that is in doubt.
-				if issue.Severity != model.ContentIssueSeverityHigh {
-					t.Errorf("the finding is graded %q, want %q", issue.Severity, model.ContentIssueSeverityHigh)
+				if issue.Severity != model.IssueSeverityHigh {
+					t.Errorf("the finding is graded %q, want %q", issue.Severity, model.IssueSeverityHigh)
 				}
 				if issue.Advice == nil || *issue.Advice == "" {
 					t.Error("the finding names a defect without saying what to do about it")
@@ -551,11 +551,11 @@ func TestHTMLRemarkCheckReportsWithoutCharging(t *testing.T) {
 		for _, issue := range issues {
 			// Filed under broken_html for want of a type of its own, and kept
 			// at the lowest severity so it never reads as a defect.
-			if issue.Type != model.ContentIssueTypeBrokenHtml {
-				t.Errorf("the remark is typed %q, want %q", issue.Type, model.ContentIssueTypeBrokenHtml)
+			if issue.Type != model.IssueTypeBrokenHtml {
+				t.Errorf("the remark is typed %q, want %q", issue.Type, model.IssueTypeBrokenHtml)
 			}
-			if issue.Severity != model.ContentIssueSeverityLow {
-				t.Errorf("the remark is graded %q, want %q", issue.Severity, model.ContentIssueSeverityLow)
+			if issue.Severity != model.IssueSeverityLow {
+				t.Errorf("the remark is graded %q, want %q", issue.Severity, model.IssueSeverityLow)
 			}
 			if issue.Advice == nil || *issue.Advice == "" {
 				t.Error("the remark says nothing about what to do instead")

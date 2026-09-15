@@ -48,8 +48,8 @@ var templatePlaceholderCheck = contentCheck{
 
 			issues = append(issues, reading.NewFinding(
 				defectUnreplacedTemplate,
-				model.ContentIssueTypeUnreplacedTemplate,
-				model.ContentIssueSeverityHigh,
+				model.IssueTypeUnreplacedTemplate,
+				model.IssueSeverityHigh,
 				link.URL,
 				fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
 				"Ensure all merge fields and template placeholders are substituted before sending",
@@ -73,7 +73,7 @@ var linkSuspicionCheck = contentCheck{
 			for _, suspicion := range link.Suspicions {
 				found := reading.NewFinding(
 					defectSuspiciousURL,
-					model.ContentIssueTypeSuspiciousLink,
+					model.IssueTypeSuspiciousLink,
 					suspicion.Severity,
 					link.URL,
 					suspicion.Message,
@@ -117,8 +117,8 @@ var probeFindingCheck = contentCheck{
 		for _, probed := range in.Results.probedURLs() {
 			for _, finding := range probed.HTTPFindings {
 				issues = append(issues, reading.Finding{
-					Defect:       finding.defect(probed.Role),
-					ContentIssue: httpFindingIssue(probed.Location, probed.Role, finding),
+					Defect: finding.defect(probed.Role),
+					Issue:  httpFindingIssue(probed.Location, probed.Role, finding),
 				})
 			}
 		}
@@ -143,8 +143,8 @@ var unprobedURLsCheck = contentCheck{
 
 		return []reading.Finding{reading.NewFinding(
 			defectUnprobedURLs,
-			model.ContentIssueTypeUnreachableLink,
-			model.ContentIssueSeverityInfo,
+			model.IssueTypeUnreachableLink,
+			model.IssueSeverityInfo,
 			"",
 			fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
 			"Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same",

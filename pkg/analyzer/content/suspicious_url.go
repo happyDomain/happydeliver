@@ -76,7 +76,7 @@ const (
 // the advice shown to the user.
 type URLSuspicion struct {
 	Kind     URLSuspicionKind
-	Severity model.ContentIssueSeverity
+	Severity model.IssueSeverity
 	Message  string
 	Advice   string
 }
@@ -110,7 +110,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	if slices.Contains(dangerousSchemes, scheme) {
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionDangerousScheme,
-			Severity: model.ContentIssueSeverityCritical,
+			Severity: model.IssueSeverityCritical,
 			Message:  fmt.Sprintf("Link uses the %q scheme, which runs code or inlines content instead of pointing to a destination", scheme+":"),
 			Advice:   "Only use http: or https: links (plus mailto: and tel:) in emails; mail clients block the other schemes and filters score them as an attack",
 		})
@@ -146,7 +146,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 		hostPort = authority[idx+1:]
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionUserInfo,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("Link hides its real destination behind credentials: everything before the \"@\" is ignored, the browser goes to %q", hostName(hostPort)),
 			Advice:   "Remove the \"user@\" part from the URL; it shows one domain while the link reaches another, and filters score it as such",
 		})
@@ -162,14 +162,14 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	case strings.Contains(host, "%"):
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionEncodedHost,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("Hostname %q contains percent-escapes, which hide the domain the link really goes to", host),
 			Advice:   "Write the hostname in plain form; filters score a percent-escaped hostname as obfuscation",
 		})
 	case strings.ContainsAny(host, `()[]<>"'\ `):
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionEncodedHost,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("Hostname %q contains characters that cannot appear in a domain name", host),
 			Advice:   "Check the link: a hostname is made of letters, digits, hyphens and dots only",
 		})
@@ -178,7 +178,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 		// (the port would be numeric) nor a bracketed IPv6 literal.
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionEncodedHost,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("Hostname %q is malformed: the \":\" is neither a port separator nor part of a bracketed IPv6 address", host),
 			Advice:   "Write the authority as \"host\", \"host:port\" with a numeric port, or \"[ipv6]:port\" with brackets around the address",
 		})
@@ -188,14 +188,14 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	case isObfuscatedIPHost(host):
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionObfuscatedIPHost,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("Hostname %q is an IP address written in a notation that hides it (decimal, hexadecimal, octal, or fewer than four parts)", host),
 			Advice:   "Link to a domain name; filters score an IP address written in this form as evasion",
 		})
 	case net.ParseIP(host) != nil:
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionIPHost,
-			Severity: model.ContentIssueSeverityMedium,
+			Severity: model.IssueSeverityMedium,
 			Message:  fmt.Sprintf("Link points to the IP address %s instead of a domain name", host),
 			Advice:   "Use a domain name covered by your TLS certificate; filters score links to raw IP addresses as a strong spam and phishing signal",
 		})
@@ -204,7 +204,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	if isShortenerHost(host) {
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionShortener,
-			Severity: model.ContentIssueSeverityLow,
+			Severity: model.IssueSeverityLow,
 			Message:  fmt.Sprintf("Link goes through the URL shortener %q, so the recipient cannot see where it leads", host),
 			Advice:   "Link directly to your own domain (a branded click-tracking domain is fine); filters penalise public shorteners",
 		})
@@ -213,7 +213,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	if isDeceptiveHost(host) {
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionDeceptiveHost,
-			Severity: model.ContentIssueSeverityMedium,
+			Severity: model.IssueSeverityMedium,
 			Message:  fmt.Sprintf("Hostname %q embeds a top-level domain in the middle of its name, making it read like a different domain than the one it belongs to", host),
 			Advice:   "Avoid host names containing labels such as \".com.\" or \".net.\" before the real domain; filters score them as look-alikes",
 		})
@@ -222,7 +222,7 @@ func analyzeURLSuspicions(rawURL string) []URLSuspicion {
 	if port != "" && port != "80" && port != "443" {
 		suspicions = append(suspicions, URLSuspicion{
 			Kind:     URLSuspicionNonStandardPort,
-			Severity: model.ContentIssueSeverityLow,
+			Severity: model.IssueSeverityLow,
 			Message:  fmt.Sprintf("Link targets the non-standard port %s", port),
 			Advice:   "Serve email links on the standard ports 80/443; other ports are blocked on many networks and flagged by filters",
 		})
@@ -251,7 +251,7 @@ func insecureSchemeSuspicion(subject, rawURL string) *URLSuspicion {
 
 	return &URLSuspicion{
 		Kind:     URLSuspicionInsecureScheme,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  subject + " is served over http: instead of https:, so it travels in clear text and can be read or altered on the way",
 		Advice:   "Serve the same URL over https: and use that one; mail clients warn about plain http: URLs, and filters score them as a negative signal",
 	}

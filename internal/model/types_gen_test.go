@@ -74,15 +74,15 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			ContentAnalysisUnsubscribeMethodsLink.Valid, ContentAnalysisUnsubscribeMethodsListUnsubscribeHeader.Valid,
 			ContentAnalysisUnsubscribeMethodsMailto.Valid, ContentAnalysisUnsubscribeMethodsOneClick.Valid,
 		}},
-		{"ContentIssueSeverity", []func() bool{
-			ContentIssueSeverityCritical.Valid, ContentIssueSeverityHigh.Valid, ContentIssueSeverityInfo.Valid,
-			ContentIssueSeverityLow.Valid, ContentIssueSeverityMedium.Valid,
+		{"IssueSeverity", []func() bool{
+			IssueSeverityCritical.Valid, IssueSeverityHigh.Valid, IssueSeverityInfo.Valid,
+			IssueSeverityLow.Valid, IssueSeverityMedium.Valid,
 		}},
-		{"ContentIssueType", []func() bool{
-			ContentIssueTypeBrokenHtml.Valid, ContentIssueTypeDangerousHtml.Valid, ContentIssueTypeExcessiveImages.Valid,
-			ContentIssueTypeMissingAlt.Valid, ContentIssueTypeObfuscatedUrl.Valid, ContentIssueTypeSuspiciousLink.Valid,
-			ContentIssueTypeTruncatedBody.Valid, ContentIssueTypeUnreplacedTemplate.Valid,
-			ContentIssueTypeUnreachableLink.Valid, ContentIssueTypeExcessiveRedirects.Valid,
+		{"IssueType", []func() bool{
+			IssueTypeBrokenHtml.Valid, IssueTypeDangerousHtml.Valid, IssueTypeExcessiveImages.Valid,
+			IssueTypeMissingAlt.Valid, IssueTypeObfuscatedUrl.Valid, IssueTypeSuspiciousLink.Valid,
+			IssueTypeTruncatedBody.Valid, IssueTypeUnreplacedTemplate.Valid,
+			IssueTypeUnreachableLink.Valid, IssueTypeExcessiveRedirects.Valid,
 		}},
 		{"DMARCRecordDkimAlignment", []func() bool{
 			DMARCRecordDkimAlignmentRelaxed.Valid, DMARCRecordDkimAlignmentStrict.Valid,
@@ -220,8 +220,8 @@ func TestEnumValidRejectsUnknown(t *testing.T) {
 		AuthResultResult(bogus).Valid,
 		BlacklistCheckResponseGrade(bogus).Valid,
 		ContentAnalysisUnsubscribeMethods(bogus).Valid,
-		ContentIssueSeverity(bogus).Valid,
-		ContentIssueType(bogus).Valid,
+		IssueSeverity(bogus).Valid,
+		IssueType(bogus).Valid,
 		DMARCRecordDkimAlignment(bogus).Valid,
 		DMARCRecordNonexistentSubdomainPolicy(bogus).Valid,
 		DMARCRecordPolicy(bogus).Valid,

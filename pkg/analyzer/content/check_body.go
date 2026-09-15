@@ -44,8 +44,8 @@ var truncatedBodyCheck = contentCheck{
 
 		return []reading.Finding{reading.NewFinding(
 			defectTruncatedBody,
-			model.ContentIssueTypeTruncatedBody,
-			model.ContentIssueSeverityMedium,
+			model.IssueTypeTruncatedBody,
+			model.IssueSeverityMedium,
 			"",
 			"The message body stops before its end: it was cut short in transit, or its MIME structure announces a part that never follows. Only the parts that arrived were analysed.",
 			"Check the message size against the limits of the relays it goes through, and that the MIME boundaries it declares are all closed",
