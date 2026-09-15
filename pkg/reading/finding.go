@@ -42,9 +42,9 @@ const (
 )
 
 // NewFinding builds a finding at the place the check was looking. Every check
-// goes through it, so that the vocabulary of an issue (its type, its severity,
-// where it was found, what to do about it) is assembled the same way each
-// time.
+// of every reading goes through it, so that the vocabulary of an issue (its
+// type, its severity, where it was found, what to do about it) is assembled
+// the same way each time.
 //
 // Location and advice are taken as plain strings and made into pointers here,
 // because that is the whole of the ceremony a check used to repeat: the

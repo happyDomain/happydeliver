@@ -10,6 +10,7 @@
     import {
         AuthenticationCard,
         BlacklistCard,
+        AttachmentAnalysisCard,
         ContentAnalysisCard,
         DnsRecordsCard,
         EmailPathCard,
@@ -474,6 +475,19 @@
                             contentAnalysis={report.content_analysis}
                             contentGrade={report.summary?.content_grade}
                             contentScore={report.summary?.content_score}
+                        />
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Attachment Analysis -->
+            {#if report.attachment_analysis}
+                <div class="row mb-4" id="attachments">
+                    <div class="col-12">
+                        <AttachmentAnalysisCard
+                            attachmentAnalysis={report.attachment_analysis}
+                            attachmentsGrade={report.summary?.attachments_grade}
+                            attachmentsScore={report.summary?.attachments_score}
                         />
                     </div>
                 </div>

@@ -5,8 +5,8 @@ import {
     adviceAnchorsBySymbol,
     categoryLabel,
     contentIssueAnchor,
-    issueLabel,
     groupIssuesByCategory,
+    issueLabel,
 } from "$lib/issues";
 
 /** A content issue with only the fields these tests care about. */
