@@ -30,7 +30,10 @@ import (
 )
 
 // typeMismatchCheck compares what a file claims to be, in the message and in
-// its own name, against what its first bytes say it is.
+// its own name, against what its first bytes say it is. It speaks only of the
+// formats that have something to gain from lying, a program or an archive
+// announced as something else: a PNG named .jpg hides nothing and is not
+// reported.
 var typeMismatchCheck = staticCheck{
 	Name:    "attachment_type_mismatch",
 	Reports: []*reading.Defect{defectTypeMismatch},
@@ -42,9 +45,7 @@ var typeMismatchCheck = staticCheck{
 // typeMismatchFindings says what a file disagreeing with its own claims is
 // worth.
 func typeMismatchFindings(fileType fileinspect.Type, name fileinspect.Name, location string) (findings []reading.Finding) {
-	// A file whose content is a program has the most to gain from lying about
-	// what it is, so a mismatch that reveals one is read as a disguise rather
-	// than as carelessness.
+	// A disguised program is graver than a disguised archive.
 	severity := model.IssueSeverityMedium
 	if fileType.Executable {
 		severity = model.IssueSeverityHigh
@@ -57,7 +58,7 @@ func typeMismatchFindings(fileType fileinspect.Type, name fileinspect.Name, loca
 			severity,
 			location,
 			fmt.Sprintf("Declared Content-Type %q but content is detected as %q", fileType.Declared, fileType.Detected),
-			"The declared MIME type should match the actual file content",
+			"A program or an archive announced as another type slips past whatever trusts the announcement",
 		))
 	}
 

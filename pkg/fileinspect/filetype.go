@@ -38,12 +38,23 @@ var executableMediaTypes = []string{
 	"application/x-sharedlib",
 }
 
-// noClaimMediaType is the type that declares nothing: a file announced as a
-// stream of bytes has made no claim about itself, and so cannot have
-// contradicted one.
+// noClaimMediaType is the type that declares nothing, and so contradicts
+// nothing.
 const noClaimMediaType = "application/octet-stream"
 
-// Type is what a file turns out to be, against what it claimed to be.
+// mediaTypeAliases maps the spellings an archive type goes by in the wild to
+// the one the detector knows it under, for the aliases it does not resolve
+// itself.
+var mediaTypeAliases = map[string]string{
+	"application/x-zip":            "application/zip",
+	"application/x-zip-compressed": "application/zip",
+	"application/x-gzip":           "application/gzip",
+	"application/x-gtar":           tarMediaType,
+}
+
+// Type is what a file turns out to be, against what it claimed to be. The two
+// mismatch fields are set only when the content is a program or an archive
+// announced as something else: a PNG named .jpg has nothing to hide.
 type Type struct {
 	// Detected is the media type the content is in, as sniffed from its first
 	// bytes.
@@ -54,18 +65,15 @@ type Type struct {
 	Declared string
 
 	// Executable says the detected type is a program. It is read off the type
-	// hierarchy rather than off a magic number, and so covers formats
-	// DetectExecutable does not name one by one.
+	// hierarchy, and so covers formats detectExecutable does not name.
 	Executable bool
 
-	// DeclaredMismatch says the announced type and the content disagree. A
-	// file announced as a plain stream of bytes never sets it: it claimed
-	// nothing.
+	// DeclaredMismatch says the content is a program or an archive, and was
+	// announced as something else.
 	DeclaredMismatch bool
 
-	// ExtensionMismatch says the type the extension implies and the content
-	// disagree. An extension the standard library knows no type for never sets
-	// it: nothing was implied to disagree with.
+	// ExtensionMismatch says the content is a program or an archive, and its
+	// extension implies something else.
 	ExtensionMismatch bool
 }
 
@@ -78,19 +86,47 @@ func inspectType(name Name, declared string, mtype *mimetype.MIME) Type {
 		Executable: isExecutableMediaType(mtype),
 	}
 
-	if declared != "" && declared != noClaimMediaType && !mimeMatches(mtype, declared) {
-		fileType.DeclaredMismatch = true
+	// Only a program or an archive is worth disguising, and only those are
+	// held to their claims.
+	if !fileType.Executable && opener(fileType.Detected) == nil {
+		return fileType
 	}
+
+	fileType.DeclaredMismatch = contradicts(mtype, declared)
 
 	if name.Extension != "" {
 		if expected := mime.TypeByExtension("." + name.Extension); expected != "" {
-			if expectedMediaType := mediaTypeOf(expected); expectedMediaType != "" && !mimeMatches(mtype, expectedMediaType) {
-				fileType.ExtensionMismatch = true
-			}
+			fileType.ExtensionMismatch = contradicts(mtype, mediaTypeOf(expected))
 		}
 	}
 
 	return fileType
+}
+
+// contradicts reports whether what the content was detected as rules out what
+// was claimed for it. It errs on the side of agreement: a claim nobody made
+// contradicts nothing, neither does a claim the detector has never heard of,
+// nor a claim more specific than the detection (a docx whose telltale entry
+// lies past the sniffed prefix is detected as the zip it also is).
+func contradicts(mtype *mimetype.MIME, claimed string) bool {
+	claimed = canonicalMediaType(claimed)
+	if claimed == "" || claimed == noClaimMediaType || mimeMatches(mtype, claimed) {
+		return false
+	}
+
+	claimedType := mimetype.Lookup(claimed)
+
+	return claimedType != nil && !mimeMatches(claimedType, mtype.String())
+}
+
+// canonicalMediaType reduces a media type to the spelling the detector knows
+// it under.
+func canonicalMediaType(mediaType string) string {
+	if canonical, ok := mediaTypeAliases[mediaType]; ok {
+		return canonical
+	}
+
+	return mediaType
 }
 
 // isExecutableMediaType reports whether the detected type is an executable

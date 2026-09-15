@@ -69,13 +69,9 @@ func InspectHeader(filename, declaredMediaType string, data []byte) Facts {
 
 // Inspect reads one file through: the name it gives itself, the type it claims
 // against the type its bytes are in, and what its content turns out to be.
-//
-// declaredMediaType is what the file was announced as by whoever carried it,
-// already reduced to a media type; empty when nobody announced anything, which
-// is the case of a file found inside an archive.
-//
-// It reads the bytes it is handed and nothing else: no file is opened, no
-// service is asked.
+// declaredMediaType is what the file was announced as, already reduced to a
+// media type; empty when nobody announced anything. Looking inside an archive
+// is Walk's business.
 func Inspect(filename, declaredMediaType string, data []byte) Facts {
 	mtype := mimetype.Detect(data)
 	name := inspectName(filename)
