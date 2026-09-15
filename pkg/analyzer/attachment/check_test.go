@@ -22,9 +22,11 @@
 package attachment
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -64,6 +66,17 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	oversize := observed("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
 	oversize.Data = nil
 
+	var macro bytes.Buffer
+	macroWriter := zip.NewWriter(&macro)
+	for _, name := range []string{"[Content_Types].xml", "word/vbaProject.bin"} {
+		entry, err := macroWriter.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Write([]byte("content"))
+	}
+	macroWriter.Close()
+
 	recognised := observed("sample.bin", "application/octet-stream", []byte("sample"))
 	recognised.ClamAV = &clamav.Scan{Status: "infected", Signature: "Eicar-Signature"}
 	recognised.VirusTotal = &virustotal.Scan{Status: "malicious", Positives: 51, Total: 70}
@@ -75,6 +88,7 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	inputs := map[string]*Attachment{
 		"oversize":   oversize,
 		"disguised":  observed("invoice.pdf.exe", "application/pdf", mzStub),
+		"macro":      observed("macro.docm", "", macro.Bytes()),
 		"recognised": recognised,
 		"unanswered": unanswered,
 	}
@@ -206,6 +220,39 @@ func TestEveryIssueAnswersAReading(t *testing.T) {
 
 	if !seen {
 		t.Fatal("the checks reported nothing on the files built to make every check speak")
+	}
+}
+
+// TestTwoEnginesAgreeingReportOnce is what the merge exists for: a sample both
+// scanners recognise is one fact about one file, and used to reach the reader
+// as two critical alerts saying the same thing.
+func TestTwoEnginesAgreeingReportOnce(t *testing.T) {
+	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
+	attachment.ClamAV = &clamav.Scan{Status: "infected", Signature: "Eicar-Signature"}
+	attachment.VirusTotal = &virustotal.Scan{Status: "malicious", Positives: 51, Total: 70}
+
+	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	malware := []model.Issue{}
+	for _, issue := range issues {
+		if issue.Type == model.IssueTypeMalwareDetected {
+			malware = append(malware, issue)
+		}
+	}
+
+	if len(malware) != 1 {
+		t.Fatalf("Expected one malware finding for one file, got %d: %+v", len(malware), malware)
+	}
+	if !strings.Contains(malware[0].Message, "ClamAV") {
+		t.Errorf("Expected the local scanner's own words to be kept, got %q", malware[0].Message)
+	}
+	if malware[0].CorroboratedBy == nil || !slices.Contains(*malware[0].CorroboratedBy, "virustotal") {
+		t.Errorf("Expected virustotal to be named as agreeing, got %v", malware[0].CorroboratedBy)
+	}
+
+	// One defect, charged once, however many engines saw it.
+	if penalty != 100 {
+		t.Errorf("Expected the file to cost the whole scale once, got %d", penalty)
 	}
 }
 

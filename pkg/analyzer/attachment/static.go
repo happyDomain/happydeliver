@@ -52,6 +52,15 @@ var documentExtensions = map[string]bool{
 	"mp3": true, "mp4": true, "avi": true,
 }
 
+// macroEnabledExtensions are Office formats that may carry VBA macros by design
+var macroEnabledExtensions = map[string]bool{
+	"docm": true, "dotm": true, "xlsm": true, "xltm": true, "xlam": true,
+	"pptm": true, "potm": true, "ppam": true, "ppsm": true, "sldm": true,
+}
+
+// ole2Magic is the magic number of legacy OLE2 compound files (doc, xls, ppt, msi)
+var ole2Magic = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
+
 // staticFindings runs every offline detection over one file: its name, its
 // declared type against its content, and the harmful-content heuristics.
 //
@@ -66,6 +75,7 @@ func staticFindings(filename, declaredType string, data []byte, location string)
 	findings = append(findings, deceptiveNameFindings(filename, location)...)
 	findings = append(findings, typeMismatchFindings(filename, declaredType, mtype, location)...)
 	findings = append(findings, executableFindings(data, location)...)
+	findings = append(findings, macroFindings(filename, data, location)...)
 
 	return findings
 }

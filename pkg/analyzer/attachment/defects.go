@@ -34,6 +34,7 @@ var attachmentDefects = []*reading.Defect{
 	defectDangerousExtension,
 	defectDoubleExtension,
 	defectTypeMismatch,
+	defectMacro,
 	defectScanSkipped,
 	defectScanError,
 }
@@ -83,6 +84,9 @@ var (
 			model.IssueSeverityMedium: 20,
 		},
 	}
+
+	// familyMacro answers for an Office document carrying VBA macros.
+	familyMacro = &reading.Family{Name: "macro", Cap: 30, PerItem: 30}
 )
 
 var (
@@ -103,6 +107,9 @@ var (
 	// defectTypeMismatch: content that is not what the message or the filename
 	// says it is.
 	defectTypeMismatch = &reading.Defect{Name: "type_mismatch", Family: familyTypeMismatch}
+
+	// defectMacro: an Office document carrying VBA macros.
+	defectMacro = &reading.Defect{Name: "macro_detected", Family: familyMacro}
 
 	// defectScanSkipped: something was not looked at, and the reader is told so
 	// rather than left to read silence as a clean bill.

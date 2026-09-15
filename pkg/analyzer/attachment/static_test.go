@@ -22,6 +22,7 @@
 package attachment
 
 import (
+	"archive/zip"
 	"bytes"
 	"testing"
 
@@ -113,5 +114,52 @@ func TestStaticCheckELFExecutable(t *testing.T) {
 
 	if types := findingTypes(findings); types[model.IssueTypeExecutableContent] == 0 {
 		t.Errorf("Expected executable_content finding for ELF, got %+v", findings)
+	}
+}
+
+func TestStaticCheckOOXMLMacro(t *testing.T) {
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for _, name := range []string{"[Content_Types].xml", "word/document.xml", "word/vbaProject.bin"} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Write([]byte("content of " + name))
+	}
+	writer.Close()
+
+	findings := staticFindings("macro.docm", "", buf.Bytes(), "macro.docm")
+
+	if types := findingTypes(findings); types[model.IssueTypeMacroDetected] == 0 {
+		t.Errorf("Expected macro_detected finding, got %+v", findings)
+	}
+}
+
+func TestStaticCheckOOXMLWithoutMacro(t *testing.T) {
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for _, name := range []string{"[Content_Types].xml", "word/document.xml"} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Write([]byte("content"))
+	}
+	writer.Close()
+
+	findings := staticFindings("normal.docx", "", buf.Bytes(), "normal.docx")
+
+	if types := findingTypes(findings); types[model.IssueTypeMacroDetected] != 0 {
+		t.Errorf("Expected no macro finding for macro-free docx, got %+v", findings)
+	}
+}
+
+func TestStaticCheckOLE2Macro(t *testing.T) {
+	doc := append(append([]byte{}, ole2Magic...), []byte("...VBA...Attribut...")...)
+	findings := staticFindings("legacy.doc", "application/msword", doc, "legacy.doc")
+
+	if types := findingTypes(findings); types[model.IssueTypeMacroDetected] == 0 {
+		t.Errorf("Expected macro_detected finding for OLE2 with VBA marker, got %+v", findings)
 	}
 }

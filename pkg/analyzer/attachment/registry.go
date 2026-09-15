@@ -40,9 +40,10 @@ var attachmentChecks = []attachmentCheck{
 	filenameCheck,
 	typeMismatchCheck,
 
-	// What the content turns out to be: a program, whatever the file is
-	// called.
+	// What the content turns out to be, from the plainest to the most
+	// conditional: a program, a document that carries macros.
 	executableCheck,
+	macroCheck,
 
 	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
