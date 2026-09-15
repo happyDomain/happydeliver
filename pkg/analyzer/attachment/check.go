@@ -48,19 +48,19 @@ type attachmentInput struct {
 // shows, and what they cost its score.
 type Reading = reading.Evaluation
 
-// Read runs the registry over every attachment of a message.
-//
-// It answers one Reading per attachment, in the order Results holds them: a
-// caller pairs the two by index, and Analysis and Score both do. It is called
-// once and its answer handed to both, so that no attachment is read twice for
-// one report.
+// concernMalware keys the verdict that a file is malicious, whoever reached
+// it, so that a sample two engines recognise is reported once with the second
+// named as agreeing.
+const concernMalware = "malware"
+
+// Read runs the registry over every attachment of a message, and answers one
+// Reading per attachment, in the order Results holds them. It is called once
+// and its answer handed to both Analysis and Score.
 func (a *Analyzer) Read(observed *Results) []Reading {
 	if observed == nil || len(observed.Attachments) == 0 {
 		return nil
 	}
 
-	// The analysis owns the deadline it gives its checks, as it owns the one it
-	// gives its scanners.
 	ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
 	defer cancel()
 

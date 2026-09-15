@@ -31,7 +31,9 @@ import (
 )
 
 // scannerChecks is one check per engine the analysis knows of, read off
-// knownScanners rather than written out here.
+// knownScanners. One per engine rather than one over all of them, because the
+// merge is written in terms of observers: two engines recognising one sample
+// are two observers agreeing.
 func scannerChecks() []attachmentCheck {
 	checks := make([]attachmentCheck, 0, len(knownScanners))
 	for _, def := range knownScanners {
@@ -54,9 +56,10 @@ func scannerCheck(info scannerInfo) attachmentCheck {
 				return nil, nil
 			}
 
+			var found reading.Finding
 			switch scan.Status {
 			case model.ScanResultStatusMalicious:
-				found := reading.NewFinding(
+				found = reading.NewFinding(
 					defectMalware,
 					model.IssueTypeMalwareDetected,
 					model.IssueSeverityCritical,
@@ -64,9 +67,16 @@ func scannerCheck(info scannerInfo) attachmentCheck {
 					fmt.Sprintf("%s flags this file as malicious%s", info.Label, scanEvidence(scan)),
 					"This attachment is known to be malicious and must not be distributed",
 				)
-				found.Issue.Source = utils.PtrTo(model.IssueSource(info.Name))
 
-				return []reading.Finding{found}, nil
+			case model.ScanResultStatusSuspicious:
+				found = reading.NewFinding(
+					defectMalware,
+					model.IssueTypeMalwareDetected,
+					model.IssueSeverityHigh,
+					in.Attachment.Location,
+					fmt.Sprintf("%s finds this file suspicious%s", info.Label, scanEvidence(scan)),
+					"This attachment is flagged by too few engines to call it malicious, and by too many to ignore; verify its origin before opening it",
+				)
 
 			case model.ScanResultStatusError:
 				return []reading.Finding{scanCaveat(info.Label, scan.Detail, in.Attachment.Location)}, nil
@@ -88,24 +98,29 @@ func scannerCheck(info scannerInfo) attachmentCheck {
 				)}, nil
 
 			default:
-				// A clean bill, an answer not in yet, an engine this instance
-				// does not run: none of them is a finding. What became of each
-				// scan is in the report whatever it was, and that is where a
-				// reader reads it.
+				// Clean, unknown, pending, disabled: none of them is a finding.
 				return nil, nil
 			}
+
+			found.Concern = concernMalware
+			found.Issue.Source = utils.PtrTo(model.IssueSource(info.Name))
+
+			return []reading.Finding{found}, nil
 		},
 	}
 }
 
 // scanEvidence is what the engine offers in support of its verdict: the name
-// it gave the sample.
+// it gave the sample, or how many of the engines it speaks for flagged it.
 func scanEvidence(scan *Scan) string {
-	if scan.Verdict == "" {
+	switch {
+	case scan.Verdict != "":
+		return fmt.Sprintf(": %s", scan.Verdict)
+	case scan.EnginesTotal > 0:
+		return fmt.Sprintf(" (%d/%d engines)", scan.EnginesFlagged, scan.EnginesTotal)
+	default:
 		return ""
 	}
-
-	return fmt.Sprintf(": %s", scan.Verdict)
 }
 
 // scanReason is why a scanner said nothing about a file, when it said.

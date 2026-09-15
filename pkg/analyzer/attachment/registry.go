@@ -34,8 +34,7 @@ var attachmentChecks = append([]attachmentCheck{
 	// saw its name and its size. It is read first for that reason.
 	sizeCheck,
 
-	// What the engines made of the whole file comes last: they complement the
-	// readings above rather than replacing them, and the reader has met what
-	// happyDeliver saw for itself by the time they reach a verdict nobody here
-	// can explain. They are read off knownScanners, in its order.
+	// What the engines made of the whole file comes last, in the order of
+	// knownScanners, so that a sample two of them recognise is reported under
+	// the one listed first.
 }, scannerChecks()...)

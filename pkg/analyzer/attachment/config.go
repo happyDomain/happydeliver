@@ -34,6 +34,6 @@ var Settings = Options{
 }
 
 func init() {
-	flag.DurationVar(&Settings.ScanTimeout, "scan-timeout", Settings.ScanTimeout, "Timeout for reading one attachment, external scans included")
+	flag.DurationVar(&Settings.ScanTimeout, "scan-timeout", Settings.ScanTimeout, "Timeout for external attachment scans (ClamAV, VirusTotal)")
 	flag.Int64Var(&Settings.MaxSize, "max-attachment-size", Settings.MaxSize, "Maximum attachment size in bytes to analyze")
 }

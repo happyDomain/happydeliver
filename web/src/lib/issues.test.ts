@@ -101,6 +101,7 @@ describe("issueObserver", () => {
     it("names whoever else observed it", () => {
         expect(issueObserver({ source: "rspamd" })).toBe("rspamd");
         expect(issueObserver({ source: "clamav" })).toBe("clamav");
+        expect(issueObserver({ source: "virustotal" })).toBe("virustotal");
     });
 });
 

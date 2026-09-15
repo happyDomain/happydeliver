@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -66,11 +67,13 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	recognised := observed("sample.bin", "application/octet-stream", []byte("sample"))
 	recognised.Scans = []Scan{
 		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
+		{Scanner: "virustotal", Status: model.ScanResultStatusMalicious, EnginesFlagged: 51, EnginesTotal: 70},
 	}
 
 	unanswered := observed("unknown.bin", "application/octet-stream", []byte("unknown"))
 	unanswered.Scans = []Scan{
 		{Scanner: "clamav", Status: model.ScanResultStatusError, Detail: "connection refused"},
+		{Scanner: "virustotal", Status: model.ScanResultStatusSkipped, Detail: "file larger than the engine accepts"},
 	}
 
 	inputs := map[string]*Attachment{
@@ -209,6 +212,54 @@ func TestEveryIssueAnswersAReading(t *testing.T) {
 	}
 }
 
+// TestTwoEnginesAgreeingReportOnce is what the merge exists for: a sample both
+// scanners recognise is one fact about one file, and used to reach the reader
+// as two critical alerts saying the same thing.
+func TestTwoEnginesAgreeingReportOnce(t *testing.T) {
+	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
+	attachment.Scans = []Scan{
+		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
+		{Scanner: "virustotal", Status: model.ScanResultStatusMalicious, EnginesFlagged: 51, EnginesTotal: 70},
+	}
+
+	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	malware := []model.Issue{}
+	for _, issue := range issues {
+		if issue.Type == model.IssueTypeMalwareDetected {
+			malware = append(malware, issue)
+		}
+	}
+
+	if len(malware) != 1 {
+		t.Fatalf("Expected one malware finding for one file, got %d: %+v", len(malware), malware)
+	}
+	if !strings.Contains(malware[0].Message, "ClamAV") {
+		t.Errorf("Expected the local scanner's own words to be kept, got %q", malware[0].Message)
+	}
+	if malware[0].CorroboratedBy == nil || !slices.Contains(*malware[0].CorroboratedBy, "virustotal") {
+		t.Errorf("Expected virustotal to be named as agreeing, got %v", malware[0].CorroboratedBy)
+	}
+
+	// One defect, charged once, however many engines saw it.
+	if penalty != 100 {
+		t.Errorf("Expected the file to cost the whole scale once, got %d", penalty)
+	}
+}
+
+func TestASuspiciousVerdictCostsLessThanARecognisedSample(t *testing.T) {
+	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
+	attachment.Scans = []Scan{
+		{Scanner: "virustotal", Status: model.ScanResultStatusSuspicious, EnginesFlagged: 3, EnginesTotal: 70},
+	}
+
+	_, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	if penalty != 40 {
+		t.Errorf("Expected a suspicious verdict to cost 40, got %d", penalty)
+	}
+}
+
 // TestAScannerThatCouldNotAnswerLeavesTheReportStanding checks that a scanner
 // being down is reported as the caveat it is, and costs nothing.
 func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
@@ -224,24 +275,5 @@ func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
 	}
 	if penalty != 0 {
 		t.Errorf("Expected a scanner being down to cost nothing, got a penalty of %d", penalty)
-	}
-}
-
-// TestARecognisedSampleDecidesTheGrade holds the engine's verdict to what it
-// is worth: a file it recognises leaves nothing else about the message worth
-// discussing.
-func TestARecognisedSampleDecidesTheGrade(t *testing.T) {
-	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
-	attachment.Scans = []Scan{
-		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
-	}
-
-	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
-
-	if types := issueTypes(issues); types[model.IssueTypeMalwareDetected] == 0 {
-		t.Errorf("Expected a malware finding, got %+v", issues)
-	}
-	if penalty != 100 {
-		t.Errorf("Expected the file to cost the whole scale, got %d", penalty)
 	}
 }

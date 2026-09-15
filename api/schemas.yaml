@@ -359,10 +359,11 @@ components:
           items:
             type: string
           description: >-
-            Other observers that reported this same defect. When happyDeliver
-            and the spam filter both see it, one issue is reported and the
-            others are named here, so the defect is not listed twice while the
-            agreement stays visible.
+            Other observers that reported this same defect. When two of them
+            see it (happyDeliver and the spam filter, or two antivirus engines
+            handed the same file), one issue is reported and the others are
+            named here, so the defect is not listed twice while the agreement
+            stays visible.
           example: ["R_SUSPICIOUS_IMAGES"]
 
     IssueSource:
@@ -459,24 +460,38 @@ components:
           example: "clamav"
         status:
           type: string
-          enum: [clean, malicious, pending, error, skipped, disabled]
+          enum: [clean, suspicious, malicious, unknown, pending, error, skipped, disabled]
           description: >-
-            What the scanner made of the file. `clean` and `malicious` are
-            verdicts; the rest are the ways there is no verdict, and they are
-            not interchangeable. `pending` = it is analysing it and the answer
-            is not in yet, `error` = it was asked and could not answer,
-            `skipped` = it was not asked about this particular file (too large,
-            or the file was never read), `disabled` = it is not configured on
-            this instance at all.
+            What the scanner made of the file. `clean`, `suspicious` and
+            `malicious` are verdicts; the rest are the ways there is no verdict,
+            and they are not interchangeable. `unknown` = the engine has never
+            seen this file, `pending` = it is analysing it and the answer is not
+            in yet, `error` = it was asked and could not answer, `skipped` = it
+            was not asked about this particular file (too large, or the file was
+            never read), `disabled` = it is not configured on this instance at
+            all.
           example: "clean"
         verdict:
           type: string
           description: What the scanner named what it recognised, when it recognised something
           example: "Eicar-Signature"
+        engines_flagged:
+          type: integer
+          description: Number of engines that flagged the file, for a scanner that aggregates several. Absent for a single-engine scanner.
+          example: 0
+        engines_total:
+          type: integer
+          description: Number of engines that analyzed the file, for a scanner that aggregates several. Absent for a single-engine scanner.
+          example: 74
+        link:
+          type: string
+          format: uri
+          description: Where the scanner publishes its own report for this file, when it publishes one
+          example: "https://www.virustotal.com/gui/file/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         detail:
           type: string
           description: What the scanner said beyond its status, and the only place an error or a skip explains itself
-          example: "connection refused"
+          example: "VirusTotal rate limit exceeded"
         metadata:
           type: object
           additionalProperties:
