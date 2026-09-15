@@ -78,9 +78,9 @@ var offDomainLinksCheck = contentCheck{
 			return nil, nil
 		}
 
-		return []reading.Finding{{Defect: defectOffDomainLinks, ContentIssue: model.ContentIssue{
-			Type:     model.ContentIssueTypeSenderDomainMismatch,
-			Severity: model.ContentIssueSeverityLow,
+		return []reading.Finding{{Defect: defectOffDomainLinks, Issue: model.Issue{
+			Type:     model.IssueTypeSenderDomainMismatch,
+			Severity: model.IssueSeverityLow,
 			// What is stated is what was read: the destinations found, and
 			// that none of them is the sender's. A body that stopped short
 			// has been reported as such above, which qualifies this as it

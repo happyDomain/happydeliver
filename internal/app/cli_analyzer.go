@@ -690,7 +690,7 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 				// Say when a finding comes from the spam filter rather than
 				// from happyDeliver's own reading, and name the symbol so the
 				// reader can look it up.
-				if issue.Source != nil && *issue.Source == model.ContentIssueSourceRspamd {
+				if issue.Source != nil && *issue.Source == model.IssueSourceRspamd {
 					if issue.Symbol != nil {
 						fmt.Fprintf(writer, "      Reported by: rspamd (%s)\n", *issue.Symbol)
 					} else {

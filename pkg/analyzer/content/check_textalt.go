@@ -66,9 +66,9 @@ var textAlternativeCheck = contentCheck{
 
 		return []reading.Finding{{
 			Defect: defectTextHTMLMismatch,
-			ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeTextHtmlMismatch,
-				Severity: model.ContentIssueSeverityHigh,
+			Issue: model.Issue{
+				Type:     model.IssueTypeTextHtmlMismatch,
+				Severity: model.IssueSeverityHigh,
 				Message:  message,
 				Advice:   utils.PtrTo(advice),
 			},
@@ -106,9 +106,9 @@ var textLinkParityCheck = contentCheck{
 			location := missing
 			issues = append(issues, reading.Finding{
 				Defect: defectTextLinkMissing,
-				ContentIssue: model.ContentIssue{
-					Type:     model.ContentIssueTypeTextHtmlMismatch,
-					Severity: model.ContentIssueSeverityLow,
+				Issue: model.Issue{
+					Type:     model.IssueTypeTextHtmlMismatch,
+					Severity: model.IssueSeverityLow,
 					Message:  fmt.Sprintf("The plain text part offers a destination the HTML part does not: %s", missing),
 					Location: &location,
 					Advice:   utils.PtrTo("Check that both parts lead to the same places; clients preferring text otherwise offer a destination the HTML does not, and filters compare the two parts"),

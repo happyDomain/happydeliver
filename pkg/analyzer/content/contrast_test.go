@@ -62,7 +62,7 @@ func TestLowContrastFindsThePairsItCanSee(t *testing.T) {
 	if finding.Defect != defectLowContrast {
 		t.Errorf("the finding is priced as %v, want the contrast defect", finding.Defect)
 	}
-	if finding.Type != model.ContentIssueTypeLowContrast {
+	if finding.Type != model.IssueTypeLowContrast {
 		t.Errorf("the finding is typed %q, want low_contrast", finding.Type)
 	}
 	if finding.Location == nil || !strings.Contains(*finding.Location, "Book a place") {
@@ -257,13 +257,13 @@ func TestLowContrastAggregatesByPair(t *testing.T) {
 func TestLowContrastSeverity(t *testing.T) {
 	// #999999 on white is 2.85:1, under every threshold there is.
 	illegible := findingsOnMarkup(t, `<p style="color:#999999;background-color:#ffffff">Pale</p>`)
-	if len(illegible) != 1 || illegible[0].Severity != model.ContentIssueSeverityHigh {
+	if len(illegible) != 1 || illegible[0].Severity != model.IssueSeverityHigh {
 		t.Errorf("a pair under 3:1 is reported at %v, want high", severitiesOf(illegible))
 	}
 
 	// #007bff on white is 3.98:1: lost to some readers, legible to most.
 	marginal := findingsOnMarkup(t, `<p style="color:#007bff;background-color:#ffffff">Blue</p>`)
-	if len(marginal) != 1 || marginal[0].Severity != model.ContentIssueSeverityMedium {
+	if len(marginal) != 1 || marginal[0].Severity != model.IssueSeverityMedium {
 		t.Errorf("a pair between 3:1 and its threshold is reported at %v, want medium", severitiesOf(marginal))
 	}
 }
@@ -315,8 +315,8 @@ func TestDirectTextIsTheElementsOwn(t *testing.T) {
 }
 
 // severitiesOf makes a failing test say what severity was reported.
-func severitiesOf(findings []reading.Finding) []model.ContentIssueSeverity {
-	severities := make([]model.ContentIssueSeverity, 0, len(findings))
+func severitiesOf(findings []reading.Finding) []model.IssueSeverity {
+	severities := make([]model.IssueSeverity, 0, len(findings))
 	for _, finding := range findings {
 		severities = append(severities, finding.Severity)
 	}

@@ -34,16 +34,16 @@ import (
 // It is the package's only statement of that order. A check that needs to
 // compare, sort or cap a severity reads it from here, so that adding a level to
 // the scale is one edit rather than a hunt.
-var severityOrder = []model.ContentIssueSeverity{
-	model.ContentIssueSeverityInfo,
-	model.ContentIssueSeverityLow,
-	model.ContentIssueSeverityMedium,
-	model.ContentIssueSeverityHigh,
-	model.ContentIssueSeverityCritical,
+var severityOrder = []model.IssueSeverity{
+	model.IssueSeverityInfo,
+	model.IssueSeverityLow,
+	model.IssueSeverityMedium,
+	model.IssueSeverityHigh,
+	model.IssueSeverityCritical,
 }
 
 // lesserSeverity is the more modest of two severities.
-func lesserSeverity(a, b model.ContentIssueSeverity) model.ContentIssueSeverity {
+func lesserSeverity(a, b model.IssueSeverity) model.IssueSeverity {
 	if slices.Index(severityOrder, a) <= slices.Index(severityOrder, b) {
 		return a
 	}
@@ -57,7 +57,7 @@ func lesserSeverity(a, b model.ContentIssueSeverity) model.ContentIssueSeverity 
 // A severity the scale does not name ranks at the bottom rather than below it,
 // which is where slices.Index would put it: an unknown value is the most
 // modest thing we can say about a finding, not something graver than silence.
-func severityRank(severity model.ContentIssueSeverity) int {
+func severityRank(severity model.IssueSeverity) int {
 	rank := slices.Index(severityOrder, severity)
 	if rank < 0 {
 		return 1

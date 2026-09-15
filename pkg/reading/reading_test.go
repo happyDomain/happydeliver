@@ -35,7 +35,7 @@ type message struct{}
 
 // reports builds a check reporting one issue per severity given, so that a
 // test states what a check found rather than how it found it.
-func reports(name string, family *Family, severities ...model.ContentIssueSeverity) Check[message] {
+func reports(name string, family *Family, severities ...model.IssueSeverity) Check[message] {
 	defect := &Defect{Name: name, Family: family}
 
 	return Check[message]{
@@ -46,8 +46,8 @@ func reports(name string, family *Family, severities ...model.ContentIssueSeveri
 			findings := make([]Finding, 0, len(severities))
 			for _, severity := range severities {
 				findings = append(findings, Finding{
-					Defect:       defect,
-					ContentIssue: model.ContentIssue{Severity: severity, Message: name},
+					Defect: defect,
+					Issue:  model.Issue{Severity: severity, Message: name},
 				})
 			}
 			return findings, nil
@@ -57,7 +57,7 @@ func reports(name string, family *Family, severities ...model.ContentIssueSeveri
 
 // concerning builds a check whose findings all name one concern, for the tests
 // about two checks seeing one defect.
-func concerning(name string, concern string, severities ...model.ContentIssueSeverity) Check[message] {
+func concerning(name string, concern string, severities ...model.IssueSeverity) Check[message] {
 	return Check[message]{
 		Name:     name,
 		Category: CategoryContent,
@@ -65,8 +65,8 @@ func concerning(name string, concern string, severities ...model.ContentIssueSev
 			findings := make([]Finding, 0, len(severities))
 			for _, severity := range severities {
 				findings = append(findings, Finding{
-					Concern:      concern,
-					ContentIssue: model.ContentIssue{Severity: severity, Message: name},
+					Concern: concern,
+					Issue:   model.Issue{Severity: severity, Message: name},
 				})
 			}
 			return findings, nil
@@ -81,7 +81,7 @@ func TestRunCharges(t *testing.T) {
 	other := &Family{Name: "test_other", Cap: 10}
 	flat := &Family{Name: "test_flat", Cap: 40, PerItem: 20}
 
-	critical := model.ContentIssueSeverityCritical
+	critical := model.IssueSeverityCritical
 
 	tests := []struct {
 		name    string
@@ -92,7 +92,7 @@ func TestRunCharges(t *testing.T) {
 		{"nothing found costs nothing", []Check[message]{reports("quiet", family)}, 0, 0},
 		{
 			"each severity has its weight",
-			[]Check[message]{reports("weighed", family, critical, model.ContentIssueSeverityHigh, model.ContentIssueSeverityMedium, model.ContentIssueSeverityLow)},
+			[]Check[message]{reports("weighed", family, critical, model.IssueSeverityHigh, model.IssueSeverityMedium, model.IssueSeverityLow)},
 			4, 9,
 		},
 		{
@@ -117,7 +117,7 @@ func TestRunCharges(t *testing.T) {
 		},
 		{
 			"a flat family ignores severity, and is capped too",
-			[]Check[message]{reports("flat", flat, model.ContentIssueSeverityLow, critical, critical)},
+			[]Check[message]{reports("flat", flat, model.IssueSeverityLow, critical, critical)},
 			3, 40,
 		},
 	}
@@ -140,7 +140,7 @@ func TestRunCharges(t *testing.T) {
 // registry lists the checks: that order is how a reading puts what qualifies
 // the rest first, and what merely remarks last.
 func TestRunKeepsRegistryOrder(t *testing.T) {
-	low := model.ContentIssueSeverityLow
+	low := model.IssueSeverityLow
 	checks := []Check[message]{reports("first", nil, low), reports("second", nil, low), reports("third", nil, low)}
 
 	issues, _ := Run(context.Background(), checks, message{})
@@ -164,12 +164,12 @@ func TestACheckThatCouldNotAnswerIsNotReported(t *testing.T) {
 	failing := Check[message]{
 		Name: "scanner",
 		Run: func(context.Context, message) ([]Finding, error) {
-			return []Finding{{ContentIssue: model.ContentIssue{Severity: model.ContentIssueSeverityHigh, Message: "scanner"}}},
+			return []Finding{{Issue: model.Issue{Severity: model.IssueSeverityHigh, Message: "scanner"}}},
 				errors.New("the service did not answer")
 		},
 	}
 
-	issues, penalty := Run(context.Background(), []Check[message]{failing, reports("reader", nil, model.ContentIssueSeverityLow)}, message{})
+	issues, penalty := Run(context.Background(), []Check[message]{failing, reports("reader", nil, model.IssueSeverityLow)}, message{})
 
 	if len(issues) != 1 || issues[0].Message != "reader" {
 		t.Fatalf("reported %+v, want the sole finding of the check that answered", issues)
@@ -183,7 +183,7 @@ func TestACheckThatCouldNotAnswerIsNotReported(t *testing.T) {
 // the same thing about the same object leave one finding, naming the other as
 // having seen it too.
 func TestADefectSeenTwiceIsReportedOnce(t *testing.T) {
-	low := model.ContentIssueSeverityLow
+	low := model.IssueSeverityLow
 	checks := []Check[message]{
 		concerning("ours", "dead_link:https://example.com/", low),
 		concerning("filter", "dead_link:https://example.com/", low),
@@ -205,7 +205,7 @@ func TestADefectSeenTwiceIsReportedOnce(t *testing.T) {
 // TestAnObserverAgreeingWithItselfIsNotACorroboration: the same check reporting
 // one concern twice has found it twice, not had it confirmed.
 func TestAnObserverAgreeingWithItselfIsNotACorroboration(t *testing.T) {
-	low := model.ContentIssueSeverityLow
+	low := model.IssueSeverityLow
 	twice := concerning("ours", "dead_link:https://example.com/", low, low)
 
 	issues, _ := Run(context.Background(), []Check[message]{twice}, message{})
@@ -226,8 +226,8 @@ func TestAFindingAnswersItsCheckReading(t *testing.T) {
 		Category: CategoryDeliverability,
 		Run: func(context.Context, message) ([]Finding, error) {
 			return []Finding{
-				{ContentIssue: model.ContentIssue{Message: "silent"}},
-				{ContentIssue: model.ContentIssue{Message: "spoken", Category: CategorySecurity}},
+				{Issue: model.Issue{Message: "silent"}},
+				{Issue: model.Issue{Message: "spoken", Category: CategorySecurity}},
 			}, nil
 		},
 	}

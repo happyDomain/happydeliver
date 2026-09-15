@@ -49,7 +49,7 @@ func rspamdWith(symbols map[string]string) *model.RspamdResult {
 	return result
 }
 
-func runRspamdCheck(t *testing.T, rspamd *model.RspamdResult) []model.ContentIssue {
+func runRspamdCheck(t *testing.T, rspamd *model.RspamdResult) []model.Issue {
 	t.Helper()
 
 	found, err := rspamdFindingsCheck.Run(context.Background(), &contentInput{Results: &Results{Rspamd: rspamd}})
@@ -57,9 +57,9 @@ func runRspamdCheck(t *testing.T, rspamd *model.RspamdResult) []model.ContentIss
 		t.Fatalf("the rspamd check could not answer: %v", err)
 	}
 
-	issues := make([]model.ContentIssue, 0, len(found))
+	issues := make([]model.Issue, 0, len(found))
 	for _, finding := range found {
-		issues = append(issues, finding.ContentIssue)
+		issues = append(issues, finding.Issue)
 	}
 
 	return issues
@@ -152,7 +152,7 @@ func TestRspamdFindingCarriesItsProvenance(t *testing.T) {
 
 	issue := issues[0]
 
-	if issue.Source == nil || *issue.Source != model.ContentIssueSourceRspamd {
+	if issue.Source == nil || *issue.Source != model.IssueSourceRspamd {
 		t.Errorf("finding does not say it comes from rspamd: %+v", issue.Source)
 	}
 	if issue.Symbol == nil || *issue.Symbol != "ZERO_FONT" {
@@ -161,8 +161,8 @@ func TestRspamdFindingCarriesItsProvenance(t *testing.T) {
 	if issue.Advice == nil || *issue.Advice == "" {
 		t.Error("finding carries no advice, which is the whole point of the catalogue")
 	}
-	if issue.Type != model.ContentIssueTypeHiddenText {
-		t.Errorf("finding is filed under %q, want %q", issue.Type, model.ContentIssueTypeHiddenText)
+	if issue.Type != model.IssueTypeHiddenText {
+		t.Errorf("finding is filed under %q, want %q", issue.Type, model.IssueTypeHiddenText)
 	}
 }
 
@@ -317,7 +317,7 @@ func TestRspamdFindingsReachTheReport(t *testing.T) {
 		t.Fatal("the report holds no content issue")
 	}
 
-	var found *model.ContentIssue
+	var found *model.Issue
 	for i, issue := range *analysis.HtmlIssues {
 		if issue.Symbol != nil && *issue.Symbol == "ZERO_FONT" {
 			found = &(*analysis.HtmlIssues)[i]
@@ -330,8 +330,8 @@ func TestRspamdFindingsReachTheReport(t *testing.T) {
 	if found == nil {
 		t.Fatal("ZERO_FONT was raised on the message but is missing from the report")
 	}
-	if found.Type != model.ContentIssueTypeHiddenText {
-		t.Errorf("the finding is filed under %q, want %q", found.Type, model.ContentIssueTypeHiddenText)
+	if found.Type != model.IssueTypeHiddenText {
+		t.Errorf("the finding is filed under %q, want %q", found.Type, model.IssueTypeHiddenText)
 	}
 
 	// And the score answers for it, once.

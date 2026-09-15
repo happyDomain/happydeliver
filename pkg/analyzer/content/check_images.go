@@ -52,9 +52,9 @@ var missingAltCheck = contentCheck{
 			return nil, nil
 		}
 
-		return []reading.Finding{{Defect: defectMissingAlt, ContentIssue: model.ContentIssue{
-			Type:     model.ContentIssueTypeMissingAlt,
-			Severity: model.ContentIssueSeverityMedium,
+		return []reading.Finding{{Defect: defectMissingAlt, Issue: model.Issue{
+			Type:     model.IssueTypeMissingAlt,
+			Severity: model.IssueSeverityMedium,
 			Message: fmt.Sprintf("%s %s no alt attribute",
 				counted(missing, "One image", "images"), agree(missing, "carries", "carry")),
 			Advice: utils.PtrTo("Add descriptive alt text to all images for better accessibility and deliverability"),
@@ -77,9 +77,9 @@ var excessiveImagesCheck = contentCheck{
 
 		return []reading.Finding{{
 			Defect: defectExcessiveImages,
-			ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeExcessiveImages,
-				Severity: model.ContentIssueSeverityMedium,
+			Issue: model.Issue{
+				Type:     model.IssueTypeExcessiveImages,
+				Severity: model.IssueSeverityMedium,
 				Message:  "Email is excessively image-heavy",
 				Advice:   utils.PtrTo("Reduce the number of images relative to text content"),
 			},
@@ -109,8 +109,8 @@ var imageSuspicionCheck = contentCheck{
 				location := img.Src
 				issues = append(issues, reading.Finding{
 					Defect: defectSuspiciousURL,
-					ContentIssue: model.ContentIssue{
-						Type:     model.ContentIssueTypeSuspiciousLink,
+					Issue: model.Issue{
+						Type:     model.IssueTypeSuspiciousLink,
 						Severity: suspicion.Severity,
 						Message:  suspicion.Message,
 						Location: &location,

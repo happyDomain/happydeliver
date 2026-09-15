@@ -47,9 +47,9 @@ var brokenHTMLCheck = contentCheck{
 
 		issues := make([]reading.Finding, 0, len(in.Results.HTMLErrors))
 		for _, errMsg := range in.Results.HTMLErrors {
-			issues = append(issues, reading.Finding{Defect: defectBrokenHTML, ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeBrokenHtml,
-				Severity: model.ContentIssueSeverityHigh,
+			issues = append(issues, reading.Finding{Defect: defectBrokenHTML, Issue: model.Issue{
+				Type:     model.IssueTypeBrokenHtml,
+				Severity: model.IssueSeverityHigh,
 				Message:  errMsg,
 				Advice:   utils.PtrTo("Fix HTML structure errors to improve email rendering across clients"),
 			}})
@@ -80,9 +80,9 @@ var harmfulHTMLCheck = contentCheck{
 				return
 			}
 
-			findings = append(findings, reading.Finding{Defect: defectDangerousHTML, ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeDangerousHtml,
-				Severity: model.ContentIssueSeverityCritical,
+			findings = append(findings, reading.Finding{Defect: defectDangerousHTML, Issue: model.Issue{
+				Type:     model.IssueTypeDangerousHtml,
+				Severity: model.IssueSeverityCritical,
 				Message:  message,
 				Advice:   utils.PtrTo("Remove dangerous HTML tags like <script>, <iframe>, <object>, <embed>, <applet>, <form>, and <base> from email content"),
 			}})
@@ -176,9 +176,9 @@ var htmlRemarkCheck = contentCheck{
 
 			findings = append(findings, reading.Finding{
 				Defect: defectHTMLRemark,
-				ContentIssue: model.ContentIssue{
-					Type:     model.ContentIssueTypeBrokenHtml,
-					Severity: model.ContentIssueSeverityLow,
+				Issue: model.Issue{
+					Type:     model.IssueTypeBrokenHtml,
+					Severity: model.IssueSeverityLow,
 					Message:  fmt.Sprintf("External stylesheet link detected: %s - may cause rendering issues or privacy concerns", href),
 					Advice:   utils.PtrTo("Use inline CSS instead of external stylesheets for better email compatibility"),
 				},

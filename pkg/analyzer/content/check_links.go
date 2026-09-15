@@ -48,9 +48,9 @@ var templatePlaceholderCheck = contentCheck{
 			}
 
 			location := link.URL
-			issues = append(issues, reading.Finding{Defect: defectUnreplacedTemplate, ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeUnreplacedTemplate,
-				Severity: model.ContentIssueSeverityHigh,
+			issues = append(issues, reading.Finding{Defect: defectUnreplacedTemplate, Issue: model.Issue{
+				Type:     model.IssueTypeUnreplacedTemplate,
+				Severity: model.IssueSeverityHigh,
 				Message:  fmt.Sprintf("Link contains an unreplaced template placeholder: %s", link.URL),
 				Location: &location,
 				Advice:   utils.PtrTo("Ensure all merge fields and template placeholders are substituted before sending"),
@@ -74,8 +74,8 @@ var linkSuspicionCheck = contentCheck{
 			for _, suspicion := range link.Suspicions {
 				issues = append(issues, reading.Finding{
 					Defect: defectSuspiciousURL,
-					ContentIssue: model.ContentIssue{
-						Type:     model.ContentIssueTypeSuspiciousLink,
+					Issue: model.Issue{
+						Type:     model.IssueTypeSuspiciousLink,
 						Severity: suspicion.Severity,
 						Message:  suspicion.Message,
 						Location: &link.URL,
@@ -118,8 +118,8 @@ var probeFindingCheck = contentCheck{
 		for _, probed := range in.Results.probedURLs() {
 			for _, finding := range probed.HTTPFindings {
 				issues = append(issues, reading.Finding{
-					Defect:       finding.defect(probed.Role),
-					ContentIssue: httpFindingIssue(probed.Location, probed.Role, finding),
+					Defect: finding.defect(probed.Role),
+					Issue:  httpFindingIssue(probed.Location, probed.Role, finding),
 				})
 			}
 		}
@@ -142,9 +142,9 @@ var unprobedURLsCheck = contentCheck{
 			return nil, nil
 		}
 
-		return []reading.Finding{{Defect: defectUnprobedURLs, ContentIssue: model.ContentIssue{
-			Type:     model.ContentIssueTypeUnreachableLink,
-			Severity: model.ContentIssueSeverityInfo,
+		return []reading.Finding{{Defect: defectUnprobedURLs, Issue: model.Issue{
+			Type:     model.IssueTypeUnreachableLink,
+			Severity: model.IssueSeverityInfo,
 			Message:  fmt.Sprintf("The message carries more distinct URLs than one analysis fetches: %d of them were left unchecked", in.Results.UnprobedURLs),
 			Advice:   utils.PtrTo("Cut the number of distinct destinations down; a message with hundreds of them is harder to check, for this report and for the filters that do the same"),
 		}}}, nil

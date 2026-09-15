@@ -379,7 +379,7 @@ type compatFeature struct {
 	//
 	// Nothing here reaches "critical" or "high": those say the message did not
 	// arrive as a message, and a dropped property never does that.
-	Impact model.ContentIssueSeverity
+	Impact model.IssueSeverity
 
 	// Advice is what the sender is to do instead. It is written here rather
 	// than taken from the dataset, whose descriptions document a feature for a
@@ -408,27 +408,27 @@ var compatFeatures = []compatFeature{
 		// supported at all. What breaks a layout is taking an element out of
 		// the flow and expecting it to stay where it was put.
 		Values: []string{"absolute", "fixed", "sticky"},
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Place the element with nested tables, cell padding and spacer rows instead; where position is dropped the element falls back into the document flow",
 	},
 	{
 		Slug:       "css-display-flex",
 		Properties: []string{"display"},
 		Values:     []string{"flex", "inline-flex"},
-		Impact:     model.ContentIssueSeverityMedium,
+		Impact:     model.IssueSeverityMedium,
 		Advice:     "Lay the row out as a table with one cell per column; flexbox is dropped rather than approximated, so its children stack into a single column",
 	},
 	{
 		Slug:       "css-display-grid",
 		Properties: []string{"display"},
 		Values:     []string{"grid", "inline-grid"},
-		Impact:     model.ContentIssueSeverityMedium,
+		Impact:     model.IssueSeverityMedium,
 		Advice:     "Lay the grid out as a table, one row per row and one cell per cell; a client that does not know grid keeps the children and loses their positions",
 	},
 	{
 		Slug:       "css-flex-direction",
 		Properties: []string{"flex-direction"},
-		Impact:     model.ContentIssueSeverityLow,
+		Impact:     model.IssueSeverityLow,
 		Advice:     "Decide the order in the markup rather than in the styles; where flex-direction is dropped the children appear in the order they are written",
 	},
 	{
@@ -436,19 +436,19 @@ var compatFeatures = []compatFeature{
 		// The dataset tracks the three of them as one feature, and so does the
 		// advice: whichever is written, what to do instead is the same.
 		Properties: []string{"grid-template-columns", "grid-template-rows", "grid-template-areas"},
-		Impact:     model.ContentIssueSeverityMedium,
+		Impact:     model.IssueSeverityMedium,
 		Advice:     "Give the rows and cells their sizes as a table instead; where the grid template is dropped, every child sizes and places itself",
 	},
 	{
 		Slug:   "css-at-font-face",
 		AtRule: "font-face",
-		Impact: model.ContentIssueSeverityLow,
+		Impact: model.IssueSeverityLow,
 		Advice: "Name a web-safe font first in every font-family and treat the downloaded one as a bonus; a client that ignores @font-face falls back to a font of its own choosing",
 	},
 	{
 		Slug:   "css-at-import",
 		AtRule: "import",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Inline the imported rules instead; an @import is a second fetch, and the clients that strip it render the message without those rules",
 	},
 }
@@ -466,7 +466,7 @@ type markupFeature struct {
 	Tag  string
 
 	// Impact and Advice mean what they mean in compatFeature.
-	Impact model.ContentIssueSeverity
+	Impact model.IssueSeverity
 	Advice string
 }
 
@@ -477,31 +477,31 @@ var markupFeatures = []markupFeature{
 	{
 		Slug:   "html-video",
 		Tag:    "video",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Show a still image linking to the video on a page instead, and keep the <video> only for the clients that support it; where the element is dropped, so is everything inside it",
 	},
 	{
 		Slug:   "html-audio",
 		Tag:    "audio",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Link to the recording on a page rather than embedding it; where the element is dropped the recipient has no way to reach it",
 	},
 	{
 		Slug:   "html-picture",
 		Tag:    "picture",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Serve one image an <img> can show, sized for the smallest screen; a client that does not know <picture> keeps only the <img> inside it, and nothing if there is none",
 	},
 	{
 		Slug:   "html-svg",
 		Tag:    "svg",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Export the drawing as a PNG and reference it with <img>; most clients strip inline SVG, leaving the space it occupied empty",
 	},
 	{
 		Slug:   "html-marquee",
 		Tag:    "marquee",
-		Impact: model.ContentIssueSeverityLow,
+		Impact: model.IssueSeverityLow,
 		Advice: "Say it in text that stays still; the element is obsolete, and a client that keeps it prints its content where it stands",
 	},
 }
@@ -535,7 +535,7 @@ type imageFormatFeature struct {
 	Scheme   string
 
 	// Impact and Advice mean what they mean in compatFeature.
-	Impact model.ContentIssueSeverity
+	Impact model.IssueSeverity
 	Advice string
 }
 
@@ -552,70 +552,70 @@ var imageFormatFeatures = []imageFormatFeature{
 		Slug:   "image-base64",
 		Name:   "an inline data: URI",
 		Scheme: "data",
-		Impact: model.ContentIssueSeverityMedium,
+		Impact: model.IssueSeverityMedium,
 		Advice: "Host the image and reference it by URL; a client that refuses a data: URI rewrites the src into nosrc, so nothing is displayed and nothing can be loaded",
 	},
 	{
 		Slug:     "image-avif",
 		Name:     "AVIF",
 		Suffixes: []string{".avif"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Serve PNG or JPEG instead, and keep AVIF for the web; a client that cannot decode it shows an empty box",
 	},
 	{
 		Slug:     "image-webp",
 		Name:     "WebP",
 		Suffixes: []string{".webp"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Serve PNG or JPEG instead; a client that does not decode WebP shows an empty box",
 	},
 	{
 		Slug:     "image-svg",
 		Name:     "SVG",
 		Suffixes: []string{".svg"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Export the drawing as a PNG at twice the size it is displayed at; a client that does not support SVG displays nothing rather than rasterising it",
 	},
 	{
 		Slug:     "image-heif",
 		Name:     "HEIF",
 		Suffixes: []string{".heif", ".heic"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Convert to PNG or JPEG; HEIF is a camera format that email clients do not display",
 	},
 	{
 		Slug:     "image-tiff",
 		Name:     "TIFF",
 		Suffixes: []string{".tiff", ".tif"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Convert to PNG or JPEG; most clients do not display TIFF",
 	},
 	{
 		Slug:     "image-mp4",
 		Name:     "an MP4 video",
 		Suffixes: []string{".mp4"},
-		Impact:   model.ContentIssueSeverityMedium,
+		Impact:   model.IssueSeverityMedium,
 		Advice:   "Use an animated GIF for the motion, or a still image linking to the video; an <img> pointed at an MP4 shows nothing in the clients that do not play it",
 	},
 	{
 		Slug:     "image-bmp",
 		Name:     "BMP",
 		Suffixes: []string{".bmp"},
-		Impact:   model.ContentIssueSeverityLow,
+		Impact:   model.IssueSeverityLow,
 		Advice:   "Convert to PNG, which is also lossless and much smaller",
 	},
 	{
 		Slug:     "image-ico",
 		Name:     "an icon file",
 		Suffixes: []string{".ico"},
-		Impact:   model.ContentIssueSeverityLow,
+		Impact:   model.IssueSeverityLow,
 		Advice:   "Reference a PNG instead; a client that does not display an .ico leaves a gap",
 	},
 	{
 		Slug:     "image-apng",
 		Name:     "APNG",
 		Suffixes: []string{".apng"},
-		Impact:   model.ContentIssueSeverityLow,
+		Impact:   model.IssueSeverityLow,
 		Advice:   "Use an animated GIF, or a still PNG if the motion is decorative; a client that does not know APNG shows the first frame at best",
 	},
 }
@@ -847,7 +847,7 @@ func styleElementFindings(harvest markupHarvest) []reading.Finding {
 		findings = append(findings, verdictFinding(
 			fmt.Sprintf("The whole design is in %s and nothing is inlined",
 				counted(len(harvest.Sheets), "a <style> element", "<style> elements")),
-			model.ContentIssueSeverityMedium,
+			model.IssueSeverityMedium,
 			"Inline the styles that carry the layout onto the elements themselves, and keep the <style> element for what only it can do, such as media queries; a client that drops it then costs the message its refinements rather than all of its design",
 			verdict, "<style> element"))
 	}
@@ -855,7 +855,7 @@ func styleElementFindings(harvest markupHarvest) []reading.Finding {
 	if harvest.StyleInBody {
 		findings = append(findings, verdictFinding(
 			"A <style> element is written inside the body",
-			model.ContentIssueSeverityLow,
+			model.IssueSeverityLow,
 			"Move the element into the <head>: a client that accepts a stylesheet at all may still refuse one it finds in the body, and there is nothing to gain by putting it there",
 			verdict, "<body>"))
 	}
@@ -990,7 +990,7 @@ func anchorLinkFinding(harvest markupHarvest) *reading.Finding {
 		fmt.Sprintf("%s %s to %s inside the message itself",
 			counted(count, "One link", "links"), agree(count, "points", "point"),
 			agree(count, "an anchor", "anchors")),
-		model.ContentIssueSeverityLow,
+		model.IssueSeverityLow,
 		"Link to a page instead of to a place in the message, or accept that the jump does nothing: where anchors are not followed the reader stays where they were, and one webmail sends them to its own home page",
 		verdict, harvest.AnchorHrefs[0])
 
@@ -1093,7 +1093,7 @@ func reportableVerdict(slug string) (caniemail.Verdict, bool) {
 // stop ("The styles use display:flex in 3 places", "Two images are served as
 // AVIF"): what follows it is the same sentence every time, because what follows
 // is the dataset's answer and not ours.
-func verdictFinding(subject string, impact model.ContentIssueSeverity, advice string, verdict caniemail.Verdict, location string) reading.Finding {
+func verdictFinding(subject string, impact model.IssueSeverity, advice string, verdict caniemail.Verdict, location string) reading.Finding {
 	var message string
 	switch {
 	case len(verdict.Unsupported) > 0:
@@ -1110,8 +1110,8 @@ func verdictFinding(subject string, impact model.ContentIssueSeverity, advice st
 
 	return reading.Finding{
 		Defect: defectClientCompat,
-		ContentIssue: model.ContentIssue{
-			Type:     model.ContentIssueTypeClientCompat,
+		Issue: model.Issue{
+			Type:     model.IssueTypeClientCompat,
 			Severity: compatSeverity(impact, verdict),
 			Message:  message,
 			Advice:   utils.PtrTo(advice),
@@ -1140,24 +1140,24 @@ var majorClients = []string{"Gmail", "Outlook", "Apple Mail", "Yahoo! Mail", "Sa
 // only LaPoste.net drops well under it, however often either is written: how
 // many places a feature appears says how much work the fix is, not how much of
 // the message is lost.
-func compatSeverity(impact model.ContentIssueSeverity, verdict caniemail.Verdict) model.ContentIssueSeverity {
+func compatSeverity(impact model.IssueSeverity, verdict caniemail.Verdict) model.IssueSeverity {
 	if impact == "" {
 		// A row that declares nothing is read at its most modest, rather than
 		// at the gravest thing the scale can say.
-		impact = model.ContentIssueSeverityLow
+		impact = model.IssueSeverityLow
 	}
 
 	switch {
 	case namesAMajorClient(verdict.Unsupported):
 		return impact
 	case len(verdict.Unsupported) >= 5:
-		return lesserSeverity(impact, model.ContentIssueSeverityMedium)
+		return lesserSeverity(impact, model.IssueSeverityMedium)
 	case len(verdict.Unsupported) > 0:
-		return lesserSeverity(impact, model.ContentIssueSeverityLow)
+		return lesserSeverity(impact, model.IssueSeverityLow)
 	case namesAMajorClient(verdict.Partial):
-		return lesserSeverity(impact, model.ContentIssueSeverityLow)
+		return lesserSeverity(impact, model.IssueSeverityLow)
 	default:
-		return model.ContentIssueSeverityInfo
+		return model.IssueSeverityInfo
 	}
 }
 
@@ -1251,11 +1251,11 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 		return nil
 	}
 
-	finding := func(category reading.Category, severity model.ContentIssueSeverity, message, advice string) *reading.Finding {
+	finding := func(category reading.Category, severity model.IssueSeverity, message, advice string) *reading.Finding {
 		return &reading.Finding{
 			Defect: defectClientCompat,
-			ContentIssue: model.ContentIssue{
-				Type:     model.ContentIssueTypeClientCompat,
+			Issue: model.Issue{
+				Type:     model.IssueTypeClientCompat,
 				Category: category,
 				Severity: severity,
 				Message:  message,
@@ -1269,7 +1269,7 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 
 	switch {
 	case !harvest.HasViewport || len(directives) == 0:
-		return finding("", model.ContentIssueSeverityLow,
+		return finding("", model.IssueSeverityLow,
 			"The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
 			`Add <meta name="viewport" content="width=device-width, initial-scale=1"> to the head; without it a mobile client renders at desktop width and scales the result down`)
 
@@ -1278,12 +1278,12 @@ func viewportFinding(harvest markupHarvest) *reading.Finding {
 	// ones who cannot read it at the size it was written. It answers to the
 	// same reading as the missing alt text and the pale palette.
 	case forbidsZooming(directives):
-		return finding(reading.CategoryAccessibility, model.ContentIssueSeverityMedium,
+		return finding(reading.CategoryAccessibility, model.IssueSeverityMedium,
 			"The viewport forbids zooming, which a recipient who needs to enlarge the text cannot override.",
 			"Drop user-scalable=no and maximum-scale from the viewport so the recipient can enlarge the text")
 
 	case directives["width"] != "device-width":
-		return finding("", model.ContentIssueSeverityLow,
+		return finding("", model.IssueSeverityLow,
 			fmt.Sprintf("The viewport is set to %q, which does not adapt the message to the width of the screen it is read on.", harvest.Viewport),
 			"Set the viewport to width=device-width so the layout follows the screen rather than a width fixed when the message was written")
 	}
@@ -1361,13 +1361,13 @@ func eventHandlerFinding(harvest markupHarvest) *reading.Finding {
 
 	return &reading.Finding{
 		Defect: defectEventHandler,
-		ContentIssue: model.ContentIssue{
-			Type: model.ContentIssueTypeClientCompat,
+		Issue: model.Issue{
+			Type: model.IssueTypeClientCompat,
 			// Medium, for the same reason the defect is uncharged: nothing that
 			// ever worked is lost. What is reported is that a behaviour was
 			// written into a medium that has none, which is a mistake worth
 			// hearing about and not a message that fails to arrive.
-			Severity: model.ContentIssueSeverityMedium,
+			Severity: model.IssueSeverityMedium,
 			Message:  message,
 			Advice:   utils.PtrTo("Remove the handlers and move what they did to a page the message links to; email clients strip them, and those that keep them do not run them"),
 			Location: utils.PtrTo(harvest.Handlers[0]),

@@ -44,7 +44,7 @@ import (
 // curated here and never derived from the symbol's weight.
 type rspamdFinding struct {
 	// Issue files the finding under one of the report's content families.
-	Issue model.ContentIssueType
+	Issue model.IssueType
 
 	// Category says which reading of the message this symbol answers, where
 	// that is not the one the check itself answers.
@@ -73,7 +73,7 @@ type rspamdFinding struct {
 
 	// Severity is how much this costs the sender, on this report's scale
 	// rather than on rspamd's.
-	Severity model.ContentIssueSeverity
+	Severity model.IssueSeverity
 
 	// Message states what was observed. A trailing "%s" is filled with the
 	// symbol's options, which several symbols need to be readable at all:
@@ -115,8 +115,8 @@ const concernURLRecipe = ":@url"
 var rspamdFindingCatalog = map[string]rspamdFinding{
 	// --- Hidden text, from a contrast failure to the oldest trick there is
 	"R_WHITE_ON_WHITE": {
-		Issue:    model.ContentIssueTypeHiddenText,
-		Severity: model.ContentIssueSeverityHigh,
+		Issue:    model.IssueTypeHiddenText,
+		Severity: model.IssueSeverityHigh,
 		Message:  "The message contains text whose colour makes it unreadable against its background.",
 		Advice:   "Give every text a colour that contrasts with what is behind it; filters score text invisible against its background as hidden content",
 		// The same defect lowContrastCheck measures, at its extreme. Where we
@@ -127,20 +127,20 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Concern: "low_contrast",
 	},
 	"ZERO_FONT": {
-		Issue:    model.ContentIssueTypeHiddenText,
-		Severity: model.ContentIssueSeverityHigh,
+		Issue:    model.IssueTypeHiddenText,
+		Severity: model.IssueSeverityHigh,
 		Message:  "The message sets a font size of zero somewhere.",
 		Advice:   "Remove the zero-sized text; filters score a \"font-size:0\" as hidden content, including one a template left behind",
 	},
 	"MANY_INVISIBLE_PARTS": {
-		Issue:    model.ContentIssueTypeHiddenText,
-		Severity: model.ContentIssueSeverityMedium,
+		Issue:    model.IssueTypeHiddenText,
+		Severity: model.IssueSeverityMedium,
 		Message:  "Several parts of the message are hidden from view.",
 		Advice:   "Remove the hidden blocks the template left in place; filters count how many a message carries, and a preheader is normally the only one",
 	},
 	"DATA_URI_OBFU": {
-		Issue:    model.ContentIssueTypeHiddenText,
-		Severity: model.ContentIssueSeverityHigh,
+		Issue:    model.IssueTypeHiddenText,
+		Severity: model.IssueSeverityHigh,
 		Message:  "Part of the content is carried as a base64 data: URI rather than as markup.",
 		Advice:   "Write the content as HTML and link images normally; filters score text or markup inside a data: URI as obfuscation, since only the rendering client decodes it",
 	},
@@ -148,29 +148,29 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 	// --- One-big-image newsletters
 	"HTML_SHORT_LINK_IMG_1": {
 		Defect:   defectExcessiveImages,
-		Issue:    model.ContentIssueTypeImageOnlyContent,
-		Severity: model.ContentIssueSeverityMedium,
+		Issue:    model.IssueTypeImageOnlyContent,
+		Severity: model.IssueSeverityMedium,
 		Message:  "The HTML part is very short and consists of a linked image.",
 		Advice:   "Put the message in text as well as in the image; a client that blocks images shows nothing, and filters cannot read the image",
 	},
 	"HTML_SHORT_LINK_IMG_2": {
 		Defect:   defectExcessiveImages,
-		Issue:    model.ContentIssueTypeImageOnlyContent,
-		Severity: model.ContentIssueSeverityLow,
+		Issue:    model.IssueTypeImageOnlyContent,
+		Severity: model.IssueSeverityLow,
 		Message:  "The HTML part is short and largely made of a linked image.",
 		Advice:   "Add real text alongside the image, for clients that block images and for filters that cannot read it",
 	},
 	"HTML_SHORT_LINK_IMG_3": {
 		Defect:   defectExcessiveImages,
-		Issue:    model.ContentIssueTypeImageOnlyContent,
-		Severity: model.ContentIssueSeverityInfo,
+		Issue:    model.IssueTypeImageOnlyContent,
+		Severity: model.IssueSeverityInfo,
 		Message:  "The HTML part leans on a linked image for much of its content.",
 		Advice:   "Keep enough text that the message still reads with images off",
 	},
 	"R_EMPTY_IMAGE": {
 		Defect:   defectExcessiveImages,
-		Issue:    model.ContentIssueTypeImageOnlyContent,
-		Severity: model.ContentIssueSeverityMedium,
+		Issue:    model.IssueTypeImageOnlyContent,
+		Severity: model.IssueSeverityMedium,
 		Message:  "The message pairs empty parts with an image.",
 		Advice:   "Fill the empty parts or drop them; an image carrying the whole message with blank text beside it is scored as an image-only mailing",
 	},
@@ -178,9 +178,9 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 	// --- Text and HTML out of sync
 	"R_PARTS_DIFFER": {
 		Defect:   defectTextHTMLMismatch,
-		Issue:    model.ContentIssueTypeTextHtmlMismatch,
+		Issue:    model.IssueTypeTextHtmlMismatch,
 		Category: reading.CategoryContent,
-		Severity: model.ContentIssueSeverityLow,
+		Severity: model.IssueSeverityLow,
 		Message:  "The text and HTML parts do not say the same thing: %s",
 		Advice:   "Generate the text part from the HTML rather than maintaining it by hand; a stale text alternative is what clients that prefer text display",
 		Concern:  "text_html_mismatch",
@@ -188,245 +188,245 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 
 	// --- Destination reputation
 	"DBL_PHISH": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is listed in the Spamhaus DBL as phishing: %s",
 		Advice:   "Remove the link; if the domain is yours, it is compromised and needs cleaning before it is linked again",
 	},
 	"DBL_BOTNET": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is listed in the Spamhaus DBL as botnet command-and-control: %s",
 		Advice:   "Remove the link, and check the machine that composed this message for compromise",
 	},
 	"DBL_SPAM": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is listed in the Spamhaus DBL as spam: %s",
 		Advice:   "Remove the link, or get the domain delisted if it is yours; one listed destination is enough for the whole message to be rejected",
 	},
 	"DBL_ABUSE_PHISH": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is a legitimate one currently abused for phishing: %s",
 		Advice:   "Remove the link; while the destination is abused, every message pointing at it is scored as phishing",
 	},
 	"URIBL_BLACK": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is on the URIBL blacklist: %s",
 		Advice:   "Remove the link, or get the domain delisted if it is yours",
 	},
 	"PH_SURBL_MULTI": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A domain the message links to is listed in SURBL as phishing: %s",
 		Advice:   "Remove the link; if the domain is yours, it is compromised",
 	},
 	"PHISHED_OPENPHISH": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A URL of the message is a known phishing address, listed by OpenPhish: %s",
 		Advice:   "Remove the link",
 	},
 	"PHISHED_PHISHTANK": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A URL of the message is a known phishing address, listed by PhishTank: %s",
 		Advice:   "Remove the link",
 	},
 	"HACKED_WP_PHISHING": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "The message looks sent from a compromised WordPress installation, for phishing.",
 		Advice:   "If the site is yours, take it off line and audit it before sending anything else from it",
 	},
 	"WP_COMPROMISED": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A link points into a WordPress installation known to be compromised: %s",
 		Advice:   "Remove the link; if the site is yours, it is serving someone else's content and needs cleaning before it is linked again",
 	},
 	"SEM_URIBL": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A domain the message links to is listed in the Spam Eating Monkey URIBL: %s",
 		Advice:   "Check the destination, and remove the link if you do not control it",
 	},
 	"SEM_URIBL_FRESH15": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "A domain the message links to was registered in the last fifteen days: %s",
 		Advice:   "Keep the links on an established domain; a newly registered domain carries no reputation and is heavily penalised, so warm it up before putting it in a campaign",
 	},
 	"URL_SUSPICIOUS_TLD": {
-		Issue:    model.ContentIssueTypeLinkReputation,
+		Issue:    model.IssueTypeLinkReputation,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "A link uses a top-level domain filters treat with suspicion: %s",
 		Advice:   "Host the destination on an established TLD; filters penalise some extensions whatever sits behind them",
 	},
 
 	// --- Deceiving URLs, homographs included
 	"URL_HOMOGRAPH_ATTACK": {
-		Issue:    model.ContentIssueTypeHomographUrl,
+		Issue:    model.IssueTypeHomographUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A URL mixes scripts so that its host reads as a name it is not: %s",
 		Advice:   "Write the host in one script; a label mixing Latin and Cyrillic look-alikes is a homograph attack",
 	},
 	"URL_RTL_OVERRIDE": {
-		Issue:    model.ContentIssueTypeHomographUrl,
+		Issue:    model.IssueTypeHomographUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A URL contains a right-to-left override character, which reverses how part of it is displayed: %s",
 		Advice:   "Remove the override; it makes the URL display as something other than where it goes",
 	},
 	"URL_ZERO_WIDTH_SPACES": {
-		Issue:    model.ContentIssueTypeHomographUrl,
+		Issue:    model.IssueTypeHomographUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "A URL contains zero-width spaces, invisible to the reader: %s",
 		Advice:   "Remove them; invisible characters break the match between what the URL shows and where it leads",
 	},
 	"OMOGRAPH_URL": {
-		Issue:    model.ContentIssueTypeHomographUrl,
+		Issue:    model.IssueTypeHomographUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A URL holds both Latin and non-Latin characters: %s",
 		Advice:   "Check the host character by character; if the domain really is internationalised, write it in punycode to remove the ambiguity",
 	},
 	"URL_BAD_UNICODE": {
-		Issue:    model.ContentIssueTypeHomographUrl,
+		Issue:    model.IssueTypeHomographUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A URL contains invalid Unicode: %s",
 		Advice:   "Rewrite the URL with a valid encoding; clients differ in what they make of an invalid sequence",
 	},
 	"URL_OBFUSCATED_TEXT": {
-		Issue:    model.ContentIssueTypeObfuscatedUrl,
+		Issue:    model.IssueTypeObfuscatedUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A URL in the text is written so as to hide where it goes: %s",
 		Advice:   "Write URLs plainly; filters decode the encodings that hide a destination from a reader, and score the obfuscation",
 	},
 	"URL_MULTIPLE_AT_SIGNS": {
-		Issue:    model.ContentIssueTypeObfuscatedUrl,
+		Issue:    model.IssueTypeObfuscatedUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A URL carries several @ signs, so what precedes the last one is not the host: %s",
 		Advice:   "Remove everything before the host; it shows one domain while the link reaches another",
 	},
 	"HTTP_TO_IP": {
-		Issue:    model.ContentIssueTypeObfuscatedUrl,
+		Issue:    model.IssueTypeObfuscatedUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "A link points at a bare IP address rather than a name: %s",
 		Advice:   "Link to a hostname; an IP address cannot be checked against a domain reputation or a TLS certificate",
 		Concern:  "ip_host" + concernURLRecipe,
 	},
 	"URL_NO_TLD": {
-		Issue:    model.ContentIssueTypeObfuscatedUrl,
+		Issue:    model.IssueTypeObfuscatedUrl,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "A URL has a host with no top-level domain: %s",
 		Advice:   "Write the full domain; a host without a TLD resolves only inside the network it was written in",
 	},
 
 	// --- Attachments
 	"BOGUS_ENCRYPTED_AND_TEXT": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "The message mixes an encrypted payload with plain text or HTML in a way that does not add up.",
 		Advice:   "Send either a properly signed and encrypted message or a plain one; this combination is used to put a payload past a scanner while keeping a readable part",
 	},
 	"MIME_DOUBLE_BAD_EXTENSION": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "An attachment hides its real extension behind a harmless-looking one: %s",
 		Advice:   "Name files with a single, true extension; a double extension makes an executable display as a document",
 	},
 	"MIME_BAD_UNICODE": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityCritical,
+		Severity: model.IssueSeverityCritical,
 		Message:  "An attachment's file name contains Unicode characters known for disguising it: %s",
 		Advice:   "Rename the file in plain characters; the ones flagged here reverse or hide part of the name as it is displayed",
 	},
 	"MIME_ARCHIVE_IN_ARCHIVE": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached archive contains another archive: %s",
 		Advice:   "Attach the files themselves, or link to them; an antivirus cannot see inside a nested archive, and scores it as evasion",
 	},
 	"MIME_OBFUSCATED_ARCHIVE": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached archive holds files showing clear signs of obfuscation: %s",
 		Advice:   "Repackage the archive with plain names and extensions, or link to the files instead",
 	},
 	"MIME_ENCRYPTED_ARCHIVE": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached archive is password-protected: %s",
 		Advice:   "Share the file through a link the recipient authenticates against; a password-protected archive cannot be scanned, and many gateways reject it outright",
 	},
 	"MIME_BAD_ATTACHMENT": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attachment has a MIME type that does not belong in a message: %s",
 		Advice:   "Send documents in formats a recipient can open safely, and link to anything executable rather than attaching it",
 	},
 	"MIME_BAD_EXTENSION": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attachment carries an extension gateways refuse: %s",
 		Advice:   "Link to the file instead; an attachment with this extension is usually stripped before delivery",
 	},
 	"EXE_IN_ARCHIVE": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached archive contains an executable: %s",
 		Advice:   "Distribute software through a download the recipient initiates; most gateways block an executable arriving by mail",
 	},
 	"PDF_SUSPICIOUS": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached PDF has properties associated with malicious documents: %s",
 		Advice:   "Regenerate the PDF from its source with a current tool, and check what the original was made with",
 	},
 	"PDF_JAVASCRIPT": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "An attached PDF contains JavaScript.",
 		Advice:   "Export the PDF without scripting; embedded scripts are where PDF exploits run",
 	},
 	"PDF_ENCRYPTED": {
-		Issue:    model.ContentIssueTypeAttachmentRisk,
+		Issue:    model.IssueTypeAttachmentRisk,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "An attached PDF is encrypted.",
 		Advice:   "Send the document unencrypted over a channel that protects it, or link to it; an encrypted PDF cannot be scanned",
 	},
@@ -438,26 +438,26 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 	// would mean losing the cases our own check misses.
 	"R_SUSPICIOUS_IMAGES": {
 		Defect:   defectExcessiveImages,
-		Issue:    model.ContentIssueTypeExcessiveImages,
-		Severity: model.ContentIssueSeverityMedium,
+		Issue:    model.IssueTypeExcessiveImages,
+		Severity: model.IssueSeverityMedium,
 		Message:  "The message carries far more image than text.",
 		Advice:   "Put the message in text and let images illustrate it; a mostly-image mailing reads as empty to a filter, and to clients that block remote content",
 		Concern:  "excessive_images",
 	},
 	"REDIRECTOR_URL": {
 		Defect:   defectSuspiciousURL,
-		Issue:    model.ContentIssueTypeSuspiciousLink,
+		Issue:    model.IssueTypeSuspiciousLink,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "A link goes through a public redirector rather than straight to its destination: %s",
 		Advice:   "Link to your own domain, a branded click-tracker included; a filter weighs the reputation of a public redirector rather than yours",
 		Concern:  "shortener" + concernURLRecipe,
 	},
 	"URL_USER_PASSWORD": {
 		Defect:   defectSuspiciousURL,
-		Issue:    model.ContentIssueTypeSuspiciousLink,
+		Issue:    model.IssueTypeSuspiciousLink,
 		Category: reading.CategorySecurity,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "A URL carries a user field before its host: %s",
 		Advice:   "Remove the \"user@\" part; it shows one domain while the link reaches another, and filters score it as such",
 		Concern:  "userinfo" + concernURLRecipe,
@@ -465,17 +465,17 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 
 	// --- Client compatibility
 	"HTML_META_REFRESH_URL": {
-		Issue:    model.ContentIssueTypeClientCompat,
+		Issue:    model.IssueTypeClientCompat,
 		Category: reading.CategoryRendering,
-		Severity: model.ContentIssueSeverityHigh,
+		Severity: model.IssueSeverityHigh,
 		Message:  "The HTML carries a meta refresh redirection: %s",
 		Advice:   "Remove it and link to the destination; no email client honours a meta refresh, and filters score a redirection hidden in markup as cloaking",
 	},
 	"EXT_CSS": {
 		Defect:   defectHTMLRemark,
-		Issue:    model.ContentIssueTypeClientCompat,
+		Issue:    model.IssueTypeClientCompat,
 		Category: reading.CategoryRendering,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "The HTML references an external stylesheet: %s",
 		Advice:   "Inline the styles; most clients never fetch an external stylesheet and render the message unstyled",
 		Concern:  "external_css" + concernURLRecipe,
@@ -550,13 +550,13 @@ var rspamdFindingsCheck = contentCheck{
 				message = strings.Replace(message, "%s", replacement, 1)
 			}
 
-			issue := model.ContentIssue{
+			issue := model.Issue{
 				Type:     m.finding.Issue,
 				Category: m.finding.Category,
 				Severity: m.finding.Severity,
 				Message:  message,
 				Advice:   utils.PtrTo(m.finding.Advice),
-				Source:   utils.PtrTo(model.ContentIssueSourceRspamd),
+				Source:   utils.PtrTo(model.IssueSourceRspamd),
 				Symbol:   utils.PtrTo(m.symbol),
 			}
 			if m.params != "" {
@@ -571,9 +571,9 @@ var rspamdFindingsCheck = contentCheck{
 			}
 
 			issues = append(issues, reading.Finding{
-				Defect:       defect,
-				ContentIssue: issue,
-				Concern:      rspamdConcern(m.finding.Concern, m.params),
+				Defect:  defect,
+				Issue:   issue,
+				Concern: rspamdConcern(m.finding.Concern, m.params),
 			})
 		}
 

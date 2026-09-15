@@ -251,7 +251,7 @@ components:
         html_issues:
           type: array
           items:
-            $ref: '#/components/schemas/ContentIssue'
+            $ref: '#/components/schemas/Issue'
           description: Issues found in HTML content
         links:
           type: array
@@ -280,8 +280,11 @@ components:
           description: Available unsubscribe methods
           example: ["link", "list-unsubscribe-header"]
 
-    ContentIssue:
+    Issue:
       type: object
+      description: >-
+        One thing a reading of the message found: what was found, which reading
+        it answers, how grave it is, and who observed it.
       required:
         - type
         - category
@@ -291,7 +294,7 @@ components:
         type:
           type: string
           enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch]
-          description: Type of content issue
+          description: What the report files the finding under
           example: "missing_alt"
         category:
           type: string

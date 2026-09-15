@@ -274,7 +274,7 @@ func TestClientCompatFindingsAggregate(t *testing.T) {
 	if finding.Defect != defectClientCompat {
 		t.Errorf("the finding is priced as %v, want the client compatibility defect", finding.Defect)
 	}
-	if finding.Type != model.ContentIssueTypeClientCompat {
+	if finding.Type != model.IssueTypeClientCompat {
 		t.Errorf("the finding is typed %q, want client_compat", finding.Type)
 	}
 
@@ -366,62 +366,62 @@ func TestClientCompatWebFontLinkIsScopedToItsURL(t *testing.T) {
 // TestCompatSeverity holds the two terms of the weighing apart: what the row
 // says is lost, and who makes the reader lose it.
 func TestCompatSeverity(t *testing.T) {
-	layout := compatFeature{Impact: model.ContentIssueSeverityMedium}
-	cosmetic := compatFeature{Impact: model.ContentIssueSeverityLow}
+	layout := compatFeature{Impact: model.IssueSeverityMedium}
+	cosmetic := compatFeature{Impact: model.IssueSeverityLow}
 
 	tests := []struct {
 		name    string
 		feature compatFeature
 		verdict caniemail.Verdict
-		want    model.ContentIssueSeverity
+		want    model.IssueSeverity
 	}{
 		{
 			name:    "a major client drops it: the row's full weight",
 			feature: layout,
 			verdict: caniemail.Verdict{Unsupported: []string{"Gmail"}},
-			want:    model.ContentIssueSeverityMedium,
+			want:    model.IssueSeverityMedium,
 		},
 		{
 			name:    "a major client on one platform still names it",
 			feature: layout,
 			verdict: caniemail.Verdict{Unsupported: []string{"Outlook (Windows)"}},
-			want:    model.ContentIssueSeverityMedium,
+			want:    model.IssueSeverityMedium,
 		},
 		{
 			name:    "the row's weight is a ceiling, not a floor",
 			feature: cosmetic,
 			verdict: caniemail.Verdict{Unsupported: []string{"Gmail", "Outlook", "Yahoo! Mail"}},
-			want:    model.ContentIssueSeverityLow,
+			want:    model.IssueSeverityLow,
 		},
 		{
 			name:    "five minor clients: below the ceiling",
 			feature: layout,
 			verdict: caniemail.Verdict{Unsupported: []string{"GMX", "WEB.DE", "Orange", "SFR", "LaPoste.net"}},
-			want:    model.ContentIssueSeverityMedium,
+			want:    model.IssueSeverityMedium,
 		},
 		{
 			name:    "one minor client alone",
 			feature: layout,
 			verdict: caniemail.Verdict{Unsupported: []string{"LaPoste.net"}},
-			want:    model.ContentIssueSeverityLow,
+			want:    model.IssueSeverityLow,
 		},
 		{
 			name:    "a major client supports it in part",
 			feature: layout,
 			verdict: caniemail.Verdict{Partial: []string{"Gmail (Android)"}},
-			want:    model.ContentIssueSeverityLow,
+			want:    model.IssueSeverityLow,
 		},
 		{
 			name:    "nobody fails it",
 			feature: layout,
 			verdict: caniemail.Verdict{},
-			want:    model.ContentIssueSeverityInfo,
+			want:    model.IssueSeverityInfo,
 		},
 		{
 			name:    "a row declaring no impact is read at its most modest",
 			feature: compatFeature{},
 			verdict: caniemail.Verdict{Unsupported: []string{"Gmail"}},
-			want:    model.ContentIssueSeverityLow,
+			want:    model.IssueSeverityLow,
 		},
 	}
 
@@ -476,31 +476,31 @@ func TestClientCompatViewportRules(t *testing.T) {
 		name     string
 		harvest  markupHarvest
 		want     string // a phrase the message must carry, empty for no finding
-		severity model.ContentIssueSeverity
+		severity model.IssueSeverity
 	}{
 		{
 			name:     "no viewport at all",
 			harvest:  markupHarvest{HasBody: true},
 			want:     "declares no viewport",
-			severity: model.ContentIssueSeverityLow,
+			severity: model.IssueSeverityLow,
 		},
 		{
 			name:     "a viewport with nothing in it",
 			harvest:  markupHarvest{HasBody: true, HasViewport: true, Viewport: "  "},
 			want:     "declares no viewport",
-			severity: model.ContentIssueSeverityLow,
+			severity: model.IssueSeverityLow,
 		},
 		{
 			name:     "zooming forbidden",
 			harvest:  markupHarvest{HasBody: true, HasViewport: true, Viewport: "width=device-width, user-scalable=no"},
 			want:     "forbids zooming",
-			severity: model.ContentIssueSeverityMedium,
+			severity: model.IssueSeverityMedium,
 		},
 		{
 			name:     "zooming pinned to its initial scale",
 			harvest:  markupHarvest{HasBody: true, HasViewport: true, Viewport: "width=device-width, maximum-scale=1.0"},
 			want:     "forbids zooming",
-			severity: model.ContentIssueSeverityMedium,
+			severity: model.IssueSeverityMedium,
 		},
 		{
 			name:     "a maximum scale of ten is not a maximum scale of one",
@@ -512,7 +512,7 @@ func TestClientCompatViewportRules(t *testing.T) {
 			name:     "a width fixed when the message was written",
 			harvest:  markupHarvest{HasBody: true, HasViewport: true, Viewport: "width=600"},
 			want:     "does not adapt the message to the width",
-			severity: model.ContentIssueSeverityLow,
+			severity: model.IssueSeverityLow,
 		},
 		{
 			name:    "a viewport that says what it should",
