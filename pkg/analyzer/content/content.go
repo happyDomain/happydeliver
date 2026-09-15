@@ -440,7 +440,7 @@ func (c *Analyzer) traverseHTML(n *html.Node, results *Results) {
 				if c.hasDomainMisalignment(href, linkText) {
 					linkCheck.Suspicions = append(linkCheck.Suspicions, URLSuspicion{
 						Kind:     URLSuspicionDomainMisalignment,
-						Severity: model.ContentIssueSeverityHigh,
+						Severity: model.IssueSeverityHigh,
 						Message:  fmt.Sprintf("Link text advertises a domain that is not the destination: %q leads to %q", linkText, href),
 						Advice:   "Make the visible text match the destination domain; filters score a mismatch as a phishing link",
 					})

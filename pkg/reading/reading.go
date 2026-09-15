@@ -48,7 +48,7 @@ import (
 // answer the same reading sets it on the finding instead, and that is what is
 // kept.
 type Finding struct {
-	model.ContentIssue
+	model.Issue
 
 	// Defect says what is wrong, at the grain at which it is paid for, and so
 	// who pays for it: a family of penalties, a criterion of the score, or
@@ -87,27 +87,27 @@ type Finding struct {
 // the findings by the reading they answer rather than in the order the checks
 // happened to run. It is therefore an alias of the schema's own type rather
 // than a second vocabulary kept in step with it by hand.
-type Category = model.ContentIssueCategory
+type Category = model.IssueCategory
 
 const (
 	// CategoryContent answers for what the message says and whether it says it
 	// coherently: a merge field never substituted, a text alternative that does
 	// not match its HTML.
-	CategoryContent = model.ContentIssueCategoryContent
+	CategoryContent = model.IssueCategoryContent
 
 	// CategoryDeliverability answers for what will keep the message out of the
 	// inbox: what filters read, what reputation follows.
-	CategoryDeliverability = model.ContentIssueCategoryDeliverability
+	CategoryDeliverability = model.IssueCategoryDeliverability
 
 	// CategoryAccessibility answers for the recipients a message can leave out.
-	CategoryAccessibility = model.ContentIssueCategoryAccessibility
+	CategoryAccessibility = model.IssueCategoryAccessibility
 
 	// CategoryRendering answers for what an email client will not render as the
 	// sender saw it.
-	CategoryRendering = model.ContentIssueCategoryRendering
+	CategoryRendering = model.IssueCategoryRendering
 
 	// CategorySecurity answers for what a message may do to whoever opens it.
-	CategorySecurity = model.ContentIssueCategorySecurity
+	CategorySecurity = model.IssueCategorySecurity
 )
 
 // Check[In] is what a check file exposes. It is a value rather than an
@@ -199,11 +199,11 @@ type Defect struct {
 
 // SeverityPenalty is what one finding costs when its family weighs findings by
 // gravity rather than at a flat rate.
-func SeverityPenalty(severity model.ContentIssueSeverity) int {
+func SeverityPenalty(severity model.IssueSeverity) int {
 	switch severity {
-	case model.ContentIssueSeverityCritical, model.ContentIssueSeverityHigh:
+	case model.IssueSeverityCritical, model.IssueSeverityHigh:
 		return 3
-	case model.ContentIssueSeverityMedium:
+	case model.IssueSeverityMedium:
 		return 2
 	default:
 		return 1
@@ -220,7 +220,7 @@ func SeverityPenalty(severity model.ContentIssueSeverity) int {
 // answer twice for one message.
 type Evaluation struct {
 	// Issues is what the report shows, in the order the checks were run.
-	Issues []model.ContentIssue
+	Issues []model.Issue
 
 	// Penalty is what those findings deduct from the score, each
 	// family already capped.
@@ -252,7 +252,7 @@ func saysTheSame(a, b Finding) bool {
 //
 // Findings describing the same defect are merged before anything is charged,
 // so that a defect two checks both saw is reported once and paid for once.
-func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model.ContentIssue, penalty int) {
+func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model.Issue, penalty int) {
 	type observed struct {
 		finding Finding
 		// source names this observer in another finding's corroborated_by. It
@@ -341,9 +341,9 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 	// deduct twice its bound between them.
 	perFamily := make(map[*Family]int, len(checks))
 
-	issues = make([]model.ContentIssue, 0, len(kept))
+	issues = make([]model.Issue, 0, len(kept))
 	for _, o := range kept {
-		issues = append(issues, o.finding.ContentIssue)
+		issues = append(issues, o.finding.Issue)
 
 		// What a finding costs is its defect's business: a check reporting a
 		// dead link and a dead unsubscribe address answers for them

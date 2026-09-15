@@ -53,8 +53,8 @@ var missingAltCheck = contentCheck{
 
 		return []reading.Finding{reading.NewFinding(
 			defectMissingAlt,
-			model.ContentIssueTypeMissingAlt,
-			model.ContentIssueSeverityMedium,
+			model.IssueTypeMissingAlt,
+			model.IssueSeverityMedium,
 			"",
 			fmt.Sprintf("%s %s no alt attribute",
 				counted(missing, "One image", "images"), agree(missing, "carries", "carry")),
@@ -78,8 +78,8 @@ var excessiveImagesCheck = contentCheck{
 
 		found := reading.NewFinding(
 			defectExcessiveImages,
-			model.ContentIssueTypeExcessiveImages,
-			model.ContentIssueSeverityMedium,
+			model.IssueTypeExcessiveImages,
+			model.IssueSeverityMedium,
 			"",
 			"Email is excessively image-heavy",
 			"Reduce the number of images relative to text content",
@@ -110,7 +110,7 @@ var imageSuspicionCheck = contentCheck{
 			for _, suspicion := range img.Suspicions {
 				found := reading.NewFinding(
 					defectSuspiciousURL,
-					model.ContentIssueTypeSuspiciousLink,
+					model.IssueTypeSuspiciousLink,
 					suspicion.Severity,
 					img.Src,
 					suspicion.Message,

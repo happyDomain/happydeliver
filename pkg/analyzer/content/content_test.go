@@ -999,7 +999,7 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 	foundIssue := false
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
-			if issue.Type == model.ContentIssueTypeUnreplacedTemplate {
+			if issue.Type == model.IssueTypeUnreplacedTemplate {
 				foundIssue = true
 			}
 		}
@@ -1043,7 +1043,7 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 	found := false
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
-			if issue.Type == model.ContentIssueTypeTruncatedBody {
+			if issue.Type == model.IssueTypeTruncatedBody {
 				found = true
 			}
 		}
@@ -1174,7 +1174,7 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 	}
 	if analysis.HtmlIssues != nil {
 		for _, issue := range *analysis.HtmlIssues {
-			if issue.Type == model.ContentIssueTypeMissingAlt {
+			if issue.Type == model.IssueTypeMissingAlt {
 				t.Errorf("got a missing_alt issue for a tracking pixel: %s", issue.Message)
 			}
 		}
@@ -1514,11 +1514,11 @@ func TestHarmfulMarkupReachesTheReportAtAFlatRate(t *testing.T) {
 			}
 
 			for _, issue := range issues {
-				if issue.Type != model.ContentIssueTypeDangerousHtml {
-					t.Errorf("the finding is typed %q, want %q", issue.Type, model.ContentIssueTypeDangerousHtml)
+				if issue.Type != model.IssueTypeDangerousHtml {
+					t.Errorf("the finding is typed %q, want %q", issue.Type, model.IssueTypeDangerousHtml)
 				}
-				if issue.Severity != model.ContentIssueSeverityCritical {
-					t.Errorf("the finding is graded %q, want %q", issue.Severity, model.ContentIssueSeverityCritical)
+				if issue.Severity != model.IssueSeverityCritical {
+					t.Errorf("the finding is graded %q, want %q", issue.Severity, model.IssueSeverityCritical)
 				}
 				if issue.Advice == nil || *issue.Advice == "" {
 					t.Error("the finding names a defect without saying what to do about it")

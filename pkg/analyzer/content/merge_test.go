@@ -47,8 +47,8 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 		{
 			name: "two observers of one defect make one finding",
 			checks: []contentCheck{
-				concernedIssuesOf("ours", family, "same_defect", model.ContentIssueSeverityHigh),
-				concernedIssuesOf("theirs", family, "same_defect", model.ContentIssueSeverityHigh),
+				concernedIssuesOf("ours", family, "same_defect", model.IssueSeverityHigh),
+				concernedIssuesOf("theirs", family, "same_defect", model.IssueSeverityHigh),
 			},
 			wantIssues: []string{"ours"},
 			wantCorrob: []string{"theirs"},
@@ -58,9 +58,9 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 		{
 			name: "three observers all land on the one finding",
 			checks: []contentCheck{
-				concernedIssuesOf("ours", family, "same_defect", model.ContentIssueSeverityHigh),
-				concernedIssuesOf("theirs", family, "same_defect", model.ContentIssueSeverityHigh),
-				concernedIssuesOf("third", family, "same_defect", model.ContentIssueSeverityHigh),
+				concernedIssuesOf("ours", family, "same_defect", model.IssueSeverityHigh),
+				concernedIssuesOf("theirs", family, "same_defect", model.IssueSeverityHigh),
+				concernedIssuesOf("third", family, "same_defect", model.IssueSeverityHigh),
 			},
 			wantIssues:  []string{"ours"},
 			wantCorrob:  []string{"theirs", "third"},
@@ -69,8 +69,8 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 		{
 			name: "different concerns are left apart",
 			checks: []contentCheck{
-				concernedIssuesOf("ours", family, "one_defect", model.ContentIssueSeverityHigh),
-				concernedIssuesOf("theirs", family, "another_defect", model.ContentIssueSeverityHigh),
+				concernedIssuesOf("ours", family, "one_defect", model.IssueSeverityHigh),
+				concernedIssuesOf("theirs", family, "another_defect", model.IssueSeverityHigh),
 			},
 			wantIssues:  []string{"ours", "theirs"},
 			wantCorrob:  nil,
@@ -80,8 +80,8 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 			name: "findings with no concern are never merged, even from one check",
 			checks: []contentCheck{
 				issuesOf("unkeyed", family,
-					model.ContentIssueSeverityHigh,
-					model.ContentIssueSeverityHigh,
+					model.IssueSeverityHigh,
+					model.IssueSeverityHigh,
 				),
 			},
 			wantIssues:  []string{"unkeyed", "unkeyed"},
@@ -92,8 +92,8 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 			name: "a check agreeing with itself drops the duplicate silently",
 			checks: []contentCheck{
 				concernedIssuesOf("ours", family, "same_defect",
-					model.ContentIssueSeverityHigh,
-					model.ContentIssueSeverityHigh,
+					model.IssueSeverityHigh,
+					model.IssueSeverityHigh,
 				),
 			},
 			wantIssues: []string{"ours"},
@@ -106,8 +106,8 @@ func TestMergeKeepsTheFirstObserver(t *testing.T) {
 			checks: []contentCheck{
 				// Ours answers for itself elsewhere, so it charges nothing;
 				// the filter's agreement must not smuggle a penalty back in.
-				concernedIssuesOf("ours", nil, "same_defect", model.ContentIssueSeverityCritical),
-				concernedIssuesOf("theirs", family, "same_defect", model.ContentIssueSeverityCritical),
+				concernedIssuesOf("ours", nil, "same_defect", model.IssueSeverityCritical),
+				concernedIssuesOf("theirs", family, "same_defect", model.IssueSeverityCritical),
 			},
 			wantIssues:  []string{"ours"},
 			wantCorrob:  []string{"theirs"},
@@ -286,7 +286,7 @@ func TestRspamdCorroboratesOurOwnFinding(t *testing.T) {
 			Valid: true,
 			Suspicions: []URLSuspicion{{
 				Kind:     URLSuspicionShortener,
-				Severity: model.ContentIssueSeverityMedium,
+				Severity: model.IssueSeverityMedium,
 				Message:  "the link goes through a public URL shortener",
 				Advice:   "link to your own domain instead",
 			}},

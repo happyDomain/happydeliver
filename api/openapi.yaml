@@ -390,8 +390,8 @@ components:
       $ref: './schemas.yaml#/components/schemas/ScoreSummary'
     ContentAnalysis:
       $ref: './schemas.yaml#/components/schemas/ContentAnalysis'
-    ContentIssue:
-      $ref: './schemas.yaml#/components/schemas/ContentIssue'
+    Issue:
+      $ref: './schemas.yaml#/components/schemas/Issue'
     LinkCheck:
       $ref: './schemas.yaml#/components/schemas/LinkCheck'
     ImageCheck:

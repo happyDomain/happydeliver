@@ -61,7 +61,7 @@ const (
 // that both travel the same way to the report and to the score.
 type LinkHTTPFinding struct {
 	Kind     LinkHTTPFindingKind
-	Severity model.ContentIssueSeverity
+	Severity model.IssueSeverity
 	Message  string
 	Advice   string
 }
@@ -69,12 +69,12 @@ type LinkHTTPFinding struct {
 // IssueType tells which content issue a finding is filed under. A URL that
 // answers but only after a detour is not unreachable: the two read differently
 // in a report, and the web UI labels issues by type.
-func (f LinkHTTPFinding) IssueType() model.ContentIssueType {
+func (f LinkHTTPFinding) IssueType() model.IssueType {
 	switch f.Kind {
 	case LinkHTTPExcessiveRedirects, LinkHTTPRedirectLoop:
-		return model.ContentIssueTypeExcessiveRedirects
+		return model.IssueTypeExcessiveRedirects
 	default:
-		return model.ContentIssueTypeUnreachableLink
+		return model.IssueTypeUnreachableLink
 	}
 }
 
@@ -265,7 +265,7 @@ func httpFindings(p urlprobe.Answer, subject string) []LinkHTTPFinding {
 		if urlprobe.RedirectExhausted(p.Err) {
 			return []LinkHTTPFinding{{
 				Kind:     LinkHTTPRedirectLoop,
-				Severity: model.ContentIssueSeverityHigh,
+				Severity: model.IssueSeverityHigh,
 				Message:  fmt.Sprintf("%s never arrives: its redirections come back to a URL already visited, or exceed %d hops", subject, urlprobe.MaxRedirects),
 				Advice:   "Follow the link yourself and remove the loop; a destination that never resolves is unreachable for the recipient and for the filters that check it",
 			}}
@@ -298,7 +298,7 @@ func httpStatusFinding(subject string, status int) (LinkHTTPFinding, bool) {
 	case status == http.StatusNotFound || status == http.StatusGone:
 		return LinkHTTPFinding{
 			Kind:     LinkHTTPNotFound,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("%s leads nowhere (HTTP %d): the recipient who clicks it lands on an error page", subject, status),
 			Advice:   "Point it at a live page, or drop it; filters score dead links as a negative signal",
 		}, true
@@ -306,7 +306,7 @@ func httpStatusFinding(subject string, status int) (LinkHTTPFinding, bool) {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
 		return LinkHTTPFinding{
 			Kind:     LinkHTTPProtected,
-			Severity: model.ContentIssueSeverityHigh,
+			Severity: model.IssueSeverityHigh,
 			Message:  fmt.Sprintf("%s is not reachable by the recipient (HTTP %d): it sits behind an authentication or an access restriction", subject, status),
 			Advice:   "Serve the destination without a login, or restrict it only after the click; a filter following the link sees the same refusal it would see for a dead page",
 		}, true
@@ -319,7 +319,7 @@ func httpStatusFinding(subject string, status int) (LinkHTTPFinding, bool) {
 	case status >= 500:
 		return LinkHTTPFinding{
 			Kind:     LinkHTTPServerFailure,
-			Severity: model.ContentIssueSeverityMedium,
+			Severity: model.IssueSeverityMedium,
 			Message:  fmt.Sprintf("%s answered with a server-side failure (HTTP %d); this may be temporary", subject, status),
 			Advice:   "Check that the destination stays up for the whole campaign",
 		}, true
@@ -346,9 +346,9 @@ func redirectChainFinding(subject string, chain []string, finalURL string) (Link
 		return LinkHTTPFinding{}, false
 	}
 
-	severity := model.ContentIssueSeverityMedium
+	severity := model.IssueSeverityMedium
 	if len(chain) > severeRedirectHops {
-		severity = model.ContentIssueSeverityHigh
+		severity = model.IssueSeverityHigh
 	}
 
 	return LinkHTTPFinding{
@@ -525,8 +525,8 @@ func (i *ImageCheck) applyProbe(probe urlprobe.Answer) {
 // The role is read for the same reason defect reads it: what a URL that does
 // not answer costs, and which reading of the message it answers, both depend
 // on what the URL was found as.
-func httpFindingIssue(location string, role urlRole, finding LinkHTTPFinding) model.ContentIssue {
-	return model.ContentIssue{
+func httpFindingIssue(location string, role urlRole, finding LinkHTTPFinding) model.Issue {
+	return model.Issue{
 		Type:     finding.IssueType(),
 		Category: finding.category(role),
 		Severity: finding.Severity,

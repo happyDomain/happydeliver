@@ -1,9 +1,9 @@
 <script lang="ts">
     import type { ContentAnalysis } from "$lib/api/types.gen";
     import {
-        contentCategoryLabel,
+        categoryLabel,
         contentIssueAnchor,
-        contentIssueLabel,
+        issueLabel,
         groupIssuesByCategory,
         issueObserver,
     } from "$lib/issues";
@@ -103,14 +103,14 @@
                          to show: its findings are listed as they always were. -->
                     {#if group.category}
                         <h6 class="text-muted text-uppercase small mt-3 mb-2">
-                            {contentCategoryLabel(group.category)}
+                            {categoryLabel(group.category)}
                             <span class="badge bg-secondary ms-1">{group.issues.length}</span>
                         </h6>
                     {/if}
                     {#each group.issues as placed (placed.index)}
                         <IssueAlert
                             id={contentIssueAnchor(placed.index)}
-                            title={contentIssueLabel(placed.issue.type)}
+                            title={issueLabel(placed.issue.type)}
                             severity={placed.issue.severity}
                             message={placed.issue.message}
                             location={placed.issue.location}

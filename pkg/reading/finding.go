@@ -34,11 +34,11 @@ import (
 const (
 	// SourceSelf is happyDeliver, which is also what leaving the source out
 	// says.
-	SourceSelf model.ContentIssueSource = "self"
+	SourceSelf model.IssueSource = "self"
 
 	// SourceRspamd is the spam filter, which reports what it raised on the
 	// message under the symbol that raised it.
-	SourceRspamd model.ContentIssueSource = "rspamd"
+	SourceRspamd model.IssueSource = "rspamd"
 )
 
 // NewFinding builds a finding at the place the check was looking. Every check
@@ -54,8 +54,8 @@ const (
 // What a finding carries beyond this is set on the answer: a Concern, when the
 // check knows the key another check would recognise the same defect under, and
 // a Category, when a check's findings do not all answer the same reading.
-func NewFinding(defect *Defect, issueType model.ContentIssueType, severity model.ContentIssueSeverity, location, message, advice string) Finding {
-	issue := model.ContentIssue{
+func NewFinding(defect *Defect, issueType model.IssueType, severity model.IssueSeverity, location, message, advice string) Finding {
+	issue := model.Issue{
 		Type:     issueType,
 		Severity: severity,
 		Message:  message,
@@ -67,5 +67,5 @@ func NewFinding(defect *Defect, issueType model.ContentIssueType, severity model
 		issue.Advice = &advice
 	}
 
-	return Finding{ContentIssue: issue, Defect: defect}
+	return Finding{Issue: issue, Defect: defect}
 }

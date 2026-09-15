@@ -121,13 +121,13 @@ func speakingResults() *Results {
 
 	shortened := URLSuspicion{
 		Kind:     URLSuspicionShortener,
-		Severity: model.ContentIssueSeverityMedium,
+		Severity: model.IssueSeverityMedium,
 		Message:  "The destination is hidden behind a public shortener",
 		Advice:   "Write the destination out",
 	}
 	insecure := URLSuspicion{
 		Kind:     URLSuspicionInsecureScheme,
-		Severity: model.ContentIssueSeverityLow,
+		Severity: model.IssueSeverityLow,
 		Message:  "The source is fetched over http:",
 		Advice:   "Serve it over https:",
 	}

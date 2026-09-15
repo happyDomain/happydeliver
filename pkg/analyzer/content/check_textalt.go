@@ -65,8 +65,8 @@ var textAlternativeCheck = contentCheck{
 
 		found := reading.NewFinding(
 			defectTextHTMLMismatch,
-			model.ContentIssueTypeTextHtmlMismatch,
-			model.ContentIssueSeverityHigh,
+			model.IssueTypeTextHtmlMismatch,
+			model.IssueSeverityHigh,
 			"",
 			message,
 			advice,
@@ -105,8 +105,8 @@ var textLinkParityCheck = contentCheck{
 		for _, missing := range textLinksMissingFromHTML(in.Results.Links) {
 			issues = append(issues, reading.NewFinding(
 				defectTextLinkMissing,
-				model.ContentIssueTypeTextHtmlMismatch,
-				model.ContentIssueSeverityLow,
+				model.IssueTypeTextHtmlMismatch,
+				model.IssueSeverityLow,
 				missing,
 				fmt.Sprintf("The plain text part offers a destination the HTML part does not: %s", missing),
 				"Check that both parts lead to the same places; clients preferring text otherwise offer a destination the HTML does not, and filters compare the two parts",

@@ -608,7 +608,7 @@ func contrastContentFinding(failure contrastFinding) reading.Finding {
 
 	found := reading.NewFinding(
 		defectLowContrast,
-		model.ContentIssueTypeLowContrast,
+		model.IssueTypeLowContrast,
 		contrastSeverity(failure.Ratio),
 		fmt.Sprintf("%q", run.Text),
 		message,
@@ -628,10 +628,10 @@ func contrastContentFinding(failure contrastFinding) reading.Finding {
 // outright, and the reader who cannot make it out cannot ask their client to
 // help. Above it, the text is readable by most and lost to some, which is the
 // medium of this scale.
-func contrastSeverity(ratio float64) model.ContentIssueSeverity {
+func contrastSeverity(ratio float64) model.IssueSeverity {
 	if ratio < contrastThresholdLarge {
-		return model.ContentIssueSeverityHigh
+		return model.IssueSeverityHigh
 	}
 
-	return model.ContentIssueSeverityMedium
+	return model.IssueSeverityMedium
 }

@@ -1,13 +1,13 @@
-import type { ContentIssue } from "$lib/api/types.gen";
+import type { Issue } from "$lib/api/types.gen";
 
 /**
- * Readable name for a content issue type.
+ * Readable name for an issue type.
  *
  * The report used to print the raw enum ("missing_alt", "unreplaced_template"), which reads
  * as a database value rather than as a finding. The label is what a reader sees as the title
  * of the alert, so it names the defect, not the code.
  */
-const contentIssueLabels: Record<ContentIssue["type"], string> = {
+const issueLabels: Record<Issue["type"], string> = {
     broken_html: "Broken HTML",
     missing_alt: "Missing alt text",
     excessive_images: "Too many images",
@@ -29,10 +29,10 @@ const contentIssueLabels: Record<ContentIssue["type"], string> = {
     sender_domain_mismatch: "Links off the sender's domain",
 };
 
-export function contentIssueLabel(type: ContentIssue["type"]): string {
+export function issueLabel(type: Issue["type"]): string {
     // A type the API added and the front end has not caught up with still has to read as
     // something: fall back on the enum with its underscores opened up.
-    return contentIssueLabels[type] ?? type.replace(/_/g, " ");
+    return issueLabels[type] ?? type.replace(/_/g, " ");
 }
 
 /**
@@ -42,7 +42,7 @@ export function contentIssueLabel(type: ContentIssue["type"]): string {
  * label on an alert: it names what the reader is about to be shown, not the enum the API
  * sent.
  */
-const contentCategoryLabels: Record<ContentIssue["category"], string> = {
+const categoryLabels: Record<Issue["category"], string> = {
     security: "Security",
     deliverability: "Deliverability",
     content: "Content",
@@ -50,8 +50,8 @@ const contentCategoryLabels: Record<ContentIssue["category"], string> = {
     accessibility: "Accessibility",
 };
 
-export function contentCategoryLabel(category: ContentIssue["category"]): string {
-    return contentCategoryLabels[category] ?? String(category).replace(/_/g, " ");
+export function categoryLabel(category: Issue["category"]): string {
+    return categoryLabels[category] ?? String(category).replace(/_/g, " ");
 }
 
 /**
@@ -62,7 +62,7 @@ export function contentCategoryLabel(category: ContentIssue["category"]): string
  * A category absent from this list is not dropped: it is shown after the ones that are, so
  * that a reading the API adds before the front end catches up still reaches a reader.
  */
-const contentCategoryOrder: ContentIssue["category"][] = [
+const categoryOrder: Issue["category"][] = [
     "security",
     "deliverability",
     "content",
@@ -77,7 +77,7 @@ const contentCategoryOrder: ContentIssue["category"][] = [
  * red, low and info one blue. The order is what separates them, which is the other half of
  * why the severity is no longer named in a badge of its own.
  */
-const severityRank: Record<ContentIssue["severity"], number> = {
+const severityRank: Record<Issue["severity"], number> = {
     critical: 0,
     high: 1,
     medium: 2,
@@ -86,7 +86,7 @@ const severityRank: Record<ContentIssue["severity"], number> = {
 };
 
 /** Anything the report shows in an alert: a content issue, a header one. */
-type Severe = { severity: ContentIssue["severity"] };
+type Severe = { severity: Issue["severity"] };
 
 /**
  * Orders findings gravest first, leaving those the severity does not separate in the order
@@ -101,7 +101,7 @@ export function compareBySeverity(a: Severe, b: Severe): number {
 }
 
 /** One issue together with its position in html_issues, which is what its anchor is made of. */
-export type PlacedContentIssue = { issue: ContentIssue; index: number };
+export type PlacedIssue = { issue: Issue; index: number };
 
 /**
  * The issues of one reading, in the order the checks reported them.
@@ -112,9 +112,9 @@ export type PlacedContentIssue = { issue: ContentIssue; index: number };
  * keeps only its type, which deliberately does not map onto one reading. Such issues are shown
  * as they always were, in one run under no heading.
  */
-export type ContentIssueGroup = {
-    category?: ContentIssue["category"];
-    issues: PlacedContentIssue[];
+export type IssueGroup = {
+    category?: Issue["category"];
+    issues: PlacedIssue[];
 };
 
 /**
@@ -133,8 +133,8 @@ export type ContentIssueGroup = {
  * A severity the front end does not know sorts last rather than first, so that a level the
  * API adds cannot quietly take the top of every section.
  */
-export function groupIssuesByCategory(issues?: ContentIssue[]): ContentIssueGroup[] {
-    const groups = new Map<ContentIssue["category"] | undefined, PlacedContentIssue[]>();
+export function groupIssuesByCategory(issues?: Issue[]): IssueGroup[] {
+    const groups = new Map<Issue["category"] | undefined, PlacedIssue[]>();
 
     issues?.forEach((issue, index) => {
         // A report produced before the analysis recorded a reading carries none. It is
@@ -148,9 +148,9 @@ export function groupIssuesByCategory(issues?: ContentIssue[]): ContentIssueGrou
         else groups.set(category, [{ issue, index }]);
     });
 
-    const known = contentCategoryOrder.filter((category) => groups.has(category));
+    const known = categoryOrder.filter((category) => groups.has(category));
     const unknown = [...groups.keys()].filter(
-        (category) => category !== undefined && !contentCategoryOrder.includes(category),
+        (category) => category !== undefined && !categoryOrder.includes(category),
     );
     const uncategorised = groups.has(undefined) ? [undefined] : [];
 
@@ -171,7 +171,7 @@ export function groupIssuesByCategory(issues?: ContentIssue[]): ContentIssueGrou
  * the default and needs no mention. Only a finding that came from the spam filter says so,
  * because that tells the reader where to go and look it up.
  */
-export function issueObserver(issue: Pick<ContentIssue, "source">): string | undefined {
+export function issueObserver(issue: Pick<Issue, "source">): string | undefined {
     return issue.source === "rspamd" ? "rspamd" : undefined;
 }
 
@@ -191,7 +191,7 @@ export function contentIssueAnchor(index: number): string {
  * table has no way of saying so: a reader seeing ZERO_FONT at +1.00 cannot tell that an
  * explanation of what to do about it is waiting further down the page.
  */
-export function adviceAnchorsBySymbol(issues?: ContentIssue[]): Record<string, string> {
+export function adviceAnchorsBySymbol(issues?: Issue[]): Record<string, string> {
     const anchors: Record<string, string> = {};
 
     issues?.forEach((issue, index) => {
