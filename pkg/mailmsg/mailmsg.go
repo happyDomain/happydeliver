@@ -156,6 +156,17 @@ func (p *Part) IsInline() bool {
 // out as UTF-8. An unknown encoding or charset is not an error: the payload is
 // left untouched and the rest of the message is analysed.
 func Parse(raw []byte) (*Message, error) {
+	return parse(raw, 0)
+}
+
+// maxEmbeddedDepth bounds how deep embedded messages are parsed: each level
+// reads and keeps its whole payload again, so a message made of nested
+// message/rfc822 headers would otherwise cost quadratic time and memory.
+// Forwards and bounces rarely nest more than twice.
+const maxEmbeddedDepth = 5
+
+// parse is Parse at a given embedded-message depth.
+func parse(raw []byte, depth int) (*Message, error) {
 	entity, err := message.Read(bytes.NewReader(raw))
 	if err != nil && !isDecodeError(err) {
 		return nil, fmt.Errorf("failed to parse email message: %w", err)
@@ -183,7 +194,7 @@ func Parse(raw []byte) (*Message, error) {
 		email.To = to
 	}
 
-	email.Parts, email.BodyIncomplete = messageParts(entity)
+	email.Parts, email.BodyIncomplete = messageParts(entity, depth)
 
 	return email, nil
 }
@@ -202,24 +213,24 @@ func isDecodeError(err error) bool {
 // The root is unwrapped rather than reported as a part of its own, so that a
 // message declaring a boundary never found in its body comes out with no part
 // at all rather than with an empty root.
-func messageParts(e *message.Entity) ([]Part, bool) {
+func messageParts(e *message.Entity, depth int) ([]Part, bool) {
 	if mr := e.MultipartReader(); mr != nil {
-		return readMultipart(mr)
+		return readMultipart(mr, depth)
 	}
 
-	part, _ := entityPart(e)
+	part, _ := entityPart(e, depth)
 
 	return []Part{part}, false
 }
 
 // entityPart turns one entity into a Part, recursing into it when it is
 // itself multipart. The second result is whether a nested body was truncated.
-func entityPart(e *message.Entity) (Part, bool) {
+func entityPart(e *message.Entity, depth int) (Part, bool) {
 	part := describePart(e)
 
 	if mr := e.MultipartReader(); mr != nil {
 		var incomplete bool
-		part.Parts, incomplete = readMultipart(mr)
+		part.Parts, incomplete = readMultipart(mr, depth)
 		return part, incomplete
 	}
 
@@ -242,7 +253,30 @@ func entityPart(e *message.Entity) (Part, bool) {
 		}
 	}
 
+	// A forwarded or bounced message carries its own parts, and whatever it
+	// attaches must stay reachable rather than sit behind an opaque leaf. Its
+	// payload is a whole message, so it is parsed as one; a body too malformed
+	// to parse leaves the part as the leaf it already is, and so does one
+	// nested deeper than maxEmbeddedDepth.
+	if isEmbeddedMessage(part.MediaType) && depth < maxEmbeddedDepth {
+		if nested, err := parse(content, depth+1); err == nil {
+			part.Parts = nested.Parts
+		}
+	}
+
 	return part, false
+}
+
+// isEmbeddedMessage reports whether a part's media type says its payload is
+// itself a message: RFC 2046 message/rfc822, its RFC 6532 internationalised
+// counterpart message/global, and message/news.
+func isEmbeddedMessage(mediaType string) bool {
+	switch mediaType {
+	case "message/rfc822", "message/global", "message/news":
+		return true
+	}
+
+	return false
 }
 
 // readMultipart turns every part of a multipart body into a Part,
@@ -251,7 +285,7 @@ func entityPart(e *message.Entity) (Part, bool) {
 // delimiter still says plenty about deliverability through the parts that did
 // arrive. The second result keeps "no parts found" distinguishable from "body
 // unreadable", which would otherwise look alike to the report.
-func readMultipart(mr message.MultipartReader) (parts []Part, incomplete bool) {
+func readMultipart(mr message.MultipartReader, depth int) (parts []Part, incomplete bool) {
 	for {
 		child, err := mr.NextPart()
 		if err != nil && !isDecodeError(err) {
@@ -262,7 +296,7 @@ func readMultipart(mr message.MultipartReader) (parts []Part, incomplete bool) {
 			return parts, incomplete || err != io.EOF
 		}
 
-		part, nestedIncomplete := entityPart(child)
+		part, nestedIncomplete := entityPart(child, depth)
 		incomplete = incomplete || nestedIncomplete
 
 		parts = append(parts, part)
@@ -422,14 +456,14 @@ func (e *Message) AuthservIDs() []string {
 
 // GetTextParts returns all text/plain parts
 func (e *Message) GetTextParts() []Part {
-	return filterParts(e.Parts, func(p Part) bool {
+	return filterParts(e.Parts, false, func(p Part) bool {
 		return p.IsText && !p.IsHTML
 	})
 }
 
 // GetHTMLParts returns all text/html parts
 func (e *Message) GetHTMLParts() []Part {
-	return filterParts(e.Parts, func(p Part) bool {
+	return filterParts(e.Parts, false, func(p Part) bool {
 		return p.IsHTML
 	})
 }
@@ -440,7 +474,7 @@ func (e *Message) GetHTMLParts() []Part {
 // is declared an attachment or named: a Content-ID alone does not make it
 // one, since multipart/related designates its root body that way (start=).
 func (e *Message) GetAttachments() []Part {
-	return filterParts(e.Parts, func(p Part) bool {
+	return filterParts(e.Parts, true, func(p Part) bool {
 		if p.Disposition == "attachment" || p.Filename != "" {
 			return true
 		}
@@ -455,15 +489,23 @@ func (e *Message) GetAttachments() []Part {
 	})
 }
 
-// filterParts recursively filters message parts
-func filterParts(parts []Part, predicate func(Part) bool) []Part {
+// filterParts walks the MIME tree and returns the parts matching predicate.
+// multipart/* nodes are structure only and never match themselves. An
+// embedded message is both a part of the outer message and a message of its
+// own: it is tested like any other part, and its own parts are walked only
+// when crossMessages is set, since a forwarded body is not the body of the
+// message that forwards it.
+func filterParts(parts []Part, crossMessages bool, predicate func(Part) bool) []Part {
 	var result []Part
 	for _, part := range parts {
-		if len(part.Parts) > 0 {
-			// Recursively filter nested parts
-			result = append(result, filterParts(part.Parts, predicate)...)
-		} else if predicate(part) {
-			result = append(result, part)
+		embedded := isEmbeddedMessage(part.MediaType)
+		if len(part.Parts) == 0 || embedded {
+			if predicate(part) {
+				result = append(result, part)
+			}
+		}
+		if len(part.Parts) > 0 && (!embedded || crossMessages) {
+			result = append(result, filterParts(part.Parts, crossMessages, predicate)...)
 		}
 	}
 	return result
