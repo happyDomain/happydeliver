@@ -39,6 +39,10 @@ type Facts struct {
 
 	// Type is what the file turns out to be, against what it claimed.
 	Type Type
+
+	// Executable names the executable format the first bytes are in, empty
+	// when they are not a program.
+	Executable string
 }
 
 // InspectHeader reads what can be read of a file without reading it through:
@@ -67,8 +71,9 @@ func Inspect(filename, declaredMediaType string, data []byte) Facts {
 	name := inspectName(filename)
 
 	return Facts{
-		Name: name,
-		Type: inspectType(name, declaredMediaType, mtype),
+		Name:       name,
+		Type:       inspectType(name, declaredMediaType, mtype),
+		Executable: detectExecutable(data),
 	}
 }
 

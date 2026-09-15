@@ -54,6 +54,9 @@ var staticChecks = []staticCheck{
 	// What the file says it is.
 	filenameCheck,
 	typeMismatchCheck,
+
+	// What its content turns out to be.
+	executableCheck,
 }
 
 // check is the static check as the registry runs it, over the attachment.

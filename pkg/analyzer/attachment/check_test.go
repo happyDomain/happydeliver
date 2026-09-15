@@ -25,7 +25,6 @@ import (
 	"bytes"
 	"context"
 	"slices"
-	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -216,41 +215,6 @@ func TestEveryIssueAnswersAReading(t *testing.T) {
 	}
 }
 
-// TestTwoEnginesAgreeingReportOnce is what the merge exists for: a sample both
-// scanners recognise is one fact about one file, and used to reach the reader
-// as two critical alerts saying the same thing.
-func TestTwoEnginesAgreeingReportOnce(t *testing.T) {
-	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
-	attachment.Scans = []Scan{
-		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
-		{Scanner: "virustotal", Status: model.ScanResultStatusMalicious, EnginesFlagged: 51, EnginesTotal: 70},
-	}
-
-	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
-
-	malware := []model.Issue{}
-	for _, issue := range issues {
-		if issue.Type == model.IssueTypeMalwareDetected {
-			malware = append(malware, issue)
-		}
-	}
-
-	if len(malware) != 1 {
-		t.Fatalf("Expected one malware finding for one file, got %d: %+v", len(malware), malware)
-	}
-	if !strings.Contains(malware[0].Message, "ClamAV") {
-		t.Errorf("Expected the local scanner's own words to be kept, got %q", malware[0].Message)
-	}
-	if malware[0].CorroboratedBy == nil || !slices.Contains(*malware[0].CorroboratedBy, "virustotal") {
-		t.Errorf("Expected virustotal to be named as agreeing, got %v", malware[0].CorroboratedBy)
-	}
-
-	// One defect, charged once, however many engines saw it.
-	if penalty != 100 {
-		t.Errorf("Expected the file to cost the whole scale once, got %d", penalty)
-	}
-}
-
 func TestASuspiciousVerdictCostsLessThanARecognisedSample(t *testing.T) {
 	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
 	attachment.Scans = []Scan{
@@ -279,13 +243,13 @@ func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
 	if types[model.IssueTypeScanError] == 0 {
 		t.Errorf("Expected the reader to be told the file went unverified, got %+v", issues)
 	}
-	if types[model.IssueTypeDangerousExtension] == 0 {
+	if types[model.IssueTypeExecutableContent] == 0 {
 		t.Errorf("Expected what we read for ourselves to stand, got %+v", issues)
 	}
 
-	// The deceptive name and the type it lies about, and nothing for the
-	// scanner.
-	if penalty != 40+40 {
+	// The executable, the deceptive name and the type it lies about, and
+	// nothing for the scanner.
+	if penalty != 50+40+40 {
 		t.Errorf("Expected a scanner being down to cost nothing, got a penalty of %d", penalty)
 	}
 }

@@ -109,13 +109,36 @@ func TestInspectTypeExtensionMismatch(t *testing.T) {
 	}
 }
 
-// TestInspectHeaderReadsTheNameAndTheType is what a caller declining to open a
-// payload is entitled to.
-func TestInspectHeaderReadsTheNameAndTheType(t *testing.T) {
+func TestDetectExecutable(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"PE":    mzStub,
+		"ELF":   append([]byte("\x7fELF"), bytes.Repeat([]byte{0}, 60)...),
+		"MachO": append([]byte{0xfe, 0xed, 0xfa, 0xce}, bytes.Repeat([]byte{0}, 60)...),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if format := detectExecutable(data); format == "" {
+				t.Error("Expected the first bytes to name an executable format")
+			}
+		})
+	}
+}
+
+func TestDetectExecutableJavaClassIsNotUniversal(t *testing.T) {
+	class := append([]byte{0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x34}, bytes.Repeat([]byte{0}, 56)...)
+
+	if format := detectExecutable(class); format != "" {
+		t.Errorf("Expected a Java class file not to read as a universal binary, got %q", format)
+	}
+}
+
+func TestInspectHeaderReadsNoContent(t *testing.T) {
 	facts := InspectHeader("invoice.pdf.exe", "application/pdf", mzStub)
 
 	if !facts.Name.Dangerous || !facts.Type.DeclaredMismatch {
 		t.Errorf("Expected the name and the type to be read, got %+v", facts)
+	}
+	if facts.Executable != "" {
+		t.Errorf("Expected the content to be left unread, got %+v", facts)
 	}
 }
 
@@ -157,5 +180,48 @@ func TestMediaTypeOf(t *testing.T) {
 		if got := mediaTypeOf(contentType); got != expected {
 			t.Errorf("Expected %q to reduce to %q, got %q", contentType, expected, got)
 		}
+	}
+}
+
+func TestDetectExecutableMachOMagics(t *testing.T) {
+	for name, magic := range map[string][]byte{
+		"32-bit BE": {0xfe, 0xed, 0xfa, 0xce},
+		"32-bit LE": {0xce, 0xfa, 0xed, 0xfe},
+		"64-bit BE": {0xfe, 0xed, 0xfa, 0xcf},
+		"64-bit LE": {0xcf, 0xfa, 0xed, 0xfe},
+		"universal": {0xca, 0xfe, 0xba, 0xbe, 0x00, 0x00, 0x00, 0x02},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data := append(magic, bytes.Repeat([]byte{0}, 64)...)
+
+			if format := detectExecutable(data); format != "macOS executable (Mach-O)" {
+				t.Errorf("Expected the magic to name a Mach-O, got %q", format)
+			}
+		})
+	}
+}
+
+// TestDetectExecutableOfNothing: a few bytes, or bytes that are not a magic
+// number, are not a program.
+func TestDetectExecutableOfNothing(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"empty":           nil,
+		"short MZ":        []byte("MZ"),
+		"short universal": {0xca, 0xfe, 0xba, 0xbe},
+		"text":            []byte("hello, world\n"),
+		"unrelated magic": {0xde, 0xad, 0xbe, 0xef, 0, 0, 0, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if format := detectExecutable(data); format != "" {
+				t.Errorf("Expected no executable format to be named, got %q", format)
+			}
+		})
+	}
+}
+
+// TestIsMachOOfAFewBytes: fewer bytes than a magic number is no magic number.
+func TestIsMachOOfAFewBytes(t *testing.T) {
+	if isMachO([]byte{0xfe, 0xed}) {
+		t.Error("Expected two bytes not to be read as a Mach-O")
 	}
 }
