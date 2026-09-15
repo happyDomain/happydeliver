@@ -33,6 +33,7 @@ const issueLabels: Record<Issue["type"], string> = {
     double_extension: "Deceptive double extension",
     dangerous_extension: "Dangerous file extension",
     macro_detected: "Macros in a document",
+    pdf_active_content: "Active content in a PDF",
     executable_content: "Executable attachment",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
