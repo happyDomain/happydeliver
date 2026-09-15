@@ -19,6 +19,23 @@
         if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
         return `${(size / (1024 * 1024)).toFixed(1)} MB`;
     }
+
+    function scannerBadgeClass(status: string): string {
+        switch (status) {
+            case "clean":
+                return "bg-success";
+            case "infected":
+            case "malicious":
+                return "bg-danger";
+            case "suspicious":
+                return "bg-warning";
+            case "pending":
+                return "bg-info";
+            default:
+                // unknown, skipped, error, too_large
+                return "bg-secondary";
+        }
+    }
 </script>
 
 <div class="card shadow-sm" id="attachment-details">
@@ -47,6 +64,14 @@
                 This email contains no attachments.
             </p>
         {:else}
+            {#if attachmentAnalysis.clamav_enabled === false}
+                <div class="alert alert-secondary py-2 px-3 mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    ClamAV scanning is not configured on this server; only the checks happyDeliver runs
+                    itself were performed.
+                </div>
+            {/if}
+
             {#each attachmentAnalysis.attachments || [] as attachment, index (attachment.sha256 + index)}
                 <div class="border rounded p-3 mb-3">
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
@@ -83,6 +108,20 @@
                                 </span>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mt-2">
+                        {#if attachment.clamav}
+                            <span class="me-2">
+                                <strong class="small">ClamAV:</strong>
+                                <span class="badge {scannerBadgeClass(attachment.clamav.status)}">
+                                    {attachment.clamav.status}
+                                    {#if attachment.clamav.signature}
+                                        — {attachment.clamav.signature}
+                                    {/if}
+                                </span>
+                            </span>
+                        {/if}
                     </div>
 
                     {#if attachment.issues && attachment.issues.length > 0}

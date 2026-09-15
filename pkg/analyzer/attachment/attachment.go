@@ -29,24 +29,35 @@
 package attachment
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 
+	"git.happydns.org/happyDeliver/pkg/clamav"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
-// Options is what an operator decides about the attachment analysis: how much
-// of a message it will look at, and how long it may take over one file.
+// scanConcurrency bounds how many attachments are handed to the external
+// scanners at once.
+const scanConcurrency = 4
+
+// Options is what an operator decides about the attachment analysis: which
+// scanners it may ask, and how much of a message it will look at.
 //
 // It is a struct rather than a run of arguments so that a caller reads what it
 // is configuring, and so that adding a scanner tomorrow does not renumber
 // every call site.
 type Options struct {
-	// ScanTimeout bounds the reading of one attachment.
+	// ClamAVAddress is the clamd instance attachments are submitted to. Empty
+	// leaves them unscanned.
+	ClamAVAddress string
+
+	// ScanTimeout bounds each external scan.
 	ScanTimeout time.Duration
 
 	// MaxSize is the largest attachment whose content is analysed, in bytes.
@@ -56,22 +67,26 @@ type Options struct {
 
 // Analyzer reads the attachments of a message.
 type Analyzer struct {
+	clamav      *clamav.Client // nil = disabled
 	scanTimeout time.Duration
 	maxSize     int64
 }
 
-// defaultScanTimeout bounds the reading of an attachment when the caller named
-// no bound: a zero duration would hand every check a deadline that has already
-// passed.
+// defaultScanTimeout bounds a scan, and the reading of an attachment, when the
+// caller named no bound: a zero duration would hand every check a deadline
+// that has already passed.
 const defaultScanTimeout = 30 * time.Second
 
-// New creates an attachment analyzer.
+// New creates an attachment analyzer. A scanner with no address or no
+// credentials is disabled, and the report says so rather than staying silent
+// about a verdict nobody produced.
 func New(opts Options) *Analyzer {
 	if opts.ScanTimeout <= 0 {
 		opts.ScanTimeout = defaultScanTimeout
 	}
 
 	return &Analyzer{
+		clamav:      clamav.New(opts.ClamAVAddress, opts.ScanTimeout),
 		scanTimeout: opts.ScanTimeout,
 		maxSize:     opts.MaxSize,
 	}
@@ -81,6 +96,10 @@ func New(opts Options) *Analyzer {
 // anything is judged.
 type Results struct {
 	Attachments []Attachment
+
+	// ClamAVEnabled says whether an operator configured the scanner at all,
+	// which is what tells a missing verdict from a clean one.
+	ClamAVEnabled bool
 }
 
 // Attachment is one file a message carries, as it was read off it.
@@ -101,6 +120,12 @@ type Attachment struct {
 	// to look at: that is what a check reading bytes tests before reading any.
 	Data []byte
 
+	// ClamAV is what the scanner said, nil when it is disabled or was never
+	// asked. It is observed here rather than in a check because the report
+	// shows it whether or not it raised a finding, exactly as it shows what
+	// the spam filter said about the body.
+	ClamAV *clamav.Scan
+
 	// mime is the type sniffed from the payload, kept as the library returned
 	// it: a check comparing a declared type to it walks its parents, which a
 	// string cannot do. The message is sniffed once, here.
@@ -112,10 +137,11 @@ func (a *Attachment) tooLarge(maxSize int64) bool {
 	return maxSize > 0 && a.Size > maxSize
 }
 
-// Analyze reads the attachments off a message. It observes, and judges
-// nothing: what the observations are worth is Read's answer.
+// Analyze reads the attachments off a message and asks the scanner about
+// them. It observes, and judges nothing: what the observations are worth is
+// Read's answer.
 func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
-	results := &Results{}
+	results := &Results{ClamAVEnabled: a.clamav != nil}
 
 	parts := email.GetAttachments()
 	if len(parts) == 0 {
@@ -123,6 +149,9 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 	}
 
 	results.Attachments = make([]Attachment, len(parts))
+
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, scanConcurrency)
 
 	for i := range parts {
 		part := &parts[i]
@@ -147,7 +176,25 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 			continue
 		}
 		attachment.Data = data
+
+		// The scan is the only slow part of the observation: the attachments
+		// go through it together, under a bound, rather than one after the
+		// other.
+		if a.clamav != nil {
+			wg.Add(1)
+			go func(attachment *Attachment, data []byte) {
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
+				defer cancel()
+				attachment.ClamAV = a.clamav.ScanBytes(ctx, data)
+			}(attachment, data)
+		}
 	}
+
+	wg.Wait()
 
 	return results
 }

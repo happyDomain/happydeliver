@@ -33,4 +33,10 @@ var attachmentChecks = []attachmentCheck{
 	// A file nobody opened qualifies everything said below it, which only ever
 	// saw its name and its size. It is read first for that reason.
 	sizeCheck,
+
+	// What the engine made of the whole file comes last: it complements the
+	// readings above rather than replacing them, and the reader has met what
+	// happyDeliver saw for itself by the time they reach a verdict nobody here
+	// can explain.
+	clamavCheck,
 }

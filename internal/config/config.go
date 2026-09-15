@@ -95,6 +95,7 @@ type AnalysisConfig struct {
 	// trust policy is reported there rather than on every analysis.
 	VMCRoots *x509.CertPool `json:"-"`
 
+	ClamAVAddress     string        // clamd address (tcp://host:port, unix:///path or host:port). Empty = disabled
 	ScanTimeout       time.Duration // Timeout for reading one attachment, external scans included
 	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }

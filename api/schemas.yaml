@@ -312,14 +312,14 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, scan_skipped]
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, scan_error, scan_skipped]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
-            message, scan_skipped off what it carries alongside.
-            attachment_risk predates the attachment reading and is kept for the
-            reports that already carry it; a finding about an attachment now
-            names what is wrong with it.
+            message, those from malware_detected to scan_skipped off what it
+            carries alongside. attachment_risk predates the attachment reading
+            and is kept for the reports that already carry it; a finding about
+            an attachment now names what is wrong with it.
           example: "missing_alt"
         category:
           type: string
@@ -350,11 +350,12 @@ components:
           example: "Add descriptive alt text to all images for better accessibility and deliverability"
         source:
           type: string
-          enum: [self, rspamd]
+          enum: [self, rspamd, clamav]
           description: >-
             Who observed the issue. Absent means happyDeliver itself, which is
-            also what "self" says explicitly; "rspamd" means it comes from a
-            symbol the spam filter raised on this message.
+            also what "self" says explicitly; anything else names the third
+            party that saw it: a symbol the spam filter raised on this message,
+            or a scanner that was handed one of its attachments.
           example: "rspamd"
         symbol:
           type: string
@@ -379,6 +380,10 @@ components:
         has_attachments:
           type: boolean
           description: Whether the email contains attachments
+          example: true
+        clamav_enabled:
+          type: boolean
+          description: Whether ClamAV scanning was configured on the server
           example: true
         attachments:
           type: array
@@ -417,11 +422,28 @@ components:
           type: boolean
           description: Whether this is an inline part (e.g. embedded image) rather than a regular attachment
           example: false
+        clamav:
+          $ref: '#/components/schemas/ClamAVResult'
         issues:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
           description: Issues found in this attachment
+
+    ClamAVResult:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [clean, infected, error, skipped, too_large]
+          description: ClamAV scan outcome
+          example: "clean"
+        signature:
+          type: string
+          description: Malware signature name when infected
+          example: "Eicar-Signature"
 
     LinkCheck:
       type: object

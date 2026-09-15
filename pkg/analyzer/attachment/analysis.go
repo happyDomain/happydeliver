@@ -24,13 +24,14 @@ package attachment
 import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/clamav"
 )
 
-// Analysis is what the report shows of the attachments: each file, and what
-// the checks found in it.
+// Analysis is what the report shows of the attachments: each file, what the
+// scanner said about it, and what the checks found in it.
 //
 // It takes the readings rather than producing them, because the same readings
-// answer for the score: a message is read once per report.
+// answer for the score: a file is handed to a scanner once per report.
 func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.AttachmentAnalysis {
 	if results == nil {
 		return nil
@@ -38,6 +39,7 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 
 	analysis := &model.AttachmentAnalysis{
 		HasAttachments: len(results.Attachments) > 0,
+		ClamavEnabled:  utils.PtrTo(results.ClamAVEnabled),
 	}
 
 	if len(results.Attachments) == 0 {
@@ -63,6 +65,8 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 			check.Inline = utils.PtrTo(true)
 		}
 
+		check.Clamav = clamavToModel(attachment.ClamAV, results.ClamAVEnabled)
+
 		// The readings are index-aligned with the attachments, and a caller
 		// that did not read at all leaves the findings out rather than
 		// inventing an empty verdict.
@@ -76,4 +80,21 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 	analysis.Attachments = &checks
 
 	return analysis
+}
+
+// clamavToModel converts a ClamAV scan to the API model, mapping a missing
+// scan to the skipped status
+func clamavToModel(scan *clamav.Scan, enabled bool) *model.ClamAVResult {
+	if scan == nil {
+		if !enabled {
+			return &model.ClamAVResult{Status: model.ClamAVResultStatusSkipped}
+		}
+		return nil
+	}
+
+	result := &model.ClamAVResult{Status: model.ClamAVResultStatus(scan.Status)}
+	if scan.Signature != "" {
+		result.Signature = utils.PtrTo(scan.Signature)
+	}
+	return result
 }

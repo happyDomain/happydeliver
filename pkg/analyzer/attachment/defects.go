@@ -21,21 +21,57 @@
 
 package attachment
 
-import "git.happydns.org/happyDeliver/pkg/reading"
+import (
+	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/reading"
+)
 
 // attachmentDefects is the whole vocabulary. A defect missing from it is
 // priced by nobody, and the tests say so.
 var attachmentDefects = []*reading.Defect{
+	defectMalware,
 	defectScanSkipped,
+	defectScanError,
 }
 
-// defectScanSkipped: something was not looked at, and the reader is told so
-// rather than left to read silence as a clean bill.
-//
-// It is what our own limits cost, not what the message did: an attachment
-// larger than the analysis will read. Charging for it would bill a sender for
-// our ceilings.
-var defectScanSkipped = &reading.Defect{
-	Name:      "scan_skipped",
-	Uncharged: "it reports a limit of this analysis rather than a defect of the message, and a sender cannot answer for our ceilings",
-}
+var (
+	// familyMalware answers for an engine saying outright that the file is
+	// malicious.
+	//
+	// It is the one family that can decide the grade, and that is the point: a
+	// message carrying malware has one defect worth knowing about, and a
+	// hundred points is how the score says so. What a verdict costs is read
+	// off its gravity, because the engines do not all mean the same thing by
+	// it: "this is a known sample" and "several engines are uneasy about this"
+	// are different statements, and only the first is worth a report.
+	familyMalware = &reading.Family{
+		Name: "malware",
+		Cap:  100,
+		PerSeverity: map[model.IssueSeverity]int{
+			model.IssueSeverityCritical: 100,
+			model.IssueSeverityHigh:     40,
+		},
+	}
+)
+
+var (
+	// defectMalware: an engine recognised the file.
+	defectMalware = &reading.Defect{Name: "malware", Family: familyMalware}
+
+	// defectScanSkipped: something was not looked at, and the reader is told so
+	// rather than left to read silence as a clean bill.
+	//
+	// It is what our own limits cost, not what the message did: an attachment
+	// larger than the analysis will read. Charging for it would bill a sender
+	// for our ceilings.
+	defectScanSkipped = &reading.Defect{
+		Name:      "scan_skipped",
+		Uncharged: "it reports a limit of this analysis rather than a defect of the message, and a sender cannot answer for our ceilings",
+	}
+
+	// defectScanError: a scanner was asked and could not answer.
+	defectScanError = &reading.Defect{
+		Name:      "scan_error",
+		Uncharged: "a verdict nobody reached says nothing about the file, and a service being down is not the sender's doing",
+	}
+)
