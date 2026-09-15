@@ -312,14 +312,14 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, scan_skipped]
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, scan_error, scan_skipped]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
-            message, scan_skipped off what it carries alongside.
-            attachment_risk predates the attachment reading and is kept for the
-            reports that already carry it; a finding about an attachment now
-            names what is wrong with it.
+            message, those from malware_detected to scan_skipped off what it
+            carries alongside. attachment_risk predates the attachment reading
+            and is kept for the reports that already carry it; a finding about
+            an attachment now names what is wrong with it.
           example: "missing_alt"
         category:
           type: string
@@ -370,10 +370,11 @@ components:
       description: >-
         Who observed the issue. Absent means happyDeliver itself, which is also
         what "self" says explicitly; anything else names the third party that
-        saw it, such as the spam filter that raised a symbol on this message.
-        It is a plain string rather than a closed list, because which third
-        parties an instance asks is the instance's business and not something
-        a reader of a report has to have been told in advance.
+        saw it: the spam filter that raised a symbol on this message, or the
+        scanner an attachment was handed to, under the same name its scan
+        result carries. It is a plain string rather than a closed list, because
+        which third parties an instance asks is the instance's business and not
+        something a reader of a report has to have been told in advance.
       example: "rspamd"
 
     AttachmentAnalysis:
@@ -422,11 +423,68 @@ components:
           type: boolean
           description: Whether this is an inline part (e.g. embedded image) rather than a regular attachment
           example: false
+        scans:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanResult'
+          description: >-
+            What every scanner this instance knows said about this file, one
+            entry per scanner whatever its answer, including the ones that were
+            not asked. An absent entry means nothing, so a reader never has to
+            tell a scanner that found nothing from one that was never run.
         issues:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
           description: Issues found in this attachment
+
+    ScanResult:
+      type: object
+      description: >-
+        What one engine said about one file. Every scanner answers in this
+        shape, whichever it is: the result names the scanner rather than the
+        report giving each of them a field of its own, so an instance that runs
+        another engine tomorrow produces a report today's clients already know
+        how to read.
+      required:
+        - scanner
+        - status
+      properties:
+        scanner:
+          type: string
+          description: >-
+            Name of the engine that answered, the same name its findings are
+            attributed to in `Issue.source`. Deliberately not an enum: which
+            scanners an instance runs is the instance's business.
+          example: "clamav"
+        status:
+          type: string
+          enum: [clean, malicious, pending, error, skipped, disabled]
+          description: >-
+            What the scanner made of the file. `clean` and `malicious` are
+            verdicts; the rest are the ways there is no verdict, and they are
+            not interchangeable. `pending` = it is analysing it and the answer
+            is not in yet, `error` = it was asked and could not answer,
+            `skipped` = it was not asked about this particular file (too large,
+            or the file was never read), `disabled` = it is not configured on
+            this instance at all.
+          example: "clean"
+        verdict:
+          type: string
+          description: What the scanner named what it recognised, when it recognised something
+          example: "Eicar-Signature"
+        detail:
+          type: string
+          description: What the scanner said beyond its status, and the only place an error or a skip explains itself
+          example: "connection refused"
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Whatever else this particular scanner reports. It is what keeps the
+            shape agnostic: a scanner with something to say that no field above
+            holds says it here rather than in a field of its own.
 
     LinkCheck:
       type: object

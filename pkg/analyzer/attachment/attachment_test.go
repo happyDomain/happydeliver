@@ -22,16 +22,89 @@
 package attachment
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
+	"io"
+	"net"
 	"strings"
 	"testing"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/clamav"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
+
+// infectedMarker is what a payload carries to have the fake clamd report it
+// as infected. It is deliberately not the EICAR string: that one is meant to
+// trip real engines, which would quarantine this file and the test binary on
+// any machine running an on-access scanner.
+const infectedMarker = "FAKE-CLAMD-INFECTED-MARKER"
+
+// oversizeMarker is what a payload carries to have the fake clamd decline it
+// for its size.
+const oversizeMarker = "CLAMD-STREAM-TOO-LARGE"
+
+// fakeClamd starts an in-process clamd simulator and returns its address. It
+// answers FOUND when the streamed payload contains infectedMarker, the size
+// limit error when it carries oversizeMarker, and OK otherwise.
+func fakeClamd(t *testing.T) string {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to start fake clamd: %v", err)
+	}
+	t.Cleanup(func() { listener.Close() })
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer conn.Close()
+
+				reader := bufio.NewReader(conn)
+				command, err := reader.ReadString('\x00')
+				if err != nil || strings.TrimRight(command, "\x00") != "zINSTREAM" {
+					return
+				}
+
+				var payload bytes.Buffer
+				for {
+					var sizeBuf [4]byte
+					if _, err := io.ReadFull(reader, sizeBuf[:]); err != nil {
+						return
+					}
+					size := binary.BigEndian.Uint32(sizeBuf[:])
+					if size == 0 {
+						break
+					}
+					if _, err := io.CopyN(&payload, reader, int64(size)); err != nil {
+						return
+					}
+				}
+
+				if bytes.Contains(payload.Bytes(), []byte(infectedMarker)) {
+					conn.Write([]byte("stream: Eicar-Signature FOUND\x00"))
+					return
+				}
+				if bytes.Contains(payload.Bytes(), []byte(oversizeMarker)) {
+					conn.Write([]byte("INSTREAM size limit exceeded. ERROR\x00"))
+					return
+				}
+				conn.Write([]byte("stream: OK\x00"))
+			}(conn)
+		}
+	}()
+
+	return listener.Addr().String()
+}
 
 // buildAttachmentEmail assembles a multipart email with one attachment
 func buildAttachmentEmail(filename, contentType string, payload []byte) string {
@@ -140,6 +213,56 @@ func TestAnalyzeAttachmentsCleanPDF(t *testing.T) {
 	}
 }
 
+func TestAnalyzeAttachmentsWithClamAV(t *testing.T) {
+	analyzer := New(Options{ScanTimeout: 5 * time.Second, MaxSize: 25 << 20, scanners: []scanner{clamavScanner{client: clamav.New(fakeClamd(t), 5*time.Second)}}})
+
+	rawEmail := buildAttachmentEmail("virus.txt", "text/plain", []byte(infectedMarker))
+
+	results, readings := read(t, analyzer, rawEmail)
+	if len(results.Attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(results.Attachments))
+	}
+
+	att := results.Attachments[0]
+	if scan := att.ScanBy("clamav"); scan == nil || scan.Status != model.ScanResultStatusMalicious {
+		t.Fatalf("Expected a malicious verdict from ClamAV, got %+v", scan)
+	}
+
+	if types := issueTypes(readings[0].Issues); types[model.IssueTypeMalwareDetected] == 0 {
+		t.Errorf("Expected malware_detected finding, got %+v", readings[0].Issues)
+	}
+
+	score, grade := analyzer.Score(results, readings)
+	if score != 0 || grade != "F" {
+		t.Errorf("Expected 0/F for infected attachment, got %d/%s", score, grade)
+	}
+}
+
+func TestAnalyzeAttachmentsScannersDisabled(t *testing.T) {
+	analyzer := newOfflineAnalyzer()
+	rawEmail := buildAttachmentEmail("notes.txt", "text/plain", []byte("meeting notes"))
+
+	results, readings := read(t, analyzer, rawEmail)
+	analysis := analyzer.Analysis(results, readings)
+
+	// Every scanner the analysis knows of is in the report, saying it is not
+	// configured here.
+	check := (*analysis.Attachments)[0]
+	if check.Scans == nil || len(*check.Scans) != len(knownScanners) {
+		t.Fatalf("Expected one entry per known scanner, got %+v", check.Scans)
+	}
+	for _, scan := range *check.Scans {
+		if scan.Status != model.ScanResultStatusDisabled {
+			t.Errorf("Expected %s reported as disabled, got %q", scan.Scanner, scan.Status)
+		}
+	}
+
+	// Disabled scanners must not cost any points
+	if score, _ := analyzer.Score(results, readings); score != 100 {
+		t.Errorf("Expected score 100 with scanners disabled, got %d", score)
+	}
+}
+
 func TestAnalyzeAttachmentsOversize(t *testing.T) {
 	analyzer := New(Options{ScanTimeout: time.Second, MaxSize: 16})
 	rawEmail := buildAttachmentEmail("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
@@ -158,6 +281,33 @@ func TestAnalyzeAttachmentsOversize(t *testing.T) {
 
 	if score, _ := analyzer.Score(results, readings); score != 100 {
 		t.Errorf("Oversize attachments should not be penalized, got %d", score)
+	}
+}
+
+// TestAnUnnamedAttachmentIsNamedOnce holds every finding about one attachment
+// to the same name for it, whether it comes from a static check or a scanner.
+func TestAnUnnamedAttachmentIsNamedOnce(t *testing.T) {
+	analyzer := New(Options{ScanTimeout: 5 * time.Second, MaxSize: 25 << 20, scanners: []scanner{clamavScanner{client: clamav.New(fakeClamd(t), 5*time.Second)}}})
+
+	var sb strings.Builder
+	sb.WriteString("From: sender@example.com\r\n")
+	sb.WriteString("MIME-Version: 1.0\r\n")
+	sb.WriteString("Content-Type: multipart/mixed; boundary=\"BOUNDARY\"\r\n\r\n")
+	sb.WriteString("--BOUNDARY\r\n")
+	sb.WriteString("Content-Type: application/octet-stream\r\n")
+	sb.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
+	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(infectedMarker)))
+	sb.WriteString("\r\n--BOUNDARY--\r\n")
+
+	results, readings := read(t, analyzer, sb.String())
+	if len(readings) != 1 || len(readings[0].Issues) == 0 {
+		t.Fatalf("Expected findings about the unnamed attachment, got %+v", readings)
+	}
+
+	for _, issue := range readings[0].Issues {
+		if issue.Location == nil || *issue.Location != results.Attachments[0].Location {
+			t.Errorf("Finding %q names %v, want %q", issue.Type, issue.Location, results.Attachments[0].Location)
+		}
 	}
 }
 

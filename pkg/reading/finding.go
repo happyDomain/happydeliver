@@ -28,9 +28,10 @@ import (
 // The observers a finding may be attributed to, beyond happyDeliver itself.
 //
 // They are declared here rather than in the schema because the vocabulary is
-// open: a report names whoever saw the defect, and which third parties an
-// instance asks is the instance's business rather than something every reader
-// has to have been told in advance.
+// open: a report names whoever saw the defect, a spam filter or any of the
+// scanners an instance happens to run, and which those are is the instance's
+// business rather than something every reader has to have been told in
+// advance.
 const (
 	// SourceSelf is happyDeliver, which is also what leaving the source out
 	// says.

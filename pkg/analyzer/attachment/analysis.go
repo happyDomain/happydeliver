@@ -26,11 +26,10 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
-// Analysis is what the report shows of the attachments: each file, and what
-// the checks found in it.
-//
-// It takes the readings rather than producing them, because the same readings
-// answer for the score: a message is read once per report.
+// Analysis is what the report shows of the attachments: each file, what the
+// scanners said about it, and what the checks found in it. It takes the
+// readings rather than producing them, because the same readings answer for
+// the score.
 func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.AttachmentAnalysis {
 	if results == nil {
 		return nil
@@ -63,9 +62,12 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 			check.Inline = utils.PtrTo(true)
 		}
 
-		// The readings are index-aligned with the attachments, and a caller
-		// that did not read at all leaves the findings out rather than
-		// inventing an empty verdict.
+		if scans := scansToModel(attachment.Scans); len(scans) > 0 {
+			check.Scans = &scans
+		}
+
+		// The readings are index-aligned with the attachments; a caller that
+		// did not read at all leaves the findings out.
 		if i < len(readings) && len(readings[i].Issues) > 0 {
 			issues := readings[i].Issues
 			check.Issues = &issues
@@ -76,4 +78,31 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 	analysis.Attachments = &checks
 
 	return analysis
+}
+
+// scansToModel carries what the engines said into the report, one entry per
+// scanner the analysis knows of, whatever each of them answered: a reader is
+// to tell "nobody looked" from "nothing was found".
+func scansToModel(scans []Scan) []model.ScanResult {
+	results := make([]model.ScanResult, 0, len(scans))
+
+	for _, scan := range scans {
+		result := model.ScanResult{
+			Scanner: scan.Scanner,
+			Status:  scan.Status,
+		}
+		if scan.Verdict != "" {
+			result.Verdict = utils.PtrTo(scan.Verdict)
+		}
+		if scan.Detail != "" {
+			result.Detail = utils.PtrTo(scan.Detail)
+		}
+		if len(scan.Metadata) > 0 {
+			result.Metadata = utils.PtrTo(scan.Metadata)
+		}
+
+		results = append(results, result)
+	}
+
+	return results
 }
