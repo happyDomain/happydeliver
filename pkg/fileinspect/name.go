@@ -122,3 +122,9 @@ func inspectName(filename string) Name {
 func (n Name) MacroEnabledExtension() bool {
 	return macroEnabledExtensions[n.Extension]
 }
+
+// HTMLExtension reports whether the name is that of a page a browser will
+// open.
+func (n Name) HTMLExtension() bool {
+	return n.Extension == "html" || n.Extension == "htm"
+}

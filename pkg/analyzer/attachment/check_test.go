@@ -96,6 +96,7 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 		"disguised":  observed("invoice.pdf.exe", "application/pdf", mzStub),
 		"macro":      observed("macro.docm", "", macro.Bytes()),
 		"pdf":        observed("active.pdf", "application/pdf", []byte("%PDF-1.4 << /OpenAction << /JS (x) >> >>")),
+		"html":       observed("open-me.html", "text/html", []byte(`<html><script>atob("AAAA")</script></html>`)),
 		"recognised": recognised,
 		"unanswered": unanswered,
 	}

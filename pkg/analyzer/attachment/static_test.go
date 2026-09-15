@@ -109,33 +109,6 @@ func TestAMismatchHidingAProgramIsGraver(t *testing.T) {
 	}
 }
 
-// TestEveryWayOfDisguisingANameIsReported covers the tricks the other tests
-// do not reach: a name that reads backwards and one padded out of sight.
-func TestEveryWayOfDisguisingANameIsReported(t *testing.T) {
-	cases := map[string]struct {
-		name fileinspect.Name
-		want string
-	}{
-		"rtl":     {fileinspect.Name{Filename: "invoice‮fdp.exe", RTLOverride: true}, "right-to-left override"},
-		"padding": {fileinspect.Name{Filename: "invoice.pdf" + strings.Repeat(" ", 40) + ".exe", WhitespacePadding: true}, "whitespace padding"},
-	}
-
-	for name, tc := range cases {
-		findings := deceptiveNameFindings(tc.name, tc.name.Filename)
-		if len(findings) != 1 {
-			t.Errorf("%s: expected one finding, got %+v", name, findings)
-			continue
-		}
-		if findings[0].Issue.Type != model.IssueTypeDangerousExtension || !strings.Contains(findings[0].Issue.Message, tc.want) {
-			t.Errorf("%s: expected a dangerous extension finding about the %s, got %+v", name, tc.want, findings[0].Issue)
-		}
-	}
-
-	if findings := deceptiveNameFindings(fileinspect.Name{}, "attachment #1"); findings != nil {
-		t.Errorf("Expected nothing said of a file with no name, got %+v", findings)
-	}
-}
-
 func TestMacrosEstablishedAndMacrosMerelyAllowed(t *testing.T) {
 	var carried bytes.Buffer
 	writer := zip.NewWriter(&carried)
@@ -174,6 +147,66 @@ func TestMacrosEstablishedAndMacrosMerelyAllowed(t *testing.T) {
 	}
 }
 
+func TestEachActiveFeatureOfAPDFIsReported(t *testing.T) {
+	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\nendobj")
+
+	if types := findingTypes(readFile("active.pdf", "application/pdf", pdf)); types[model.IssueTypePdfActiveContent] < 2 {
+		t.Errorf("Expected the JavaScript and the automatic action to be reported apart, got %v", types)
+	}
+}
+
+func TestHTMLSmugglingIsGraverThanAScriptedPage(t *testing.T) {
+	smuggling := []byte(`<html><script>var payload = atob("AAAA"); var b = new Blob([payload]);</script></html>`)
+
+	found := false
+	for _, f := range readFile("open-me.html", "text/html", smuggling) {
+		if f.Type == model.IssueTypeScriptContent {
+			found = true
+			if f.Severity != model.IssueSeverityHigh {
+				t.Errorf("Expected a high-severity script_content finding, got %s", f.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("Expected a script_content finding for an HTML smuggling attachment")
+	}
+}
+
+func TestAScriptIsReportedWhateverItIsCalled(t *testing.T) {
+	script := []byte("#!/bin/sh\nrm -rf --no-preserve-root /\n")
+
+	if types := findingTypes(readFile("run.txt", "text/plain", script)); types[model.IssueTypeScriptContent] == 0 {
+		t.Errorf("Expected script_content finding for a shebang, got %v", types)
+	}
+}
+
+// TestEveryWayOfDisguisingANameIsReported covers the tricks the other tests
+// do not reach: a name that reads backwards and one padded out of sight.
+func TestEveryWayOfDisguisingANameIsReported(t *testing.T) {
+	cases := map[string]struct {
+		name fileinspect.Name
+		want string
+	}{
+		"rtl":     {fileinspect.Name{Filename: "invoice‮fdp.exe", RTLOverride: true}, "right-to-left override"},
+		"padding": {fileinspect.Name{Filename: "invoice.pdf" + strings.Repeat(" ", 40) + ".exe", WhitespacePadding: true}, "whitespace padding"},
+	}
+
+	for name, tc := range cases {
+		findings := deceptiveNameFindings(tc.name, tc.name.Filename)
+		if len(findings) != 1 {
+			t.Errorf("%s: expected one finding, got %+v", name, findings)
+			continue
+		}
+		if findings[0].Issue.Type != model.IssueTypeDangerousExtension || !strings.Contains(findings[0].Issue.Message, tc.want) {
+			t.Errorf("%s: expected a dangerous extension finding about the %s, got %+v", name, tc.want, findings[0].Issue)
+		}
+	}
+
+	if findings := deceptiveNameFindings(fileinspect.Name{}, "attachment #1"); findings != nil {
+		t.Errorf("Expected nothing said of a file with no name, got %+v", findings)
+	}
+}
+
 // TestALegacyDocumentWithMacroMarkersIsReportedAsAHeuristic: markers in a
 // compound file are reported as likely macros, and worth the same as
 // established ones.
@@ -190,14 +223,6 @@ func TestALegacyDocumentWithMacroMarkersIsReportedAsAHeuristic(t *testing.T) {
 	}
 	if findings[0].Issue.Severity != model.IssueSeverityHigh || !strings.Contains(findings[0].Issue.Message, "heuristic") {
 		t.Errorf("Expected a high finding said to be heuristic, got %+v", findings[0].Issue)
-	}
-}
-
-func TestEachActiveFeatureOfAPDFIsReported(t *testing.T) {
-	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >>\nendobj")
-
-	if types := findingTypes(readFile("active.pdf", "application/pdf", pdf)); types[model.IssueTypePdfActiveContent] < 2 {
-		t.Errorf("Expected the JavaScript and the automatic action to be reported apart, got %v", types)
 	}
 }
 

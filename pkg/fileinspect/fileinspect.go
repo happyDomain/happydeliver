@@ -50,6 +50,9 @@ type Facts struct {
 	// PDF is what a PDF would do when opened, in the order the features are
 	// looked for. Empty when the file is not a PDF, or is an inert one.
 	PDF []PDFFeature
+
+	// Script is the script the file is, or the one it carries.
+	Script Script
 }
 
 // InspectHeader reads what can be read of a file without reading it through:
@@ -64,8 +67,8 @@ func InspectHeader(filename, declaredMediaType string, data []byte) Facts {
 	}
 }
 
-// Inspect reads one file: the name it gives itself, the type it claims against
-// the type its bytes are in, and what its content turns out to be.
+// Inspect reads one file through: the name it gives itself, the type it claims
+// against the type its bytes are in, and what its content turns out to be.
 //
 // declaredMediaType is what the file was announced as by whoever carried it,
 // already reduced to a media type; empty when nobody announced anything, which
@@ -83,6 +86,7 @@ func Inspect(filename, declaredMediaType string, data []byte) Facts {
 		Executable: detectExecutable(data),
 		Macro:      detectMacro(name, data),
 		PDF:        inspectPDF(data),
+		Script:     inspectScript(name, mtype, data),
 	}
 }
 
