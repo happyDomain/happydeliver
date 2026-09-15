@@ -94,6 +94,9 @@ type AnalysisConfig struct {
 	// configurable directly: the file is read once at startup so a broken
 	// trust policy is reported there rather than on every analysis.
 	VMCRoots *x509.CertPool `json:"-"`
+
+	ScanTimeout       time.Duration // Timeout for reading one attachment, external scans included
+	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -120,6 +123,9 @@ func DefaultConfig() *Config {
 			RBLs:        []string{},
 			DNSWLs:      []string{},
 			CheckAllIPs: false, // By default, only check the first IP
+
+			ScanTimeout:       30 * time.Second,
+			MaxAttachmentSize: 25 << 20, // 25 MiB, matches clamd's default StreamMaxLength
 		},
 	}
 }

@@ -192,6 +192,14 @@
                     summary.content_grade,
                     summary.content_score,
                 )}
+                {#if summary.attachments_grade !== undefined}
+                    {@render scoreLink(
+                        "#attachment-details",
+                        "Attachments",
+                        summary.attachments_grade,
+                        summary.attachments_score,
+                    )}
+                {/if}
             </div>
         {/if}
     </div>

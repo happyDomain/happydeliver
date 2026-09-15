@@ -44,6 +44,8 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.Analysis.RspamdAPIURL, "rspamd-api-url", o.Analysis.RspamdAPIURL, "rspamd API URL for symbol descriptions (default: use embedded list)")
 	flag.StringVar(&o.Analysis.RspamdScanURL, "rspamd-scan-url", o.Analysis.RspamdScanURL, "rspamd normal worker URL to submit uploaded messages to for a content scan, e.g. http://127.0.0.1:11333 (default: do not scan uploads)")
 	flag.StringVar(&o.Analysis.VMCRootsFile, "bimi-vmc-roots", o.Analysis.VMCRootsFile, `PEM file of trusted BIMI root certificates ("`+bimi.DisableVMCRoots+`" to skip the check; default: use embedded bundle)`)
+	flag.DurationVar(&o.Analysis.ScanTimeout, "scan-timeout", o.Analysis.ScanTimeout, "Timeout for reading one attachment, external scans included")
+	flag.Int64Var(&o.Analysis.MaxAttachmentSize, "max-attachment-size", o.Analysis.MaxAttachmentSize, "Maximum attachment size in bytes to analyze")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")

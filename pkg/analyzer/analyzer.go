@@ -30,6 +30,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
 
+	"git.happydns.org/happyDeliver/pkg/analyzer/attachment"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -51,6 +52,10 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		RspamdAPIURL:     cfg.Analysis.RspamdAPIURL,
 		RspamdScanURL:    cfg.Analysis.RspamdScanURL,
 		VMCRoots:         cfg.Analysis.VMCRoots,
+		Attachments: attachment.Options{
+			ScanTimeout: cfg.Analysis.ScanTimeout,
+			MaxSize:     cfg.Analysis.MaxAttachmentSize,
+		},
 	})
 
 	return &EmailAnalyzer{

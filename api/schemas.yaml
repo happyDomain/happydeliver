@@ -121,6 +121,8 @@ components:
                 listed: false
         content_analysis:
           $ref: '#/components/schemas/ContentAnalysis'
+        attachment_analysis:
+          $ref: '#/components/schemas/AttachmentAnalysis'
         header_analysis:
           $ref: '#/components/schemas/HeaderAnalysis'
         raw_headers:
@@ -169,6 +171,8 @@ components:
         - header_grade
         - content_score
         - content_grade
+        - attachments_score
+        - attachments_grade
       properties:
         dns_score:
           type: integer
@@ -236,6 +240,17 @@ components:
           enum: [A+, A, B, C, D, E, F]
           description: Letter grade representation of the score (A+ is best, F is worst)
           example: "A"
+        attachments_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Attachment harmfulness score (in percentage, 100 = no attachments or all clean)
+          example: 100
+        attachments_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade representation of the score (A+ is best, F is worst)
+          example: "A"
 
     ContentAnalysis:
       type: object
@@ -283,8 +298,12 @@ components:
     Issue:
       type: object
       description: >-
-        One thing a reading of the message found: what was found, which reading
-        it answers, how grave it is, and who observed it.
+        One thing a reading of the message found. Every reading happyDeliver
+        makes reports its findings this way: what was found, which reading it
+        answers, how grave it is, and who observed it. The vocabulary of type
+        is therefore the union of what every reading may report, and each of
+        them is held to its own share of it by its registry's tests rather than
+        by this schema.
       required:
         - type
         - category
@@ -293,8 +312,14 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch]
-          description: What the report files the finding under
+          enum: [broken_html, missing_alt, excessive_images, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, scan_skipped]
+          description: >-
+            What the report files the finding under. The values from
+            broken_html to sender_domain_mismatch are read off the body of the
+            message, scan_skipped off what it carries alongside.
+            attachment_risk predates the attachment reading and is kept for the
+            reports that already carry it; a finding about an attachment now
+            names what is wrong with it.
           example: "missing_alt"
         category:
           type: string
@@ -345,6 +370,58 @@ components:
             others are named here, so the defect is not listed twice while the
             agreement stays visible.
           example: ["R_SUSPICIOUS_IMAGES"]
+
+    AttachmentAnalysis:
+      type: object
+      required:
+        - has_attachments
+      properties:
+        has_attachments:
+          type: boolean
+          description: Whether the email contains attachments
+          example: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentCheck'
+          description: Analysis of each attachment found in the email
+
+    AttachmentCheck:
+      type: object
+      required:
+        - size
+        - sha256
+      properties:
+        filename:
+          type: string
+          description: Attachment filename as declared in the email
+          example: "invoice.pdf"
+        declared_content_type:
+          type: string
+          description: Content-Type declared in the MIME part
+          example: "application/pdf"
+        detected_content_type:
+          type: string
+          description: Content type detected from the file's magic bytes
+          example: "application/pdf"
+        size:
+          type: integer
+          format: int64
+          description: Decoded attachment size in bytes
+          example: 48213
+        sha256:
+          type: string
+          description: SHA-256 checksum of the decoded attachment
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        inline:
+          type: boolean
+          description: Whether this is an inline part (e.g. embedded image) rather than a regular attachment
+          example: false
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: Issues found in this attachment
 
     LinkCheck:
       type: object

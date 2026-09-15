@@ -22,8 +22,11 @@
 package analyzer
 
 import (
+	"encoding/base64"
+	"fmt"
 	"net/mail"
 	"net/textproto"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,8 +34,32 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 
+	"git.happydns.org/happyDeliver/pkg/analyzer/attachment"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
+
+// buildAttachmentEmail assembles a multipart email carrying one attachment.
+func buildAttachmentEmail(filename, contentType string, payload []byte) string {
+	var sb strings.Builder
+	sb.WriteString("From: sender@example.com\r\n")
+	sb.WriteString("To: recipient@example.com\r\n")
+	sb.WriteString("Subject: Attachment analysis test\r\n")
+	sb.WriteString("MIME-Version: 1.0\r\n")
+	sb.WriteString("Content-Type: multipart/mixed; boundary=\"BOUNDARY\"\r\n")
+	sb.WriteString("\r\n")
+	sb.WriteString("--BOUNDARY\r\n")
+	sb.WriteString("Content-Type: text/plain\r\n")
+	sb.WriteString("\r\n")
+	sb.WriteString("Please find the file attached.\r\n")
+	sb.WriteString("--BOUNDARY\r\n")
+	fmt.Fprintf(&sb, "Content-Type: %s; name=\"%s\"\r\n", contentType, filename)
+	sb.WriteString("Content-Transfer-Encoding: base64\r\n")
+	fmt.Fprintf(&sb, "Content-Disposition: attachment; filename=\"%s\"\r\n", filename)
+	sb.WriteString("\r\n")
+	sb.WriteString(base64.StdEncoding.EncodeToString(payload))
+	sb.WriteString("\r\n--BOUNDARY--\r\n")
+	return sb.String()
+}
 
 func TestNewReportGenerator(t *testing.T) {
 	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
@@ -129,6 +156,43 @@ func TestGenerateReport(t *testing.T) {
 		if report.Summary.DnsScore < 0 || report.Summary.DnsScore > 100 {
 			t.Errorf("DnsScore %v is out of bounds", report.Summary.DnsScore)
 		}
+		if report.Summary.AttachmentsScore < 0 || report.Summary.AttachmentsScore > 100 {
+			t.Errorf("AttachmentsScore %v is out of bounds", report.Summary.AttachmentsScore)
+		}
+	}
+}
+
+func TestGenerateReportAttachments(t *testing.T) {
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs, Attachments: attachment.Options{ScanTimeout: 10 * time.Second, MaxSize: 25 << 20}})
+	testID := uuid.New()
+
+	// Email without attachments scores a perfect attachments category
+	email := createTestEmail()
+	report := gen.GenerateReport(testID, gen.AnalyzeEmail(email, AnalysisOptions{}))
+
+	if report.Summary.AttachmentsScore != 100 {
+		t.Errorf("AttachmentsScore = %d without attachments, want 100", report.Summary.AttachmentsScore)
+	}
+	if report.AttachmentAnalysis == nil {
+		t.Fatal("AttachmentAnalysis should be present")
+	}
+	if report.AttachmentAnalysis.HasAttachments {
+		t.Error("HasAttachments should be false")
+	}
+
+	// An email carrying one reaches the report as one attachment check
+	rawEmail := buildAttachmentEmail("notes.txt", "text/plain", []byte("meeting notes"))
+	parsed, err := mailmsg.Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+	report = gen.GenerateReport(testID, gen.AnalyzeEmail(parsed, AnalysisOptions{}))
+
+	if !report.AttachmentAnalysis.HasAttachments {
+		t.Error("HasAttachments should be true")
+	}
+	if report.AttachmentAnalysis.Attachments == nil || len(*report.AttachmentAnalysis.Attachments) != 1 {
+		t.Fatal("Expected one attachment check in the report")
 	}
 }
 
@@ -185,6 +249,7 @@ func TestGenerateReportExcludesCategoriesThatDidNotRun(t *testing.T) {
 		{report.Summary.AuthenticationScore, string(report.Summary.AuthenticationGrade)},
 		{report.Summary.ContentScore, string(report.Summary.ContentGrade)},
 		{report.Summary.HeaderScore, string(report.Summary.HeaderGrade)},
+		{report.Summary.AttachmentsScore, string(report.Summary.AttachmentsGrade)},
 	} {
 		if s.grade == "" {
 			continue

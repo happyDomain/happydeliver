@@ -30,6 +30,7 @@ import (
 	"git.happydns.org/happyDeliver/pkg/rspamd"
 	"github.com/google/uuid"
 
+	"git.happydns.org/happyDeliver/pkg/analyzer/attachment"
 	"git.happydns.org/happyDeliver/pkg/analyzer/content"
 	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
@@ -45,6 +46,9 @@ type ReportGenerator struct {
 	dnswlChecker    *DNSListChecker
 	contentAnalyzer *content.Analyzer
 	headerAnalyzer  *HeaderAnalyzer
+
+	// attachmentAnalyzer reads what the message carries alongside its body.
+	attachmentAnalyzer *attachment.Analyzer
 	// rspamdScanner asks an rspamd instance about a message this one did not
 	// receive itself. Nil unless an operator configured one, and usable nil.
 	rspamdScanner *rspamd.Scanner
@@ -92,6 +96,10 @@ type GeneratorOptions struct {
 	// VMCRoots is the trust anchor a BIMI Verified Mark Certificate must chain
 	// back to. Nil uses the embedded bundle.
 	VMCRoots *x509.CertPool
+
+	// Attachments is what the attachment analysis may do: which scanners it
+	// may ask about a file, and how large a file it will open.
+	Attachments attachment.Options
 }
 
 // NewReportGenerator creates a new report generator
@@ -101,15 +109,16 @@ func NewReportGenerator(opts GeneratorOptions) *ReportGenerator {
 	symbols := rspamd.Symbols(opts.RspamdAPIURL)
 
 	return &ReportGenerator{
-		authAnalyzer:    NewAuthenticationAnalyzer(opts.ReceiverHostname),
-		spamAnalyzer:    NewSpamAssassinAnalyzer(),
-		rspamdAnalyzer:  NewRspamdAnalyzer(symbols),
-		rspamdScanner:   rspamd.NewScanner(opts.RspamdScanURL, opts.HTTPTimeout, symbols),
-		dnsAnalyzer:     NewDNSAnalyzer(opts.DNSTimeout, opts.VMCRoots),
-		rblChecker:      NewRBLChecker(opts.DNSTimeout, opts.RBLs, opts.CheckAllIPs),
-		dnswlChecker:    NewDNSWLChecker(opts.DNSTimeout, opts.DNSWLs, opts.CheckAllIPs),
-		contentAnalyzer: content.NewAnalyzer(opts.HTTPTimeout),
-		headerAnalyzer:  NewHeaderAnalyzer(),
+		authAnalyzer:       NewAuthenticationAnalyzer(opts.ReceiverHostname),
+		spamAnalyzer:       NewSpamAssassinAnalyzer(),
+		rspamdAnalyzer:     NewRspamdAnalyzer(symbols),
+		rspamdScanner:      rspamd.NewScanner(opts.RspamdScanURL, opts.HTTPTimeout, symbols),
+		dnsAnalyzer:        NewDNSAnalyzer(opts.DNSTimeout, opts.VMCRoots),
+		rblChecker:         NewRBLChecker(opts.DNSTimeout, opts.RBLs, opts.CheckAllIPs),
+		dnswlChecker:       NewDNSWLChecker(opts.DNSTimeout, opts.DNSWLs, opts.CheckAllIPs),
+		contentAnalyzer:    content.NewAnalyzer(opts.HTTPTimeout),
+		headerAnalyzer:     NewHeaderAnalyzer(),
+		attachmentAnalyzer: attachment.New(opts.Attachments),
 	}
 }
 
@@ -153,6 +162,13 @@ type AnalysisResults struct {
 	DNSWL          *DNSListResults
 	SpamAssassin   *model.SpamAssassinResult
 	Rspamd         *model.RspamdResult
+	Attachments    *attachment.Results
+
+	// AttachmentReadings is what the attachment checks made of the above, one
+	// per attachment and in their order. It is held beside the observations
+	// for the same reason ContentReading is: a file is handed to a scanner
+	// once per report, and both the score and the report read that one answer.
+	AttachmentReadings []attachment.Reading
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -225,6 +241,8 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 		// verdict included.
 		results.ContentReading = r.contentAnalyzer.Read(results.Content)
 	}
+	results.Attachments = r.attachmentAnalyzer.Analyze(email)
+	results.AttachmentReadings = r.attachmentAnalyzer.Read(results.Attachments)
 
 	return results
 }
@@ -289,6 +307,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		_, whitelistGrade = r.dnswlChecker.CalculateScore(results.DNSWL, true)
 	}
 
+	attachmentsScore, attachmentsGrade := r.attachmentAnalyzer.Score(results.Attachments, results.AttachmentReadings)
+
 	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
 	rspamdScore, rspamdGrade := r.rspamdAnalyzer.CalculateRspamdScore(results.Rspamd)
 
@@ -324,6 +344,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		HeaderGrade:         model.ScoreSummaryHeaderGrade(headerGrade),
 		SpamScore:           spamScore,
 		SpamGrade:           model.ScoreSummarySpamGrade(spamGrade),
+		AttachmentsScore:    attachmentsScore,
+		AttachmentsGrade:    model.ScoreSummaryAttachmentsGrade(attachmentsGrade),
 	}
 
 	// Add authentication results
@@ -333,6 +355,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	if results.Content != nil {
 		contentAnalysis := r.contentAnalyzer.Analysis(results.Content, results.ContentReading)
 		report.ContentAnalysis = contentAnalysis
+	}
+
+	// Add attachment analysis
+	if results.Attachments != nil {
+		report.AttachmentAnalysis = r.attachmentAnalyzer.Analysis(results.Attachments, results.AttachmentReadings)
 	}
 
 	// Add DNS records
@@ -389,6 +416,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		{report.Summary.ContentScore, string(report.Summary.ContentGrade)},
 		{report.Summary.HeaderScore, string(report.Summary.HeaderGrade)},
 		{report.Summary.SpamScore, string(report.Summary.SpamGrade)},
+		{report.Summary.AttachmentsScore, string(report.Summary.AttachmentsGrade)},
 	}
 
 	var totalScore int

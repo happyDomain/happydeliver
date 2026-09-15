@@ -31,6 +31,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"mime"
 	"net/mail"
 	"net/textproto"
 	"strings"
@@ -80,9 +81,43 @@ type Message struct {
 type Part struct {
 	ContentType string
 	Content     string
-	IsHTML      bool
-	IsText      bool
-	Parts       []Part // For nested multipart messages
+
+	// Filename is what the part calls itself: the Content-Disposition
+	// filename= parameter, falling back to the deprecated Content-Type name=.
+	// RFC 2047 encoded words and RFC 2231 continuations are already decoded.
+	Filename string
+
+	// Disposition is the Content-Disposition type, lowercased: "attachment",
+	// "inline", or empty when the part carries no such header.
+	Disposition string
+
+	// ContentID is the Content-ID header with its angle brackets stripped, the
+	// name an HTML body refers to an embedded resource by (cid:...).
+	ContentID string
+
+	// Body is the decoded payload of a part that is not text. Text parts leave
+	// it nil and put their payload in Content, already converted to UTF-8.
+	Body []byte
+
+	IsHTML bool
+	IsText bool
+	Parts  []Part // For nested multipart messages
+}
+
+// DecodedBytes returns the payload of the part, transfer encoding and charset
+// already undone by the parse.
+func (p *Part) DecodedBytes() []byte {
+	if p.Body != nil {
+		return p.Body
+	}
+
+	return []byte(p.Content)
+}
+
+// IsInline reports whether the part is an inline resource (e.g. an image
+// embedded in the HTML body) rather than a regular attachment.
+func (p *Part) IsInline() bool {
+	return p.Disposition == "inline" || (p.Disposition == "" && p.ContentID != "")
 }
 
 // Parse parses a raw email message.
@@ -158,15 +193,18 @@ func entityPart(e *message.Entity) (Part, bool) {
 		return part, incomplete
 	}
 
-	// Only text parts are ever read back, by GetTextParts and GetHTMLParts:
-	// decoding an attachment would allocate and throw away its whole payload.
-	// NextPart() skips over whatever is left unconsumed.
+	// Every leaf part is read back: the text ones by GetTextParts and
+	// GetHTMLParts, the others by whoever analyses the attachments. A part is
+	// read once, here, because e.Body is a stream NextPart() would otherwise
+	// skip past.
 	//
 	// Best-effort: ReadAll returns the bytes decoded so far alongside any error,
 	// so a part malformed partway through still contributes its valid prefix.
+	content, _ := io.ReadAll(e.Body)
 	if part.IsText || part.IsHTML {
-		content, _ := io.ReadAll(e.Body)
 		part.Content = string(content)
+	} else {
+		part.Body = content
 	}
 
 	return part, false
@@ -209,7 +247,7 @@ func describePart(e *message.Entity) Part {
 	// included, so keep only what precedes the first one: otherwise an unquoted
 	// filename such as "Rapport contexte.pdf" would make the attachment look
 	// like text. Casing is not normalised either, hence the fold.
-	mediaType, _, err := e.Header.ContentType()
+	mediaType, ctParams, err := e.Header.ContentType()
 	if err != nil {
 		mediaType, _, _ = strings.Cut(mediaType, ";")
 	}
@@ -220,11 +258,34 @@ func describePart(e *message.Entity) Part {
 	// read back as text here: its body would come through undecoded.
 	isText := strings.HasPrefix(mediaType, "text/")
 
+	disposition, dispParams, err := e.Header.ContentDisposition()
+	if err != nil {
+		// A header too malformed to parse still names its type in the token
+		// before the first parameter, and that is what tells an attachment
+		// from an inline resource.
+		disposition, _, _ = strings.Cut(e.Header.Get("Content-Disposition"), ";")
+	}
+	disposition = strings.ToLower(strings.TrimSpace(disposition))
+
 	return Part{
 		ContentType: contentType,
+		Filename:    partFilename(dispParams, ctParams),
+		Disposition: disposition,
+		ContentID:   strings.Trim(e.Header.Get("Content-Id"), "<>"),
 		IsHTML:      mediaType == "text/html",
 		IsText:      isText,
 	}
+}
+
+// partFilename returns the name a part gives itself: the Content-Disposition
+// filename= parameter, or the Content-Type name= one deprecated by RFC 2183
+// but still emitted by older senders.
+func partFilename(dispParams, ctParams map[string]string) string {
+	if filename := dispParams["filename"]; filename != "" {
+		return filename
+	}
+
+	return ctParams["name"]
 }
 
 // rawHeaderBlock returns the header block of a raw message, stopping before the
@@ -320,6 +381,28 @@ func (e *Message) GetTextParts() []Part {
 func (e *Message) GetHTMLParts() []Part {
 	return filterParts(e.Parts, func(p Part) bool {
 		return p.IsHTML
+	})
+}
+
+// GetAttachments returns every part carrying a payload to analyze: explicit
+// attachments, parts naming a file, inline resources such as embedded images,
+// and any leaf part that is not a text body.
+func (e *Message) GetAttachments() []Part {
+	return filterParts(e.Parts, func(p Part) bool {
+		if p.Disposition == "attachment" || p.Filename != "" || p.ContentID != "" {
+			return true
+		}
+
+		mediaType, _, err := mime.ParseMediaType(p.ContentType)
+		if err != nil {
+			mediaType, _, _ = strings.Cut(p.ContentType, ";")
+		}
+		mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+
+		return mediaType != "" &&
+			!strings.HasPrefix(mediaType, "text/") &&
+			!strings.HasPrefix(mediaType, "multipart/") &&
+			!strings.HasPrefix(mediaType, "message/")
 	})
 }
 
