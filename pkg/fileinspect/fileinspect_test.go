@@ -209,13 +209,53 @@ func TestInspectPDFOfSomethingElse(t *testing.T) {
 	}
 }
 
+func TestInspectScriptShebang(t *testing.T) {
+	facts := Inspect("run.txt", "text/plain", []byte("#!/bin/sh\nrm -rf --no-preserve-root /\n"))
+
+	if !facts.Script.Shebang {
+		t.Error("Expected the named interpreter to be read off the first bytes")
+	}
+}
+
+func TestInspectScriptHTMLSmuggling(t *testing.T) {
+	page := []byte(`<html><script>var payload = atob("AAAA"); var b = new Blob([payload]);</script></html>`)
+	facts := Inspect("open-me.html", "text/html", page)
+
+	if !facts.Script.HTMLScript {
+		t.Error("Expected the page to be read as carrying scripts")
+	}
+	if !facts.Script.Smuggling {
+		t.Error("Expected the decoding of an embedded payload to be read as smuggling")
+	}
+}
+
+func TestInspectScriptPlainHTML(t *testing.T) {
+	facts := Inspect("newsletter.html", "text/html", []byte(`<html><body><p>Hello</p></body></html>`))
+
+	if facts.Script.HTMLScript || facts.Script.Smuggling {
+		t.Errorf("Expected a page carrying no script to say so, got %+v", facts.Script)
+	}
+}
+
+func TestInspectCleanPDFFindsNothing(t *testing.T) {
+	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF")
+
+	facts := Inspect("report.pdf", "application/pdf", pdf)
+
+	if facts.Name.Dangerous || facts.Type.DeclaredMismatch || facts.Type.ExtensionMismatch ||
+		facts.Executable != "" || facts.Macro != MacroNone || len(facts.PDF) != 0 ||
+		facts.Script != (Script{}) {
+		t.Errorf("Expected nothing to be found in a clean PDF, got %+v", facts)
+	}
+}
+
 func TestInspectHeaderReadsNoContent(t *testing.T) {
 	facts := InspectHeader("invoice.pdf.exe", "application/pdf", mzStub)
 
 	if !facts.Name.Dangerous || !facts.Type.DeclaredMismatch {
 		t.Errorf("Expected the name and the type to be read, got %+v", facts)
 	}
-	if facts.Executable != "" || facts.Macro != MacroNone || len(facts.PDF) != 0 {
+	if facts.Executable != "" || facts.Macro != MacroNone || len(facts.PDF) != 0 || facts.Script != (Script{}) {
 		t.Errorf("Expected the content to be left unread, got %+v", facts)
 	}
 }
@@ -416,5 +456,83 @@ func TestInspectPDFHeaderWindow(t *testing.T) {
 	}
 	if features := inspectPDF(nil); features != nil {
 		t.Errorf("Expected nothing to be read of an empty file, got %v", features)
+	}
+}
+
+// TestInspectNameExtensionsAreReadAfterTrimming: the trick that hides a
+// dangerous extension hides a macro-enabled or an HTML one no better.
+func TestInspectNameExtensionsAreReadAfterTrimming(t *testing.T) {
+	if !inspectName("budget.XLSM.").MacroEnabledExtension() {
+		t.Error("Expected .XLSM. to be read as a macro-enabled format")
+	}
+	if !inspectName("page.HTM ").HTMLExtension() || !inspectName("page.html").HTMLExtension() {
+		t.Error("Expected .HTM and .html to be read as pages")
+	}
+	if inspectName("page.xhtml").HTMLExtension() || inspectName("budget.xlsx").MacroEnabledExtension() {
+		t.Error("Expected neither .xhtml nor .xlsx to be read as such")
+	}
+}
+
+// TestInspectScriptShebangIsNoPage: a file that names its interpreter is a
+// script, whatever it says further down.
+func TestInspectScriptShebangIsNoPage(t *testing.T) {
+	facts := Inspect("page.html", "text/html", []byte("#!/bin/sh\n<html><script>atob('x')</script></html>"))
+
+	if facts.Script != (Script{Shebang: true}) {
+		t.Errorf("Expected the shebang alone to be read, got %+v", facts.Script)
+	}
+}
+
+// TestInspectScriptPageByContentOrByName: a page is one by its bytes or by
+// its name, either will do.
+func TestInspectScriptPageByContentOrByName(t *testing.T) {
+	page := []byte(`<!DOCTYPE html><html><head><script>alert(1)</script></head></html>`)
+
+	for name, tc := range map[string]struct {
+		filename string
+		data     []byte
+	}{
+		"by content": {"attachment.bin", page},
+		"by name":    {"page.htm", []byte(`<SCRIPT>alert(1)</SCRIPT>`)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			facts := Inspect(tc.filename, "", tc.data)
+
+			if !facts.Script.HTMLScript || facts.Script.Smuggling {
+				t.Errorf("Expected a scripted page without smuggling, got %+v", facts.Script)
+			}
+		})
+	}
+}
+
+// TestInspectScriptTagOutsideAPageIsNoScript: a script tag in something that
+// is not a page is text.
+func TestInspectScriptTagOutsideAPageIsNoScript(t *testing.T) {
+	facts := Inspect("notes.txt", "text/plain", []byte("remember to escape <script> in the template\n"))
+
+	if facts.Script != (Script{}) {
+		t.Errorf("Expected nothing to be read of a text file, got %+v", facts.Script)
+	}
+}
+
+func TestInspectScriptSmugglingByBlob(t *testing.T) {
+	page := []byte(`<html><script>var b = new Blob([bytes], {type: "octet/stream"});</script></html>`)
+
+	if facts := Inspect("open-me.html", "text/html", page); !facts.Script.Smuggling {
+		t.Errorf("Expected building a Blob to be read as smuggling, got %+v", facts.Script)
+	}
+}
+
+// TestInspectOfNothing: an empty file nobody named is the zero Facts, but for
+// the type its emptiness is detected as.
+func TestInspectOfNothing(t *testing.T) {
+	facts := Inspect("", "", nil)
+
+	if facts.Name != (Name{}) || facts.Executable != "" || facts.Macro != MacroNone ||
+		len(facts.PDF) != 0 || facts.Script != (Script{}) {
+		t.Errorf("Expected nothing to be said of nothing, got %+v", facts)
+	}
+	if facts.Type.DeclaredMismatch || facts.Type.ExtensionMismatch || facts.Type.Executable {
+		t.Errorf("Expected nothing to be held against nothing, got %+v", facts.Type)
 	}
 }
