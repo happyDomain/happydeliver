@@ -24,13 +24,18 @@ package attachment
 // attachmentChecks is every check the attachment analysis runs on one file, in
 // the order their findings are read.
 //
-// This is the one place to touch to add a check: write its file, declare an
-// attachmentCheck in it, and name it here. Where it sits in the list is where
-// its findings sit in the report, so the order is not arbitrary: what
-// qualifies the whole reading of a file comes first, what merely informs comes
-// last.
-var attachmentChecks = []attachmentCheck{
+// To add a check, write its file and name it here; the scanner checks differ
+// only by which engine they read, so they are derived from knownScanners
+// instead. Where a check sits is where its findings sit in the report: what
+// qualifies the whole reading of a file comes first, what merely informs
+// comes last.
+var attachmentChecks = append([]attachmentCheck{
 	// A file nobody opened qualifies everything said below it, which only ever
 	// saw its name and its size. It is read first for that reason.
 	sizeCheck,
-}
+
+	// What the engines made of the whole file comes last: they complement the
+	// readings above rather than replacing them, and the reader has met what
+	// happyDeliver saw for itself by the time they reach a verdict nobody here
+	// can explain. They are read off knownScanners, in its order.
+}, scannerChecks()...)

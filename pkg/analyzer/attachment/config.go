@@ -26,14 +26,8 @@ import (
 )
 
 // Settings is what the operator decided about the attachment analysis, read
-// off the command line, the environment or the configuration file.
-//
-// The flags live here rather than in the central configuration because they
-// concern nobody else: the attachments are this package's business, and
-// carrying its knobs through the configuration and the generator only to hand
-// them back here was a run of fields every layer had to know about. New takes
-// an explicit Options instead of reading this, so a test decides for itself
-// what it runs with.
+// off the command line, the environment or the configuration file. Each
+// scanner declares its own flags the same way, in its own file.
 var Settings = Options{
 	ScanTimeout: defaultScanTimeout,
 	MaxSize:     25 << 20, // 25 MiB, matches clamd's default StreamMaxLength

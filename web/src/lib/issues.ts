@@ -28,6 +28,8 @@ const issueLabels: Record<Issue["type"], string> = {
     low_contrast: "Low contrast",
     sender_domain_mismatch: "Links off the sender's domain",
     // What a message carries alongside its body.
+    malware_detected: "Malware detected",
+    scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
 };
 
@@ -170,11 +172,12 @@ export function groupIssuesByCategory(issues?: Issue[]): IssueGroup[] {
  * Who observed an issue, phrased for a reader.
  *
  * An issue with no source is one happyDeliver found by reading the message itself, which is
- * the default and needs no mention. Only a finding that came from the spam filter says so,
- * because that tells the reader where to go and look it up.
+ * the default and needs no mention. Only a finding that came from elsewhere says so — the
+ * spam filter, an antivirus engine — because that tells the reader where to go and look it
+ * up.
  */
 export function issueObserver(issue: Pick<Issue, "source">): string | undefined {
-    return issue.source === "rspamd" ? "rspamd" : undefined;
+    return !issue.source || issue.source === "self" ? undefined : issue.source;
 }
 
 /**

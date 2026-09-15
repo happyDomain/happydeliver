@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SchemasAttachmentAnalysis } from "$lib/api/types.gen";
+    import type { SchemasAttachmentAnalysis, SchemasScanResult } from "$lib/api/types.gen";
     import { categoryLabel, groupIssuesByCategory, issueLabel, issueObserver } from "$lib/issues";
     import { getScoreColorClass } from "$lib/score";
     import { theme } from "$lib/stores/theme";
@@ -18,6 +18,40 @@
         if (size < 1024) return `${size} B`;
         if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
         return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function scannerBadgeClass(status: string): string {
+        switch (status) {
+            case "clean":
+                return "bg-success";
+            case "malicious":
+                return "bg-danger";
+            case "pending":
+                return "bg-info";
+            default:
+                // skipped, error
+                return "bg-secondary";
+        }
+    }
+
+    /**
+     * Name of a scanner as a sentence calls it. A scanner nobody wrote a label for is shown
+     * under the name it answers with: the report is meant to carry engines this build has
+     * never heard of.
+     */
+    const scannerLabels: Record<string, string> = {
+        clamav: "ClamAV",
+    };
+
+    function scannerLabel(scanner: string): string {
+        return scannerLabels[scanner] ?? scanner;
+    }
+
+    /**
+     * What a scanner says beyond its status: the name it gave what it recognised.
+     */
+    function scanEvidence(scan: SchemasScanResult): string {
+        return scan.verdict ? ` — ${scan.verdict}` : "";
     }
 </script>
 
@@ -85,6 +119,24 @@
                                 </span>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <!-- Every scanner the report carries is shown, whatever it answered:
+                             what a reader must be able to tell apart is a file nobody looked
+                             at and one nothing was found in. A scanner the instance does not
+                             run is simply not in the report. -->
+                        {#each attachment.scans || [] as scan (scan.scanner)}
+                            <span class="me-2">
+                                <strong class="small">{scannerLabel(scan.scanner)}:</strong>
+                                <span
+                                    class="badge {scannerBadgeClass(scan.status)}"
+                                    title={scan.detail ?? ""}
+                                >
+                                    {scan.status}{scanEvidence(scan)}
+                                </span>
+                            </span>
+                        {/each}
                     </div>
 
                     {#if attachment.issues && attachment.issues.length > 0}

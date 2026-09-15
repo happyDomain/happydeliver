@@ -7,6 +7,7 @@ import {
     contentIssueAnchor,
     groupIssuesByCategory,
     issueLabel,
+    issueObserver,
 } from "$lib/issues";
 
 /** A content issue with only the fields these tests care about. */
@@ -67,6 +68,13 @@ describe("issueLabel", () => {
         expect(issueLabel("homograph_url")).toBe("Look-alike URL");
     });
 
+    it("names what a message carries as well as what it says", () => {
+        // One vocabulary, two readings: an attachment finding is labelled by
+        // the same table as a body one.
+        expect(issueLabel("malware_detected")).toBe("Malware detected");
+        expect(issueLabel("scan_skipped")).toBe("Not fully scanned");
+    });
+
     it("still reads as something for a type the API added and we have not", () => {
         // Not reachable through the type, but reachable from an older front end
         // talking to a newer server.
@@ -81,6 +89,18 @@ describe("categoryLabel", () => {
 
     it("still reads as something for a reading the API added and we have not", () => {
         expect(categoryLabel("some_new_reading" as Issue["category"])).toBe("some new reading");
+    });
+});
+
+describe("issueObserver", () => {
+    it("says nothing about what happyDeliver read for itself", () => {
+        expect(issueObserver({ source: undefined })).toBeUndefined();
+        expect(issueObserver({ source: "self" })).toBeUndefined();
+    });
+
+    it("names whoever else observed it", () => {
+        expect(issueObserver({ source: "rspamd" })).toBe("rspamd");
+        expect(issueObserver({ source: "clamav" })).toBe("clamav");
     });
 });
 

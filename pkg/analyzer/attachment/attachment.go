@@ -29,51 +29,87 @@
 package attachment
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/fileinspect"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
-// Options is what an operator decides about the attachment analysis: how much
-// of a message it will look at, and how long it may take over one file.
-//
-// It is a struct rather than a run of arguments so that a caller reads what it
-// is configuring, and so that adding a scanner tomorrow does not renumber
-// every call site.
+// scanConcurrency bounds how many attachments are handed to the external
+// scanners at once.
+const scanConcurrency = 4
+
+// Options is what an operator decides about the attachment analysis as a
+// whole. What each scanner needs to run is declared in that scanner's file.
 type Options struct {
-	// ScanTimeout bounds the reading of one attachment.
+	// ScanTimeout bounds each external scan.
 	ScanTimeout time.Duration
 
 	// MaxSize is the largest attachment whose content is analysed, in bytes.
 	// Zero means no limit.
 	MaxSize int64
+
+	// scanners, when set, are the engines this instance runs instead of the
+	// ones the operator configured. Tests set it to hand over a fake.
+	scanners []scanner
 }
 
 // Analyzer reads the attachments of a message.
 type Analyzer struct {
+	// scanners are the engines this instance actually runs.
+	scanners    []scanner
 	scanTimeout time.Duration
 	maxSize     int64
 }
 
-// defaultScanTimeout bounds the reading of an attachment when the caller named
-// no bound: a zero duration would hand every check a deadline that has already
-// passed.
+// defaultScanTimeout bounds a scan, and the reading of an attachment, when the
+// caller named no bound.
 const defaultScanTimeout = 30 * time.Second
 
-// New creates an attachment analyzer.
+// New creates an attachment analyzer. A scanner with no address or no
+// credentials is not run, and the report does not mention it: which engines
+// an instance leaves unconfigured is the instance's business, not the
+// reader's.
 func New(opts Options) *Analyzer {
 	if opts.ScanTimeout <= 0 {
 		opts.ScanTimeout = defaultScanTimeout
 	}
 
-	return &Analyzer{
+	a := &Analyzer{
 		scanTimeout: opts.ScanTimeout,
 		maxSize:     opts.MaxSize,
 	}
+
+	if opts.scanners != nil {
+		a.scanners = opts.scanners
+		return a
+	}
+
+	for _, def := range knownScanners {
+		if engine := def.build(opts.ScanTimeout); engine != nil {
+			a.scanners = append(a.scanners, engine)
+		}
+	}
+
+	return a
+}
+
+// scannerFor is the engine this instance runs under that name, or nil when it
+// runs none.
+func (a *Analyzer) scannerFor(name string) scanner {
+	for _, engine := range a.scanners {
+		if engine.info().Name == name {
+			return engine
+		}
+	}
+
+	return nil
 }
 
 // Results is what was observed about the attachments of one message, before
@@ -106,10 +142,31 @@ type Attachment struct {
 	// to look at: that is what a check reading bytes tests before reading any.
 	Data []byte
 
+	// Scans is what the engines said about this file: one entry per scanner
+	// the analysis knows of, including the ones this instance does not run and
+	// the ones not asked about this file, so that a reader never reads our
+	// silence as a clean bill.
+	//
+	// They are observed here rather than in a check because the report shows
+	// them whether or not they raised a finding.
+	Scans []Scan
+
 	// facts are what reading the file offline turned up. The file is read
 	// once, here, and every reader of it reads its own part off them rather
 	// than scanning the bytes again with a question of its own.
 	facts fileinspect.Facts
+}
+
+// ScanBy is what the named engine said about this file, or nil when the
+// analysis does not know that engine at all.
+func (a *Attachment) ScanBy(scanner string) *Scan {
+	for i := range a.Scans {
+		if a.Scans[i].Scanner == scanner {
+			return &a.Scans[i]
+		}
+	}
+
+	return nil
 }
 
 // tooLarge reports that the attachment was left unanalysed for its size.
@@ -117,8 +174,8 @@ func (a *Attachment) tooLarge(maxSize int64) bool {
 	return maxSize > 0 && a.Size > maxSize
 }
 
-// Analyze reads the attachments off a message. It observes, and judges
-// nothing: what the observations are worth is Read's answer.
+// Analyze reads the attachments off a message and asks the scanners about
+// them. It observes and judges nothing: that is Read's job.
 func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 	results := &Results{}
 
@@ -128,6 +185,9 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 	}
 
 	results.Attachments = make([]Attachment, len(parts))
+
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, scanConcurrency)
 
 	for i := range parts {
 		part := &parts[i]
@@ -149,11 +209,44 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 		// A file nobody will look at is still named, sized and typed in the
 		// report: what is withheld is the reading of its content, which is
 		// what leaving Data nil says to the checks.
-		if attachment.tooLarge(a.maxSize) {
-			continue
+		if !attachment.tooLarge(a.maxSize) {
+			attachment.Data = data
 		}
-		attachment.Data = data
+
+		// Only the scanners this instance runs get an entry, before any of
+		// them is asked, so that the file carries a complete answer whatever
+		// happens next: an engine the reader never hears of is one that was
+		// never in the picture.
+		attachment.Scans = make([]Scan, len(a.scanners))
+
+		for j, engine := range a.scanners {
+			name := engine.info().Name
+
+			if attachment.Data == nil {
+				attachment.Scans[j] = Scan{
+					Scanner: name,
+					Status:  model.ScanResultStatusSkipped,
+					Detail:  fmt.Sprintf("the attachment was not read: it is larger than the %d bytes this analysis looks at", a.maxSize),
+				}
+				continue
+			}
+
+			attachment.Scans[j] = Scan{Scanner: name, Status: model.ScanResultStatusPending}
+
+			wg.Add(1)
+			go func(scan *Scan, engine scanner, attachment *Attachment) {
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
+				defer cancel()
+				*scan = engine.scan(ctx, attachment)
+			}(&attachment.Scans[j], engine, attachment)
+		}
 	}
+
+	wg.Wait()
 
 	return results
 }

@@ -189,9 +189,19 @@ This setting only applies to messages delivered to happyDeliver. For an uploaded
 
 #### Attachment Analysis
 
-happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report.
+happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report. An optional external scanner improves detection:
 
-Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread.
+- **ClamAV**: point happyDeliver at a running `clamd` daemon:
+
+  ```bash
+  ./happyDeliver server -clamav-address tcp://127.0.0.1:3310
+  # or a unix socket:
+  ./happyDeliver server -clamav-address unix:///run/clamav/clamd.sock
+  ```
+
+  With docker compose, start the bundled ClamAV service (requires ~1.5 GB RAM): `docker compose --profile clamav up -d`, then set `HAPPYDELIVER_CLAMAV_ADDRESS=tcp://clamav:3310`.
+
+Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks happyDeliver runs itself still apply and the scanner's verdict is reported as `disabled` without affecting the score.
 
 #### Postfix LMTP Transport
 

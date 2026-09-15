@@ -27,6 +27,7 @@ import (
 	"slices"
 	"testing"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/fileinspect"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 	"git.happydns.org/happyDeliver/pkg/reading"
@@ -62,8 +63,20 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	oversize := observed("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
 	oversize.Data = nil
 
+	recognised := observed("sample.bin", "application/octet-stream", []byte("sample"))
+	recognised.Scans = []Scan{
+		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
+	}
+
+	unanswered := observed("unknown.bin", "application/octet-stream", []byte("unknown"))
+	unanswered.Scans = []Scan{
+		{Scanner: "clamav", Status: model.ScanResultStatusError, Detail: "connection refused"},
+	}
+
 	inputs := map[string]*Attachment{
-		"oversize": oversize,
+		"oversize":   oversize,
+		"recognised": recognised,
+		"unanswered": unanswered,
 	}
 
 	speaking := make(map[string]*attachmentInput, len(inputs))
@@ -193,5 +206,42 @@ func TestEveryIssueAnswersAReading(t *testing.T) {
 
 	if !seen {
 		t.Fatal("the checks reported nothing on the files built to make every check speak")
+	}
+}
+
+// TestAScannerThatCouldNotAnswerLeavesTheReportStanding checks that a scanner
+// being down is reported as the caveat it is, and costs nothing.
+func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
+	attachment := observed("unknown.bin", "application/octet-stream", []byte("unknown"))
+	attachment.Scans = []Scan{
+		{Scanner: "clamav", Status: model.ScanResultStatusError, Detail: "connection refused"},
+	}
+
+	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	if types := issueTypes(issues); types[model.IssueTypeScanError] == 0 {
+		t.Errorf("Expected the reader to be told the file went unverified, got %+v", issues)
+	}
+	if penalty != 0 {
+		t.Errorf("Expected a scanner being down to cost nothing, got a penalty of %d", penalty)
+	}
+}
+
+// TestARecognisedSampleDecidesTheGrade holds the engine's verdict to what it
+// is worth: a file it recognises leaves nothing else about the message worth
+// discussing.
+func TestARecognisedSampleDecidesTheGrade(t *testing.T) {
+	attachment := observed("sample.bin", "application/octet-stream", []byte("sample"))
+	attachment.Scans = []Scan{
+		{Scanner: "clamav", Status: model.ScanResultStatusMalicious, Verdict: "Eicar-Signature"},
+	}
+
+	issues, penalty := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
+
+	if types := issueTypes(issues); types[model.IssueTypeMalwareDetected] == 0 {
+		t.Errorf("Expected a malware finding, got %+v", issues)
+	}
+	if penalty != 100 {
+		t.Errorf("Expected the file to cost the whole scale, got %d", penalty)
 	}
 }
