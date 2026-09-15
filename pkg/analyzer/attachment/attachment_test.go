@@ -22,6 +22,7 @@
 package attachment
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"encoding/base64"
@@ -210,6 +211,33 @@ func TestAnalyzeAttachmentsCleanPDF(t *testing.T) {
 
 	if score, _ := analyzer.Score(results, readings); score != 100 {
 		t.Errorf("Expected score 100 for clean PDF, got %d", score)
+	}
+}
+
+func TestAnalyzeAttachmentsZippedExecutable(t *testing.T) {
+	analyzer := newOfflineAnalyzer()
+
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	entry, _ := writer.Create("invoice.pdf.exe")
+	entry.Write(mzStub)
+	writer.Close()
+
+	rawEmail := buildAttachmentEmail("invoice.zip", "application/zip", buf.Bytes())
+
+	results, readings := read(t, analyzer, rawEmail)
+	if len(results.Attachments) != 1 {
+		t.Fatalf("Expected 1 attachment, got %d", len(results.Attachments))
+	}
+
+	types := issueTypes(readings[0].Issues)
+	if types[model.IssueTypeExecutableContent] == 0 || types[model.IssueTypeDoubleExtension] == 0 {
+		t.Errorf("Expected executable and double-extension findings, got %+v", readings[0].Issues)
+	}
+
+	score, grade := analyzer.Score(results, readings)
+	if score > 30 {
+		t.Errorf("Expected heavily degraded score, got %d (%s)", score, grade)
 	}
 }
 

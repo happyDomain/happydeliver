@@ -189,7 +189,7 @@ This setting only applies to messages delivered to happyDeliver. For an uploaded
 
 #### Attachment Analysis
 
-happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report. Two optional external scanners improve detection:
+happyDeliver reads the files a message carries alongside its body: file type mismatches (a `.pdf` that is really an executable, `.pdf.exe` double extensions), Office macros, PDF active content, scripts, nested and password-protected archives. Two optional external scanners improve detection:
 
 - **ClamAV**: point happyDeliver at a running `clamd` daemon:
 

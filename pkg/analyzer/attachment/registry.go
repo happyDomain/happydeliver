@@ -37,6 +37,9 @@ func registry() (checks []attachmentCheck) {
 		checks = append(checks, c.check())
 	}
 
+	// What it hides inside itself.
+	checks = append(checks, archiveCheck)
+
 	// What the engines made of it, in the order of knownScanners, so that a
 	// sample two of them recognise is reported under the one listed first.
 	return append(checks, scannerChecks()...)

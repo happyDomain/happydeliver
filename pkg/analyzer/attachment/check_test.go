@@ -55,18 +55,23 @@ func observed(filename, declaredType string, data []byte) *Attachment {
 // speakingInputs is one file per thing the registry looks for: together they
 // make every check speak, so that what each of them reports can be held to
 // what it declares.
-//
-// They are several because they have to be: a file too large to open silences
-// every check reading bytes. What matters is that no check stays silent across
-// the whole set, which is how a wrong declaration survives unnoticed.
 func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	t.Helper()
 
-	// A file too large to look at: what was kept of it is what Analyze keeps,
-	// its name and its type, and none of the reading of its content.
+	// A file too large to look at, kept as Analyze keeps it: name and type,
+	// no content.
 	oversize := observed("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
 	oversize.Data = nil
 	oversize.facts = fileinspect.InspectHeader(oversize.Filename, oversize.DeclaredMediaType, nil)
+
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	entry, err := writer.Create("payload.pdf.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Write(mzStub)
+	writer.Close()
 
 	var macro bytes.Buffer
 	macroWriter := zip.NewWriter(&macro)
@@ -97,6 +102,7 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 		"macro":      observed("macro.docm", "", macro.Bytes()),
 		"pdf":        observed("active.pdf", "application/pdf", []byte("%PDF-1.4 << /OpenAction << /JS (x) >> >>")),
 		"html":       observed("open-me.html", "text/html", []byte(`<html><script>atob("AAAA")</script></html>`)),
+		"archive":    observed("invoice.zip", "application/zip", archive.Bytes()),
 		"recognised": recognised,
 		"unanswered": unanswered,
 	}
@@ -306,14 +312,13 @@ func TestAScannerThatCouldNotAnswerLeavesTheReportStanding(t *testing.T) {
 }
 
 // TestAMalformedContentTypeStillDeclaresSomething holds the type check to
-// reading a header no parser agrees on. An unquoted filename with a space in
+// reading a header no parser agrees on: an unquoted filename with a space in
 // it defeats mime.ParseMediaType, and a file whose declared type is thrown
-// away for that is a file free to lie about what it is: the header most worth
-// distrusting would be the one nothing is compared against.
+// away for that would be free to lie about what it is.
 func TestAMalformedContentTypeStillDeclaresSomething(t *testing.T) {
-	// The name agrees with the content, so the header is the only thing left
-	// that can reveal the disagreement.
-	attachment := observed("report.pdf", "text/plain; name=Rapport contexte.txt", []byte("%PDF-1.4 harmless"))
+	// The name agrees with the content: only the header can reveal the
+	// disagreement.
+	attachment := observed("setup.exe", "text/plain; name=Rapport contexte.txt", mzStub)
 
 	issues, _ := reading.Run(context.Background(), attachmentChecks, &attachmentInput{Attachment: attachment})
 

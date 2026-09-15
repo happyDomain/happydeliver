@@ -24,6 +24,7 @@ package fileinspect
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"slices"
 	"testing"
 )
@@ -120,6 +121,50 @@ func TestInspectTypeOctetStreamMakesNoClaim(t *testing.T) {
 
 	if facts.Type.DeclaredMismatch {
 		t.Error("Expected application/octet-stream to be read as no claim at all")
+	}
+}
+
+// TestInspectTypeHarmlessDisagreementIsNoMismatch: text the detector cannot
+// name, a claim it has never heard of, a document announced as a sibling
+// format, a photo with the wrong extension: none of them hides anything.
+func TestInspectTypeHarmlessDisagreementIsNoMismatch(t *testing.T) {
+	for name, tc := range map[string]struct {
+		filename, declared string
+		data               []byte
+	}{
+		"PGP signature":       {"signature.asc", "application/pgp-signature", []byte("-----BEGIN PGP SIGNATURE-----\n\niQEz\n-----END PGP SIGNATURE-----\n")},
+		"Markdown":            {"README.md", "text/markdown", []byte("# Title\n\nSome *text*.\n")},
+		"CSV header":          {"export.csv", "text/csv", []byte("id,name,amount\n")},
+		"UTF-16 CSV":          {"export.csv", "text/csv", []byte("a\x00,\x00b\x00\n\x00")},
+		"TypeScript":          {"app.ts", "text/plain", []byte("const x: number = 1;\n")},
+		"misspelt JPEG":       {"photo.jpg", "image/jpg", []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00")},
+		"PNG called JPEG":     {"photo.jpg", "image/jpeg", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")},
+		"HTML Excel export":   {"export.xls", "application/vnd.ms-excel", []byte("<html><body><table><tr><td>1</td></tr></table></body></html>")},
+		"docx as old Word":    {"letter.doc", "application/msword", ooxml(t, "[Content_Types].xml", "word/document.xml")},
+		"HTML as PDF":         {"invoice.pdf", "application/pdf", []byte("<html><body>hello</body></html>")},
+		"text as ZIP":         {"files.zip", "application/zip", []byte("this is not a zip\n")},
+		"bytes as PNG":        {"logo.png", "image/png", []byte("\x00\x01\x02\x03garbage")},
+		"unknown claim":       {"model.stl", "application/vnd.acme.model", mzStub},
+		"zip by another name": {"files.zip", "application/x-zip-compressed", ooxml(t, "a.txt")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			facts := Inspect(tc.filename, tc.declared, tc.data)
+
+			if facts.Type.DeclaredMismatch || facts.Type.ExtensionMismatch {
+				t.Errorf("Expected a harmless disagreement to be no mismatch, got %+v", facts.Type)
+			}
+		})
+	}
+}
+
+func TestInspectTypeDisguisedArchive(t *testing.T) {
+	facts := Inspect("holiday.png", "image/png", ooxml(t, "payload.txt"))
+
+	if !facts.Type.DeclaredMismatch || !facts.Type.ExtensionMismatch {
+		t.Errorf("Expected a zip announced and named as a PNG to disagree twice, got %+v", facts.Type)
+	}
+	if facts.Type.Executable {
+		t.Error("Expected an archive not to be read as a program")
 	}
 }
 
@@ -534,5 +579,34 @@ func TestInspectOfNothing(t *testing.T) {
 	}
 	if facts.Type.DeclaredMismatch || facts.Type.ExtensionMismatch || facts.Type.Executable {
 		t.Errorf("Expected nothing to be held against nothing, got %+v", facts.Type)
+	}
+}
+
+// TestInspectTypeAliasesAreTheSameClaim: an archive announced under the
+// spelling the wild gives it is announced as what it is.
+func TestInspectTypeAliasesAreTheSameClaim(t *testing.T) {
+	var gzipped bytes.Buffer
+	writer := gzip.NewWriter(&gzipped)
+	writer.Write([]byte("content"))
+	writer.Close()
+
+	var tarred bytes.Buffer
+	writeTar(t, &tarred, "file.txt", []byte("content"))
+
+	for name, tc := range map[string]struct {
+		filename, declared string
+		data               []byte
+	}{
+		"x-zip":  {"files.zip", "application/x-zip", ooxml(t, "a.txt")},
+		"x-gzip": {"file.gz", "application/x-gzip", gzipped.Bytes()},
+		"x-gtar": {"file.tar", "application/x-gtar", tarred.Bytes()},
+	} {
+		t.Run(name, func(t *testing.T) {
+			facts := Inspect(tc.filename, tc.declared, tc.data)
+
+			if facts.Type.DeclaredMismatch || facts.Type.ExtensionMismatch {
+				t.Errorf("Expected the alias to be read as the same claim, got %+v", facts.Type)
+			}
+		})
 	}
 }

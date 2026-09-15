@@ -74,8 +74,19 @@ func (c staticCheck) check() attachmentCheck {
 	}
 }
 
-// staticFindings is what every static check makes of the facts of one file,
-// as the registry reports them about the attachment itself.
+// staticReports is every defect a static check may name, and so what a check
+// reading files through staticFindings may report on their behalf.
+func staticReports() (defects []*reading.Defect) {
+	for _, c := range staticChecks {
+		defects = append(defects, c.Reports...)
+	}
+
+	return defects
+}
+
+// staticFindings is what every static check makes of the facts of one file.
+// It is what an archive member gets, the registry running the same checks on
+// the attachment itself.
 func staticFindings(facts fileinspect.Facts, location string) (findings []reading.Finding) {
 	for _, c := range staticChecks {
 		findings = append(findings, c.Findings(facts, location)...)

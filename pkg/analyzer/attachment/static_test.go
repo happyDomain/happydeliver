@@ -34,9 +34,8 @@ import (
 )
 
 // What is held here is the reading of a file turning into findings: the defect
-// a fact is filed under, and how grave it is said to be. What the facts
-// themselves are worth reading off a name, or off the first bytes of a file,
-// is fileinspect's own business, and is tested there.
+// a fact is filed under, how grave it is, and where it was found. Reading the
+// facts themselves off a zip, a PDF or a name is tested in fileinspect.
 
 // mzStub is a minimal PE-looking payload (MZ magic)
 var mzStub = append([]byte("MZ"), bytes.Repeat([]byte{0x90}, 62)...)
@@ -54,6 +53,33 @@ func findingTypes(findings []reading.Finding) map[model.IssueType]int {
 		types[f.Type]++
 	}
 	return types
+}
+
+// locationOf is where a finding says it was found, or the empty string when it
+// named no place.
+func locationOf(f reading.Finding) string {
+	if f.Location == nil {
+		return ""
+	}
+	return *f.Location
+}
+
+// zipOf builds a zip holding one member.
+func zipOf(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	entry, err := writer.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Write(content)
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return buf.Bytes()
 }
 
 func TestAFileThatIsWhatItClaimsIsReportedForNothing(t *testing.T) {
@@ -88,8 +114,8 @@ func TestAMismatchHidingAProgramIsGraver(t *testing.T) {
 		data     []byte
 		expected model.IssueSeverity
 	}{
-		"a program announced as a document": {"document.pdf", "application/pdf", mzStub, model.IssueSeverityHigh},
-		"a page announced as a document":    {"document.pdf", "application/pdf", []byte("<html><body>hello</body></html>"), model.IssueSeverityMedium},
+		"a program announced as a document":  {"document.pdf", "application/pdf", mzStub, model.IssueSeverityHigh},
+		"an archive announced as a document": {"document.pdf", "application/pdf", zipOf(t, "payload.txt", []byte("hello")), model.IssueSeverityMedium},
 	} {
 		t.Run(name, func(t *testing.T) {
 			found := false
@@ -106,6 +132,17 @@ func TestAMismatchHidingAProgramIsGraver(t *testing.T) {
 				t.Error("Expected a type_mismatch finding")
 			}
 		})
+	}
+}
+
+// TestAHarmlessMismatchIsNoFinding: a disagreement between two types is
+// charged for what it hides, and an "Excel" export that is an HTML table hides
+// nothing.
+func TestAHarmlessMismatchIsNoFinding(t *testing.T) {
+	table := []byte("<html><body><table><tr><td>1</td></tr></table></body></html>")
+
+	if types := findingTypes(readFile("export.xls", "application/vnd.ms-excel", table)); types[model.IssueTypeTypeMismatch] != 0 {
+		t.Errorf("Expected an HTML table called a spreadsheet to be no mismatch, got %v", types)
 	}
 }
 
@@ -177,6 +214,104 @@ func TestAScriptIsReportedWhateverItIsCalled(t *testing.T) {
 
 	if types := findingTypes(readFile("run.txt", "text/plain", script)); types[model.IssueTypeScriptContent] == 0 {
 		t.Errorf("Expected script_content finding for a shebang, got %v", types)
+	}
+}
+
+// TestAFindingInAnArchiveNamesTheWayToIt: the location is the path a reader
+// would double-click through, starting from the attachment they were sent.
+func TestAFindingInAnArchiveNamesTheWayToIt(t *testing.T) {
+	outer := zipOf(t, "inner.zip", zipOf(t, "payload.pdf.exe", mzStub))
+
+	findings := archiveFindings(fileinspect.Walk(outer, archiveLimits), "outer.zip")
+	types := findingTypes(findings)
+
+	if types[model.IssueTypeNestedArchive] == 0 {
+		t.Errorf("Expected nested_archive finding, got %v", types)
+	}
+	if types[model.IssueTypeExecutableContent] == 0 {
+		t.Errorf("Expected executable_content finding inside nested zip, got %v", types)
+	}
+	if types[model.IssueTypeDoubleExtension] == 0 {
+		t.Errorf("Expected double_extension finding inside nested zip, got %v", types)
+	}
+
+	located := false
+	for _, f := range findings {
+		if f.Type == model.IssueTypeExecutableContent &&
+			locationOf(f) == "outer.zip → inner.zip → payload.pdf.exe" {
+			located = true
+		}
+	}
+	if !located {
+		t.Errorf("Expected the full archive path in the location, got %+v", findings)
+	}
+}
+
+// TestAnArchiveAnswersForItselfAtItsOwnName: a locked zip is the attachment
+// being locked, not a member of it.
+func TestAnArchiveAnswersForItselfAtItsOwnName(t *testing.T) {
+	entries := []fileinspect.Entry{{Kind: fileinspect.KindEncrypted}}
+
+	findings := archiveFindings(entries, "locked.zip")
+	if len(findings) != 1 {
+		t.Fatalf("Expected the archive to be reported locked once, got %+v", findings)
+	}
+	if got := locationOf(findings[0]); got != "locked.zip" {
+		t.Errorf("Expected the finding at the attachment itself, got %q", got)
+	}
+}
+
+func TestTheDepthTheWalkStoppedAtIsTheOneItIsHeldTo(t *testing.T) {
+	entries := []fileinspect.Entry{{Kind: fileinspect.KindTooDeep, At: []string{"level.zip"}, Name: "level.zip"}}
+
+	findings := archiveFindings(entries, "deep.zip")
+	if len(findings) != 1 {
+		t.Fatalf("Expected one finding, got %+v", findings)
+	}
+	if !strings.Contains(findings[0].Message, "exceeds 3 levels") {
+		t.Errorf("Expected the message to name the depth the walk goes to, got %q", findings[0].Message)
+	}
+}
+
+// TestWhatWasNotReadIsNamedWhetherOrNotAMemberCanBe is the difference between
+// a zip, which names the member it gave up on, and a gzip stream, which has no
+// member to name.
+func TestWhatWasNotReadIsNamedWhetherOrNotAMemberCanBe(t *testing.T) {
+	findings := archiveFindings([]fileinspect.Entry{
+		{Kind: fileinspect.KindTruncated, Name: "huge.iso"},
+		{Kind: fileinspect.KindTruncated},
+		{Kind: fileinspect.KindBomb, Name: "zeros.bin"},
+		{Kind: fileinspect.KindBomb},
+		{Kind: fileinspect.KindBudgetExhausted},
+	}, "archive.zip")
+
+	if len(findings) != 5 {
+		t.Fatalf("Expected every place the reading stopped to be reported, got %+v", findings)
+	}
+	if !strings.Contains(findings[0].Message, `"huge.iso"`) {
+		t.Errorf("Expected the member to be named, got %q", findings[0].Message)
+	}
+	if strings.Contains(findings[1].Message, `""`) {
+		t.Errorf("Expected no member to be named when there is none, got %q", findings[1].Message)
+	}
+	if !strings.Contains(findings[2].Message, `"zeros.bin"`) {
+		t.Errorf("Expected the member to be named, got %q", findings[2].Message)
+	}
+}
+
+func TestACleanArchiveIsReportedForNothing(t *testing.T) {
+	clean := zipOf(t, "notes.txt", []byte("meeting notes"))
+
+	if findings := archiveFindings(fileinspect.Walk(clean, archiveLimits), "notes.zip"); len(findings) != 0 {
+		t.Errorf("Expected no findings for a clean zip, got %+v", findings)
+	}
+}
+
+func TestAFileThatIsNoArchiveIsReportedForNothing(t *testing.T) {
+	entries := fileinspect.Walk([]byte("just plain text"), archiveLimits)
+
+	if findings := archiveFindings(entries, "note.txt"); findings != nil {
+		t.Errorf("Expected nil findings for non-archive data, got %+v", findings)
 	}
 }
 
