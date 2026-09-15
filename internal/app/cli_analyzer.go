@@ -123,6 +123,11 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			summary.SpamScore, summary.SpamGrade)
 		fmt.Fprintf(writer, "  Content Quality:                %3d%% (%s)\n",
 			summary.ContentScore, summary.ContentGrade)
+		// A message carrying nothing is not graded on its attachments.
+		if summary.AttachmentsGrade != "" {
+			fmt.Fprintf(writer, "  Attachments:                    %3d%% (%s)\n",
+				summary.AttachmentsScore, summary.AttachmentsGrade)
+		}
 	}
 
 	// DNS Results
@@ -708,6 +713,71 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 				}
 				if issue.Advice != nil {
 					fmt.Fprintf(writer, "      Advice: %s\n", *issue.Advice)
+				}
+			}
+		}
+	}
+
+	// Attachment Analysis
+	if report.AttachmentAnalysis != nil && report.AttachmentAnalysis.HasAttachments {
+		fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))
+		fmt.Fprintln(writer, "ATTACHMENT ANALYSIS")
+		fmt.Fprintln(writer, strings.Repeat("-", 70))
+
+		attachments := report.AttachmentAnalysis
+
+		if attachments.Attachments != nil {
+			for i, att := range *attachments.Attachments {
+				name := "(unnamed)"
+				if att.Filename != nil {
+					name = *att.Filename
+				}
+				fmt.Fprintf(writer, "\n  [%d] %s (%d bytes)", i+1, name, att.Size)
+				if att.Inline != nil && *att.Inline {
+					fmt.Fprintf(writer, " [inline]")
+				}
+				fmt.Fprintln(writer)
+				if att.DeclaredContentType != nil {
+					fmt.Fprintf(writer, "      Declared type: %s\n", *att.DeclaredContentType)
+				}
+				if att.DetectedContentType != nil {
+					fmt.Fprintf(writer, "      Detected type: %s\n", *att.DetectedContentType)
+				}
+				fmt.Fprintf(writer, "      SHA-256: %s\n", att.Sha256)
+
+				// Every scanner the instance knows of is printed, whatever it
+				// answered.
+				if att.Scans != nil {
+					for _, scan := range *att.Scans {
+						fmt.Fprintf(writer, "      %s: %s", scan.Scanner, scan.Status)
+						if scan.Verdict != nil {
+							fmt.Fprintf(writer, " (%s)", *scan.Verdict)
+						}
+						if scan.EnginesFlagged != nil && scan.EnginesTotal != nil {
+							fmt.Fprintf(writer, " (%d/%d engines)", *scan.EnginesFlagged, *scan.EnginesTotal)
+						}
+						if scan.Detail != nil {
+							fmt.Fprintf(writer, " - %s", *scan.Detail)
+						}
+						if scan.Link != nil {
+							fmt.Fprintf(writer, "\n        %s", *scan.Link)
+						}
+						fmt.Fprintln(writer)
+					}
+				}
+
+				if att.Issues != nil && len(*att.Issues) > 0 {
+					fmt.Fprintln(writer, "      Issues:")
+					for _, issue := range *att.Issues {
+						fmt.Fprintf(writer, "        [%s] %s: %s\n",
+							strings.ToUpper(string(issue.Severity)), issue.Type, issue.Message)
+						if issue.Location != nil {
+							fmt.Fprintf(writer, "          Location: %s\n", *issue.Location)
+						}
+						if issue.Advice != nil {
+							fmt.Fprintf(writer, "          Advice: %s\n", *issue.Advice)
+						}
+					}
 				}
 			}
 		}
