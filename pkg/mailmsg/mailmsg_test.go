@@ -1066,3 +1066,54 @@ func TestGetAttachments_NoAttachments(t *testing.T) {
 		t.Errorf("Expected no attachments, got %d", len(attachments))
 	}
 }
+
+func TestGetAttachments_EmbeddedMessage(t *testing.T) {
+	inner := "From: original@example.com\r\n" +
+		"Subject: forwarded\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"INNER\"\r\n" +
+		"\r\n" +
+		"--INNER\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"Original body.\r\n" +
+		"--INNER\r\n" +
+		"Content-Type: application/pdf; name=\"invoice.pdf\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n" +
+		"Content-Disposition: attachment; filename=\"invoice.pdf\"\r\n" +
+		"\r\n" +
+		"JVBERi0xLjQK\r\n" +
+		"--INNER--\r\n"
+
+	rawEmail := "From: forwarder@example.com\r\n" +
+		"Subject: Fwd: forwarded\r\n" +
+		"MIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=\"OUTER\"\r\n" +
+		"\r\n" +
+		"--OUTER\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"See the message below.\r\n" +
+		"--OUTER\r\n" +
+		"Content-Type: message/rfc822\r\n" +
+		"Content-Disposition: attachment; filename=\"forwarded.eml\"\r\n" +
+		"\r\n" +
+		inner +
+		"--OUTER--\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	attachments := email.GetAttachments()
+	if len(attachments) != 1 {
+		t.Fatalf("Expected the embedded message's own attachment, got %d", len(attachments))
+	}
+	if attachments[0].Filename != "invoice.pdf" {
+		t.Errorf("Expected filename invoice.pdf, got %q", attachments[0].Filename)
+	}
+	if decoded := string(attachments[0].DecodedBytes()); !strings.HasPrefix(decoded, "%PDF") {
+		t.Errorf("Expected decoded PDF magic, got %q", decoded)
+	}
+}

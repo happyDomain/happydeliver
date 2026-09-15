@@ -207,7 +207,34 @@ func entityPart(e *message.Entity) (Part, bool) {
 		part.Body = content
 	}
 
+	// A forwarded or bounced message carries its own parts, and whatever it
+	// attaches must stay reachable rather than sit behind an opaque leaf. Its
+	// payload is a whole message, so it is parsed as one; a body too malformed
+	// to parse leaves the part as the leaf it already is.
+	if isEmbeddedMessage(part.ContentType) {
+		if nested, err := Parse(content); err == nil {
+			part.Parts = nested.Parts
+		}
+	}
+
 	return part, false
+}
+
+// isEmbeddedMessage reports whether a part's Content-Type says its payload is
+// itself a message: RFC 2046 message/rfc822, its RFC 6532 internationalised
+// counterpart message/global, and message/news.
+func isEmbeddedMessage(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType, _, _ = strings.Cut(contentType, ";")
+	}
+
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "message/rfc822", "message/global", "message/news":
+		return true
+	}
+
+	return false
 }
 
 // readMultipart turns every part of a multipart body into a Part,
