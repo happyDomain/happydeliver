@@ -22,12 +22,33 @@
 package fileinspect
 
 import (
+	"archive/zip"
 	"bytes"
 	"testing"
 )
 
 // mzStub is a minimal PE-looking payload (MZ magic)
 var mzStub = append([]byte("MZ"), bytes.Repeat([]byte{0x90}, 62)...)
+
+// ooxml builds an OOXML document carrying the named parts.
+func ooxml(t *testing.T, parts ...string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for _, name := range parts {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Write([]byte("content of " + name))
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return buf.Bytes()
+}
 
 func TestInspectNameDoubleExtension(t *testing.T) {
 	name := inspectName("invoice.pdf.exe")
@@ -131,13 +152,46 @@ func TestDetectExecutableJavaClassIsNotUniversal(t *testing.T) {
 	}
 }
 
+func TestDetectMacroOOXML(t *testing.T) {
+	document := ooxml(t, "[Content_Types].xml", "word/document.xml", "word/vbaProject.bin")
+
+	if evidence := detectMacro(inspectName("macro.docm"), document); evidence != MacroVBAProject {
+		t.Errorf("Expected the vbaProject.bin part to establish the macros, got %q", evidence)
+	}
+}
+
+// TestDetectMacroOOXMLWithoutMacroAnswersOffItsContent: the extension of a
+// macro-enabled format says what it may carry, and the archive says what it
+// does.
+func TestDetectMacroOOXMLWithoutMacroAnswersOffItsContent(t *testing.T) {
+	document := ooxml(t, "[Content_Types].xml", "word/document.xml")
+
+	if evidence := detectMacro(inspectName("normal.docm"), document); evidence != MacroNone {
+		t.Errorf("Expected a macro-free document to answer off its content, got %q", evidence)
+	}
+}
+
+func TestDetectMacroOLE2Markers(t *testing.T) {
+	document := append(append([]byte{}, ole2Magic...), []byte("...VBA...Attribut...")...)
+
+	if evidence := detectMacro(inspectName("legacy.doc"), document); evidence != MacroOLE2Markers {
+		t.Errorf("Expected the VBA markers to be found in the compound file, got %q", evidence)
+	}
+}
+
+func TestDetectMacroFallsBackOnTheExtension(t *testing.T) {
+	if evidence := detectMacro(inspectName("unreadable.xlsm"), []byte("not an office document")); evidence != MacroExtension {
+		t.Errorf("Expected the extension to be all that is left, got %q", evidence)
+	}
+}
+
 func TestInspectHeaderReadsNoContent(t *testing.T) {
 	facts := InspectHeader("invoice.pdf.exe", "application/pdf", mzStub)
 
 	if !facts.Name.Dangerous || !facts.Type.DeclaredMismatch {
 		t.Errorf("Expected the name and the type to be read, got %+v", facts)
 	}
-	if facts.Executable != "" {
+	if facts.Executable != "" || facts.Macro != MacroNone {
 		t.Errorf("Expected the content to be left unread, got %+v", facts)
 	}
 }
@@ -223,5 +277,51 @@ func TestDetectExecutableOfNothing(t *testing.T) {
 func TestIsMachOOfAFewBytes(t *testing.T) {
 	if isMachO([]byte{0xfe, 0xed}) {
 		t.Error("Expected two bytes not to be read as a Mach-O")
+	}
+}
+
+// TestDetectMacroCorruptedOOXMLFallsBackOnTheExtension: an archive that does
+// not open says nothing of its content, and the extension is all that is
+// left.
+func TestDetectMacroCorruptedOOXMLFallsBackOnTheExtension(t *testing.T) {
+	corrupted := []byte("PK\x03\x04this is not the rest of a zip")
+
+	if evidence := detectMacro(inspectName("broken.docm"), corrupted); evidence != MacroExtension {
+		t.Errorf("Expected the extension to be all that is left, got %q", evidence)
+	}
+	if evidence := detectMacro(inspectName("broken.docx"), corrupted); evidence != MacroNone {
+		t.Errorf("Expected nothing to be said of a plain extension, got %q", evidence)
+	}
+}
+
+// TestDetectMacroOLE2WithoutMarkersAnswersOffItsContent: a compound file that
+// opened is held to its bytes, not to its extension.
+func TestDetectMacroOLE2WithoutMarkersAnswersOffItsContent(t *testing.T) {
+	document := append(append([]byte{}, ole2Magic...), bytes.Repeat([]byte("plain text of a letter "), 8)...)
+
+	if evidence := detectMacro(inspectName("legacy.doc"), document); evidence != MacroNone {
+		t.Errorf("Expected a marker-free compound file to carry no macros, got %q", evidence)
+	}
+}
+
+func TestDetectMacroOLE2EachMarker(t *testing.T) {
+	for name, marker := range map[string][]byte{
+		"vba":      []byte("...VBA_PROJECT..."),
+		"macros":   []byte("...Macros..."),
+		"attribut": []byte("...\x00Attribut..."),
+	} {
+		t.Run(name, func(t *testing.T) {
+			document := append(append([]byte{}, ole2Magic...), marker...)
+
+			if evidence := detectMacro(inspectName("legacy.xls"), document); evidence != MacroOLE2Markers {
+				t.Errorf("Expected the marker to be found, got %q", evidence)
+			}
+		})
+	}
+}
+
+func TestDetectMacroOfAnOrdinaryFile(t *testing.T) {
+	if evidence := detectMacro(inspectName("notes.txt"), []byte("nothing to see")); evidence != MacroNone {
+		t.Errorf("Expected nothing to be said of an ordinary file, got %q", evidence)
 	}
 }

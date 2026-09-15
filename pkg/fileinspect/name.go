@@ -46,6 +46,12 @@ var documentExtensions = map[string]bool{
 	"mp3": true, "mp4": true, "avi": true,
 }
 
+// macroEnabledExtensions are Office formats that may carry VBA macros by design
+var macroEnabledExtensions = map[string]bool{
+	"docm": true, "dotm": true, "xlsm": true, "xltm": true, "xlam": true,
+	"pptm": true, "potm": true, "ppam": true, "ppsm": true, "sldm": true,
+}
+
 // Name is what the name of a file says about it, before anything is read of
 // its content.
 type Name struct {
@@ -107,4 +113,12 @@ func inspectName(filename string) Name {
 	name.WhitespacePadding = strings.Contains(filename, strings.Repeat(" ", paddingRun))
 
 	return name
+}
+
+// MacroEnabledExtension reports whether the name is that of an Office format
+// carrying VBA macros by design. It reads Extension rather than the name as
+// written, so that the same trick that hides a dangerous extension does not
+// hide a macro-enabled one.
+func (n Name) MacroEnabledExtension() bool {
+	return macroEnabledExtensions[n.Extension]
 }
