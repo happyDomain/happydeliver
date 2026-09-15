@@ -54,6 +54,7 @@ var clamavCheck = attachmentCheck{
 				fmt.Sprintf("ClamAV detected malware: %s", scan.Signature),
 				"This attachment is malicious and must not be distributed",
 			)
+			found.Concern = concernMalware
 			found.Issue.Source = source(model.IssueSourceClamav)
 
 			return []reading.Finding{found}, nil
@@ -63,6 +64,53 @@ var clamavCheck = attachmentCheck{
 		}
 
 		return nil, nil
+	},
+}
+
+// virustotalCheck reads what VirusTotal knows about this file.
+var virustotalCheck = attachmentCheck{
+	Name:     "virustotal",
+	Category: reading.CategorySecurity,
+	Reports:  []*reading.Defect{defectMalware, defectScanError},
+	Run: func(_ context.Context, in *attachmentInput) ([]reading.Finding, error) {
+		scan := in.Attachment.VirusTotal
+		if scan == nil {
+			return nil, nil
+		}
+
+		var found reading.Finding
+		switch scan.Status {
+		case "malicious":
+			found = finding(
+				defectMalware,
+				model.IssueTypeMalwareDetected,
+				model.IssueSeverityCritical,
+				in.Attachment.Location,
+				fmt.Sprintf("VirusTotal flags this file as malicious (%d/%d engines)", scan.Positives, scan.Total),
+				"This attachment is known to be malicious and must not be distributed",
+			)
+
+		case "suspicious":
+			found = finding(
+				defectMalware,
+				model.IssueTypeMalwareDetected,
+				model.IssueSeverityHigh,
+				in.Attachment.Location,
+				fmt.Sprintf("VirusTotal flags this file as suspicious (%d/%d engines)", scan.Positives, scan.Total),
+				"Several engines consider this attachment suspicious; verify its origin before opening it",
+			)
+
+		case "error":
+			return []reading.Finding{scanCaveat("VirusTotal", scan.Error, in.Attachment.Location)}, nil
+
+		default:
+			return nil, nil
+		}
+
+		found.Concern = concernMalware
+		found.Issue.Source = source(model.IssueSourceVirustotal)
+
+		return []reading.Finding{found}, nil
 	},
 }
 

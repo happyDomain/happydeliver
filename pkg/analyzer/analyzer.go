@@ -53,9 +53,11 @@ func NewEmailAnalyzer(cfg *config.Config) *EmailAnalyzer {
 		RspamdScanURL:    cfg.Analysis.RspamdScanURL,
 		VMCRoots:         cfg.Analysis.VMCRoots,
 		Attachments: attachment.Options{
-			ClamAVAddress: cfg.Analysis.ClamAVAddress,
-			ScanTimeout:   cfg.Analysis.ScanTimeout,
-			MaxSize:       cfg.Analysis.MaxAttachmentSize,
+			ClamAVAddress:    cfg.Analysis.ClamAVAddress,
+			VirusTotalAPIKey: cfg.Analysis.VirusTotalAPIKey,
+			VirusTotalUpload: cfg.Analysis.VirusTotalUpload,
+			ScanTimeout:      cfg.Analysis.ScanTimeout,
+			MaxSize:          cfg.Analysis.MaxAttachmentSize,
 		},
 	})
 

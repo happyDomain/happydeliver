@@ -96,7 +96,9 @@ type AnalysisConfig struct {
 	VMCRoots *x509.CertPool `json:"-"`
 
 	ClamAVAddress     string        // clamd address (tcp://host:port, unix:///path or host:port). Empty = disabled
-	ScanTimeout       time.Duration // Timeout for reading one attachment, external scans included
+	VirusTotalAPIKey  string        // VirusTotal API key. Empty = disabled
+	VirusTotalUpload  bool          // Upload files unknown to VirusTotal for analysis
+	ScanTimeout       time.Duration // Timeout for external attachment scans (ClamAV, VirusTotal)
 	MaxAttachmentSize int64         // Maximum attachment size in bytes to analyze
 }
 

@@ -34,9 +34,11 @@ var attachmentChecks = []attachmentCheck{
 	// saw its name and its size. It is read first for that reason.
 	sizeCheck,
 
-	// What the engine made of the whole file comes last: it complements the
+	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
 	// happyDeliver saw for itself by the time they reach a verdict nobody here
-	// can explain.
+	// can explain. Ours first, so that a sample both recognise is reported
+	// under the scanner this instance runs.
 	clamavCheck,
+	virustotalCheck,
 }

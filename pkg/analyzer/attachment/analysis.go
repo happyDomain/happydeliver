@@ -25,10 +25,11 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/clamav"
+	"git.happydns.org/happyDeliver/pkg/virustotal"
 )
 
 // Analysis is what the report shows of the attachments: each file, what the
-// scanner said about it, and what the checks found in it.
+// scanners said about it, and what the checks found in it.
 //
 // It takes the readings rather than producing them, because the same readings
 // answer for the score: a file is handed to a scanner once per report.
@@ -38,8 +39,9 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 	}
 
 	analysis := &model.AttachmentAnalysis{
-		HasAttachments: len(results.Attachments) > 0,
-		ClamavEnabled:  utils.PtrTo(results.ClamAVEnabled),
+		HasAttachments:    len(results.Attachments) > 0,
+		ClamavEnabled:     utils.PtrTo(results.ClamAVEnabled),
+		VirustotalEnabled: utils.PtrTo(results.VirusTotalEnabled),
 	}
 
 	if len(results.Attachments) == 0 {
@@ -66,6 +68,7 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 		}
 
 		check.Clamav = clamavToModel(attachment.ClamAV, results.ClamAVEnabled)
+		check.Virustotal = virustotalToModel(attachment.VirusTotal, results.VirusTotalEnabled)
 
 		// The readings are index-aligned with the attachments, and a caller
 		// that did not read at all leaves the findings out rather than
@@ -95,6 +98,27 @@ func clamavToModel(scan *clamav.Scan, enabled bool) *model.ClamAVResult {
 	result := &model.ClamAVResult{Status: model.ClamAVResultStatus(scan.Status)}
 	if scan.Signature != "" {
 		result.Signature = utils.PtrTo(scan.Signature)
+	}
+	return result
+}
+
+// virustotalToModel converts a VirusTotal scan to the API model, mapping a
+// missing scan to the skipped status
+func virustotalToModel(scan *virustotal.Scan, enabled bool) *model.VirusTotalResult {
+	if scan == nil {
+		if !enabled {
+			return &model.VirusTotalResult{Status: model.VirusTotalResultStatusSkipped}
+		}
+		return nil
+	}
+
+	result := &model.VirusTotalResult{Status: model.VirusTotalResultStatus(scan.Status)}
+	if scan.Total > 0 {
+		result.Positives = utils.PtrTo(scan.Positives)
+		result.Total = utils.PtrTo(scan.Total)
+	}
+	if scan.Permalink != "" {
+		result.Permalink = utils.PtrTo(scan.Permalink)
 	}
 	return result
 }

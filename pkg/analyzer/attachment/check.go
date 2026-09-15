@@ -55,6 +55,15 @@ type attachmentInput struct {
 // shows, and what they cost its score.
 type Reading = reading.Evaluation
 
+// concernMalware keys the verdict that a file is malicious, whoever reached
+// it. Both scanners report under it, so that a sample two engines recognise is
+// reported once and the second engine is named as agreeing rather than
+// repeating the alarm.
+//
+// It needs nothing to distinguish it: one reading covers one attachment, so
+// the file is already implied.
+const concernMalware = "malware"
+
 // Read runs the registry over every attachment of a message.
 //
 // It answers one Reading per attachment, in the order they appear in the

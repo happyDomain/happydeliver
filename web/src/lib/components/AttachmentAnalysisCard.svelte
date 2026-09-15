@@ -64,11 +64,17 @@
                 This email contains no attachments.
             </p>
         {:else}
-            {#if attachmentAnalysis.clamav_enabled === false}
+            {#if attachmentAnalysis.clamav_enabled === false || attachmentAnalysis.virustotal_enabled === false}
                 <div class="alert alert-secondary py-2 px-3 mb-3">
                     <i class="bi bi-info-circle me-1"></i>
-                    ClamAV scanning is not configured on this server; only the checks happyDeliver runs
-                    itself were performed.
+                    {#if attachmentAnalysis.clamav_enabled === false && attachmentAnalysis.virustotal_enabled === false}
+                        No antivirus scanner is configured on this server; only static checks were
+                        performed.
+                    {:else if attachmentAnalysis.clamav_enabled === false}
+                        ClamAV scanning is not configured on this server.
+                    {:else}
+                        VirusTotal lookups are not configured on this server.
+                    {/if}
                 </div>
             {/if}
 
@@ -103,9 +109,22 @@
                         <div class="col-md-6">
                             <div class="small">
                                 <strong>SHA-256:</strong>
-                                <span class="font-monospace text-break ms-1">
-                                    {attachment.sha256}
-                                </span>
+                                {#if attachment.virustotal?.permalink}
+                                    <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
+                                    <a
+                                        href={attachment.virustotal.permalink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="font-monospace text-break ms-1"
+                                    >
+                                        {attachment.sha256}
+                                    </a>
+                                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                                {:else}
+                                    <span class="font-monospace text-break ms-1">
+                                        {attachment.sha256}
+                                    </span>
+                                {/if}
                             </div>
                         </div>
                     </div>
@@ -118,6 +137,20 @@
                                     {attachment.clamav.status}
                                     {#if attachment.clamav.signature}
                                         — {attachment.clamav.signature}
+                                    {/if}
+                                </span>
+                            </span>
+                        {/if}
+                        {#if attachment.virustotal}
+                            <span>
+                                <strong class="small">VirusTotal:</strong>
+                                <span
+                                    class="badge {scannerBadgeClass(attachment.virustotal.status)}"
+                                >
+                                    {attachment.virustotal.status}
+                                    {#if attachment.virustotal.positives !== undefined && attachment.virustotal.total !== undefined}
+                                        ({attachment.virustotal.positives}/{attachment.virustotal
+                                            .total})
                                     {/if}
                                 </span>
                             </span>

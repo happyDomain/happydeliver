@@ -188,7 +188,7 @@ If the value is misconfigured, happyDeliver will log a warning when the last `Re
 This setting only applies to messages delivered to happyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
 #### Attachment Analysis
 
-happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report. An optional external scanner improves detection:
+happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report. Two optional external scanners improve detection:
 
 - **ClamAV**: point happyDeliver at a running `clamd` daemon:
 
@@ -200,7 +200,15 @@ happyDeliver reads the files a message carries alongside its body, and reports w
 
   With docker compose, start the bundled ClamAV service (requires ~1.5 GB RAM): `docker compose --profile clamav up -d`, then set `HAPPYDELIVER_CLAMAV_ADDRESS=tcp://clamav:3310`.
 
-Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks happyDeliver runs itself still apply and the scanner's verdict is reported as `skipped` without affecting the score.
+- **VirusTotal**: attachment SHA-256 hashes are looked up against the VirusTotal database (file content is *not* shared):
+
+  ```bash
+  ./happyDeliver server -virustotal-api-key YOUR_API_KEY
+  ```
+
+  Add `-virustotal-upload` to also submit files unknown to VirusTotal for analysis. **Warning:** uploaded files are shared with the VirusTotal community; do not enable it if test emails may contain confidential documents. Note the free API tier is limited to 4 requests/minute.
+
+Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks happyDeliver runs itself still apply and scanner verdicts are reported as `skipped` without affecting the score.
 
 #### Postfix LMTP Transport
 

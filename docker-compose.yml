@@ -27,6 +27,7 @@ services:
       HAPPYDELIVER_DOMAIN: happydeliver.local
       # Attachment scanning (optional): start the clamav profile and uncomment
       # HAPPYDELIVER_CLAMAV_ADDRESS: tcp://clamav:3310
+      # HAPPYDELIVER_VIRUSTOTAL_API_KEY: your-api-key
 
     ports:
       # SMTP port

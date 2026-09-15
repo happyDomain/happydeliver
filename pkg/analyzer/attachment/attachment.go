@@ -40,6 +40,7 @@ import (
 
 	"git.happydns.org/happyDeliver/pkg/clamav"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
+	"git.happydns.org/happyDeliver/pkg/virustotal"
 )
 
 // scanConcurrency bounds how many attachments are handed to the external
@@ -57,6 +58,15 @@ type Options struct {
 	// leaves them unscanned.
 	ClamAVAddress string
 
+	// VirusTotalAPIKey is the key the attachment hashes are looked up with.
+	// Empty leaves them unqueried.
+	VirusTotalAPIKey string
+
+	// VirusTotalUpload allows submitting an attachment VirusTotal does not
+	// already know the hash of. Off by default: it hands the file over to a
+	// third party.
+	VirusTotalUpload bool
+
 	// ScanTimeout bounds each external scan.
 	ScanTimeout time.Duration
 
@@ -67,7 +77,8 @@ type Options struct {
 
 // Analyzer reads the attachments of a message.
 type Analyzer struct {
-	clamav      *clamav.Client // nil = disabled
+	clamav      *clamav.Client     // nil = disabled
+	virustotal  *virustotal.Client // nil = disabled
 	scanTimeout time.Duration
 	maxSize     int64
 }
@@ -87,6 +98,7 @@ func New(opts Options) *Analyzer {
 
 	return &Analyzer{
 		clamav:      clamav.New(opts.ClamAVAddress, opts.ScanTimeout),
+		virustotal:  virustotal.New(opts.VirusTotalAPIKey, opts.VirusTotalUpload, opts.ScanTimeout),
 		scanTimeout: opts.ScanTimeout,
 		maxSize:     opts.MaxSize,
 	}
@@ -97,9 +109,11 @@ func New(opts Options) *Analyzer {
 type Results struct {
 	Attachments []Attachment
 
-	// ClamAVEnabled says whether an operator configured the scanner at all,
-	// which is what tells a missing verdict from a clean one.
-	ClamAVEnabled bool
+	// ClamAVEnabled and VirusTotalEnabled say whether an operator configured
+	// the scanner at all, which is what tells a missing verdict from a clean
+	// one.
+	ClamAVEnabled     bool
+	VirusTotalEnabled bool
 }
 
 // Attachment is one file a message carries, as it was read off it.
@@ -120,11 +134,12 @@ type Attachment struct {
 	// to look at: that is what a check reading bytes tests before reading any.
 	Data []byte
 
-	// ClamAV is what the scanner said, nil when it is disabled or was never
-	// asked. It is observed here rather than in a check because the report
-	// shows it whether or not it raised a finding, exactly as it shows what
-	// the spam filter said about the body.
-	ClamAV *clamav.Scan
+	// ClamAV and VirusTotal are what the scanners said, nil when the scanner
+	// is disabled or was never asked. They are observed here rather than in a
+	// check because the report shows them whether or not they raised a
+	// finding, exactly as it shows what the spam filter said about the body.
+	ClamAV     *clamav.Scan
+	VirusTotal *virustotal.Scan
 
 	// mime is the type sniffed from the payload, kept as the library returned
 	// it: a check comparing a declared type to it walks its parents, which a
@@ -137,11 +152,14 @@ func (a *Attachment) tooLarge(maxSize int64) bool {
 	return maxSize > 0 && a.Size > maxSize
 }
 
-// Analyze reads the attachments off a message and asks the scanner about
+// Analyze reads the attachments off a message and asks the scanners about
 // them. It observes, and judges nothing: what the observations are worth is
 // Read's answer.
 func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
-	results := &Results{ClamAVEnabled: a.clamav != nil}
+	results := &Results{
+		ClamAVEnabled:     a.clamav != nil,
+		VirusTotalEnabled: a.virustotal != nil,
+	}
 
 	parts := email.GetAttachments()
 	if len(parts) == 0 {
@@ -177,9 +195,9 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 		}
 		attachment.Data = data
 
-		// The scan is the only slow part of the observation: the attachments
-		// go through it together, under a bound, rather than one after the
-		// other.
+		// The scanners are the only slow part of the observation, and they are
+		// independent of one another: they run together, under a bound, while
+		// the rest of the message is read.
 		if a.clamav != nil {
 			wg.Add(1)
 			go func(attachment *Attachment, data []byte) {
@@ -191,6 +209,18 @@ func (a *Analyzer) Analyze(email *mailmsg.Message) *Results {
 				defer cancel()
 				attachment.ClamAV = a.clamav.ScanBytes(ctx, data)
 			}(attachment, data)
+		}
+		if a.virustotal != nil {
+			wg.Add(1)
+			go func(attachment *Attachment, sum string, data []byte) {
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
+				defer cancel()
+				attachment.VirusTotal = a.virustotal.CheckHash(ctx, sum, data)
+			}(attachment, attachment.SHA256, data)
 		}
 	}
 

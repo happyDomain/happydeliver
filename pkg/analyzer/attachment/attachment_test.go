@@ -230,23 +230,26 @@ func TestAnalyzeAttachmentsWithClamAV(t *testing.T) {
 	}
 }
 
-func TestAnalyzeAttachmentsScannerDisabled(t *testing.T) {
+func TestAnalyzeAttachmentsScannersDisabled(t *testing.T) {
 	analyzer := newOfflineAnalyzer()
 	rawEmail := buildAttachmentEmail("notes.txt", "text/plain", []byte("meeting notes"))
 
 	results, readings := read(t, analyzer, rawEmail)
 	analysis := analyzer.Analysis(results, readings)
 
-	if *analysis.ClamavEnabled {
-		t.Error("Expected the scanner reported as disabled")
+	if *analysis.ClamavEnabled || *analysis.VirustotalEnabled {
+		t.Error("Expected both scanners reported as disabled")
 	}
 
 	check := (*analysis.Attachments)[0]
 	if check.Clamav == nil || check.Clamav.Status != model.ClamAVResultStatusSkipped {
 		t.Errorf("Expected skipped ClamAV status, got %+v", check.Clamav)
 	}
+	if check.Virustotal == nil || check.Virustotal.Status != model.VirusTotalResultStatusSkipped {
+		t.Errorf("Expected skipped VirusTotal status, got %+v", check.Virustotal)
+	}
 
-	// A disabled scanner must not cost any points
+	// Disabled scanners must not cost any points
 	if score, _ := analyzer.Score(results, readings); score != 100 {
 		t.Errorf("Expected score 100 with scanners disabled, got %d", score)
 	}

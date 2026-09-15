@@ -350,7 +350,7 @@ components:
           example: "Add descriptive alt text to all images for better accessibility and deliverability"
         source:
           type: string
-          enum: [self, rspamd, clamav]
+          enum: [self, rspamd, clamav, virustotal]
           description: >-
             Who observed the issue. Absent means happyDeliver itself, which is
             also what "self" says explicitly; anything else names the third
@@ -366,10 +366,11 @@ components:
           items:
             type: string
           description: >-
-            Other observers that reported this same defect. When happyDeliver
-            and the spam filter both see it, one issue is reported and the
-            others are named here, so the defect is not listed twice while the
-            agreement stays visible.
+            Other observers that reported this same defect. When two of them
+            see it (happyDeliver and the spam filter, or two antivirus engines
+            handed the same file), one issue is reported and the others are
+            named here, so the defect is not listed twice while the agreement
+            stays visible.
           example: ["R_SUSPICIOUS_IMAGES"]
 
     AttachmentAnalysis:
@@ -385,6 +386,10 @@ components:
           type: boolean
           description: Whether ClamAV scanning was configured on the server
           example: true
+        virustotal_enabled:
+          type: boolean
+          description: Whether VirusTotal lookups were configured on the server
+          example: false
         attachments:
           type: array
           items:
@@ -424,6 +429,8 @@ components:
           example: false
         clamav:
           $ref: '#/components/schemas/ClamAVResult'
+        virustotal:
+          $ref: '#/components/schemas/VirusTotalResult'
         issues:
           type: array
           items:
@@ -444,6 +451,30 @@ components:
           type: string
           description: Malware signature name when infected
           example: "Eicar-Signature"
+
+    VirusTotalResult:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [clean, suspicious, malicious, unknown, pending, error, skipped]
+          description: VirusTotal lookup outcome (unknown = hash not in VT database, pending = uploaded and awaiting analysis)
+          example: "clean"
+        positives:
+          type: integer
+          description: Number of engines flagging the file as malicious or suspicious
+          example: 0
+        total:
+          type: integer
+          description: Total number of engines that analyzed the file
+          example: 74
+        permalink:
+          type: string
+          format: uri
+          description: Link to the VirusTotal report for this file
+          example: "https://www.virustotal.com/gui/file/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
     LinkCheck:
       type: object
