@@ -76,6 +76,7 @@ func staticFindings(filename, declaredType string, data []byte, location string)
 	findings = append(findings, typeMismatchFindings(filename, declaredType, mtype, location)...)
 	findings = append(findings, executableFindings(data, location)...)
 	findings = append(findings, macroFindings(filename, data, location)...)
+	findings = append(findings, pdfActiveContentFindings(data, location)...)
 
 	return findings
 }

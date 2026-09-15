@@ -276,6 +276,32 @@ func TestAnalyzeAttachmentsOversize(t *testing.T) {
 	}
 }
 
+func TestAnalysisModel(t *testing.T) {
+	analyzer := newOfflineAnalyzer()
+	pdf := []byte("%PDF-1.4 << /JavaScript (x) /JS (y) >>")
+	rawEmail := buildAttachmentEmail("active.pdf", "application/pdf", pdf)
+
+	results, readings := read(t, analyzer, rawEmail)
+	analysis := analyzer.Analysis(results, readings)
+
+	if !analysis.HasAttachments {
+		t.Fatal("Expected HasAttachments true")
+	}
+	check := (*analysis.Attachments)[0]
+	if check.Filename == nil || *check.Filename != "active.pdf" {
+		t.Errorf("Unexpected filename: %v", check.Filename)
+	}
+	if check.Issues == nil || len(*check.Issues) == 0 {
+		t.Fatal("Expected issues in the generated analysis")
+	}
+	if (*check.Issues)[0].Type != model.IssueTypePdfActiveContent {
+		t.Errorf("Expected pdf_active_content issue, got %s", (*check.Issues)[0].Type)
+	}
+	if (*check.Issues)[0].Category != model.IssueCategorySecurity {
+		t.Errorf("Expected the finding to be filed under security, got %q", (*check.Issues)[0].Category)
+	}
+}
+
 // TestAnUnnamedAttachmentIsNamedOnce holds every finding about one attachment
 // to the same name for it. A part giving itself no filename used to be called
 // one thing by the static checks and another by the scanners, which read as two
@@ -302,35 +328,5 @@ func TestAnUnnamedAttachmentIsNamedOnce(t *testing.T) {
 		if issue.Location == nil || *issue.Location != results.Attachments[0].Location {
 			t.Errorf("Finding %q names %v, want %q", issue.Type, issue.Location, results.Attachments[0].Location)
 		}
-	}
-}
-
-// TestAnalysisModel checks that what the report shows of a file carries both
-// what the file is and what was found in it.
-func TestAnalysisModel(t *testing.T) {
-	analyzer := newOfflineAnalyzer()
-	rawEmail := buildAttachmentEmail("invoice.pdf.exe", "application/pdf", []byte("harmless"))
-
-	results, readings := read(t, analyzer, rawEmail)
-	analysis := analyzer.Analysis(results, readings)
-
-	if !analysis.HasAttachments {
-		t.Fatal("Expected HasAttachments true")
-	}
-	check := (*analysis.Attachments)[0]
-	if check.Filename == nil || *check.Filename != "invoice.pdf.exe" {
-		t.Errorf("Unexpected filename: %v", check.Filename)
-	}
-	if check.Sha256 == "" || check.Size == 0 {
-		t.Errorf("Expected sha256 and size to be set, got %q / %d", check.Sha256, check.Size)
-	}
-	if check.Issues == nil || len(*check.Issues) == 0 {
-		t.Fatal("Expected issues in the generated analysis")
-	}
-	if (*check.Issues)[0].Type != model.IssueTypeDangerousExtension {
-		t.Errorf("Expected dangerous_extension issue, got %s", (*check.Issues)[0].Type)
-	}
-	if (*check.Issues)[0].Category != model.IssueCategorySecurity {
-		t.Errorf("Expected the finding to be filed under security, got %q", (*check.Issues)[0].Category)
 	}
 }

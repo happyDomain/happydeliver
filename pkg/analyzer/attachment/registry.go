@@ -41,9 +41,11 @@ var attachmentChecks = []attachmentCheck{
 	typeMismatchCheck,
 
 	// What the content turns out to be, from the plainest to the most
-	// conditional: a program, a document that carries macros.
+	// conditional: a program, a document that carries macros, one that acts
+	// when opened.
 	executableCheck,
 	macroCheck,
+	pdfActiveContentCheck,
 
 	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
