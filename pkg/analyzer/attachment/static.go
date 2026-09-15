@@ -77,6 +77,7 @@ func staticFindings(filename, declaredType string, data []byte, location string)
 	findings = append(findings, executableFindings(data, location)...)
 	findings = append(findings, macroFindings(filename, data, location)...)
 	findings = append(findings, pdfActiveContentFindings(data, location)...)
+	findings = append(findings, scriptFindings(filename, mtype, data, location)...)
 
 	return findings
 }

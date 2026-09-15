@@ -35,6 +35,7 @@ const issueLabels: Record<Issue["type"], string> = {
     macro_detected: "Macros in a document",
     pdf_active_content: "Active content in a PDF",
     executable_content: "Executable attachment",
+    script_content: "Script in an attachment",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
 };

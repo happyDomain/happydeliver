@@ -36,6 +36,7 @@ var attachmentDefects = []*reading.Defect{
 	defectTypeMismatch,
 	defectMacro,
 	defectPDFActiveContent,
+	defectScriptContent,
 	defectScanSkipped,
 	defectScanError,
 }
@@ -130,6 +131,9 @@ var (
 
 	// defectPDFActiveContent: a PDF that runs something when it is opened.
 	defectPDFActiveContent = &reading.Defect{Name: "pdf_active_content", Family: familyActiveContent}
+
+	// defectScriptContent: a script, or an HTML attachment that carries one.
+	defectScriptContent = &reading.Defect{Name: "script_content", Family: familyActiveContent}
 
 	// defectScanSkipped: something was not looked at, and the reader is told so
 	// rather than left to read silence as a clean bill.

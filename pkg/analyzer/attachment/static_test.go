@@ -183,3 +183,27 @@ func TestStaticCheckPDFTokenNotPrefix(t *testing.T) {
 		t.Errorf("Expected no PDF active content finding, got %+v", findings)
 	}
 }
+
+func TestStaticCheckHTMLSmuggling(t *testing.T) {
+	html := []byte(`<html><script>var payload = atob("AAAA"); var b = new Blob([payload]);</script></html>`)
+	findings := staticFindings("open-me.html", "text/html", html, "open-me.html")
+
+	found := false
+	for _, f := range findings {
+		if f.Type == model.IssueTypeScriptContent && f.Severity == model.IssueSeverityHigh {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected high-severity script_content finding for HTML smuggling, got %+v", findings)
+	}
+}
+
+func TestStaticCheckShebang(t *testing.T) {
+	script := []byte("#!/bin/sh\nrm -rf --no-preserve-root /\n")
+	findings := staticFindings("run.txt", "text/plain", script, "run.txt")
+
+	if types := findingTypes(findings); types[model.IssueTypeScriptContent] == 0 {
+		t.Errorf("Expected script_content finding for shebang, got %+v", findings)
+	}
+}
