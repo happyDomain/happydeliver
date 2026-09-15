@@ -32,6 +32,7 @@ const issueLabels: Record<Issue["type"], string> = {
     type_mismatch: "Content is not what it claims",
     double_extension: "Deceptive double extension",
     dangerous_extension: "Dangerous file extension",
+    executable_content: "Executable attachment",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
 };

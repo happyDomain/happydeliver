@@ -40,6 +40,10 @@ var attachmentChecks = []attachmentCheck{
 	filenameCheck,
 	typeMismatchCheck,
 
+	// What the content turns out to be: a program, whatever the file is
+	// called.
+	executableCheck,
+
 	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
 	// happyDeliver saw for itself by the time they reach a verdict nobody here

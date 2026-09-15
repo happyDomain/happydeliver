@@ -65,6 +65,7 @@ func TestStaticCheckDoubleExtension(t *testing.T) {
 	for _, expected := range []model.IssueType{
 		model.IssueTypeDoubleExtension,
 		model.IssueTypeDangerousExtension,
+		model.IssueTypeExecutableContent,
 	} {
 		if types[expected] == 0 {
 			t.Errorf("Expected a %s finding, got %+v", expected, findings)
@@ -103,5 +104,14 @@ func TestStaticCheckRTLOverride(t *testing.T) {
 
 	if types := findingTypes(findings); types[model.IssueTypeDangerousExtension] == 0 {
 		t.Errorf("Expected dangerous_extension finding for RTL override, got %+v", findings)
+	}
+}
+
+func TestStaticCheckELFExecutable(t *testing.T) {
+	elf := append([]byte("\x7fELF"), bytes.Repeat([]byte{0}, 60)...)
+	findings := staticFindings("tool", "application/octet-stream", elf, "tool")
+
+	if types := findingTypes(findings); types[model.IssueTypeExecutableContent] == 0 {
+		t.Errorf("Expected executable_content finding for ELF, got %+v", findings)
 	}
 }

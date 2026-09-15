@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"net/mail"
@@ -37,6 +38,10 @@ import (
 	"git.happydns.org/happyDeliver/pkg/analyzer/attachment"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
+
+// mzStub is a minimal PE-looking payload (MZ magic), which the attachment
+// analysis reads as a Windows executable.
+var mzStub = append([]byte("MZ"), bytes.Repeat([]byte{0x90}, 62)...)
 
 // buildAttachmentEmail assembles a multipart email carrying one attachment.
 func buildAttachmentEmail(filename, contentType string, payload []byte) string {
@@ -180,14 +185,18 @@ func TestGenerateReportAttachments(t *testing.T) {
 		t.Error("HasAttachments should be false")
 	}
 
-	// An email carrying one reaches the report as one attachment check
-	rawEmail := buildAttachmentEmail("notes.txt", "text/plain", []byte("meeting notes"))
+	// Email with a disguised executable attachment tanks the category and
+	// drags the overall grade down
+	rawEmail := buildAttachmentEmail("invoice.pdf.exe", "application/pdf", mzStub)
 	parsed, err := mailmsg.Parse([]byte(rawEmail))
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
 	report = gen.GenerateReport(testID, gen.AnalyzeEmail(parsed, AnalysisOptions{}))
 
+	if report.Summary.AttachmentsScore > 30 {
+		t.Errorf("AttachmentsScore = %d for a disguised executable, want heavily degraded", report.Summary.AttachmentsScore)
+	}
 	if !report.AttachmentAnalysis.HasAttachments {
 		t.Error("HasAttachments should be true")
 	}

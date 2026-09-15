@@ -52,17 +52,20 @@ var documentExtensions = map[string]bool{
 	"mp3": true, "mp4": true, "avi": true,
 }
 
-// staticFindings runs every offline detection over one file: what its name
-// says, and what its declared type says against what its first bytes say.
+// staticFindings runs every offline detection over one file: its name, its
+// declared type against its content, and the harmful-content heuristics.
 //
-// The registry runs the same detections check by check, so that each of them
-// can be named, declared and priced on its own; this is where they are read
-// together, over a file nobody has broken into parts.
+// It is what a check of the registry does to the attachment itself, and it is
+// also what an archive member gets: a file inside a zip is read exactly as a
+// file attached to the message would be, which is the point of looking inside
+// the zip at all. The registry runs the same detections check by check so that
+// each of them can be named, declared and priced on its own.
 func staticFindings(filename, declaredType string, data []byte, location string) (findings []reading.Finding) {
 	mtype := mimetype.Detect(data)
 
 	findings = append(findings, deceptiveNameFindings(filename, location)...)
 	findings = append(findings, typeMismatchFindings(filename, declaredType, mtype, location)...)
+	findings = append(findings, executableFindings(data, location)...)
 
 	return findings
 }

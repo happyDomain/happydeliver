@@ -30,6 +30,7 @@ import (
 // priced by nobody, and the tests say so.
 var attachmentDefects = []*reading.Defect{
 	defectMalware,
+	defectExecutableContent,
 	defectDangerousExtension,
 	defectDoubleExtension,
 	defectTypeMismatch,
@@ -55,6 +56,11 @@ var (
 			model.IssueSeverityHigh:     40,
 		},
 	}
+
+	// familyExecutable answers for an attachment whose content is a program.
+	// There is nothing to weigh: either the magic bytes say it is one or they
+	// do not.
+	familyExecutable = &reading.Family{Name: "executable", Cap: 50, PerItem: 50}
 
 	// familyDeceptiveName answers for a filename written to be misread: a
 	// dangerous extension, a document extension placed in front of it, an
@@ -82,6 +88,9 @@ var (
 var (
 	// defectMalware: an engine recognised the file.
 	defectMalware = &reading.Defect{Name: "malware", Family: familyMalware}
+
+	// defectExecutableContent: the payload is a program, whatever it is called.
+	defectExecutableContent = &reading.Defect{Name: "executable_content", Family: familyExecutable}
 
 	// defectDangerousExtension: a name ending in something a recipient's system
 	// would run, or written so that the ending cannot be seen.
