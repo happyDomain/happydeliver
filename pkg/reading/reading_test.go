@@ -80,6 +80,10 @@ func TestRunCharges(t *testing.T) {
 	family := &Family{Name: "test", Cap: 10}
 	other := &Family{Name: "test_other", Cap: 10}
 	flat := &Family{Name: "test_flat", Cap: 40, PerItem: 20}
+	graded := &Family{Name: "test_graded", Cap: 60, PerSeverity: map[model.IssueSeverity]int{
+		model.IssueSeverityCritical: 40,
+		model.IssueSeverityMedium:   15,
+	}}
 
 	critical := model.IssueSeverityCritical
 
@@ -119,6 +123,21 @@ func TestRunCharges(t *testing.T) {
 			"a flat family ignores severity, and is capped too",
 			[]Check[message]{reports("flat", flat, model.IssueSeverityLow, critical, critical)},
 			3, 40,
+		},
+		{
+			"a graded family reads what a finding costs off its gravity",
+			[]Check[message]{reports("graded", graded, critical, model.IssueSeverityMedium)},
+			2, 55,
+		},
+		{
+			"a gravity a graded family does not name costs nothing",
+			[]Check[message]{reports("graded", graded, model.IssueSeverityLow, model.IssueSeverityInfo)},
+			2, 0,
+		},
+		{
+			"a graded family is capped like any other",
+			[]Check[message]{reports("graded", graded, critical, critical)},
+			2, 60,
 		},
 	}
 
