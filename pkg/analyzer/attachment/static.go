@@ -1,0 +1,113 @@
+// This file is part of the happyDeliver (R) project.
+// Copyright (c) 2025-2026 happyDomain
+// Authors: Pierre-Olivier Mercier, et al.
+//
+// This program is offered under a commercial and under the AGPL license.
+// For commercial licensing, contact us at <contact@happydomain.org>.
+//
+// For AGPL licensing:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package attachment
+
+import (
+	"mime"
+	"path"
+	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
+
+	"git.happydns.org/happyDeliver/pkg/reading"
+)
+
+// dangerousExtensions are file extensions commonly used to deliver malware.
+// Values are lowercase without the leading dot.
+var dangerousExtensions = map[string]bool{
+	"exe": true, "scr": true, "pif": true, "com": true, "bat": true,
+	"cmd": true, "js": true, "jse": true, "vbs": true, "vbe": true,
+	"wsf": true, "wsh": true, "ps1": true, "psm1": true, "msi": true,
+	"msp": true, "jar": true, "hta": true, "cpl": true, "lnk": true,
+	"iso": true, "img": true, "vhd": true, "reg": true, "dll": true,
+	"chm": true, "application": true, "appx": true,
+}
+
+// documentExtensions are innocuous-looking extensions used as decoys in
+// double-extension attacks (invoice.pdf.exe)
+var documentExtensions = map[string]bool{
+	"pdf": true, "doc": true, "docx": true, "xls": true, "xlsx": true,
+	"ppt": true, "pptx": true, "odt": true, "ods": true, "txt": true,
+	"rtf": true, "csv": true, "jpg": true, "jpeg": true, "png": true,
+	"gif": true, "bmp": true, "html": true, "htm": true, "zip": true,
+	"mp3": true, "mp4": true, "avi": true,
+}
+
+// staticFindings runs every offline detection over one file: what its name
+// says, and what its declared type says against what its first bytes say.
+//
+// The registry runs the same detections check by check, so that each of them
+// can be named, declared and priced on its own; this is where they are read
+// together, over a file nobody has broken into parts.
+func staticFindings(filename, declaredType string, data []byte, location string) (findings []reading.Finding) {
+	mtype := mimetype.Detect(data)
+
+	findings = append(findings, deceptiveNameFindings(filename, location)...)
+	findings = append(findings, typeMismatchFindings(filename, declaredType, mtype, location)...)
+
+	return findings
+}
+
+// extensionOf is the lowercased extension of a filename, without its dot.
+func extensionOf(filename string) string {
+	return strings.ToLower(strings.TrimPrefix(path.Ext(filename), "."))
+}
+
+// mimeMatches walks the detected type's parent hierarchy looking for expected
+// (e.g. text/html matches an expected text/plain parent). Structured-suffix
+// equivalences like docx (zip) are handled by the hierarchy too.
+func mimeMatches(mtype *mimetype.MIME, expected string) bool {
+	for m := mtype; m != nil; m = m.Parent() {
+		if m.Is(expected) {
+			return true
+		}
+	}
+	return false
+}
+
+// isExecutableMIME reports whether the detected type is an executable format
+func isExecutableMIME(mtype *mimetype.MIME) bool {
+	for _, executable := range []string{
+		"application/vnd.microsoft.portable-executable",
+		"application/x-msdownload",
+		"application/x-elf",
+		"application/x-executable",
+		"application/x-mach-binary",
+		"application/x-sharedlib",
+	} {
+		if mimeMatches(mtype, executable) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseMediaType is the media type of a Content-Type header, without its
+// parameters, and empty when the header says nothing usable.
+func parseMediaType(contentType string) string {
+	declared, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return ""
+	}
+
+	return declared
+}

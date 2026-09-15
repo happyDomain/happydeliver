@@ -30,6 +30,9 @@ import (
 // priced by nobody, and the tests say so.
 var attachmentDefects = []*reading.Defect{
 	defectMalware,
+	defectDangerousExtension,
+	defectDoubleExtension,
+	defectTypeMismatch,
 	defectScanSkipped,
 	defectScanError,
 }
@@ -52,11 +55,45 @@ var (
 			model.IssueSeverityHigh:     40,
 		},
 	}
+
+	// familyDeceptiveName answers for a filename written to be misread: a
+	// dangerous extension, a document extension placed in front of it, an
+	// override character, padding that pushes the real extension out of sight.
+	//
+	// They are capped together, and charged once, because they are one
+	// decision: a sender who names a file invoice.pdf.exe has not made two
+	// mistakes.
+	familyDeceptiveName = &reading.Family{Name: "deceptive_name", Cap: 40, PerItem: 40}
+
+	// familyTypeMismatch answers for a file whose content is not what it
+	// claims. A mismatch that reveals an executable is a disguise; one between
+	// two document formats is usually a sender's tooling being careless, and
+	// the gap between the two is wider than a severity step.
+	familyTypeMismatch = &reading.Family{
+		Name: "type_mismatch",
+		Cap:  40,
+		PerSeverity: map[model.IssueSeverity]int{
+			model.IssueSeverityHigh:   40,
+			model.IssueSeverityMedium: 20,
+		},
+	}
 )
 
 var (
 	// defectMalware: an engine recognised the file.
 	defectMalware = &reading.Defect{Name: "malware", Family: familyMalware}
+
+	// defectDangerousExtension: a name ending in something a recipient's system
+	// would run, or written so that the ending cannot be seen.
+	defectDangerousExtension = &reading.Defect{Name: "dangerous_extension", Family: familyDeceptiveName}
+
+	// defectDoubleExtension: a document extension placed in front of the real
+	// one, so the file reads as a report and opens as a program.
+	defectDoubleExtension = &reading.Defect{Name: "double_extension", Family: familyDeceptiveName}
+
+	// defectTypeMismatch: content that is not what the message or the filename
+	// says it is.
+	defectTypeMismatch = &reading.Defect{Name: "type_mismatch", Family: familyTypeMismatch}
 
 	// defectScanSkipped: something was not looked at, and the reader is told so
 	// rather than left to read silence as a clean bill.

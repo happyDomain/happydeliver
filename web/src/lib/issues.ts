@@ -29,6 +29,9 @@ const issueLabels: Record<Issue["type"], string> = {
     sender_domain_mismatch: "Links off the sender's domain",
     // What a message carries alongside its body.
     malware_detected: "Malware detected",
+    type_mismatch: "Content is not what it claims",
+    double_extension: "Deceptive double extension",
+    dangerous_extension: "Dangerous file extension",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
 };

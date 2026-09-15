@@ -34,6 +34,12 @@ var attachmentChecks = []attachmentCheck{
 	// saw its name and its size. It is read first for that reason.
 	sizeCheck,
 
+	// What the file says it is, before what it is made of: a name written to
+	// be misread, and content that is not what either the name or the message
+	// claims.
+	filenameCheck,
+	typeMismatchCheck,
+
 	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
 	// happyDeliver saw for itself by the time they reach a verdict nobody here

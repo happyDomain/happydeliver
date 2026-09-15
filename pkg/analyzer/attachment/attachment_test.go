@@ -305,12 +305,11 @@ func TestAnUnnamedAttachmentIsNamedOnce(t *testing.T) {
 	}
 }
 
-// TestAnalysisModel checks that what the report shows of a file says what the
-// file is, whether or not anything was found in it.
+// TestAnalysisModel checks that what the report shows of a file carries both
+// what the file is and what was found in it.
 func TestAnalysisModel(t *testing.T) {
 	analyzer := newOfflineAnalyzer()
-	pdf := []byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF")
-	rawEmail := buildAttachmentEmail("report.pdf", "application/pdf", pdf)
+	rawEmail := buildAttachmentEmail("invoice.pdf.exe", "application/pdf", []byte("harmless"))
 
 	results, readings := read(t, analyzer, rawEmail)
 	analysis := analyzer.Analysis(results, readings)
@@ -319,16 +318,19 @@ func TestAnalysisModel(t *testing.T) {
 		t.Fatal("Expected HasAttachments true")
 	}
 	check := (*analysis.Attachments)[0]
-	if check.Filename == nil || *check.Filename != "report.pdf" {
+	if check.Filename == nil || *check.Filename != "invoice.pdf.exe" {
 		t.Errorf("Unexpected filename: %v", check.Filename)
-	}
-	if check.DeclaredContentType == nil || !strings.HasPrefix(*check.DeclaredContentType, "application/pdf") {
-		t.Errorf("Unexpected declared type: %v", check.DeclaredContentType)
-	}
-	if check.DetectedContentType == nil || !strings.HasPrefix(*check.DetectedContentType, "application/pdf") {
-		t.Errorf("Unexpected detected type: %v", check.DetectedContentType)
 	}
 	if check.Sha256 == "" || check.Size == 0 {
 		t.Errorf("Expected sha256 and size to be set, got %q / %d", check.Sha256, check.Size)
+	}
+	if check.Issues == nil || len(*check.Issues) == 0 {
+		t.Fatal("Expected issues in the generated analysis")
+	}
+	if (*check.Issues)[0].Type != model.IssueTypeDangerousExtension {
+		t.Errorf("Expected dangerous_extension issue, got %s", (*check.Issues)[0].Type)
+	}
+	if (*check.Issues)[0].Category != model.IssueCategorySecurity {
+		t.Errorf("Expected the finding to be filed under security, got %q", (*check.Issues)[0].Category)
 	}
 }
