@@ -188,7 +188,7 @@ If the value is misconfigured, happyDeliver will log a warning when the last `Re
 This setting only applies to messages delivered to happyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
 #### Attachment Analysis
 
-happyDeliver reads the files a message carries alongside its body, and reports what it finds in them beside the rest of the report. Two optional external scanners improve detection:
+happyDeliver reads the files a message carries alongside its body: file type mismatches (a `.pdf` that is really an executable, `.pdf.exe` double extensions), Office macros, PDF active content, scripts, nested and password-protected archives. Two optional external scanners improve detection:
 
 - **ClamAV**: point happyDeliver at a running `clamd` daemon:
 

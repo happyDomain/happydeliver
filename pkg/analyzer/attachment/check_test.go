@@ -58,13 +58,23 @@ func observed(filename, declaredType string, data []byte) *Attachment {
 // what it declares.
 //
 // They are several because they have to be: a file too large to open silences
-// every check reading bytes. What matters is that no check stays silent across
-// the whole set, which is how a wrong declaration survives unnoticed.
+// every check reading bytes, and a zip is not also a PDF. What matters is that
+// no check stays silent across the whole set, which is how a wrong declaration
+// survives unnoticed.
 func speakingInputs(t *testing.T) map[string]*attachmentInput {
 	t.Helper()
 
 	oversize := observed("big.bin", "application/octet-stream", bytes.Repeat([]byte("A"), 64))
 	oversize.Data = nil
+
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	entry, err := writer.Create("payload.pdf.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Write(mzStub)
+	writer.Close()
 
 	var macro bytes.Buffer
 	macroWriter := zip.NewWriter(&macro)
@@ -91,6 +101,7 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 		"macro":      observed("macro.docm", "", macro.Bytes()),
 		"pdf":        observed("active.pdf", "application/pdf", []byte("%PDF-1.4 << /OpenAction << /JS (x) >> >>")),
 		"html":       observed("open-me.html", "text/html", []byte(`<html><script>atob("AAAA")</script></html>`)),
+		"archive":    observed("invoice.zip", "application/zip", archive.Bytes()),
 		"recognised": recognised,
 		"unanswered": unanswered,
 	}

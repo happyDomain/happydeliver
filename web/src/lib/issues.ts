@@ -36,6 +36,9 @@ const issueLabels: Record<Issue["type"], string> = {
     pdf_active_content: "Active content in a PDF",
     executable_content: "Executable attachment",
     script_content: "Script in an attachment",
+    password_protected: "Password-protected archive",
+    nested_archive: "Nested archive",
+    archive_bomb: "Archive bomb",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
 };

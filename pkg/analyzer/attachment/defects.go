@@ -33,10 +33,13 @@ var attachmentDefects = []*reading.Defect{
 	defectExecutableContent,
 	defectDangerousExtension,
 	defectDoubleExtension,
+	defectArchiveBomb,
 	defectTypeMismatch,
 	defectMacro,
 	defectPDFActiveContent,
 	defectScriptContent,
+	defectPasswordProtected,
+	defectNestedArchive,
 	defectScanSkipped,
 	defectScanError,
 }
@@ -74,6 +77,10 @@ var (
 	// mistakes.
 	familyDeceptiveName = &reading.Family{Name: "deceptive_name", Cap: 40, PerItem: 40}
 
+	// familyArchiveBomb answers for an archive that expands out of proportion
+	// to what it weighs.
+	familyArchiveBomb = &reading.Family{Name: "archive_bomb", Cap: 40, PerItem: 40}
+
 	// familyTypeMismatch answers for a file whose content is not what it
 	// claims. A mismatch that reveals an executable is a disguise; one between
 	// two document formats is usually a sender's tooling being careless, and
@@ -105,6 +112,11 @@ var (
 			model.IssueSeverityMedium: 15,
 		},
 	}
+
+	// familyArchiveOpacity answers for an archive nothing can be read out of:
+	// one behind a password, or one nested inside another. Both are charged,
+	// and the cap holds an archive that is several times both to two answers.
+	familyArchiveOpacity = &reading.Family{Name: "archive_opacity", Cap: 30, PerItem: 15}
 )
 
 var (
@@ -122,6 +134,9 @@ var (
 	// one, so the file reads as a report and opens as a program.
 	defectDoubleExtension = &reading.Defect{Name: "double_extension", Family: familyDeceptiveName}
 
+	// defectArchiveBomb: an archive whose members expand out of all proportion.
+	defectArchiveBomb = &reading.Defect{Name: "archive_bomb", Family: familyArchiveBomb}
+
 	// defectTypeMismatch: content that is not what the message or the filename
 	// says it is.
 	defectTypeMismatch = &reading.Defect{Name: "type_mismatch", Family: familyTypeMismatch}
@@ -135,12 +150,20 @@ var (
 	// defectScriptContent: a script, or an HTML attachment that carries one.
 	defectScriptContent = &reading.Defect{Name: "script_content", Family: familyActiveContent}
 
+	// defectPasswordProtected: an archive whose members are encrypted, so
+	// nothing inside it was scanned.
+	defectPasswordProtected = &reading.Defect{Name: "password_protected", Family: familyArchiveOpacity}
+
+	// defectNestedArchive: an archive inside an archive, which is how a payload
+	// is put out of a scanner's reach.
+	defectNestedArchive = &reading.Defect{Name: "nested_archive", Family: familyArchiveOpacity}
+
 	// defectScanSkipped: something was not looked at, and the reader is told so
 	// rather than left to read silence as a clean bill.
 	//
 	// It is what our own limits cost, not what the message did: an attachment
-	// larger than the analysis will read. Charging for it would bill a sender
-	// for our ceilings.
+	// larger than the analysis will read, an archive whose budget ran out.
+	// Charging for it would bill a sender for our ceilings.
 	defectScanSkipped = &reading.Defect{
 		Name:      "scan_skipped",
 		Uncharged: "it reports a limit of this analysis rather than a defect of the message, and a sender cannot answer for our ceilings",

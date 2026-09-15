@@ -48,6 +48,10 @@ var attachmentChecks = []attachmentCheck{
 	pdfActiveContentCheck,
 	scriptCheck,
 
+	// What the file hides inside itself, and what could not be reached in
+	// there.
+	archiveCheck,
+
 	// What the engines made of the whole file comes last: they complement the
 	// readings above rather than replacing them, and the reader has met what
 	// happyDeliver saw for itself by the time they reach a verdict nobody here
