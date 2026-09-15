@@ -26,10 +26,12 @@
                 return "bg-success";
             case "malicious":
                 return "bg-danger";
+            case "suspicious":
+                return "bg-warning";
             case "pending":
                 return "bg-info";
             default:
-                // skipped, error
+                // unknown, skipped, error
                 return "bg-secondary";
         }
     }
@@ -41,6 +43,7 @@
      */
     const scannerLabels: Record<string, string> = {
         clamav: "ClamAV",
+        virustotal: "VirusTotal",
     };
 
     function scannerLabel(scanner: string): string {
@@ -48,10 +51,22 @@
     }
 
     /**
-     * What a scanner says beyond its status: the name it gave what it recognised.
+     * What a scanner says beyond its status: the name it gave what it recognised, or how many
+     * of the engines it speaks for flagged the file.
      */
     function scanEvidence(scan: SchemasScanResult): string {
-        return scan.verdict ? ` — ${scan.verdict}` : "";
+        if (scan.verdict) return ` — ${scan.verdict}`;
+        if (scan.engines_flagged !== undefined && scan.engines_total !== undefined) {
+            return ` (${scan.engines_flagged}/${scan.engines_total})`;
+        }
+        return "";
+    }
+
+    /**
+     * Where an attachment's own report is published, when one of the scanners publishes one.
+     */
+    function scanLink(scans?: SchemasScanResult[]): string | undefined {
+        return scans?.find((scan) => scan.link)?.link;
     }
 </script>
 
@@ -114,9 +129,22 @@
                         <div class="col-md-6">
                             <div class="small">
                                 <strong>SHA-256:</strong>
-                                <span class="font-monospace text-break ms-1">
-                                    {attachment.sha256}
-                                </span>
+                                {#if scanLink(attachment.scans)}
+                                    <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
+                                    <a
+                                        href={scanLink(attachment.scans)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="font-monospace text-break ms-1"
+                                    >
+                                        {attachment.sha256}
+                                    </a>
+                                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                                {:else}
+                                    <span class="font-monospace text-break ms-1">
+                                        {attachment.sha256}
+                                    </span>
+                                {/if}
                             </div>
                         </div>
                     </div>

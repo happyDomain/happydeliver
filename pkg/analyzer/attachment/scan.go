@@ -28,30 +28,29 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 )
 
-// Scan is what one engine said about one file, in the terms every engine
-// answers in.
-//
-// The engines do not agree on their own vocabulary: one says "infected" where
-// another says "malicious". What is written here is the report's vocabulary,
-// and each adapter is the one place its engine's words are translated into
-// it. So a scanner added tomorrow is one file, holding its
-// flags, its scannerDef and its adapter, plus a line in knownScanners, and
-// touches neither the checks, nor the score, nor the schema.
+// Scan is what one engine said about one file, in the report's vocabulary:
+// each adapter is the one place its engine's words are translated into it.
 type Scan struct {
-	// Scanner names the engine that answered. It is the name its findings are
-	// attributed to, and the name the report shows.
+	// Scanner names the engine that answered.
 	Scanner string
 
-	// Status is what the engine made of the file, or why it has no verdict:
-	// "not asked" is a status of its own, so that a reader never has to read
-	// silence as a clean bill.
+	// Status is what the engine made of the file, or why it has no verdict.
 	Status model.ScanResultStatus
 
 	// Verdict is what the engine called what it recognised, when it named it.
 	Verdict string
 
-	// Detail is what the scanner said beyond its status, and the only place an
-	// error or a skip explains itself.
+	// EnginesFlagged and EnginesTotal are how many engines a scanner that
+	// aggregates several found the file worth flagging. Both zero for a
+	// scanner that speaks only for itself.
+	EnginesFlagged int
+	EnginesTotal   int
+
+	// Link is where the scanner publishes its own report about this file.
+	Link string
+
+	// Detail is what the scanner said beyond its status, where an error or a
+	// skip explains itself.
 	Detail string
 
 	// Metadata is whatever else this engine reports and no field above holds.
@@ -75,22 +74,18 @@ type scannerDef struct {
 	build func(timeout time.Duration) scanner
 }
 
-// knownScanners is every engine the analysis knows how to ask. This is the one
-// list to grow to add a scanner: the checks are read off it, so is what a
-// report says about a file nobody scanned, and so are the engines New runs.
-//
-// It is written out rather than filled by each file's init: the order is
-// meaningful, and the order Go runs init functions in is the order of the
-// file names.
+// knownScanners is every engine the analysis knows how to ask, and the one
+// list to grow to add a scanner. It is written out rather than filled by each
+// file's init because the order is meaningful: a sample two engines recognise
+// is reported under the first, with the other named as agreeing.
 var knownScanners = []scannerDef{
 	clamavDef,
+	virustotalDef,
 }
 
-// scanner is an engine an attachment may be handed to.
-//
-// It answers a Scan rather than an error: an engine that could not be reached
-// has said something about the file, namely that nothing is known about it,
-// and that is a line of the report rather than a failure of the analysis.
+// scanner is an engine an attachment may be handed to. It answers a Scan
+// rather than an error: an engine that could not be reached is a line of the
+// report, not a failure of the analysis.
 type scanner interface {
 	info() scannerInfo
 	scan(ctx context.Context, attachment *Attachment) Scan

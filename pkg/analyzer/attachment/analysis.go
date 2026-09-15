@@ -94,6 +94,13 @@ func scansToModel(scans []Scan) []model.ScanResult {
 		if scan.Verdict != "" {
 			result.Verdict = utils.PtrTo(scan.Verdict)
 		}
+		if scan.EnginesTotal > 0 {
+			result.EnginesFlagged = utils.PtrTo(scan.EnginesFlagged)
+			result.EnginesTotal = utils.PtrTo(scan.EnginesTotal)
+		}
+		if scan.Link != "" {
+			result.Link = utils.PtrTo(scan.Link)
+		}
 		if scan.Detail != "" {
 			result.Detail = utils.PtrTo(scan.Detail)
 		}
