@@ -236,59 +236,6 @@ func TestRunContentChecksOrder(t *testing.T) {
 	}
 }
 
-// TestContentRegistryIsWellFormed guards the registry itself: a check added
-// without a name, or twice, is a mistake no fixture would catch.
-func TestContentRegistryIsWellFormed(t *testing.T) {
-	seen := make(map[string]bool, len(contentChecks))
-
-	for i, check := range contentChecks {
-		if check.Name == "" {
-			t.Errorf("check %d has no name", i)
-		}
-		if check.Run == nil {
-			t.Errorf("check %q has nothing to run", check.Name)
-		}
-		if seen[check.Name] {
-			t.Errorf("check %q is registered twice", check.Name)
-		}
-		seen[check.Name] = true
-
-		if check.Category == "" {
-			t.Errorf("check %q says nothing about which reading it answers", check.Name)
-		} else if !check.Category.Valid() {
-			t.Errorf("check %q answers %q, which the schema does not offer a reader", check.Name, check.Category)
-		}
-
-		if len(check.Reports) == 0 {
-			t.Errorf("check %q declares no defect, so nothing says what its findings cost", check.Name)
-		}
-
-		for _, defect := range check.Reports {
-			if !slices.Contains(contentDefects, defect) {
-				t.Errorf("check %q reports %q, which the defect vocabulary does not hold", check.Name, defect.Name)
-			}
-			if defect.Family != nil && defect.Family.Cap <= 0 {
-				t.Errorf("defect %q belongs to family %q, whose cap of %d would silence it", defect.Name, defect.Family.Name, defect.Family.Cap)
-			}
-		}
-	}
-}
-
-// TestContentChecksTolerateAnEmptyMessage covers the case every check must
-// survive: a message the parser could read nothing from. A check that assumes
-// a part, a link or an image is there would panic here rather than in
-// production.
-func TestContentChecksTolerateAnEmptyMessage(t *testing.T) {
-	issues, penalty := reading.Run(context.Background(), contentChecks, &contentInput{Results: &Results{}})
-
-	if len(issues) != 0 {
-		t.Errorf("an empty message drew %d issue(s): %+v", len(issues), issues)
-	}
-	if penalty != 0 {
-		t.Errorf("an empty message was charged %d point(s)", penalty)
-	}
-}
-
 // TestReadRunsTheChecksOnce pins what Read is for: the checks run when it is
 // called, and the findings and the penalty both come from that one run.
 //

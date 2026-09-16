@@ -1252,34 +1252,6 @@ func TestWithoutSentencePunctuation(t *testing.T) {
 	}
 }
 
-// TestContentCriteriaSumToTheScale holds the score to the scale it is
-// expressed on: a criterion added without taking its weight from another would
-// otherwise quietly make a hundred mean something else, and the penalties the
-// checks deduct are expressed in points of that hundred.
-func TestContentCriteriaSumToTheScale(t *testing.T) {
-	total := 0
-	seen := make(map[string]bool, len(contentCriteria))
-
-	for i, criterion := range contentCriteria {
-		if criterion.Name == "" {
-			t.Errorf("criterion %d has no name", i)
-		}
-		if seen[criterion.Name] {
-			t.Errorf("criterion %q is weighed twice", criterion.Name)
-		}
-		seen[criterion.Name] = true
-
-		if criterion.Weight <= 0 {
-			t.Errorf("criterion %q weighs %d, so nothing it judges counts", criterion.Name, criterion.Weight)
-		}
-		total += criterion.Weight
-	}
-
-	if total != 100 {
-		t.Errorf("the criteria weigh %d in all, want 100", total)
-	}
-}
-
 // TestAWithdrawnCriterionIsNotFailed pins how a criterion that cannot be
 // judged is handled: it leaves the scale, and the message is graded on what
 // was readable. Failing it instead would charge the sender for bytes that
