@@ -52,8 +52,6 @@ var sharedSpamHeaders = []string{
 	"X-Spam-Score",
 	"X-Spam-Flag",
 	"X-Spam-Level",
-	"X-Spam-Report",
-	"X-Spam-Checker-Version",
 }
 
 // sharedSpamHeadersOwner is who a shared header belongs to when nothing in the
@@ -68,8 +66,7 @@ type spamScannerProfile struct {
 	scanner SpamScanner
 
 	// ownHeaders are the names only this scanner ever writes: the name alone
-	// identifies the author. A scanner writing nothing but the shared names,
-	// SpamAssassin being the first of them, has none.
+	// identifies the author.
 	ownHeaders []string
 
 	// verdictHeaders are those of ownHeaders whose presence proves the scanner
@@ -111,7 +108,14 @@ var spamScannerProfiles = []spamScannerProfile{
 		borrowsSharedNames: true,
 	},
 	{
-		scanner:    ScannerSpamAssassin,
+		scanner: ScannerSpamAssassin,
+		// Of the names SpamAssassin established, these two are the ones no
+		// other filter reproduces: rspamd's milter_headers has no routine for
+		// a rule-by-rule report nor for a checker version.
+		ownHeaders: []string{
+			"X-Spam-Report",
+			"X-Spam-Checker-Version",
+		},
 		signatures: map[string]*regexp.Regexp{"X-Spam-Status": spamAssassinStatusSignatureRe},
 	},
 }

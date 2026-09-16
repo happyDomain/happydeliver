@@ -112,13 +112,6 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(headers ScannerHeaders) *model.RspamdResu
 		result.Score = shared.score
 		hasScore = true
 	}
-	if result.Report == nil {
-		// Not a symbol breakdown this analyzer can parse, but still a report
-		// written about this message: surface it rather than drop it.
-		if report, ok := headers["X-Spam-Report"]; ok {
-			result.Report = utils.PtrTo(report)
-		}
-	}
 
 	// Parse X-Rspamd-Server
 	if serverHeader, ok := headers["X-Rspamd-Server"]; ok {

@@ -118,6 +118,27 @@ func TestSpamScannerHeaders(t *testing.T) {
 			},
 		},
 		{
+			name: "both scanners: the report and checker version are SpamAssassin's whatever rspamd stamped",
+			headers: mail.Header{
+				"X-Spam-Status":          {"No, score=1.6 required=5.0 tests=DKIM_SIGNED,SPF_NEUTRAL autolearn=disabled version=4.0.2"},
+				"X-Spam-Report":          {"*  0.7 SPF_NEUTRAL SPF: sender does not match SPF record (neutral)"},
+				"X-Spam-Level":           {"*"},
+				"X-Spam-Checker-Version": {"SpamAssassin 4.0.2 (2025-08-27) on mx.example.com"},
+				"X-Spamd-Result":         {"default: False [-1.20 / 0.00];"},
+				"X-Rspamd-Server":        {"mx.example.com"},
+			},
+			wantSpamAssassin: map[string]string{
+				"X-Spam-Status":          "No, score=1.6 required=5.0 tests=DKIM_SIGNED,SPF_NEUTRAL autolearn=disabled version=4.0.2",
+				"X-Spam-Report":          "*  0.7 SPF_NEUTRAL SPF: sender does not match SPF record (neutral)",
+				"X-Spam-Checker-Version": "SpamAssassin 4.0.2 (2025-08-27) on mx.example.com",
+			},
+			wantRspamd: map[string]string{
+				"X-Spamd-Result":  "default: False [-1.20 / 0.00];",
+				"X-Rspamd-Server": "mx.example.com",
+				"X-Spam-Level":    "*",
+			},
+		},
+		{
 			name: "no scanner identified: the naming convention is SpamAssassin's",
 			headers: mail.Header{
 				"X-Spam-Score": {"3.2"},
