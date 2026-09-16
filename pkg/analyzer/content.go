@@ -496,11 +496,22 @@ func (c *ContentAnalyzer) validateLink(urlStr string) LinkCheck {
 	check.Valid = true
 
 	// Check for error status codes
-	if resp.StatusCode >= 400 {
+	if refusesAutomatedClients(resp.StatusCode) {
+		check.Warning = fmt.Sprintf("Could not verify link: destination answered %d to the automated request", resp.StatusCode)
+	} else if resp.StatusCode >= 400 {
 		check.Error = fmt.Sprintf("Link returns %d status", resp.StatusCode)
 	}
 
 	return check
+}
+
+// refusesAutomatedClients says whether an HTTP status is one a destination
+// answers to automated clients it does not want, rather than to a recipient
+// following the link: 429 is a rate limit, and 999 is the non-standard code
+// LinkedIn returns to anything that is not a browser. Neither says the page is
+// dead, so neither is held against the message; the link is merely unverified.
+func refusesAutomatedClients(status int) bool {
+	return status == http.StatusTooManyRequests || status == 999
 }
 
 // hasDomainMisalignment checks if the link text contains a different domain than the actual URL
@@ -959,7 +970,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 			if !link.Valid {
 				// Link could not be parsed/validated (e.g. unreplaced template placeholder)
 				status = model.LinkCheckStatusBroken
-			} else if link.Status >= 400 {
+			} else if link.Status >= 400 && !refusesAutomatedClients(link.Status) {
 				status = model.LinkCheckStatusBroken
 			} else if !link.IsSafe {
 				status = model.LinkCheckStatusSuspicious
@@ -1056,7 +1067,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 	if len(results.Links) > 0 {
 		brokenLinks := 0
 		for _, link := range results.Links {
-			if link.Status >= 400 {
+			if link.Status >= 400 && !refusesAutomatedClients(link.Status) {
 				brokenLinks++
 			}
 		}

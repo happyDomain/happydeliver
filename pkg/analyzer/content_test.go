@@ -22,9 +22,12 @@
 package analyzer
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/mail"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1288,5 +1291,70 @@ func TestCalculateContentScoreTruncatedBodyDropsConsistency(t *testing.T) {
 	inconsistent.TextPlainRatio = 0
 	if score, _ := analyzer.CalculateContentScore(&inconsistent); score >= want {
 		t.Errorf("CalculateContentScore() = %d for a complete body with no consistency, want less than %d", score, want)
+	}
+}
+
+// A destination that turns the automated client away (a rate limit, or the
+// 999 LinkedIn answers to anything but a browser) is not a dead link: the
+// recipient who clicks it gets the page. It is reported as unverified, and
+// costs the message nothing.
+func TestValidateLink_RefusedAutomationIsNotBroken(t *testing.T) {
+	for _, status := range []int{http.StatusTooManyRequests, 999} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+
+			// Reached by name rather than by address, so that the URL is not
+			// suspicious on its own.
+			link := strings.Replace(server.URL, "127.0.0.1", "localhost", 1)
+
+			analyzer := NewContentAnalyzer(5 * time.Second)
+
+			check := analyzer.validateLink(link)
+			if !check.Valid {
+				t.Errorf("validateLink().Valid = false, want true")
+			}
+			if check.Error != "" {
+				t.Errorf("validateLink().Error = %q, want none", check.Error)
+			}
+			if check.Warning == "" {
+				t.Errorf("validateLink().Warning is empty, want the link reported as unverified")
+			}
+
+			results := &ContentResults{HTMLValid: true, Links: []LinkCheck{check}}
+			analysis := analyzer.GenerateContentAnalysis(results)
+			if got := (*analysis.Links)[0].Status; got != model.LinkCheckStatusTimeout {
+				t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusTimeout)
+			}
+
+			refused, _ := analyzer.CalculateContentScore(results)
+			reachable, _ := analyzer.CalculateContentScore(&ContentResults{HTMLValid: true, Links: []LinkCheck{{URL: link, Valid: true, IsSafe: true, Status: http.StatusOK}}})
+			if refused != reachable {
+				t.Errorf("CalculateContentScore() = %d with a link answering %d, want %d, the score of a reachable one", refused, status, reachable)
+			}
+		})
+	}
+}
+
+// A destination that fails on its own side is still a broken link: the
+// recipient sees the same error page the checker did.
+func TestValidateLink_ServerFailureIsBroken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	check := analyzer.validateLink(server.URL)
+	if check.Error == "" {
+		t.Errorf("validateLink().Error is empty, want a status error")
+	}
+
+	results := &ContentResults{HTMLValid: true, Links: []LinkCheck{check}}
+	if got := (*analyzer.GenerateContentAnalysis(results).Links)[0].Status; got != model.LinkCheckStatusBroken {
+		t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusBroken)
 	}
 }
