@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -123,6 +124,18 @@ func (r *ContentResults) HasPlaintext() bool {
 	return r.TextContent != ""
 }
 
+// VisibleImages returns the images the recipient is meant to see, leaving
+// out the tracking pixels: what those show, or fail to describe, is nothing.
+func (r *ContentResults) VisibleImages() []ImageCheck {
+	var visible []ImageCheck
+	for _, img := range r.Images {
+		if !img.IsTrackingPixel {
+			visible = append(visible, img)
+		}
+	}
+	return visible
+}
+
 // LinkCheck represents a link validation result
 type LinkCheck struct {
 	URL        string
@@ -142,6 +155,9 @@ type ImageCheck struct {
 	Valid    bool
 	Error    string
 	IsBroken bool
+	// IsTrackingPixel says the image is there to be fetched, not seen: a one
+	// pixel or hidden image whose only purpose is to signal the open.
+	IsTrackingPixel bool
 }
 
 // AnalyzeContent performs content analysis on email message
@@ -249,14 +265,69 @@ func (c *ContentAnalyzer) analyzeHTML(htmlContent string, results *ContentResult
 	// Traverse HTML tree
 	c.traverseHTML(doc, results)
 
-	// Calculate image-to-text ratio
+	// Calculate image-to-text ratio. A tracking pixel shows nothing, so it
+	// does not weigh on how much of the message is pictures.
 	if results.HTMLContent != "" {
 		textLength := len(c.extractTextFromHTML(htmlContent))
-		imageCount := len(results.Images)
+		imageCount := len(results.VisibleImages())
 		if textLength > 0 {
 			results.ImageTextRatio = float32(imageCount) / float32(textLength) * 1000 // Images per 1000 chars
 		}
 	}
+}
+
+// isTrackingPixel says whether an <img> is one nobody is meant to see: an
+// image drawn one pixel wide or high, or hidden outright, is fetched for the
+// request it makes, not for what it shows. Its dimensions are read off the
+// width and height attributes and off the inline style, since senders use
+// either.
+func isTrackingPixel(n *html.Node) bool {
+	var width, height string
+	var hidden bool
+	for _, attr := range n.Attr {
+		switch attr.Key {
+		case "width":
+			width = attr.Val
+		case "height":
+			height = attr.Val
+		case "hidden":
+			hidden = true
+		case "style":
+			for _, declaration := range strings.Split(attr.Val, ";") {
+				property, value, found := strings.Cut(declaration, ":")
+				if !found {
+					continue
+				}
+				value = strings.TrimSpace(value)
+				switch strings.ToLower(strings.TrimSpace(property)) {
+				case "width":
+					width = value
+				case "height":
+					height = value
+				case "display":
+					hidden = hidden || strings.EqualFold(value, "none")
+				case "visibility":
+					hidden = hidden || strings.EqualFold(value, "hidden")
+				}
+			}
+		}
+	}
+
+	return hidden || (isPixelDimension(width) && isPixelDimension(height))
+}
+
+// isPixelDimension says whether a width or height, as written in an attribute
+// or a style, is at most one pixel.
+func isPixelDimension(dimension string) bool {
+	dimension = strings.ToLower(strings.TrimSpace(dimension))
+	dimension = strings.TrimSuffix(dimension, "px")
+	dimension = strings.TrimSpace(dimension)
+	if dimension == "" {
+		return false
+	}
+
+	value, err := strconv.ParseFloat(dimension, 64)
+	return err == nil && value <= 1
 }
 
 // traverseHTML recursively traverses HTML nodes
@@ -301,10 +372,11 @@ func (c *ContentAnalyzer) traverseHTML(n *html.Node, results *ContentResults) {
 			alt := c.getAttr(n, "alt")
 
 			imageCheck := ImageCheck{
-				Src:     src,
-				HasAlt:  alt != "",
-				AltText: alt,
-				Valid:   src != "",
+				Src:             src,
+				HasAlt:          alt != "",
+				AltText:         alt,
+				Valid:           src != "",
+				IsTrackingPixel: isTrackingPixel(n),
 			}
 
 			if src == "" {
@@ -872,9 +944,9 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	}
 
 	// Add missing alt text issues
-	if len(results.Images) > 0 {
+	if visible := results.VisibleImages(); len(visible) > 0 {
 		missingAltCount := 0
-		for _, img := range results.Images {
+		for _, img := range visible {
 			if !img.HasAlt {
 				missingAltCount++
 			}
@@ -1012,8 +1084,7 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 			if img.AltText != "" {
 				apiImg.AltText = &img.AltText
 			}
-			// Simple heuristic: tracking pixels are typically 1x1
-			apiImg.IsTrackingPixel = utils.PtrTo(false)
+			apiImg.IsTrackingPixel = utils.PtrTo(img.IsTrackingPixel)
 
 			images = append(images, apiImg)
 		}
@@ -1082,14 +1153,14 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 	}
 
 	// Images (15 points)
-	if len(results.Images) > 0 {
+	if visible := results.VisibleImages(); len(visible) > 0 {
 		noAltCount := 0
-		for _, img := range results.Images {
+		for _, img := range visible {
 			if !img.HasAlt {
 				noAltCount++
 			}
 		}
-		score += 15 * (len(results.Images) - noAltCount) / len(results.Images)
+		score += 15 * (len(visible) - noAltCount) / len(visible)
 	} else {
 		// No images is Ok
 		score += 15

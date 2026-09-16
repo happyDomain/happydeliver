@@ -1358,3 +1358,99 @@ func TestValidateLink_ServerFailureIsBroken(t *testing.T) {
 		t.Errorf("link status = %q, want %q", got, model.LinkCheckStatusBroken)
 	}
 }
+
+// A tracking pixel is told apart from a picture by what it is drawn as: one
+// pixel wide and high, in attributes or in style, or hidden altogether.
+func TestIsTrackingPixel(t *testing.T) {
+	tests := []struct {
+		name string
+		img  string
+		want bool
+	}{
+		{"attributes 1x1", `<img src="https://example.com/o.gif" width="1" height="1">`, true},
+		{"attributes 0x0", `<img src="https://example.com/o.gif" width="0" height="0">`, true},
+		{"style 1px", `<img src="https://example.com/o.gif" style="width:1px;height:1px">`, true},
+		{"style with spaces and case", `<img src="https://example.com/o.gif" style="Width: 1PX ; Height : 1px">`, true},
+		{"display none", `<img src="https://example.com/o.gif" style="display:none">`, true},
+		{"visibility hidden", `<img src="https://example.com/o.gif" style="visibility: hidden">`, true},
+		{"hidden attribute", `<img src="https://example.com/o.gif" hidden>`, true},
+		{"one pixel high banner", `<img src="https://example.com/rule.gif" width="600" height="1">`, false},
+		{"no dimensions", `<img src="https://example.com/logo.png">`, false},
+		{"logo", `<img src="https://example.com/logo.png" width="200" height="50" alt="Logo">`, false},
+		{"percent width", `<img src="https://example.com/logo.png" style="width:100%">`, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := parseHTML(tt.img)
+			if err != nil {
+				t.Fatalf("parseHTML() error = %v", err)
+			}
+			var node *html.Node
+			var find func(*html.Node)
+			find = func(n *html.Node) {
+				if n.Type == html.ElementNode && n.Data == "img" {
+					node = n
+				}
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					find(c)
+				}
+			}
+			find(doc)
+			if node == nil {
+				t.Fatalf("no <img> in %q", tt.img)
+			}
+
+			if got := isTrackingPixel(node); got != tt.want {
+				t.Errorf("isTrackingPixel(%s) = %v, want %v", tt.img, got, tt.want)
+			}
+		})
+	}
+}
+
+// A tracking pixel has no alt text and shows nothing, and the message is
+// judged on neither: the pixel is reported for what it is, then left out of
+// the images the recipient is meant to see.
+func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
+	analyzer := NewContentAnalyzer(5 * time.Second)
+
+	email := &mailmsg.Message{
+		Header: make(mail.Header),
+		Parts: []mailmsg.Part{
+			{
+				ContentType: "text/html",
+				IsHTML:      true,
+				Content: `<html><body><p>Hello there</p>
+					<img src="https://example.com/open.gif" width="1" height="1">
+				</body></html>`,
+			},
+		},
+	}
+
+	results := analyzer.AnalyzeContent(email)
+	if len(results.Images) != 1 || !results.Images[0].IsTrackingPixel {
+		t.Fatalf("Images = %+v, want one tracking pixel", results.Images)
+	}
+	if results.ImageTextRatio != 0 {
+		t.Errorf("ImageTextRatio = %v, want 0: a pixel is not a picture", results.ImageTextRatio)
+	}
+
+	analysis := analyzer.GenerateContentAnalysis(results)
+	if img := (*analysis.Images)[0]; img.IsTrackingPixel == nil || !*img.IsTrackingPixel {
+		t.Errorf("reported image = %+v, want it flagged as a tracking pixel", img)
+	}
+	if analysis.HtmlIssues != nil {
+		for _, issue := range *analysis.HtmlIssues {
+			if issue.Type == model.ContentIssueTypeMissingAlt {
+				t.Errorf("got a missing_alt issue for a tracking pixel: %s", issue.Message)
+			}
+		}
+	}
+
+	score, _ := analyzer.CalculateContentScore(results)
+	results.Images = nil
+	without, _ := analyzer.CalculateContentScore(results)
+	if score != without {
+		t.Errorf("CalculateContentScore() = %d with a tracking pixel, want %d, the score without it", score, without)
+	}
+}
