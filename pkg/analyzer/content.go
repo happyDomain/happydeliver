@@ -1111,6 +1111,11 @@ func (c *ContentAnalyzer) GenerateContentAnalysis(results *ContentResults) *mode
 	return analysis
 }
 
+// minImagesForShare is the smallest count an image's share of the images
+// criterion is taken over, so that a lone faulty image does not cost the whole
+// of it.
+const minImagesForShare = 5
+
 // CalculateContentScore calculates the content score (0-20 points)
 func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, string) {
 	if results == nil {
@@ -1152,7 +1157,10 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 		score += 25
 	}
 
-	// Images (15 points)
+	// Images (15 points). Each image without alt text costs its share of the
+	// criterion, over a count of at least five: a message with a single
+	// undescribed picture is short of one description, not of every one, and
+	// loses three points for it rather than fifteen.
 	if visible := results.VisibleImages(); len(visible) > 0 {
 		noAltCount := 0
 		for _, img := range visible {
@@ -1160,7 +1168,7 @@ func (c *ContentAnalyzer) CalculateContentScore(results *ContentResults) (int, s
 				noAltCount++
 			}
 		}
-		score += 15 * (len(visible) - noAltCount) / len(visible)
+		score += 15 - 15*noAltCount/max(len(visible), minImagesForShare)
 	} else {
 		// No images is Ok
 		score += 15

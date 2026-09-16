@@ -1454,3 +1454,41 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 		t.Errorf("CalculateContentScore() = %d with a tracking pixel, want %d, the score without it", score, without)
 	}
 }
+
+// An image without alt text costs its share of the images criterion, over a
+// count of at least five: one undescribed picture among few is three points
+// short, not fifteen, and a message whose every picture is undescribed still
+// loses the criterion once there are five of them.
+func TestCalculateContentScoreImageShareFloor(t *testing.T) {
+	analyzer := NewContentAnalyzer(0)
+
+	score := func(images []ImageCheck) int {
+		got, _ := analyzer.CalculateContentScore(&ContentResults{HTMLValid: true, Images: images})
+		return got
+	}
+
+	described := ImageCheck{Src: "https://example.com/a.png", HasAlt: true, AltText: "A"}
+	undescribed := ImageCheck{Src: "https://example.com/b.png"}
+
+	perfect := score([]ImageCheck{described})
+
+	tests := []struct {
+		name   string
+		images []ImageCheck
+		lost   int
+	}{
+		{"one image, undescribed", []ImageCheck{undescribed}, 3},
+		{"two images, one undescribed", []ImageCheck{described, undescribed}, 3},
+		{"two images, both undescribed", []ImageCheck{undescribed, undescribed}, 6},
+		{"five images, all undescribed", []ImageCheck{undescribed, undescribed, undescribed, undescribed, undescribed}, 15},
+		{"ten images, five undescribed", append([]ImageCheck{undescribed, undescribed, undescribed, undescribed, undescribed}, described, described, described, described, described), 7},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := perfect - score(tt.images); got != tt.lost {
+				t.Errorf("lost %d points, want %d", got, tt.lost)
+			}
+		})
+	}
+}
