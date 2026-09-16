@@ -22,75 +22,27 @@
 package content
 
 import (
-	"context"
 	"net/http"
 	"net/mail"
-	"slices"
-	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
-	"git.happydns.org/happyDeliver/pkg/reading"
+	"git.happydns.org/happyDeliver/pkg/reading/readingtest"
 )
 
-// TestEveryDefectIsPricedOnce is the rule the whole content score rests on: a
-// defect is charged for by exactly one party.
-//
-// The score is the sum of two answers: what the criteria withhold from a
-// flawless message, and what the checks deduct on top, and nothing but this
-// keeps them from answering for the same thing. A defect charged twice costs
-// the sender a grade for one mistake; a defect charged by nobody is reported
-// and free. Both are silent, and both are what this test refuses.
-//
-// It reads the two registries and runs nothing: the rule is a property of how
-// the defects are declared, not of what a given message happens to trigger.
-func TestEveryDefectIsPricedOnce(t *testing.T) {
-	answeredBy := make(map[*reading.Defect][]string, len(contentDefects))
-	for _, criterion := range contentCriteria {
-		for _, defect := range criterion.Answers {
-			answeredBy[defect] = append(answeredBy[defect], criterion.Name)
-		}
-	}
-
-	for _, defect := range contentDefects {
-		t.Run(defect.Name, func(t *testing.T) {
-			criteria := answeredBy[defect]
-
-			switch {
-			case len(criteria) > 1:
-				t.Errorf("criteria %s all charge for it: one defect, one payer", strings.Join(criteria, ", "))
-
-			case len(criteria) == 1 && defect.Family != nil:
-				t.Errorf("the %s criterion already charges for it, and family %q charges for it again: the sender pays twice for one defect",
-					criteria[0], defect.Family.Name)
-
-			case len(criteria) == 1 && defect.Uncharged != "":
-				t.Errorf("the %s criterion charges for it, yet it claims to cost nothing (%q): one of the two is wrong",
-					criteria[0], defect.Uncharged)
-
-			case defect.Family != nil && defect.Uncharged != "":
-				t.Errorf("family %q charges for it, yet it claims to cost nothing (%q): one of the two is wrong",
-					defect.Family.Name, defect.Uncharged)
-
-			case len(criteria) == 0 && defect.Family == nil && defect.Uncharged == "":
-				t.Error("nobody charges for it: give it a penalty family, name it in the Answers of the criterion that already grades it, or say in Uncharged why it costs nothing on purpose")
-			}
-		})
-	}
-}
-
-// TestCriteriaAnswerKnownDefects keeps the two registries from drifting apart:
-// a criterion answering for a defect the vocabulary does not hold prices
-// nothing at all, and the rule above would never notice.
-func TestCriteriaAnswerKnownDefects(t *testing.T) {
-	for _, criterion := range contentCriteria {
-		for _, defect := range criterion.Answers {
-			if !slices.Contains(contentDefects, defect) {
-				t.Errorf("the %s criterion answers for %q, which the defect vocabulary does not hold", criterion.Name, defect.Name)
-			}
-		}
-	}
+// TestContentRegistry holds the content analysis to the rules every reading is
+// made of, which live in readingtest.
+func TestContentRegistry(t *testing.T) {
+	readingtest.Registry[*contentInput]{
+		Checks:   contentChecks,
+		Defects:  contentDefects,
+		Criteria: contentCriteria,
+		// Built from the results themselves: checkInput reads email and
+		// htmlDocument off the results at construction.
+		Speaking: map[string]*contentInput{"a message carrying one of everything": speakingResults().checkInput()},
+		Empty:    &contentInput{Results: &Results{}},
+	}.Test(t)
 }
 
 // speakingResults is a message built to make every registered check speak: it
@@ -175,76 +127,5 @@ func speakingResults() *Results {
 			"R_WHITE_ON_WHITE":    {Name: "R_WHITE_ON_WHITE"},
 			"R_SUSPICIOUS_IMAGES": {Name: "R_SUSPICIOUS_IMAGES"},
 		}},
-	}
-}
-
-// TestACheckOnlyReportsWhatItDeclares keeps a check's Reports honest, since
-// that declaration is what the rule above is read off: a check quietly
-// reporting a defect it never declared is a defect priced by nobody.
-//
-// A finding carrying no defect at all fails here too: it would cost nothing,
-// whatever the check meant.
-func TestACheckOnlyReportsWhatItDeclares(t *testing.T) {
-	// Built from the results themselves, not copied into an input made from an
-	// empty set: checkInput reads email and htmlDocument off the results at
-	// construction, so overwriting them afterwards left every check that reads
-	// the message or its markup with nothing to read.
-	in := speakingResults().checkInput()
-
-	for _, check := range contentChecks {
-		t.Run(check.Name, func(t *testing.T) {
-			findings, err := check.Run(context.Background(), in)
-			if err != nil {
-				t.Fatalf("the check could not answer: %v", err)
-			}
-
-			// A check that says nothing about a message carrying one of
-			// everything leaves its declaration unverified, which is how a
-			// wrong one survives. speakingResults is what has to grow.
-			if len(findings) == 0 {
-				t.Fatal("the check reported nothing on a message built to make every check speak: add what it looks for to speakingResults")
-			}
-
-			for _, finding := range findings {
-				// A finding is free to answer a reading other than its
-				// check's, and several do. What it may not do is name a
-				// reading the schema does not offer, which would reach the
-				// report as a group no reader can be shown.
-				if finding.Category != "" && !finding.Category.Valid() {
-					t.Errorf("%q answers %q, which the schema does not offer a reader", finding.Message, finding.Category)
-				}
-
-				if finding.Defect == nil {
-					t.Errorf("%q is reported with no defect, so nothing says what it costs", finding.Message)
-					continue
-				}
-				if !slices.Contains(check.Reports, finding.Defect) {
-					t.Errorf("%q is reported as %q, which the check does not declare in Reports", finding.Message, finding.Defect.Name)
-				}
-			}
-		})
-	}
-}
-
-// TestEveryIssueAnswersAReading holds the whole pipeline to filing every
-// finding under one of the readings the report groups by.
-//
-// It is the invariant the web report rests on: issues are shown by category
-// there, so an issue carrying none would be a finding a reader is never shown,
-// lost in a group that has no heading. The check's own category answers for
-// most of them, which is why this passes today without a check having to think
-// about it; what it guards is the check added tomorrow whose findings are
-// built by hand and skip that default.
-func TestEveryIssueAnswersAReading(t *testing.T) {
-	issues, _ := reading.Run(context.Background(), contentChecks, speakingResults().checkInput())
-
-	if len(issues) == 0 {
-		t.Fatal("the checks reported nothing on a message built to make every check speak")
-	}
-
-	for _, issue := range issues {
-		if !issue.Category.Valid() {
-			t.Errorf("%q is filed under %q, which is not a reading the report groups by", issue.Message, issue.Category)
-		}
 	}
 }
