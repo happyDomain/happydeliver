@@ -1584,3 +1584,16 @@ func TestHTMLRemarkOnlyNamesStylesheetsItCanFetch(t *testing.T) {
 		})
 	}
 }
+
+// TestAnalysisAndScoreOfNothing: a message that was never read has no
+// analysis and no grade.
+func TestAnalysisAndScoreOfNothing(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	if analysis := analyzer.Analysis(nil, Reading{}); analysis != nil {
+		t.Errorf("Analysis(nil) = %+v, want nothing", analysis)
+	}
+	if score, grade := analyzer.Score(nil, Reading{}); score != 0 || grade != "" {
+		t.Errorf("Score(nil) = %d %q, want no grade", score, grade)
+	}
+}

@@ -23,39 +23,11 @@ package content
 
 import (
 	"git.happydns.org/happyDeliver/pkg/reading"
-
-	"git.happydns.org/happyDeliver/pkg/grade"
 )
 
-// contentCriterion is one of the things the content score weighs. The checks
-// say what is wrong with a message; the criteria say what a good one is made
-// of, which is a different question and deserves its own list.
-//
-// A criterion owns its weight, so the scale is read here rather than
-// reconstructed from a run of additions, and a criterion the received bytes
-// cannot answer is withdrawn from the scale rather than failed: a body cut
-// short in transit costs the sender nothing it did not do.
-type contentCriterion struct {
-	// Name identifies the criterion in the tests, and is what the report will
-	// show beside its points the day the score is broken down for the reader.
-	Name string
-
-	// Weight is what a flawless message earns here, and what leaves the scale
-	// when the criterion cannot be judged.
-	Weight int
-
-	// Answers names the defects this criterion already charges for, by
-	// withholding points a flawless message would have earned. A check is free
-	// to report them (naming a defect is its job) but none of them may carry
-	// a penalty family on top, which TestEveryDefectIsPricedOnce holds the
-	// vocabulary to.
-	Answers []*reading.Defect
-
-	// Points is what this message earns of Weight, and whether the criterion
-	// could be judged at all. Points above Weight are not expected; points
-	// below zero are, a criterion being free to charge for what it weighs.
-	Points func(*contentInput) (points int, applicable bool)
-}
+// contentCriterion is one of the things the content score weighs, written over
+// the same facts the content checks read and weighed by reading.Weigh.
+type contentCriterion = reading.Criterion[*contentInput]
 
 // contentCriteria is what the content score is made of. Their weights sum to a
 // hundred, which TestContentCriteriaSumToTheScale holds them to: the score is
@@ -224,43 +196,12 @@ var contentCriteria = []contentCriterion{
 // of it.
 const minImagesForShare = 5
 
-// Score grades the content of a message out of a hundred.
-//
-// It awards what the criteria say the message is worth, brings what could be
-// judged back onto the full scale, then deducts what the checks found. The two
-// halves answer different questions and are kept apart: what a good message is
-// made of, and what is wrong with this one.
+// Score grades the content of a message out of a hundred: what contentCriteria
+// award, less what the checks deducted.
 func (c *Analyzer) Score(results *Results, read Reading) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
 
-	in := results.checkInput()
-
-	score := 0
-	// The points a flawless message can reach. A criterion the received bytes
-	// cannot answer is subtracted from it instead of being refused.
-	attainable := 0
-
-	for _, criterion := range contentCriteria {
-		points, applicable := criterion.Points(in)
-		if !applicable {
-			continue
-		}
-		attainable += criterion.Weight
-		score += points
-	}
-
-	if attainable > 0 && attainable != 100 {
-		score = score * 100 / attainable
-	}
-
-	// Answer for what the checks found. Each family of findings is capped on
-	// its own, so that a message with two unrelated defects answers for both
-	// without either deciding the grade by itself.
-	score -= read.Penalty
-
-	score = min(max(score, 0), 100)
-
-	return score, grade.Of(score)
+	return reading.Weigh(contentCriteria, results.checkInput(), read.Penalty)
 }
