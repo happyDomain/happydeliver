@@ -1569,3 +1569,47 @@ func TestAnalysisAndScoreOfNothing(t *testing.T) {
 		t.Errorf("Score(nil) = %d %q, want no grade", score, grade)
 	}
 }
+
+// TestHasDomainMisalignment_SchemesAndMalformedLinks: only a destination
+// that names a domain can be misaligned with its text.
+func TestHasDomainMisalignment_SchemesAndMalformedLinks(t *testing.T) {
+	analyzer := NewAnalyzer(5 * time.Second)
+
+	tests := []struct {
+		name     string
+		href     string
+		linkText string
+		expected bool
+	}{
+		{"mailto with a subject", "mailto:contact@example.com?subject=Hello", "Write to contact@example.com", false},
+		{"mailto to another domain", "mailto:contact@example.net?subject=Hello", "Write to contact@example.com", true},
+		{"mailto without an address", "mailto:nobody", "Write to contact@example.com", false},
+		{"tel: names no domain", "tel:+33123456789", "Call shop.example.org", false},
+		{"http without a host", "http:///path", "Visit shop.example.org", false},
+		{"href that does not parse", "http://exa mple.com/", "Visit shop.example.org", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := analyzer.hasDomainMisalignment(tt.href, tt.linkText); got != tt.expected {
+				t.Errorf("hasDomainMisalignment(%q, %q) = %v, want %v", tt.href, tt.linkText, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsMissingSpace(t *testing.T) {
+	tests := map[string]bool{
+		"end.Next":     true,
+		"example.com":  false,
+		"Example.Com":  false,
+		"nodot":        false,
+		"end.Next.com": false,
+	}
+
+	for token, want := range tests {
+		if got := isMissingSpace(token); got != want {
+			t.Errorf("isMissingSpace(%q) = %v, want %v", token, got, want)
+		}
+	}
+}
