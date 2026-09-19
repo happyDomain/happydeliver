@@ -1301,3 +1301,105 @@ func TestGetHTMLParts_EmbeddedMessage(t *testing.T) {
 		t.Errorf("Expected filename fwd.eml, got %q", attachments[0].Filename)
 	}
 }
+
+func TestGetHeaderValue(t *testing.T) {
+	email, err := Parse([]byte("From: sender@example.com\r\nSubject: Hello\r\n\r\nBody.\r\n"))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if got := email.GetHeaderValue("subject"); got != "Hello" {
+		t.Errorf("Expected the header whatever its case, got %q", got)
+	}
+	if got := email.GetHeaderValue("List-Unsubscribe"); got != "" {
+		t.Errorf("Expected nothing for a header that is not there, got %q", got)
+	}
+}
+
+func TestGetListUnsubscribeURLs(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   []string
+	}{
+		{"one URL", "<https://example.com/unsubscribe?id=1>", []string{"https://example.com/unsubscribe?id=1"}},
+		{"a mailto and a URL", "<mailto:unsubscribe@example.com>, <https://example.com/unsubscribe>", []string{"mailto:unsubscribe@example.com", "https://example.com/unsubscribe"}},
+		{"a comment is not a URL", "<https://example.com/u>, (Use this to unsubscribe)", []string{"https://example.com/u"}},
+		{"bare text is not a URL", "https://example.com/u", nil},
+		{"no header", "", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := "From: sender@example.com\r\n"
+			if tt.header != "" {
+				raw += "List-Unsubscribe: " + tt.header + "\r\n"
+			}
+			email, err := Parse([]byte(raw + "\r\nBody.\r\n"))
+			if err != nil {
+				t.Fatalf("Failed to parse email: %v", err)
+			}
+
+			got := email.GetListUnsubscribeURLs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("Expected %v, got %v", tt.want, got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("Expected %v, got %v", tt.want, got)
+				}
+			}
+		})
+	}
+}
+
+// TestLocalPartAndAddressDomain reads the two halves of an address off the
+// header as written: a display name, angle brackets, a quoted local part, and
+// what a strict parser refuses but plainly holds.
+func TestLocalPartAndAddressDomain(t *testing.T) {
+	tests := []struct {
+		address string
+		local   string
+		domain  string
+	}{
+		{"user@example.com", "user", "example.com"},
+		{"<user@example.com>", "user", "example.com"},
+		{"Jane Doe <jane.doe@example.com>", "jane.doe", "example.com"},
+		{`"Doe, Jane" <jane@example.com>`, "jane", "example.com"},
+		{`"quoted@local"@example.com`, "quoted@local", "example.com"},
+		// Not an address a strict parser accepts, but what it holds is plain.
+		{"<not an address@example.com>", "not an address", "example.com"},
+		{"nobody", "", ""},
+		{"@example.com", "", "example.com"},
+		{"", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.address, func(t *testing.T) {
+			if got := LocalPart(tt.address); got != tt.local {
+				t.Errorf("LocalPart(%q) = %q, want %q", tt.address, got, tt.local)
+			}
+			if got := AddressDomain(tt.address); got != tt.domain {
+				t.Errorf("AddressDomain(%q) = %q, want %q", tt.address, got, tt.domain)
+			}
+		})
+	}
+}
+
+// TestAuthservIDs_SkipsAHeaderNamingNone: an Authentication-Results header
+// with nothing before its first semicolon names no authserv-id.
+func TestAuthservIDs_SkipsAHeaderNamingNone(t *testing.T) {
+	rawEmail := "From: sender@example.net\r\n" +
+		"Authentication-Results: ; spf=pass\r\n" +
+		"Authentication-Results: mx.example.com; dkim=pass\r\n" +
+		"\r\nBody\r\n"
+
+	email, err := Parse([]byte(rawEmail))
+	if err != nil {
+		t.Fatalf("Failed to parse email: %v", err)
+	}
+
+	if ids := email.AuthservIDs(); len(ids) != 1 || ids[0] != "mx.example.com" {
+		t.Errorf("AuthservIDs() = %v, expected the one header that names one", ids)
+	}
+}
