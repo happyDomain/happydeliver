@@ -49,6 +49,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 		name          string
 		results       *model.AuthenticationResults
 		expectedScore int
+		expectedGrade string
 	}{
 		{
 			name: "Perfect authentication (SPF + DKIM + DMARC)",
@@ -64,6 +65,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 				},
 			},
 			expectedScore: 90, // SPF=30 + DKIM=30 + DMARC=30
+			expectedGrade: "B",
 		},
 		{
 			name: "SPF and DKIM only",
@@ -76,6 +78,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 				},
 			},
 			expectedScore: 60, // SPF=30 + DKIM=30
+			expectedGrade: "E",
 		},
 		{
 			name: "SPF fail, DKIM pass",
@@ -88,6 +91,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 				},
 			},
 			expectedScore: 30, // SPF=0 + DKIM=30
+			expectedGrade: "F",
 		},
 		{
 			name: "SPF softfail",
@@ -97,11 +101,33 @@ func TestGetAuthenticationScore(t *testing.T) {
 				},
 			},
 			expectedScore: 5, // 30 * 17 / 100 = 5
+			expectedGrade: "F",
 		},
 		{
 			name:          "No authentication",
 			results:       &model.AuthenticationResults{},
 			expectedScore: 0,
+			expectedGrade: "",
+		},
+		{
+			name: "ARC alone is not an authentication verdict",
+			results: &model.AuthenticationResults{
+				Arc: &model.ARCResult{
+					Result: model.ARCResultResultPass,
+				},
+			},
+			expectedScore: 0,
+			expectedGrade: "",
+		},
+		{
+			name: "SPF fail is graded, not skipped",
+			results: &model.AuthenticationResults{
+				Spf: &model.AuthResult{
+					Result: model.AuthResultResultFail,
+				},
+			},
+			expectedScore: 0,
+			expectedGrade: "F",
 		},
 		{
 			name: "BIMI adds to score",
@@ -114,6 +140,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 				},
 			},
 			expectedScore: 40, // SPF (30) + BIMI (10)
+			expectedGrade: "F",
 		},
 	}
 
@@ -121,10 +148,13 @@ func TestGetAuthenticationScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, _ := scorer.CalculateAuthenticationScore(tt.results)
+			score, gotGrade := scorer.CalculateAuthenticationScore(tt.results)
 
 			if score != tt.expectedScore {
 				t.Errorf("Score = %v, want %v", score, tt.expectedScore)
+			}
+			if gotGrade != tt.expectedGrade {
+				t.Errorf("Grade = %q, want %q", gotGrade, tt.expectedGrade)
 			}
 		})
 	}

@@ -180,10 +180,21 @@ func methodDetails(method authresults.Method) string {
 	return strings.TrimSpace(details)
 }
 
+// hasRequiredResults tells whether any of the mechanisms the score is built
+// on (SPF, DKIM, DMARC) was actually evaluated by a receiver. An ARC seal or a
+// transport check alone says nothing about the sender's authentication.
+func (a *AuthenticationAnalyzer) hasRequiredResults(results *model.AuthenticationResults) bool {
+	return results.Spf != nil || results.SpfHelo != nil ||
+		(results.Dkim != nil && len(*results.Dkim) > 0) ||
+		results.Dmarc != nil
+}
+
 // CalculateAuthenticationScore calculates the authentication score from auth results
-// Returns a score from 0-100 where higher is better
+// Returns a score from 0-100 where higher is better, and an empty grade when no
+// receiver reported any of the required mechanisms: the category did not run,
+// so it must not weigh on the report as if the sender had failed everything.
 func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.AuthenticationResults) (int, string) {
-	if results == nil {
+	if results == nil || !a.hasRequiredResults(results) {
 		return 0, ""
 	}
 
