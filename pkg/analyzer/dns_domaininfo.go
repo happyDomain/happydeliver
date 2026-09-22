@@ -26,6 +26,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"strings"
 	"time"
 
 	"git.happydns.org/happyDomain/pkg/domaininfo"
@@ -79,6 +80,28 @@ const (
 	penaltyDisposableReturnPath = -10
 )
 
+// What a sender domain costs for its registration. Filters distrust young
+// domains most of all, a week-old one being what a campaign registers the
+// day before it sends; a domain whose registration is lapsing or on hold is
+// one whose mail is about to stop working either way.
+const (
+	penaltyDomainUnderWeek    = -15
+	penaltyDomainUnderMonth   = -10
+	penaltyDomainUnderQuarter = -5
+	penaltyDomainLapsing      = -10
+	domainRegistrationPenalty = -20 // what one domain's registration may cost at most
+)
+
+// lapsingStatuses are the EPP statuses under which a domain is on its way
+// out, or no longer resolves: the registry is deleting it, or has taken it
+// out of the zone.
+var lapsingStatuses = map[string]bool{
+	"pendingdelete":    true,
+	"redemptionperiod": true,
+	"clienthold":       true,
+	"serverhold":       true,
+}
+
 // orgDomainOf is the organizational domain to ask a registry about: the one
 // the headers analysis already worked out, and otherwise the one read off
 // the domain itself. Both callers need it, and they must agree, or the same
@@ -124,7 +147,46 @@ func calculateDomainInfoPenalty(results *model.DNSResults) (penalty int) {
 	if results.RpDomainInfo != nil && results.RpDomainInfo.Disposable {
 		penalty += penaltyDisposableReturnPath
 	}
+	for _, info := range []*model.SenderDomainInfo{results.FromDomainInfo, results.RpDomainInfo} {
+		if info != nil {
+			penalty += registrationPenalty(info, time.Now())
+		}
+	}
 	return
+}
+
+// registrationPenalty is what one domain's registration costs: its youth,
+// and its lapsing, bounded together so that a domain answers for its
+// registration once.
+func registrationPenalty(info *model.SenderDomainInfo, now time.Time) (penalty int) {
+	if info.CreationDate != nil {
+		switch age := now.Sub(*info.CreationDate); {
+		case age < 7*24*time.Hour:
+			penalty += penaltyDomainUnderWeek
+		case age < 30*24*time.Hour:
+			penalty += penaltyDomainUnderMonth
+		case age < 90*24*time.Hour:
+			penalty += penaltyDomainUnderQuarter
+		}
+	}
+
+	lapsing := info.ExpirationDate != nil && info.ExpirationDate.Before(now)
+	if info.Status != nil {
+		for _, status := range *info.Status {
+			// A status may be published as "clientHold" or as the EPP URL
+			// "clientHold https://icann.org/epp#clientHold"; the first word
+			// is the status.
+			word, _, _ := strings.Cut(strings.TrimSpace(status), " ")
+			if lapsingStatuses[strings.ToLower(word)] {
+				lapsing = true
+			}
+		}
+	}
+	if lapsing {
+		penalty += penaltyDomainLapsing
+	}
+
+	return max(penalty, domainRegistrationPenalty)
 }
 
 // readRegistration fills in what the registry publishes about the domain.

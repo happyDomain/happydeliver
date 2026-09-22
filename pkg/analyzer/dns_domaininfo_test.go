@@ -308,3 +308,50 @@ func TestMain(m *testing.M) {
 	domainInfoDisabled = true
 	os.Exit(m.Run())
 }
+
+func TestRegistrationPenalty(t *testing.T) {
+	now := time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)
+	daysAgo := func(days int) *time.Time {
+		return utils.PtrTo(now.AddDate(0, 0, -days))
+	}
+
+	tests := []struct {
+		name string
+		info model.SenderDomainInfo
+		want int
+	}{
+		{"nothing known", model.SenderDomainInfo{}, 0},
+		{"old domain", model.SenderDomainInfo{CreationDate: daysAgo(3650), ExpirationDate: daysAgo(-365)}, 0},
+		{"registered yesterday", model.SenderDomainInfo{CreationDate: daysAgo(1)}, penaltyDomainUnderWeek},
+		{"registered a fortnight ago", model.SenderDomainInfo{CreationDate: daysAgo(14)}, penaltyDomainUnderMonth},
+		{"registered two months ago", model.SenderDomainInfo{CreationDate: daysAgo(60)}, penaltyDomainUnderQuarter},
+		{"registered a year ago", model.SenderDomainInfo{CreationDate: daysAgo(365)}, 0},
+		{"expired", model.SenderDomainInfo{CreationDate: daysAgo(3650), ExpirationDate: daysAgo(3)}, penaltyDomainLapsing},
+		{"pending delete", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pendingDelete"})}, penaltyDomainLapsing},
+		{"on hold, EPP URL form", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientHold https://icann.org/epp#clientHold"})}, penaltyDomainLapsing},
+		{"ordinary status", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientTransferProhibited", "active"})}, 0},
+		{"expired and on hold is charged once", model.SenderDomainInfo{ExpirationDate: daysAgo(3), Status: utils.PtrTo([]string{"serverHold"})}, penaltyDomainLapsing},
+		{"young and lapsing is bounded", model.SenderDomainInfo{CreationDate: daysAgo(1), Status: utils.PtrTo([]string{"pendingDelete"})}, domainRegistrationPenalty},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := registrationPenalty(&tt.info, now); got != tt.want {
+				t.Errorf("registrationPenalty() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCalculateDomainInfoPenaltyRegistration(t *testing.T) {
+	yesterday := utils.PtrTo(time.Now().AddDate(0, 0, -1))
+
+	results := &model.DNSResults{
+		FromDomainInfo: &model.SenderDomainInfo{Domain: disposableDomain, Disposable: true, CreationDate: yesterday},
+		RpDomainInfo:   &model.SenderDomainInfo{Domain: "example.net", CreationDate: yesterday},
+	}
+	want := penaltyDisposableFrom + 2*penaltyDomainUnderWeek
+	if got := calculateDomainInfoPenalty(results); got != want {
+		t.Errorf("calculateDomainInfoPenalty() = %d, want %d", got, want)
+	}
+}
