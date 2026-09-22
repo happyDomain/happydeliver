@@ -1111,6 +1111,8 @@ components:
             type: string
           description: A or AAAA records resolved from the PTR hostnames (forward confirmation)
           example: ["192.0.2.1", "2001:db8::1"]
+        sender_origin:
+          $ref: '#/components/schemas/IPOrigin'
         helo_hostname:
           type: string
           description: HELO/EHLO hostname announced by the sending server (from the inbound Received hop)
@@ -1132,6 +1134,81 @@ components:
           items:
             type: string
           description: DNS lookup errors
+
+    IPOrigin:
+      type: object
+      description: >-
+        Where the sending address comes from: the autonomous system announcing
+        it and the country it is tied to. It is context for the reader, not a
+        verdict: no score reads it. Every field but source may be absent, a
+        source answering only what it knows.
+
+        Several sources may answer one origin, each filling what the previous
+        one left blank, so provenance is per fact rather than per record:
+        source names who gave the network answer, and country_source who gave
+        the country, which is the field whose meaning depends on who answered.
+      required:
+        - source
+      properties:
+        asn:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Autonomous system number announcing the address
+          example: 64496
+        as_name:
+          type: string
+          description: Name the autonomous system is registered under
+          example: "EXAMPLE-AS"
+        prefix:
+          type: string
+          description: BGP prefix the address is announced within, when the source reads routing tables
+          example: "192.0.2.0/24"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: >-
+            ISO 3166-1 alpha-2 code of the country the address is tied to.
+            What it means depends on country_source: a registry service
+            answers where the block was allocated, a geolocation database
+            where the address is believed to be used.
+          example: "FR"
+        country_name:
+          type: string
+          description: The country spelled out, when the source provides it
+          example: "France"
+        registry:
+          type: string
+          description: Regional Internet registry the block was allocated by, when the source is a registry service
+          example: "ripencc"
+        allocated:
+          type: string
+          format: date-time
+          description: When the block was allocated, when the source knows it
+        country_source:
+          allOf:
+            - $ref: '#/components/schemas/IPOriginSource'
+          description: >-
+            Who answered country, which says how it is to be read. It need not
+            be source: an operator with an ASN-only database gets the network
+            from it and the country from the registry service. Absent when no
+            source knew a country.
+        source:
+          allOf:
+            - $ref: '#/components/schemas/IPOriginSource'
+          description: >-
+            Who gave the network answer this origin is built on. It does not
+            answer for every field, the origin being completed from whatever
+            later sources knew; country carries its own country_source.
+
+    IPOriginSource:
+      type: string
+      enum: [cymru]
+      description: >-
+        Who answered a fact about an address: the Team Cymru IP-to-ASN mapping
+        service, which reads routing tables and registry allocations.
+      example: "cymru"
 
     ReturnOK:
       type: object
