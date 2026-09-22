@@ -36,6 +36,7 @@ import (
 	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/ipinfo"
 	"git.happydns.org/happyDeliver/pkg/ipinfo/cymru"
+	"git.happydns.org/happyDeliver/pkg/ipinfo/maxmind"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -83,7 +84,7 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, vmcRoots *x509.CertPool, 
 	d := &DNSAnalyzer{
 		Timeout:           timeout,
 		resolver:          resolver,
-		ipOrigin:          cymru.New(resolver),
+		ipOrigin:          ipinfo.Chain{maxmind.Configured(), cymru.New(resolver)},
 		domainInfoTimeout: domainInfoTimeout,
 		bimiHTTPClient:    bimi.NewHTTPClient(0),
 		VMCRoots:          vmcRoots,
