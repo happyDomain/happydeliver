@@ -329,6 +329,8 @@ func TestRegistrationPenalty(t *testing.T) {
 		{"expired", model.SenderDomainInfo{CreationDate: daysAgo(3650), ExpirationDate: daysAgo(3)}, penaltyDomainLapsing},
 		{"pending delete", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pendingDelete"})}, penaltyDomainLapsing},
 		{"on hold, EPP URL form", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientHold https://icann.org/epp#clientHold"})}, penaltyDomainLapsing},
+		{"pending delete, RDAP spelling", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pending delete"})}, penaltyDomainLapsing},
+		{"ordinary status, RDAP spelling", model.SenderDomainInfo{Status: utils.PtrTo([]string{"client delete prohibited", "client transfer prohibited"})}, 0},
 		{"ordinary status", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientTransferProhibited", "active"})}, 0},
 		{"expired and on hold is charged once", model.SenderDomainInfo{ExpirationDate: daysAgo(3), Status: utils.PtrTo([]string{"serverHold"})}, penaltyDomainLapsing},
 		{"young and lapsing is bounded", model.SenderDomainInfo{CreationDate: daysAgo(1), Status: utils.PtrTo([]string{"pendingDelete"})}, domainRegistrationPenalty},

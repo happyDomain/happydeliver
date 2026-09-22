@@ -127,6 +127,9 @@ func (d *DNSAnalyzer) checkDomainInfo(domain, orgDomain string) *model.SenderDom
 		Disposable: disposable.Is(domain),
 	}
 	d.readRegistration(info)
+	// Settled at analysis time, like AgeDays, so that a report read later
+	// still says what the registration was when the message was sent.
+	info.Lapsing = isLapsing(info, time.Now())
 	// The free provider list holds throwaway providers too, being a list of
 	// where anyone may open an address. A domain is one thing to the reader:
 	// a throwaway provider is reported as that, and not also as a mailbox
@@ -155,6 +158,25 @@ func calculateDomainInfoPenalty(results *model.DNSResults) (penalty int) {
 	return
 }
 
+// isLapsing answers whether the registration is on its way out: past its
+// expiration, or under a status by which the registry is deleting the domain
+// or holding it out of the zone. It is the one place the rule is written:
+// the score charges for it, and the report publishes it, off the same
+// answer.
+func isLapsing(info *model.SenderDomainInfo, now time.Time) bool {
+	if info.ExpirationDate != nil && info.ExpirationDate.Before(now) {
+		return true
+	}
+	if info.Status != nil {
+		for _, status := range *info.Status {
+			if lapsingStatuses[normalizeStatus(status)] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // registrationPenalty is what one domain's registration costs: its youth,
 // and its lapsing, bounded together so that a domain answers for its
 // registration once.
@@ -170,19 +192,7 @@ func registrationPenalty(info *model.SenderDomainInfo, now time.Time) (penalty i
 		}
 	}
 
-	lapsing := info.ExpirationDate != nil && info.ExpirationDate.Before(now)
-	if info.Status != nil {
-		for _, status := range *info.Status {
-			// A status may be published as "clientHold" or as the EPP URL
-			// "clientHold https://icann.org/epp#clientHold"; the first word
-			// is the status.
-			word, _, _ := strings.Cut(strings.TrimSpace(status), " ")
-			if lapsingStatuses[strings.ToLower(word)] {
-				lapsing = true
-			}
-		}
-	}
-	if lapsing {
+	if isLapsing(info, now) {
 		penalty += penaltyDomainLapsing
 	}
 
@@ -233,4 +243,17 @@ func (d *DNSAnalyzer) readRegistration(info *model.SenderDomainInfo) {
 	if registrant := registration.Contacts["registrant"]; registrant != nil && registrant.Country != "" {
 		info.RegistrantCountry = utils.PtrTo(registrant.Country)
 	}
+}
+
+// normalizeStatus reads a status the way lapsingStatuses keys it. WHOIS
+// publishes EPP codes, "clientHold", often followed by their URL,
+// "clientHold https://icann.org/epp#clientHold"; RDAP spells them out,
+// "client hold". Lowercased, cut before any URL and stripped of its spaces,
+// each is "clienthold".
+func normalizeStatus(status string) string {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if i := strings.Index(status, "http"); i >= 0 {
+		status = status[:i]
+	}
+	return strings.ReplaceAll(status, " ", "")
 }
