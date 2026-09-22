@@ -424,6 +424,12 @@ components:
       $ref: './schemas.yaml#/components/schemas/RspamdResult'
     DNSResults:
       $ref: './schemas.yaml#/components/schemas/DNSResults'
+    SenderDomainInfo:
+      $ref: './schemas.yaml#/components/schemas/SenderDomainInfo'
+    IPOrigin:
+      $ref: './schemas.yaml#/components/schemas/IPOrigin'
+    IPOriginSource:
+      $ref: './schemas.yaml#/components/schemas/IPOriginSource'
     MXRecord:
       $ref: './schemas.yaml#/components/schemas/MXRecord'
     SPFRecord:
