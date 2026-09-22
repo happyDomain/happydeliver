@@ -22,11 +22,54 @@
 package analyzer
 
 import (
+	"context"
+	"errors"
+	"flag"
+	"log"
+	"time"
+
+	"git.happydns.org/happyDomain/pkg/domaininfo"
+	"git.happydns.org/happyDomain/pkg/domaininfo/types"
+
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/domainname"
 	"git.happydns.org/happyDeliver/pkg/emaildata/disposable"
 	"git.happydns.org/happyDeliver/pkg/emaildata/freemail"
 )
+
+// What the operator decided about reading registrations, declared here the
+// way each attachment scanner declares its own flags: the analysis config
+// need not know what a registry lookup is made of.
+var (
+	// domainInfoTimeout bounds one registration lookup. RDAP fetches the
+	// IANA bootstrap file over HTTP before asking the registry, and a WHOIS
+	// fallback can be slow, so it is longer than a DNS query's.
+	domainInfoTimeout = 15 * time.Second
+
+	// domainInfoDisabled leaves registrations unread, for an operator who
+	// does not want outbound WHOIS from this instance.
+	domainInfoDisabled bool
+)
+
+func init() {
+	flag.DurationVar(&domainInfoTimeout, "domain-info-timeout", domainInfoTimeout, "Timeout when reading a sender domain's registration over RDAP or WHOIS")
+	flag.BoolVar(&domainInfoDisabled, "disable-domain-info", domainInfoDisabled, "Do not read sender domain registrations over RDAP or WHOIS")
+}
+
+// defaultDomainInfoGetter is what an analyzer reads registrations with when
+// nothing else is injected: happyDomain's lookup, behind a cache shared by
+// every analyzer of the process. Registries rate-limit, and the same sender
+// domain is tested over and over.
+var defaultDomainInfoGetter = newDomainInfoCache(domaininfo.GetDomainInfo, domainInfoCacheTTL, domainInfoCacheSize).get
+
+// domainInfoCacheTTL is how long a registration is trusted not to have
+// changed. A day: a domain does not get registered twice in one.
+const domainInfoCacheTTL = 24 * time.Hour
+
+// domainInfoCacheSize bounds the cache, so that a stream of never-seen
+// domains cannot grow it without end.
+const domainInfoCacheSize = 4096
 
 // What a sender domain costs the DNS score for what it is. A throwaway
 // provider in the visible sender is what filters refuse outright; in the
@@ -60,6 +103,7 @@ func (d *DNSAnalyzer) checkDomainInfo(domain, orgDomain string) *model.SenderDom
 		Domain:     orgDomainOf(domain, orgDomain),
 		Disposable: disposable.Is(domain),
 	}
+	d.readRegistration(info)
 	// The free provider list holds throwaway providers too, being a list of
 	// where anyone may open an address. A domain is one thing to the reader:
 	// a throwaway provider is reported as that, and not also as a mailbox
@@ -81,4 +125,50 @@ func calculateDomainInfoPenalty(results *model.DNSResults) (penalty int) {
 		penalty += penaltyDisposableReturnPath
 	}
 	return
+}
+
+// readRegistration fills in what the registry publishes about the domain.
+// A lookup that fails leaves the registration fields out and says why in
+// error: a registry being down says nothing about the sender.
+func (d *DNSAnalyzer) readRegistration(info *model.SenderDomainInfo) {
+	if d.domainInfo == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), d.domainInfoTimeout)
+	defer cancel()
+
+	registration, err := d.domainInfo(ctx, info.Domain)
+	switch {
+	case errors.Is(err, types.ErrDomainDoesNotExist):
+		info.Error = utils.PtrTo("domain is not registered")
+		return
+	case err != nil:
+		log.Printf("registration of %s could not be read: %v", info.Domain, err)
+		info.Error = utils.PtrTo("registration could not be read: " + err.Error())
+		return
+	case registration == nil:
+		return
+	}
+
+	if registration.Registrar != "" && registration.Registrar != "Unknown" {
+		info.Registrar = utils.PtrTo(registration.Registrar)
+	}
+	info.RegistrarUrl = registration.RegistrarURL
+	info.CreationDate = registration.CreationDate
+	info.ExpirationDate = registration.ExpirationDate
+	if registration.CreationDate != nil {
+		// Settled at analysis time, so that a report read later still says
+		// how old the domain was when the message was sent.
+		info.AgeDays = utils.PtrTo(max(0, int(time.Since(*registration.CreationDate).Hours()/24)))
+	}
+	if len(registration.Status) > 0 {
+		info.Status = utils.PtrTo(registration.Status)
+	}
+	// The registrant's country is the one contact field kept: it says where
+	// the sender is, which is what the reader wants of it, and nothing of
+	// who they are.
+	if registrant := registration.Contacts["registrant"]; registrant != nil && registrant.Country != "" {
+		info.RegistrantCountry = utils.PtrTo(registrant.Country)
+	}
 }
