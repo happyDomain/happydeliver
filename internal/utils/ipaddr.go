@@ -21,7 +21,13 @@
 
 package utils
 
-import "net"
+import (
+	"fmt"
+	"net"
+	"net/netip"
+	"strconv"
+	"strings"
+)
 
 // cgnatRange is the RFC 6598 shared address space: carrier-grade NAT addresses
 // never identify a sending MTA, and no DNS list carries them.
@@ -66,4 +72,30 @@ func IsPublicIP(ip net.IP) bool {
 	}
 
 	return true
+}
+
+// ReverseLabels writes an address the way DNS blocklist and IP-to-ASN queries
+// key it: octets reversed for IPv4, nibbles reversed for IPv6, least
+// significant first and dot separated, with no suffix and no trailing dot.
+// Empty for an address that is neither.
+func ReverseLabels(ip netip.Addr) string {
+	ip = ip.Unmap()
+
+	switch {
+	case ip.Is4():
+		b := ip.As4()
+		return fmt.Sprintf("%d.%d.%d.%d", b[3], b[2], b[1], b[0])
+
+	case ip.Is6():
+		b := ip.As16()
+		nibbles := make([]string, 0, 32)
+		for i := len(b) - 1; i >= 0; i-- {
+			nibbles = append(nibbles, strconv.FormatUint(uint64(b[i]&0x0f), 16))
+			nibbles = append(nibbles, strconv.FormatUint(uint64(b[i]>>4), 16))
+		}
+		return strings.Join(nibbles, ".")
+
+	default:
+		return ""
+	}
 }
