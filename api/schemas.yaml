@@ -1282,10 +1282,11 @@ components:
 
     IPOriginSource:
       type: string
-      enum: [cymru]
+      enum: [cymru, maxmind]
       description: >-
         Who answered a fact about an address: the Team Cymru IP-to-ASN mapping
-        service, which reads routing tables and registry allocations.
+        service, which reads routing tables and registry allocations, or a
+        MaxMind database the operator keeps, which locates the address.
       example: "cymru"
 
     ReturnOK:

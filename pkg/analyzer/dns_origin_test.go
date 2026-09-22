@@ -102,15 +102,35 @@ func TestPopulateInboundHopResultsSenderOrigin(t *testing.T) {
 	}
 }
 
+// TestOriginToModelCarriesCountrySource checks the case a chain produces:
+// the network read off the operator's ASN database, the country off the
+// registry service. The report must not say the country came from a
+// geolocation database, which is a different claim.
+func TestOriginToModelCarriesCountrySource(t *testing.T) {
+	got := originToModel(&ipinfo.Origin{
+		ASN:           64496,
+		Source:        "maxmind",
+		Country:       "FR",
+		CountrySource: "cymru",
+	})
+
+	if got.Source != model.IPOriginSourceMaxmind {
+		t.Errorf("Source = %v, want maxmind", got.Source)
+	}
+	if got.CountrySource == nil || *got.CountrySource != model.IPOriginSourceCymru {
+		t.Errorf("CountrySource = %v, want cymru", got.CountrySource)
+	}
+}
+
 func TestOriginToModelLeavesUnknownOut(t *testing.T) {
-	got := originToModel(&ipinfo.Origin{Source: "cymru", Country: "DE", CountryName: "Germany"})
+	got := originToModel(&ipinfo.Origin{Source: "maxmind", Country: "DE", CountryName: "Germany"})
 	if got.CountrySource != nil {
 		t.Errorf("originToModel() named a country source the origin had none of: %v", *got.CountrySource)
 	}
 	if got.Asn != nil || got.AsName != nil || got.Prefix != nil || got.Registry != nil || got.Allocated != nil {
 		t.Errorf("originToModel() filled fields the source did not know: %+v", *got)
 	}
-	if utils.Deref(got.Country) != "DE" || utils.Deref(got.CountryName) != "Germany" || got.Source != model.IPOriginSourceCymru {
+	if utils.Deref(got.Country) != "DE" || utils.Deref(got.CountryName) != "Germany" || got.Source != model.IPOriginSourceMaxmind {
 		t.Errorf("originToModel() = %+v", *got)
 	}
 }

@@ -12,6 +12,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
+	github.com/oschwald/maxminddb-golang/v2 v2.6.0
 	github.com/tdewolff/parse/v2 v2.8.16
 	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0

@@ -21,6 +21,12 @@
 
 // Package ipinfo answers where an address comes from: the autonomous system
 // announcing it and the country it is registered or located in.
+//
+// It states facts and judges none of them. Whether a sender's network is
+// worth remarking on is the analysis's business; what this package settles
+// is how the fact is obtained, and from whom: the Team Cymru DNS service when
+// nothing else is configured, and MaxMind databases when an operator has
+// them.
 package ipinfo
 
 import (
