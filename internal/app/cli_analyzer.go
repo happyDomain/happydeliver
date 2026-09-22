@@ -138,8 +138,10 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 
 		dns := report.DnsResults
 		fmt.Fprintf(writer, "\nFrom Domain: %s\n", dns.FromDomain)
+		printDomainInfo(writer, dns.FromDomainInfo)
 		if dns.RpDomain != nil && *dns.RpDomain != dns.FromDomain {
 			fmt.Fprintf(writer, "Return-Path Domain: %s\n", *dns.RpDomain)
+			printDomainInfo(writer, dns.RpDomainInfo)
 		}
 
 		// MX Records
@@ -286,6 +288,11 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			for _, ptr := range *dns.PtrRecords {
 				fmt.Fprintf(writer, "    %s\n", ptr)
 			}
+		}
+
+		// Where the sending address comes from
+		if dns.SenderOrigin != nil {
+			fmt.Fprintf(writer, "\n  Sender IP Origin: %s\n", describeOrigin(dns.SenderOrigin))
 		}
 
 		// DNS Errors
@@ -830,4 +837,90 @@ func printVMCSummary(writer io.Writer, vmc *model.VMCInfo) {
 	if vmc.NotAfter != nil {
 		fmt.Fprintf(writer, "      VMC Expires: %s\n", vmc.NotAfter.Format("2006-01-02"))
 	}
+}
+
+// printDomainInfo writes what is known of a sender domain under its name:
+// the kind of provider it is, and its registration.
+func printDomainInfo(writer io.Writer, info *model.SenderDomainInfo) {
+	if info == nil {
+		return
+	}
+
+	switch {
+	case info.Disposable:
+		fmt.Fprintf(writer, "  ! %s is a disposable (throwaway) address provider\n", info.Domain)
+	case info.FreeProvider:
+		fmt.Fprintf(writer, "  ~ %s is a free mailbox provider\n", info.Domain)
+	}
+
+	if info.Error != nil {
+		fmt.Fprintf(writer, "  Registration of %s: %s\n", info.Domain, *info.Error)
+		return
+	}
+
+	var parts []string
+	if info.CreationDate != nil {
+		registered := "registered " + info.CreationDate.Format("2006-01-02")
+		if info.AgeDays != nil {
+			registered += fmt.Sprintf(" (%d days ago)", *info.AgeDays)
+		}
+		parts = append(parts, registered)
+	}
+	if info.Registrar != nil {
+		parts = append(parts, "through "+*info.Registrar)
+	}
+	if info.ExpirationDate != nil {
+		parts = append(parts, "expires "+info.ExpirationDate.Format("2006-01-02"))
+	}
+	if info.RegistrantCountry != nil {
+		parts = append(parts, "registrant in "+*info.RegistrantCountry)
+	}
+	if len(parts) > 0 {
+		fmt.Fprintf(writer, "  Registration of %s: %s\n", info.Domain, strings.Join(parts, ", "))
+	}
+	if info.Status != nil && len(*info.Status) > 0 {
+		fmt.Fprintf(writer, "  Status: %s\n", strings.Join(*info.Status, ", "))
+	}
+	if info.Lapsing {
+		fmt.Fprintf(writer, "  ! The registration of %s is lapsing: mail to and from it is about to stop working\n", info.Domain)
+	}
+}
+
+// describeOrigin writes an origin on one line: "AS64496 EXAMPLE-AS (FR,
+// 192.0.2.0/24, via cymru)", with whatever the source did not know left
+// out.
+func describeOrigin(origin *model.IPOrigin) string {
+	var head string
+	if origin.Asn != nil {
+		head = fmt.Sprintf("AS%d", *origin.Asn)
+		if origin.AsName != nil {
+			head += " " + *origin.AsName
+		}
+	}
+
+	var details []string
+	if origin.Country != nil {
+		country := *origin.Country
+		if origin.CountryName != nil {
+			country += " " + *origin.CountryName
+		}
+		// The country need not come from whoever answered the rest, and it
+		// does not mean the same thing depending on who did.
+		if origin.CountrySource != nil && *origin.CountrySource != origin.Source {
+			country += " via " + string(*origin.CountrySource)
+		}
+		details = append(details, country)
+	}
+	if origin.Prefix != nil {
+		details = append(details, *origin.Prefix)
+	}
+	if origin.Registry != nil {
+		details = append(details, *origin.Registry)
+	}
+	details = append(details, "via "+string(origin.Source))
+
+	if head == "" {
+		return strings.Join(details, ", ")
+	}
+	return head + " (" + strings.Join(details, ", ") + ")"
 }
