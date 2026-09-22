@@ -1111,6 +1111,10 @@ components:
             type: string
           description: A or AAAA records resolved from the PTR hostnames (forward confirmation)
           example: ["192.0.2.1", "2001:db8::1"]
+        from_domain_info:
+          $ref: '#/components/schemas/SenderDomainInfo'
+        rp_domain_info:
+          $ref: '#/components/schemas/SenderDomainInfo'
         sender_origin:
           $ref: '#/components/schemas/IPOrigin'
         helo_hostname:
@@ -1134,6 +1138,80 @@ components:
           items:
             type: string
           description: DNS lookup errors
+
+    SenderDomainInfo:
+      type: object
+      description: >-
+        What is known of a sender domain beyond its records: the kind of
+        provider it belongs to, and its registration as the registry
+        publishes it over RDAP or WHOIS. It is read for the organizational
+        domain, which is what a registry answers for, and from_domain_info
+        stands for rp_domain_info too when both share it. Registration
+        fields are absent when the lookup was disabled, failed, or found
+        nothing, which error then says.
+      required:
+        - domain
+        - disposable
+        - free_provider
+        - lapsing
+      properties:
+        domain:
+          type: string
+          description: The organizational domain the information is about
+          example: "example.com"
+        disposable:
+          type: boolean
+          description: Whether the domain belongs to a known throwaway address provider
+          example: false
+        free_provider:
+          type: boolean
+          description: Whether the domain belongs to a public mailbox provider anyone may open an address at
+          example: false
+        lapsing:
+          type: boolean
+          description: >-
+            Whether the registration is on its way out: expired, or under an
+            EPP status by which the registry is deleting the domain or holding
+            it out of the DNS. It is settled here, where the score charges for
+            it, so that every reader says the same thing of a registration
+            rather than reading the status codes again in its own way.
+          example: false
+        registrar:
+          type: string
+          description: Registrar the domain is registered through
+          example: "Example Registrar, Inc."
+        registrar_url:
+          type: string
+          format: uri
+          description: The registrar's web site
+          example: "https://registrar.example"
+        creation_date:
+          type: string
+          format: date-time
+          description: When the domain was registered
+        expiration_date:
+          type: string
+          format: date-time
+          description: When the registration lapses unless renewed
+        age_days:
+          type: integer
+          minimum: 0
+          description: Days since the domain was registered, at the time of the analysis
+          example: 5883
+        status:
+          type: array
+          items:
+            type: string
+          description: EPP status codes the registry publishes for the domain
+          example: ["clientTransferProhibited"]
+        registrant_country:
+          type: string
+          description: Country of the registrant, when the registry publishes it
+          example: "FR"
+        error:
+          type: string
+          description: Why no registration was read, when none was
+          example: "domain is not registered"
 
     IPOrigin:
       type: object
