@@ -46,6 +46,24 @@ provider.
 go generate -tags refresh_disposable ./pkg/emaildata/disposable/
 ```
 
+## Free mailbox provider domain list
+
+- **File**: `pkg/emaildata/freemail/data/free-email-domains.json`
+- **Upstream**: [Kikobeats/free-email-domains](https://github.com/Kikobeats/free-email-domains),
+  by Kiko Beats and contributors
+- **License**: [MIT](https://opensource.org/licenses/MIT),
+  full text in `pkg/emaildata/freemail/data/free-email-domains.LICENSE`
+- **Modified**: no
+
+Used to tell a personal mailbox at a public provider from a domain the sender
+controls.
+
+**To refresh the list**, re-download it (and its license text) with:
+
+```sh
+go generate -tags refresh_freemail ./pkg/emaildata/freemail/
+```
+
 ## Email client support data
 
 - **File**: `pkg/emaildata/caniemail/data/caniemail.json`
