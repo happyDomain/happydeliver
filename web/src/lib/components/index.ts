@@ -21,6 +21,7 @@ export { default as PendingState } from "./PendingState.svelte";
 export { default as PtrForwardRecordsDisplay } from "./PtrForwardRecordsDisplay.svelte";
 export { default as PtrRecordsDisplay } from "./PtrRecordsDisplay.svelte";
 export { default as ScoreCard } from "./ScoreCard.svelte";
+export { default as SenderOriginDisplay } from "./SenderOriginDisplay.svelte";
 export { default as RspamdCard } from "./RspamdCard.svelte";
 export { default as SpamAssassinCard } from "./SpamAssassinCard.svelte";
 export { default as SpfRecordsDisplay } from "./SpfRecordsDisplay.svelte";

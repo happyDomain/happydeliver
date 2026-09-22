@@ -12,6 +12,7 @@
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
     import ReturnOkDisplay from "./ReturnOkDisplay.svelte";
+    import SenderOriginDisplay from "./SenderOriginDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
 
     interface Props {
@@ -84,6 +85,9 @@
                     ptrForwardRecords={dnsResults.ptr_forward_records}
                     {senderIp}
                 />
+
+                <!-- Where the sending address comes from -->
+                <SenderOriginDisplay senderOrigin={dnsResults.sender_origin} />
 
                 <!-- HELO / PTR Consistency -->
                 <HeloPtrMatchDisplay
