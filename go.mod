@@ -6,7 +6,7 @@ require (
 	github.com/JGLTechnologies/gin-rate-limit v1.5.9
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-smtp v0.25.0
-	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
