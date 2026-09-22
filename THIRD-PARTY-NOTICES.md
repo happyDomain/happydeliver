@@ -27,6 +27,25 @@ service.
 go generate -tags refresh_shorteners ./pkg/emaildata/shorteners/
 ```
 
+## Disposable email domain list
+
+- **File**: `pkg/emaildata/disposable/data/disposable_email_blocklist.conf`
+- **Upstream**: [disposable-email-domains/disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains),
+  by Martin and contributors
+- **License**: [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/),
+  a public domain dedication, full text in
+  `pkg/emaildata/disposable/data/disposable_email_blocklist.LICENSE`
+- **Modified**: no
+
+Used to recognise a sender domain that belongs to a throwaway address
+provider.
+
+**To refresh the list**, re-download it (and its license text) with:
+
+```sh
+go generate -tags refresh_disposable ./pkg/emaildata/disposable/
+```
+
 ## Email client support data
 
 - **File**: `pkg/emaildata/caniemail/data/caniemail.json`
