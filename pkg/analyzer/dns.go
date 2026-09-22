@@ -24,6 +24,7 @@ package analyzer
 import (
 	"crypto/x509"
 	"net/http"
+	"sync"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -142,6 +143,30 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.H
 
 	d.populateInboundHopResults(results, inboundHop)
 
+	// What the sender domains are, beyond their records. The Return-Path is
+	// read on its own only when it is another organization's: the same
+	// registrar answers for both otherwise. Then it is a second registry to
+	// wait on, and neither answer depends on the other, so the two are asked
+	// at once rather than one registry timeout after the other.
+	fromOrgDomain := orgDomainOf(fromDomain, utils.Deref(headersResults.DomainAlignment.FromOrgDomain))
+	var domainInfoWG sync.WaitGroup
+	domainInfoWG.Add(1)
+	go func() {
+		defer domainInfoWG.Done()
+		results.FromDomainInfo = d.checkDomainInfo(fromDomain, fromOrgDomain)
+	}()
+	if results.RpDomain != nil && *results.RpDomain != "" {
+		rpDomain := *results.RpDomain
+		if rpOrgDomain := orgDomainOf(rpDomain, utils.Deref(headersResults.DomainAlignment.ReturnPathOrgDomain)); rpOrgDomain != fromOrgDomain {
+			domainInfoWG.Add(1)
+			go func() {
+				defer domainInfoWG.Done()
+				results.RpDomainInfo = d.checkDomainInfo(rpDomain, rpOrgDomain)
+			}()
+		}
+	}
+	domainInfoWG.Wait()
+
 	// Check MX records for From domain (where replies would go)
 	results.FromMxRecords = d.checkMXRecords(fromDomain)
 
@@ -225,6 +250,8 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
 		FromDomain: domain,
 	}
 
+	results.FromDomainInfo = d.checkDomainInfo(domain, "")
+
 	// Check MX records
 	results.FromMxRecords = d.checkMXRecords(domain)
 
@@ -271,6 +298,9 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
+
+	// Penalty for what the sender domains are, whatever their records say
+	score += calculateDomainInfoPenalty(results)
 
 	// BIMI Record: only bonus
 	if results.BimiRecord != nil && results.BimiRecord.Valid {
@@ -320,6 +350,9 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
+
+	// Penalty for what the sender domains are, whatever their records say
+	score += calculateDomainInfoPenalty(results)
 
 	// BIMI Record
 	// BIMI is optional but indicates advanced email branding
