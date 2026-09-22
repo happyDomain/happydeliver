@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"regexp"
 	"strings"
 	"sync"
@@ -313,29 +314,12 @@ func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
 // reverseIP reverses an IPv4 or IPv6 address for DNSBL/DNSWL queries
 // Example: 192.0.2.1 -> 1.2.0.192
 func (r *DNSListChecker) reverseIP(ipStr string) string {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
 		return ""
 	}
 
-	if ipv4 := ip.To4(); ipv4 != nil {
-		return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
-	}
-
-	// IPv6: reverse all 32 nibbles, least-significant first, dot-separated.
-	// Example: 2001:db8::1 -> 1.0.0.0...0.8.b.d.0.1.0.0.2
-	ipv6 := ip.To16()
-	if ipv6 == nil {
-		return ""
-	}
-
-	nibbles := make([]string, 0, 32)
-	for i := len(ipv6) - 1; i >= 0; i-- {
-		nibbles = append(nibbles, fmt.Sprintf("%x", ipv6[i]&0x0f))
-		nibbles = append(nibbles, fmt.Sprintf("%x", ipv6[i]>>4))
-	}
-
-	return strings.Join(nibbles, ".")
+	return utils.ReverseLabels(ip)
 }
 
 // CalculateScore calculates the list contribution to deliverability.
