@@ -6,6 +6,7 @@ export { default as BlacklistCard } from "./BlacklistCard.svelte";
 export { default as ContentAnalysisCard } from "./ContentAnalysisCard.svelte";
 export { default as DkimRecordsDisplay } from "./DkimRecordsDisplay.svelte";
 export { default as DmarcRecordDisplay } from "./DmarcRecordDisplay.svelte";
+export { default as DomainInfoDisplay } from "./DomainInfoDisplay.svelte";
 export { default as DnsRecordsCard } from "./DnsRecordsCard.svelte";
 export { default as EmailAddressDisplay } from "./EmailAddressDisplay.svelte";
 export { default as EmailPathCard } from "./EmailPathCard.svelte";
