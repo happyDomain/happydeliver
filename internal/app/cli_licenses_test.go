@@ -51,6 +51,11 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		"CC-BY-SA-4.0",
 		"https://creativecommons.org/licenses/by-sa/4.0/",
 		"Attribution-ShareAlike 4.0 International",
+		// The disposable domain list, CC0-1.0: nothing is required, and the
+		// source and the terms are named all the same.
+		"https://github.com/disposable-email-domains/disposable-email-domains",
+		"CC0-1.0",
+		"CC0 1.0 Universal",
 		// The email client support data, MIT.
 		"Rémi Parmentier",
 		"https://github.com/hteumeuleu/caniemail",
