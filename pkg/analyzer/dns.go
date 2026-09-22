@@ -31,6 +31,8 @@ import (
 	"git.happydns.org/happyDeliver/pkg/bimi"
 
 	"git.happydns.org/happyDeliver/pkg/grade"
+	"git.happydns.org/happyDeliver/pkg/ipinfo"
+	"git.happydns.org/happyDeliver/pkg/ipinfo/cymru"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -38,6 +40,9 @@ import (
 type DNSAnalyzer struct {
 	Timeout  time.Duration
 	resolver DNSResolver
+	// ipOrigin says where the sending address comes from. Nil leaves the
+	// question unasked.
+	ipOrigin ipinfo.Source
 	// bimiHTTPClient fetches BIMI logo/VMC assets. The only files
 	// DNSAnalyzer downloads are published by the domain under analysis, so
 	// they go through the guarded client of pkg/bimi rather than a bare
@@ -70,6 +75,7 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, vmcRoots *x509.CertPool, 
 	return &DNSAnalyzer{
 		Timeout:        timeout,
 		resolver:       resolver,
+		ipOrigin:       cymru.New(resolver),
 		bimiHTTPClient: bimi.NewHTTPClient(0),
 		VMCRoots:       vmcRoots,
 	}
@@ -92,6 +98,7 @@ func (d *DNSAnalyzer) populateInboundHopResults(results *model.DNSResults, inbou
 	if len(forwardRecords) > 0 {
 		results.PtrForwardRecords = &forwardRecords
 	}
+	results.SenderOrigin = d.checkSenderOrigin(senderIP)
 
 	// Record the announced HELO name and whether it matches the PTR record
 	if inboundHop.From != nil && *inboundHop.From != "" {
