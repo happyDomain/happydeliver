@@ -56,6 +56,9 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		"https://github.com/disposable-email-domains/disposable-email-domains",
 		"CC0-1.0",
 		"CC0 1.0 Universal",
+		// The free mailbox provider list, MIT.
+		"Kiko Beats",
+		"https://github.com/Kikobeats/free-email-domains",
 		// The email client support data, MIT.
 		"Rémi Parmentier",
 		"https://github.com/hteumeuleu/caniemail",
