@@ -103,7 +103,7 @@
                                     <h2 class="h2 mb-2">
                                         <span class="font-monospace">{result.domain}</span>
                                     </h2>
-                                    {#if result.is_disposable}
+                                    {#if result.dns_results.from_domain_info?.disposable}
                                         <div class="alert alert-warning mb-0 d-inline-block">
                                             <i class="bi bi-exclamation-triangle me-2"></i>
                                             <strong>Disposable Email Provider Detected</strong>
