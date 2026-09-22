@@ -5,6 +5,7 @@
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
+    import DomainInfoDisplay from "./DomainInfoDisplay.svelte";
     import GradeDisplay from "./GradeDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
@@ -130,6 +131,9 @@
                     </div>
                 </div>
 
+                <!-- What the Return-Path domain is, when another organization's -->
+                <DomainInfoDisplay domainInfo={dnsResults.rp_domain_info} role="return-path" />
+
                 <!-- MX Records for Return-Path Domain -->
                 {#if dnsResults.rp_mx_records && dnsResults.rp_mx_records.length > 0}
                     <MxRecordsDisplay
@@ -162,6 +166,9 @@
                     {/if}
                 </div>
             {/if}
+
+            <!-- What the From domain is -->
+            <DomainInfoDisplay domainInfo={dnsResults.from_domain_info} role="from" />
 
             <!-- MX Records for From Domain -->
             {#if dnsResults.from_mx_records && dnsResults.from_mx_records.length > 0}
