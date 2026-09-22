@@ -309,11 +309,38 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestRegistrationPenalty(t *testing.T) {
+func TestIsLapsing(t *testing.T) {
 	now := time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)
 	daysAgo := func(days int) *time.Time {
 		return utils.PtrTo(now.AddDate(0, 0, -days))
 	}
+
+	tests := []struct {
+		name string
+		info model.SenderDomainInfo
+		want bool
+	}{
+		{"nothing known", model.SenderDomainInfo{}, false},
+		{"not expired", model.SenderDomainInfo{ExpirationDate: daysAgo(-365)}, false},
+		{"expired", model.SenderDomainInfo{ExpirationDate: daysAgo(3)}, true},
+		{"pending delete", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pendingDelete"})}, true},
+		{"on hold, EPP URL form", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientHold https://icann.org/epp#clientHold"})}, true},
+		{"pending delete, RDAP spelling", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pending delete"})}, true},
+		{"ordinary status, RDAP spelling", model.SenderDomainInfo{Status: utils.PtrTo([]string{"client delete prohibited", "client transfer prohibited"})}, false},
+		{"ordinary status", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientTransferProhibited", "active"})}, false},
+		{"expired and on hold", model.SenderDomainInfo{ExpirationDate: daysAgo(3), Status: utils.PtrTo([]string{"serverHold"})}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isLapsing(&tt.info, now); got != tt.want {
+				t.Errorf("isLapsing() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRegistrationPenalty(t *testing.T) {
 	aged := func(days int) *int { return utils.PtrTo(days) }
 
 	tests := []struct {
@@ -322,22 +349,18 @@ func TestRegistrationPenalty(t *testing.T) {
 		want int
 	}{
 		{"nothing known", model.SenderDomainInfo{}, 0},
-		{"old domain", model.SenderDomainInfo{AgeDays: aged(3650), ExpirationDate: daysAgo(-365)}, 0},
+		{"old domain", model.SenderDomainInfo{AgeDays: aged(3650)}, 0},
 		{"registered yesterday", model.SenderDomainInfo{AgeDays: aged(1)}, penaltyDomainUnderWeek},
 		{"registered a fortnight ago", model.SenderDomainInfo{AgeDays: aged(14)}, penaltyDomainUnderMonth},
 		{"registered two months ago", model.SenderDomainInfo{AgeDays: aged(60)}, penaltyDomainUnderQuarter},
 		{"registered a year ago", model.SenderDomainInfo{AgeDays: aged(365)}, 0},
-		{"expired", model.SenderDomainInfo{AgeDays: aged(3650), ExpirationDate: daysAgo(3)}, penaltyDomainLapsing},
-		{"pending delete", model.SenderDomainInfo{Status: utils.PtrTo([]string{"pendingDelete"})}, penaltyDomainLapsing},
-		{"on hold, EPP URL form", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientHold https://icann.org/epp#clientHold"})}, penaltyDomainLapsing},
-		{"ordinary status", model.SenderDomainInfo{Status: utils.PtrTo([]string{"clientTransferProhibited", "active"})}, 0},
-		{"expired and on hold is charged once", model.SenderDomainInfo{ExpirationDate: daysAgo(3), Status: utils.PtrTo([]string{"serverHold"})}, penaltyDomainLapsing},
-		{"young and lapsing is bounded", model.SenderDomainInfo{AgeDays: aged(1), Status: utils.PtrTo([]string{"pendingDelete"})}, domainRegistrationPenalty},
+		{"lapsing", model.SenderDomainInfo{AgeDays: aged(3650), Lapsing: true}, penaltyDomainLapsing},
+		{"young and lapsing is bounded", model.SenderDomainInfo{AgeDays: aged(1), Lapsing: true}, domainRegistrationPenalty},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := registrationPenalty(&tt.info, now); got != tt.want {
+			if got := registrationPenalty(&tt.info); got != tt.want {
 				t.Errorf("registrationPenalty() = %d, want %d", got, tt.want)
 			}
 		})
