@@ -22,7 +22,14 @@
 package analyzer
 
 import (
+	"context"
+	"errors"
+	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"git.happydns.org/happyDomain/pkg/domaininfo/types"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
@@ -205,4 +212,99 @@ func TestAnalyzeDomainOnlyDomainInfo(t *testing.T) {
 	if score >= cleanScore && cleanScore > 0 {
 		t.Errorf("disposable domain scored %d, no less than a clean one at %d", score, cleanScore)
 	}
+}
+
+// fakeRegistry answers registrations from a map, and fails for any other
+// domain.
+func fakeRegistry(known map[string]*types.DomainInfo) types.Getter {
+	return func(_ context.Context, domain string) (*types.DomainInfo, error) {
+		if info, ok := known[domain]; ok {
+			if info == nil {
+				return nil, types.ErrDomainDoesNotExist
+			}
+			return info, nil
+		}
+		return nil, errors.New("registry unreachable")
+	}
+}
+
+func TestReadRegistration(t *testing.T) {
+	created := time.Now().AddDate(-2, 0, 0)
+	expires := time.Now().AddDate(1, 0, 0)
+	registrarURL := "https://registrar.example"
+
+	d := newMockAnalyzer(nil, nil).WithDomainInfo(fakeRegistry(map[string]*types.DomainInfo{
+		"example.com": {
+			Name:           "example.com",
+			Registrar:      "Example Registrar",
+			RegistrarURL:   &registrarURL,
+			CreationDate:   &created,
+			ExpirationDate: &expires,
+			Status:         []string{"clientTransferProhibited"},
+			Contacts: map[string]*types.ContactInfo{
+				"registrant": {Name: "Somebody", Email: "somebody@example.com", Country: "FR"},
+			},
+		},
+		"bare.example":    {Name: "bare.example", Registrar: "Unknown"},
+		"missing.example": nil,
+	}), time.Second)
+
+	t.Run("registered", func(t *testing.T) {
+		info := d.checkDomainInfo("mail.example.com", "example.com")
+		if info.Error != nil {
+			t.Fatalf("Error = %q, want none", *info.Error)
+		}
+		if utils.Deref(info.Registrar) != "Example Registrar" || utils.Deref(info.RegistrarUrl) != registrarURL {
+			t.Errorf("registrar = %v %v", info.Registrar, info.RegistrarUrl)
+		}
+		if info.CreationDate == nil || !info.CreationDate.Equal(created) || info.ExpirationDate == nil || !info.ExpirationDate.Equal(expires) {
+			t.Errorf("dates = %v %v", info.CreationDate, info.ExpirationDate)
+		}
+		if age := utils.Deref(info.AgeDays); age < 729 || age > 732 {
+			t.Errorf("AgeDays = %d, want about two years", age)
+		}
+		if info.Status == nil || len(*info.Status) != 1 {
+			t.Errorf("status = %v", info.Status)
+		}
+		if utils.Deref(info.RegistrantCountry) != "FR" {
+			t.Errorf("RegistrantCountry = %v, want FR", info.RegistrantCountry)
+		}
+	})
+
+	t.Run("nothing published", func(t *testing.T) {
+		info := d.checkDomainInfo("bare.example", "")
+		if info.Error != nil || info.Registrar != nil || info.CreationDate != nil || info.AgeDays != nil || info.Status != nil || info.RegistrantCountry != nil {
+			t.Errorf("checkDomainInfo(bare.example) = %+v, want every registration field left out", *info)
+		}
+	})
+
+	t.Run("not registered", func(t *testing.T) {
+		info := d.checkDomainInfo("missing.example", "")
+		if utils.Deref(info.Error) != "domain is not registered" || info.Registrar != nil {
+			t.Errorf("checkDomainInfo(missing.example) = %+v", *info)
+		}
+	})
+
+	t.Run("registry unreachable", func(t *testing.T) {
+		info := d.checkDomainInfo("down.example", "")
+		if info.Error == nil || !strings.Contains(*info.Error, "registry unreachable") || info.Registrar != nil {
+			t.Errorf("checkDomainInfo(down.example) = %+v", *info)
+		}
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		info := newMockAnalyzer(nil, nil).WithDomainInfo(nil, 0).checkDomainInfo("example.com", "")
+		if info.Error != nil || info.Registrar != nil {
+			t.Errorf("checkDomainInfo() with no getter = %+v, want nothing read", *info)
+		}
+	})
+}
+
+// TestMain leaves registrations unread by default: the tests that exercise
+// the report generator on real messages must not depend on registries
+// answering, and the ones about registrations inject a registry of their
+// own.
+func TestMain(m *testing.M) {
+	domainInfoDisabled = true
+	os.Exit(m.Run())
 }

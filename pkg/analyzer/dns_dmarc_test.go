@@ -67,7 +67,7 @@ func newMockAnalyzer(txt map[string][]string, errMap map[string]error) *DNSAnaly
 	if errMap == nil {
 		errMap = map[string]error{}
 	}
-	return NewDNSAnalyzerWithResolver(5*time.Second, nil, &mockDNSResolver{txt: txt, err: errMap})
+	return NewDNSAnalyzerWithResolver(5*time.Second, nil, &mockDNSResolver{txt: txt, err: errMap}).WithDomainInfo(nil, 0)
 }
 
 func TestCheckDMARCRecordFallback(t *testing.T) {

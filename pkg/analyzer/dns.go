@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"git.happydns.org/happyDomain/pkg/domaininfo/types"
+
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/bimi"
@@ -44,6 +46,11 @@ type DNSAnalyzer struct {
 	// ipOrigin says where the sending address comes from. Nil leaves the
 	// question unasked.
 	ipOrigin ipinfo.Source
+	// domainInfo reads what the registry publishes about a sender domain.
+	// Nil leaves registrations unread.
+	domainInfo types.Getter
+	// domainInfoTimeout bounds one registration lookup.
+	domainInfoTimeout time.Duration
 	// bimiHTTPClient fetches BIMI logo/VMC assets. The only files
 	// DNSAnalyzer downloads are published by the domain under analysis, so
 	// they go through the guarded client of pkg/bimi rather than a bare
@@ -73,13 +80,29 @@ func NewDNSAnalyzerWithResolver(timeout time.Duration, vmcRoots *x509.CertPool, 
 	if resolver == nil {
 		resolver = NewStandardDNSResolver()
 	}
-	return &DNSAnalyzer{
-		Timeout:        timeout,
-		resolver:       resolver,
-		ipOrigin:       cymru.New(resolver),
-		bimiHTTPClient: bimi.NewHTTPClient(0),
-		VMCRoots:       vmcRoots,
+	d := &DNSAnalyzer{
+		Timeout:           timeout,
+		resolver:          resolver,
+		ipOrigin:          cymru.New(resolver),
+		domainInfoTimeout: domainInfoTimeout,
+		bimiHTTPClient:    bimi.NewHTTPClient(0),
+		VMCRoots:          vmcRoots,
 	}
+	if !domainInfoDisabled {
+		d.domainInfo = defaultDomainInfoGetter
+	}
+	return d
+}
+
+// WithDomainInfo sets what the analyzer reads registrations with, and how
+// long it waits for one. A nil getter leaves registrations unread. Tests
+// hand over a fake; the default is happyDomain's lookup behind a cache.
+func (d *DNSAnalyzer) WithDomainInfo(getter types.Getter, timeout time.Duration) *DNSAnalyzer {
+	d.domainInfo = getter
+	if timeout > 0 {
+		d.domainInfoTimeout = timeout
+	}
+	return d
 }
 
 // populateInboundHopResults stores the sender IP, its PTR/forward records and
@@ -150,21 +173,15 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.H
 	// at once rather than one registry timeout after the other.
 	fromOrgDomain := orgDomainOf(fromDomain, utils.Deref(headersResults.DomainAlignment.FromOrgDomain))
 	var domainInfoWG sync.WaitGroup
-	domainInfoWG.Add(1)
-	go func() {
-		defer domainInfoWG.Done()
-		results.FromDomainInfo = d.checkDomainInfo(fromDomain, fromOrgDomain)
-	}()
 	if results.RpDomain != nil && *results.RpDomain != "" {
 		rpDomain := *results.RpDomain
 		if rpOrgDomain := orgDomainOf(rpDomain, utils.Deref(headersResults.DomainAlignment.ReturnPathOrgDomain)); rpOrgDomain != fromOrgDomain {
-			domainInfoWG.Add(1)
-			go func() {
-				defer domainInfoWG.Done()
+			domainInfoWG.Go(func() {
 				results.RpDomainInfo = d.checkDomainInfo(rpDomain, rpOrgDomain)
-			}()
+			})
 		}
 	}
+	results.FromDomainInfo = d.checkDomainInfo(fromDomain, fromOrgDomain)
 	domainInfoWG.Wait()
 
 	// Check MX records for From domain (where replies would go)
