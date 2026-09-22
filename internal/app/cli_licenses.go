@@ -27,6 +27,7 @@ import (
 
 	"git.happydns.org/happyDeliver/pkg/bimi"
 	"git.happydns.org/happyDeliver/pkg/emaildata/caniemail"
+	"git.happydns.org/happyDeliver/pkg/emaildata/disposable"
 	"git.happydns.org/happyDeliver/pkg/emaildata/shorteners"
 	"git.happydns.org/happyDeliver/pkg/rspamd"
 )
@@ -55,6 +56,7 @@ type notice struct {
 // material unnamed.
 var embeddedWorks = []notice{
 	{Attribution: shorteners.Attribution, License: shorteners.License},
+	{Attribution: disposable.Attribution, License: disposable.License},
 	{Attribution: caniemail.Attribution, License: caniemail.License},
 	{Attribution: rspamd.Attribution, License: rspamd.License},
 	{Attribution: bimi.RootsAttribution},
