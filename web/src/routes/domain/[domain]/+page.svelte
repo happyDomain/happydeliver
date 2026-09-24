@@ -5,13 +5,19 @@
 
     import { testDomain } from "$lib/api";
     import type { DomainTestResponse } from "$lib/api/types.gen";
-    import { DnsRecordsCard, GradeDisplay, TinySurvey } from "$lib/components";
-    import { theme } from "$lib/stores/theme";
+    import {
+        DnsRecordsCard,
+        DomainReputationCard,
+        ScoreLink,
+        TinySurvey,
+    } from "$lib/components";
 
     let domain = $derived(page.params.domain);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let result = $state<DomainTestResponse | null>(null);
+
+    let blacklist = $derived(result?.domain_reputation ?? null);
 
     async function analyzeDomain() {
         loading = true;
@@ -75,7 +81,9 @@
                             <span class="visually-hidden">Loading...</span>
                         </div>
                         <h3 class="h5">Analyzing {domain}...</h3>
-                        <p class="text-muted mb-0">Checking DNS records and configuration</p>
+                        <p class="text-muted mb-0">
+                            Checking DNS records, configuration and domain reputation
+                        </p>
                     </div>
                 </div>
             {:else if error}
@@ -117,14 +125,25 @@
                                         <p class="text-muted mb-0">Domain Configuration Score</p>
                                     {/if}
                                 </div>
-                                <div class="offset-md-3 col-md-3 text-center">
-                                    <div
-                                        class="p-2 rounded text-center summary-card"
-                                        class:bg-light={$theme === "light"}
-                                        class:bg-secondary={$theme !== "light"}
-                                    >
-                                        <GradeDisplay score={result.score} grade={result.grade} />
-                                        <small class="text-muted d-block">DNS</small>
+                                <div class="col-md-6">
+                                    <div class="score-tiles d-flex justify-content-md-end justify-content-center gap-3">
+                                        <div class="score-tile">
+                                            <ScoreLink
+                                                href="#dns-details"
+                                                label="DNS"
+                                                grade={result.grade}
+                                                score={result.score}
+                                            />
+                                        </div>
+                                        {#if blacklist}
+                                            <div class="score-tile">
+                                                <ScoreLink
+                                                    href="#reputation-details"
+                                                    label="Reputation"
+                                                    grade={blacklist.grade ?? "?"}
+                                                />
+                                            </div>
+                                        {/if}
                                     </div>
                                 </div>
                             </div>
@@ -145,6 +164,11 @@
                         domainOnly={true}
                     />
 
+                    <!-- Domain Reputation / Blacklist -->
+                    {#if blacklist}
+                        <DomainReputationCard {blacklist} domain={result.domain} />
+                    {/if}
+
                     <!-- Next Steps -->
                     <div class="card shadow-sm border-primary mt-4">
                         <div class="card-body">
@@ -153,9 +177,9 @@
                                 Want Complete Email Analysis?
                             </h3>
                             <p class="mb-3">
-                                This domain-only test checks DNS configuration. For comprehensive
-                                deliverability testing including DKIM verification, content
-                                analysis, spam scoring, and blacklist checks:
+                                This domain test checks DNS configuration and domain reputation. For
+                                comprehensive deliverability testing including DKIM verification,
+                                content analysis, spam scoring, and sending-IP blacklist checks:
                             </p>
                             <a href={resolve("/")} class="btn btn-primary">
                                 <i class="bi bi-envelope-plus me-2"></i>
@@ -187,5 +211,13 @@
 
     .card {
         border: none;
+    }
+
+    .score-tiles {
+        width: 12rem;
+    }
+
+    .score-tile {
+        flex: 1;
     }
 </style>
