@@ -23,6 +23,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	blacklist "git.happydns.org/checker-blacklist/checker"
+	sdk "git.happydns.org/checker-sdk-go/checker"
 
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
@@ -144,6 +148,33 @@ func (f *fakeAnalyzer) CheckBIMI(domain, selector, localPart string) (*model.BIM
 
 func newTestHandler(t *testing.T, cfg *config.Config) (*APIHandler, *fakeStorage, *fakeAnalyzer) {
 	t.Helper()
+	return newTestHandlerWithBlacklist(t, cfg, nil)
+}
+
+// fakeBlacklistProvider is a hand-written sdk.ObservationProvider stand-in so
+// tests never need to reach a real DNSBL/HTTP reputation source.
+type fakeBlacklistProvider struct {
+	data *blacklist.BlacklistData
+	err  error
+
+	// deadline records the ceiling the handler put on the aggregation.
+	deadline time.Time
+}
+
+func (f *fakeBlacklistProvider) Key() sdk.ObservationKey {
+	return blacklist.ObservationKeyBlacklist
+}
+
+func (f *fakeBlacklistProvider) Collect(ctx context.Context, opts sdk.CheckerOptions) (any, error) {
+	f.deadline, _ = ctx.Deadline()
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.data, nil
+}
+
+func newTestHandlerWithBlacklist(t *testing.T, cfg *config.Config, blacklistProvider sdk.ObservationProvider) (*APIHandler, *fakeStorage, *fakeAnalyzer) {
+	t.Helper()
 
 	gin.SetMode(gin.TestMode)
 
@@ -154,7 +185,7 @@ func newTestHandler(t *testing.T, cfg *config.Config) (*APIHandler, *fakeStorage
 	store := newFakeStorage()
 	analyzer := &fakeAnalyzer{}
 
-	return NewAPIHandler(store, cfg, analyzer), store, analyzer
+	return NewAPIHandler(store, cfg, analyzer, blacklistProvider), store, analyzer
 }
 
 // uploadRequest builds a multipart request carrying body under the given field name.
@@ -475,6 +506,149 @@ func TestCheckBimi(t *testing.T) {
 		}
 		if analyzer.lastBIMIDomain != "" {
 			t.Errorf("Analyzer was called with %q, expected the request to be refused first", analyzer.lastBIMIDomain)
+		}
+	})
+}
+
+func domainRequest(t *testing.T, body string) *http.Request {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/domain", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func TestTestDomain(t *testing.T) {
+	t.Run("a populated blacklist result is included in the response", func(t *testing.T) {
+		provider := &fakeBlacklistProvider{
+			data: &blacklist.BlacklistData{
+				Domain:           "example.com",
+				RegisteredDomain: "example.com",
+				CollectedAt:      time.Now(),
+				Results: []blacklist.SourceResult{
+					{SourceID: "dnsbl", SourceName: "DNS blocklists", Subject: "zen.spamhaus.org", Enabled: true},
+				},
+			},
+		}
+		handler, _, _ := newTestHandlerWithBlacklist(t, nil, provider)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+
+		handler.TestDomain(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+
+		var response model.DomainTestResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.Blacklist == nil {
+			t.Fatal("Response carries no blacklist result, expected one")
+		}
+		if response.Blacklist.RegisteredDomain != "example.com" {
+			t.Errorf("RegisteredDomain = %q, expected \"example.com\"", response.Blacklist.RegisteredDomain)
+		}
+		if len(response.Blacklist.Results) != 1 {
+			t.Errorf("len(Results) = %d, expected 1", len(response.Blacklist.Results))
+		}
+	})
+
+	t.Run("the aggregation is bounded by the blacklist collect timeout", func(t *testing.T) {
+		// Regression test: the ceiling used to be Analysis.HTTPTimeout, which
+		// budgets a single outbound call. A cold feed source downloads its
+		// whole list inside this one Collect, so the two cannot share a knob.
+		cfg := config.DefaultConfig()
+		cfg.Analysis.HTTPTimeout = time.Second
+		cfg.Analysis.Blacklist.CollectTimeout = 45 * time.Second
+
+		provider := &fakeBlacklistProvider{}
+		handler, _, _ := newTestHandlerWithBlacklist(t, cfg, provider)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+
+		handler.TestDomain(c)
+
+		if provider.deadline.IsZero() {
+			t.Fatal("Collect received no deadline, expected one")
+		}
+		if budget := time.Until(provider.deadline); budget < 40*time.Second {
+			t.Errorf("Collect budget = %v, expected ~45s: the handler is still using Analysis.HTTPTimeout", budget)
+		}
+	})
+
+	t.Run("a zero collect timeout falls back to the default", func(t *testing.T) {
+		// Several callers build config.AnalysisConfig literals by hand and
+		// never go through DefaultConfig, so a zero here must not turn into an
+		// already-expired context.
+		cfg := config.DefaultConfig()
+		cfg.Analysis.Blacklist.CollectTimeout = 0
+
+		provider := &fakeBlacklistProvider{}
+		handler, _, _ := newTestHandlerWithBlacklist(t, cfg, provider)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+
+		handler.TestDomain(c)
+
+		want := config.DefaultBlacklistCollectTimeout
+		if budget := time.Until(provider.deadline); budget < want-5*time.Second || budget > want {
+			t.Errorf("Collect budget = %v, expected the %v default", budget, want)
+		}
+	})
+
+	t.Run("a failing blacklist provider does not fail the domain analysis", func(t *testing.T) {
+		provider := &fakeBlacklistProvider{err: errors.New("collect failed")}
+		handler, _, _ := newTestHandlerWithBlacklist(t, nil, provider)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+
+		handler.TestDomain(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+
+		var response model.DomainTestResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.Blacklist != nil {
+			t.Errorf("Response carries a blacklist result %+v, expected none", response.Blacklist)
+		}
+		if response.Domain != "example.com" {
+			t.Errorf("Domain = %q, expected \"example.com\"", response.Domain)
+		}
+	})
+
+	t.Run("no blacklist provider configured does not fail the domain analysis", func(t *testing.T) {
+		handler, _, _ := newTestHandler(t, nil)
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+
+		handler.TestDomain(c)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Status = %d, expected 200: %s", rec.Code, rec.Body.String())
+		}
+
+		var response model.DomainTestResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.Blacklist != nil {
+			t.Errorf("Response carries a blacklist result %+v, expected none", response.Blacklist)
 		}
 	})
 }

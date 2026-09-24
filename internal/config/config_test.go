@@ -98,6 +98,9 @@ func TestDefaultConfig(t *testing.T) {
 	if c.Analysis.CheckAllIPs {
 		t.Error("Analysis.CheckAllIPs = true, want false")
 	}
+	if c.Analysis.Blacklist.CollectTimeout != 60*time.Second {
+		t.Errorf("Analysis.Blacklist.CollectTimeout = %v, want 60s", c.Analysis.Blacklist.CollectTimeout)
+	}
 }
 
 // TestValidate exercises Config.Validate. A config is valid when: the email

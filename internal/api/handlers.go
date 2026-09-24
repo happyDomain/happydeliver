@@ -22,6 +22,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,8 +35,10 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	sdk "git.happydns.org/checker-sdk-go/checker"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/internal/version"
@@ -52,19 +55,21 @@ type EmailAnalyzer interface {
 
 // APIHandler implements the ServerInterface for handling API requests
 type APIHandler struct {
-	storage   storage.Storage
-	config    *config.Config
-	analyzer  EmailAnalyzer
-	startTime time.Time
+	storage           storage.Storage
+	config            *config.Config
+	analyzer          EmailAnalyzer
+	blacklistProvider sdk.ObservationProvider
+	startTime         time.Time
 }
 
 // NewAPIHandler creates a new API handler
-func NewAPIHandler(store storage.Storage, cfg *config.Config, analyzer EmailAnalyzer) *APIHandler {
+func NewAPIHandler(store storage.Storage, cfg *config.Config, analyzer EmailAnalyzer, blacklistProvider sdk.ObservationProvider) *APIHandler {
 	return &APIHandler{
-		storage:   store,
-		config:    cfg,
-		analyzer:  analyzer,
-		startTime: time.Now(),
+		storage:           store,
+		config:            cfg,
+		analyzer:          analyzer,
+		blacklistProvider: blacklistProvider,
+		startTime:         time.Now(),
 	}
 }
 
@@ -434,6 +439,7 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 		Score:      score,
 		Grade:      responseGrade,
 		DnsResults: *dnsResults,
+		Blacklist:  h.runDomainBlacklist(c.Request.Context(), request.Domain),
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -543,6 +549,39 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// runDomainBlacklist runs the checker-blacklist aggregation against a domain.
+// It returns nil (and logs nothing fatal) when the check cannot be run, so the
+// surrounding domain analysis still succeeds.
+func (h *APIHandler) runDomainBlacklist(ctx context.Context, domain string) *model.DomainBlacklistResult {
+	if h.blacklistProvider == nil {
+		return nil
+	}
+
+	opts := h.config.Analysis.Blacklist.AsCheckerOptions()
+	// "domain_name" is the option key the checker-blacklist provider reads
+	// (see checker/collect.go in the checker-blacklist module).
+	opts["domain_name"] = domain
+
+	// Cap the aggregation: sources run concurrently, each with its own
+	// timeouts; this is the host-side ceiling. It deliberately does not reuse
+	// Analysis.HTTPTimeout, which budgets a single outbound call: a cold feed
+	// source downloads its whole list here, and a parent deadline shorter than
+	// the source's own silently overrides it.
+	timeout := h.config.Analysis.Blacklist.CollectTimeout
+	if timeout <= 0 {
+		timeout = config.DefaultBlacklistCollectTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	raw, err := h.blacklistProvider.Collect(ctx, opts)
+	if err != nil {
+		return nil
+	}
+
+	return reputation.FromObservation(raw)
 }
 
 // ListTests returns a paginated list of test summaries

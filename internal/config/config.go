@@ -97,15 +97,35 @@ type AnalysisConfig struct {
 	Blacklist BlacklistConfig
 }
 
+const (
+	// DefaultBlacklistCollectTimeout is the ceiling for one full
+	// checker-blacklist aggregation. It matches what the module gives itself,
+	// its shared HTTP client and OISD's per-feed budget both being 60s, and a
+	// shorter parent silently overrides those rather than adding to them.
+	//
+	// Each source carries its own deadline, so this ceiling only really binds
+	// while a feed cache is cold.
+	DefaultBlacklistCollectTimeout = 60 * time.Second
+)
+
 // BlacklistConfig holds per-source credentials/options for the
-// domain-oriented checker-blacklist provider. Keys must match the
-// option IDs declared by each source in the checker-blacklist module
-// (see checker/virustotal.go, checker/safebrowsing.go, …). Free sources
-// (Quad9, OISD, URLhaus, OpenPhish, Disconnect, Botvrij, …) need no
-// configuration.
+// domain-oriented checker-blacklist provider, plus the host-side budgets
+// happyDeliver applies around it. Credential keys must match the option IDs
+// declared by each source in the checker-blacklist module (see
+// checker/virustotal.go, checker/safebrowsing.go, …) — AsCheckerOptions is
+// where that mapping lives, and where it is tested. Free sources (Quad9, OISD,
+// URLhaus, OpenPhish, Disconnect, Botvrij, …) need no configuration. The
+// timeout below is ours and is not forwarded to the checker.
 type BlacklistConfig struct {
 	VirusTotalAPIKey   string
 	SafeBrowsingAPIKey string
+	// CollectTimeout bounds the whole checker-blacklist aggregation, not a
+	// single outbound call the way Analysis.HTTPTimeout does: Collect fans out
+	// every source concurrently, and the feed-backed ones (OISD, Disconnect,
+	// Botvrij, OpenPhish, PhishTank) download their full list when their cache
+	// is cold. Too short and they all error out, which leaves the verdict
+	// inconclusive. 0 falls back to the default.
+	CollectTimeout time.Duration
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -132,6 +152,9 @@ func DefaultConfig() *Config {
 			RBLs:        []string{},
 			DNSWLs:      []string{},
 			CheckAllIPs: false, // By default, only check the first IP
+			Blacklist: BlacklistConfig{
+				CollectTimeout: DefaultBlacklistCollectTimeout,
+			},
 		},
 	}
 }
