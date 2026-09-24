@@ -101,6 +101,12 @@ func TestDefaultConfig(t *testing.T) {
 	if c.Analysis.Blacklist.CollectTimeout != 60*time.Second {
 		t.Errorf("Analysis.Blacklist.CollectTimeout = %v, want 60s", c.Analysis.Blacklist.CollectTimeout)
 	}
+	if c.Analysis.Blacklist.Warmup {
+		t.Error("Analysis.Blacklist.Warmup = true, want false: warming downloads other people's feeds, so it is opt-in")
+	}
+	if c.Analysis.Blacklist.WarmupInterval != 24*time.Hour {
+		t.Errorf("Analysis.Blacklist.WarmupInterval = %v, want 24h", c.Analysis.Blacklist.WarmupInterval)
+	}
 }
 
 // TestValidate exercises Config.Validate. A config is valid when: the email

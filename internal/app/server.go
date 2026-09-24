@@ -71,7 +71,13 @@ func RunServer(cfg *config.Config) error {
 	analyzerAdapter := analyzer.NewAPIAdapter(cfg)
 
 	// Create API handler
-	handler := api.NewAPIHandler(store, cfg, analyzerAdapter, blacklist.Provider())
+	blacklistProvider := blacklist.Provider()
+	handler := api.NewAPIHandler(store, cfg, analyzerAdapter, blacklistProvider)
+
+	// Keep the blacklist feed caches warm so no check pays for filling them
+	warmupSvc := NewBlacklistWarmupService(blacklistProvider, cfg)
+	warmupSvc.Start(ctx)
+	defer warmupSvc.Stop()
 
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") == "" {

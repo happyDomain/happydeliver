@@ -104,8 +104,21 @@ const (
 	// shorter parent silently overrides those rather than adding to them.
 	//
 	// Each source carries its own deadline, so this ceiling only really binds
-	// while a feed cache is cold.
+	// while a feed cache is cold. That happens on any instance, the warmup
+	// being off by default, so the ceiling has to cover it rather than count
+	// on the caches being filled ahead of time.
 	DefaultBlacklistCollectTimeout = 60 * time.Second
+
+	// DefaultBlacklistWarmupInterval matches the TTL of the two feeds worth
+	// warming on a schedule: OISD, which the module sizes for 262144 entries,
+	// and Disconnect. The shorter-lived feeds upstream (OpenPhish 1h, Botvrij
+	// 6h, PhishTank 12h) do expire between two warmups and are reloaded by
+	// whichever check finds them stale, which is the cheaper trade: they are
+	// one to two orders of magnitude smaller.
+	//
+	// Repeating oftener is an explicit choice, not a default: these are other
+	// people's feeds.
+	DefaultBlacklistWarmupInterval = 24 * time.Hour
 )
 
 // BlacklistConfig holds per-source credentials/options for the
@@ -115,7 +128,7 @@ const (
 // checker/virustotal.go, checker/safebrowsing.go, …) — AsCheckerOptions is
 // where that mapping lives, and where it is tested. Free sources (Quad9, OISD,
 // URLhaus, OpenPhish, Disconnect, Botvrij, …) need no configuration. The
-// timeout below is ours and is not forwarded to the checker.
+// duration fields below are ours and are not forwarded to the checker.
 type BlacklistConfig struct {
 	VirusTotalAPIKey   string
 	SafeBrowsingAPIKey string
@@ -126,6 +139,15 @@ type BlacklistConfig struct {
 	// is cold. Too short and they all error out, which leaves the verdict
 	// inconclusive. 0 falls back to the default.
 	CollectTimeout time.Duration
+	// Warmup fills the feed caches in background rather than leaving them to
+	// the first check that needs them. Off by default: it downloads several
+	// feeds on every start, which is an operator's call to make, not a thing
+	// to discover. Left off, a check simply reloads a stale feed itself,
+	// which CollectTimeout is sized for.
+	Warmup bool
+	// WarmupInterval is how often the warmup repeats once enabled. 0 runs it
+	// at startup only.
+	WarmupInterval time.Duration
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -154,6 +176,8 @@ func DefaultConfig() *Config {
 			CheckAllIPs: false, // By default, only check the first IP
 			Blacklist: BlacklistConfig{
 				CollectTimeout: DefaultBlacklistCollectTimeout,
+				Warmup:         false, // Opt-in: warming downloads other people's feeds
+				WarmupInterval: DefaultBlacklistWarmupInterval,
 			},
 		},
 	}

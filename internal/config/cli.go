@@ -47,6 +47,8 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.Analysis.Blacklist.VirusTotalAPIKey, "blacklist-virustotal-api-key", o.Analysis.Blacklist.VirusTotalAPIKey, "VirusTotal v3 API key for the domain blacklist checker")
 	flag.StringVar(&o.Analysis.Blacklist.SafeBrowsingAPIKey, "blacklist-safebrowsing-api-key", o.Analysis.Blacklist.SafeBrowsingAPIKey, "Google Safe Browsing API key for the domain blacklist checker")
 	flag.DurationVar(&o.Analysis.Blacklist.CollectTimeout, "blacklist-collect-timeout", o.Analysis.Blacklist.CollectTimeout, "Timeout for the whole domain blacklist aggregation (every source runs concurrently, some download a full feed when cold)")
+	flag.BoolVar(&o.Analysis.Blacklist.Warmup, "blacklist-warmup", o.Analysis.Blacklist.Warmup, "Fill the blacklist feed caches in background instead of leaving them to the first check that needs them")
+	flag.DurationVar(&o.Analysis.Blacklist.WarmupInterval, "blacklist-warmup-interval", o.Analysis.Blacklist.WarmupInterval, "How often the blacklist feed cache warmup repeats once enabled. 0 = at startup only")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
