@@ -70,17 +70,17 @@ func closedPort(t *testing.T) string {
 // and a caller naming no timeout gets the default.
 func TestNewRunsTheEnginesTheOperatorConfigured(t *testing.T) {
 	// The flags are package state: what this test sets, it puts back.
-	savedClamav, savedKey := clamavAddress, virustotalAPIKey
-	t.Cleanup(func() { clamavAddress, virustotalAPIKey = savedClamav, savedKey })
+	savedClamav, savedKey := clamavAddress, virustotal.APIKey
+	t.Cleanup(func() { clamavAddress, virustotal.APIKey = savedClamav, savedKey })
 
-	clamavAddress, virustotalAPIKey = "", ""
+	clamavAddress, virustotal.APIKey = "", ""
 	if analyzer := New(Options{}); len(analyzer.scanners) != 0 {
 		t.Errorf("Expected no engine without configuration, got %d", len(analyzer.scanners))
 	} else if analyzer.scanTimeout != defaultScanTimeout {
 		t.Errorf("Expected the default timeout for a caller naming none, got %v", analyzer.scanTimeout)
 	}
 
-	clamavAddress, virustotalAPIKey = "127.0.0.1:3310", "secret"
+	clamavAddress, virustotal.APIKey = "127.0.0.1:3310", "secret"
 	analyzer := New(Options{ScanTimeout: time.Second})
 	if len(analyzer.scanners) != len(knownScanners) {
 		t.Fatalf("Expected every known engine once configured, got %d", len(analyzer.scanners))

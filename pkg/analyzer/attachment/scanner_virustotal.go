@@ -30,19 +30,12 @@ import (
 	"git.happydns.org/happyDeliver/pkg/virustotal"
 )
 
-var (
-	// virustotalAPIKey is the key the attachment hashes are looked up with.
-	// Empty leaves them unqueried.
-	virustotalAPIKey string
-
-	// virustotalUpload allows submitting an attachment VirusTotal does not
-	// already know the hash of. Off by default: it hands the file over to a
-	// third party.
-	virustotalUpload bool
-)
+// virustotalUpload allows submitting an attachment VirusTotal does not
+// already know the hash of. Off by default: it hands the file over to a
+// third party.
+var virustotalUpload bool
 
 func init() {
-	flag.StringVar(&virustotalAPIKey, "virustotal-api-key", virustotalAPIKey, "VirusTotal API key for attachment hash lookups (empty = disabled)")
 	flag.BoolVar(&virustotalUpload, "virustotal-upload", virustotalUpload, "Upload attachments unknown to VirusTotal for analysis (warning: shares file content with VirusTotal)")
 }
 
@@ -50,7 +43,7 @@ func init() {
 var virustotalDef = scannerDef{
 	scannerInfo: scannerInfo{Name: "virustotal", Label: "VirusTotal"},
 	build: func(timeout time.Duration) scanner {
-		if client := virustotal.New(virustotalAPIKey, virustotalUpload, timeout); client != nil {
+		if client := virustotal.New(virustotal.APIKey, virustotalUpload, timeout); client != nil {
 			return virustotalScanner{client: client}
 		}
 		return nil
