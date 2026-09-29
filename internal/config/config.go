@@ -93,7 +93,15 @@ type AnalysisConfig struct {
 	// VMCRoots is the pool built from VMCRootsFile by Validate. It is not
 	// configurable directly: the file is read once at startup so a broken
 	// trust policy is reported there rather than on every analysis.
-	VMCRoots *x509.CertPool `json:"-"`
+	VMCRoots  *x509.CertPool `json:"-"`
+	Blacklist BlacklistConfig
+}
+
+// BlacklistConfig holds what happyDeliver hands the domain-oriented
+// checker-blacklist provider. The credentials are those of the sources that
+// take themselves out without one: empty leaves the matching source disabled.
+// internal/reputation maps them onto the module's option IDs.
+type BlacklistConfig struct {
 }
 
 // DefaultConfig returns a configuration with sensible defaults
