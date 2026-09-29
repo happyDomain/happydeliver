@@ -1956,13 +1956,16 @@ components:
           description: Verdict from the source's Evaluate (false when errored)
         status:
           type: string
-          enum: [listed, errored, pending, clean]
+          enum: [listed, errored, pending, clean, informational]
           description: |
             How the source counts toward the verdict. errored covers a blocked
             resolver as well as an error: the source did not really answer.
             pending is a feed source whose list is still being downloaded: it
             has no answer yet, so it counts toward neither the verdict nor the
             score, and a later check gets its result.
+            informational is a web ad and tracker blocklist that answered:
+            mail filters do not use it, so it counts toward neither the verdict
+            nor the score, and listed says whether it lists the domain.
         blocked_query:
           type: boolean
           description: Resolver returned a block response (not a real listing)

@@ -126,8 +126,8 @@ func tally(results []model.DomainBlacklistSourceResult) (summary blacklistTally)
 			summary.errored++
 		case model.DomainBlacklistSourceResultStatusClean:
 			summary.answered++
-		case model.DomainBlacklistSourceResultStatusPending:
-			// No answer yet: it neither penalises nor vouches for the domain.
+		case model.DomainBlacklistSourceResultStatusInformational, model.DomainBlacklistSourceResultStatusPending:
+			// Shown only: it neither penalises nor vouches for the domain.
 		case model.DomainBlacklistSourceResultStatusListed:
 			summary.answered++
 			summary.listed++
@@ -159,6 +159,12 @@ func verdictOf(s blacklistTally) model.DomainBlacklistResultVerdict {
 	}
 }
 
+// webOnlySources block ad and tracker hosts for web browsing. No mail
+// filter acts on them, and they list most large senders (google.com,
+// microsoft.com, or their ad subdomains), so they are shown for
+// information only.
+var webOnlySources = map[string]bool{"oisd": true, "disconnect": true}
+
 // statusOf says how a source counts toward the verdict. A source whose
 // resolver was blocked (e.g. a DNSBL refusing public resolvers) counts as
 // errored, as in the checker's own rule engine: it did not answer, so it
@@ -170,6 +176,8 @@ func statusOf(r blacklist.SourceResult, listed bool) model.DomainBlacklistSource
 		return model.DomainBlacklistSourceResultStatusErrored
 	case r.Pending:
 		return model.DomainBlacklistSourceResultStatusPending
+	case webOnlySources[r.SourceID]:
+		return model.DomainBlacklistSourceResultStatusInformational
 	case listed:
 		return model.DomainBlacklistSourceResultStatusListed
 	default:

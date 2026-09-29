@@ -54,6 +54,8 @@
                 return 2;
             case "clean":
                 return 3;
+            case "informational":
+                return 4;
         }
     }
 
@@ -80,6 +82,8 @@
                 return r.severity && r.severity !== "ok" ? `Listed (${r.severity})` : "Listed";
             case "clean":
                 return "Clean";
+            case "informational":
+                return r.listed ? "Listed (web only)" : "Clean";
         }
     }
 
@@ -95,6 +99,8 @@
                     : "text-danger";
             case "clean":
                 return "text-success";
+            case "informational":
+                return r.listed ? "text-info" : "text-success";
         }
     }
 
@@ -108,6 +114,8 @@
                 return "bi-x-circle-fill";
             case "clean":
                 return "bi-check-circle-fill";
+            case "informational":
+                return r.listed ? "bi-info-circle-fill" : "bi-check-circle-fill";
         }
     }
 
@@ -265,6 +273,12 @@
                                 </button>
                             {/if}
                         </div>
+                        {#if r.status === "informational"}
+                            <div class="small text-muted">
+                                Web ad and tracker blocklist, not used by mail filters: not counted
+                                in the score.
+                            </div>
+                        {/if}
                         {#if expandable && open}
                             <div class="mt-2">
                                 {#if r.reasons && r.reasons.length > 0}

@@ -22,6 +22,7 @@
 package reputation
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -218,10 +219,10 @@ func TestFromObservationBlockedQueryIsIgnored(t *testing.T) {
 			{SourceID: "dnsbl", SourceName: "DNS blocklists", Subject: "zen.spamhaus.org", Enabled: true, BlockedQuery: true},
 			{SourceID: "dnsbl", SourceName: "DNS blocklists", Subject: "multi.surbl.org", Enabled: true},
 			{
-				SourceID:   "disconnect",
-				SourceName: "Disconnect",
+				SourceID:   "malwarebazaar",
+				SourceName: "MalwareBazaar",
 				Enabled:    true,
-				Evidence:   []blacklist.Evidence{{Label: "Category", Value: "Advertising"}},
+				Evidence:   []blacklist.Evidence{{Label: "Sample", Value: "0123456789abcdef"}},
 			},
 		},
 	}
@@ -357,5 +358,51 @@ func TestTallyPenaltyIsShared(t *testing.T) {
 		if got := tc.tally.penalty(); got != tc.want {
 			t.Errorf("%s: penalty() = %d, want %d", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A large sender's domain lists ad and tracker hosts in the web
+// blocklists; those are shown but weigh on nothing.
+func TestFromObservationWebOnlySourcesAreInformational(t *testing.T) {
+	webOnly := []blacklist.SourceResult{
+		{
+			SourceID:   "oisd",
+			SourceName: "OISD domain blocklist",
+			Enabled:    true,
+			Reasons:    []string{"Listed in OISD"},
+			Evidence:   []blacklist.Evidence{{Label: "Domain", Value: "adwords.example.com"}},
+		},
+		{
+			SourceID:   "disconnect",
+			SourceName: "Disconnect.me",
+			Enabled:    true,
+			Reasons:    []string{"Content"},
+			Evidence:   []blacklist.Evidence{{Label: "Category", Value: "Content"}},
+		},
+	}
+
+	data := &blacklist.BlacklistData{
+		Domain:           "example.com",
+		RegisteredDomain: "example.com",
+		CollectedAt:      time.Now(),
+		Results:          append(slices.Clone(webOnly), blacklist.SourceResult{SourceID: "dnsbl", SourceName: "DNS blocklists", Subject: "dbl.spamhaus.org", Enabled: true}),
+	}
+	result := FromObservation(data)
+	if result.Score == nil || *result.Score != 100 {
+		t.Errorf("Score = %v, want 100", result.Score)
+	}
+	if result.Verdict != model.DomainBlacklistResultVerdictClean {
+		t.Errorf("Verdict = %q, want %q", result.Verdict, model.DomainBlacklistResultVerdictClean)
+	}
+	for _, r := range result.Results[:2] {
+		if r.Status != model.DomainBlacklistSourceResultStatusInformational || !r.Listed {
+			t.Errorf("%s: status = %q, listed = %v, want informational and listed", r.SourceId, r.Status, r.Listed)
+		}
+	}
+
+	// On their own, they do not vouch for the domain either.
+	data.Results = webOnly
+	if result := FromObservation(data); result.Verdict != model.DomainBlacklistResultVerdictInconclusive {
+		t.Errorf("web-only Verdict = %q, want %q", result.Verdict, model.DomainBlacklistResultVerdictInconclusive)
 	}
 }
