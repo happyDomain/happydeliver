@@ -30,9 +30,11 @@ import (
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 
+	blacklist "git.happydns.org/checker-blacklist/checker"
 	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/lmtp"
+	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
 	"git.happydns.org/happyDeliver/web"
@@ -70,7 +72,8 @@ func RunServer(cfg *config.Config) error {
 	analyzerAdapter := analyzer.NewAPIAdapter(cfg)
 
 	// Create API handler
-	handler := api.NewAPIHandler(store, cfg, analyzerAdapter)
+	blacklistChecker := reputation.NewChecker(blacklist.Provider(), cfg.Analysis.Blacklist)
+	handler := api.NewAPIHandler(store, cfg, analyzerAdapter, blacklistChecker)
 
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") == "" {

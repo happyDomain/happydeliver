@@ -28,6 +28,13 @@ services:
       # Attachment scanning (optional): start the clamav profile and uncomment
       # HAPPYDELIVER_CLAMAV_ADDRESS: tcp://clamav:3310
       # HAPPYDELIVER_VIRUSTOTAL_API_KEY: your-api-key
+      # Domain blacklist sources needing a key (optional); VirusTotal reuses
+      # HAPPYDELIVER_VIRUSTOTAL_API_KEY above
+      # HAPPYDELIVER_BLACKLIST_ABUSECH_AUTH_KEY: your-auth-key
+      # HAPPYDELIVER_BLACKLIST_OTX_API_KEY: your-api-key
+      # HAPPYDELIVER_BLACKLIST_PULSEDIVE_API_KEY: your-api-key
+      # HAPPYDELIVER_BLACKLIST_CRIMINALIP_API_KEY: your-api-key
+      # HAPPYDELIVER_BLACKLIST_SAFEBROWSING_API_KEY: your-api-key
 
     ports:
       # SMTP port

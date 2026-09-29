@@ -211,6 +211,21 @@ happyDeliver reads the files a message carries alongside its body: file type mis
 
 Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks happyDeliver runs itself still apply and scanner verdicts are reported as `disabled` without affecting the score.
 
+#### Domain Blacklist Sources
+
+The domain check (`/domain/<name>`) queries free blocklists (DNSBLs, Quad9, OISD, OpenPhish, Disconnect, PhishTank, …) out of the box. The following sources only run once the operator supplies a key:
+
+| Flag | Sources |
+|---|---|
+| `-blacklist-abusech-auth-key` | abuse.ch URLhaus, ThreatFox and MalwareBazaar (free account at [auth.abuse.ch](https://auth.abuse.ch/)) |
+| `-blacklist-otx-api-key` | AlienVault OTX (free account) |
+| `-blacklist-pulsedive-api-key` | Pulsedive (free account) |
+| `-blacklist-criminalip-api-key` | Criminal IP (free tier: 100 requests/day) |
+| `-virustotal-api-key` | VirusTotal (free tier: 4 requests/minute; shared with attachment scanning, see above) |
+| `-blacklist-safebrowsing-api-key` | Google Safe Browsing |
+
+As any other option, each can be given through the environment, e.g. `HAPPYDELIVER_BLACKLIST_ABUSECH_AUTH_KEY`.
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.

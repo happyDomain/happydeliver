@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/internal/version"
@@ -55,15 +57,17 @@ type APIHandler struct {
 	storage   storage.Storage
 	config    *config.Config
 	analyzer  EmailAnalyzer
+	blacklist *reputation.Checker
 	startTime time.Time
 }
 
 // NewAPIHandler creates a new API handler
-func NewAPIHandler(store storage.Storage, cfg *config.Config, analyzer EmailAnalyzer) *APIHandler {
+func NewAPIHandler(store storage.Storage, cfg *config.Config, analyzer EmailAnalyzer, blacklist *reputation.Checker) *APIHandler {
 	return &APIHandler{
 		storage:   store,
 		config:    cfg,
 		analyzer:  analyzer,
+		blacklist: blacklist,
 		startTime: time.Now(),
 	}
 }
@@ -404,8 +408,17 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 		return
 	}
 
+	// The reputation check waits on other services than the DNS analysis
+	// does, so the two run at once rather than one budget after the other.
+	var domainReputation *model.DomainBlacklistResult
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		domainReputation = h.blacklist.Check(c.Request.Context(), request.Domain)
+	})
+
 	// Perform domain analysis
 	dnsResults, score, grade := h.analyzer.AnalyzeDomain(request.Domain)
+	wg.Wait()
 
 	// Convert grade string to DomainTestResponseGrade enum
 	var responseGrade model.DomainTestResponseGrade
@@ -430,10 +443,11 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 
 	// Build response
 	response := model.DomainTestResponse{
-		Domain:     request.Domain,
-		Score:      score,
-		Grade:      responseGrade,
-		DnsResults: *dnsResults,
+		Domain:           request.Domain,
+		Score:            score,
+		Grade:            responseGrade,
+		DnsResults:       *dnsResults,
+		DomainReputation: domainReputation,
 	}
 
 	c.JSON(http.StatusOK, response)
