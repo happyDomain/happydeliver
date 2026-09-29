@@ -97,11 +97,31 @@ type AnalysisConfig struct {
 	Blacklist BlacklistConfig
 }
 
+const (
+	// DefaultBlacklistWarmupInterval only has to stay below the module's 48h
+	// idle cutoff: once started, the module refreshes each feed every TTL by
+	// itself, and stops only after that long without a lookup. The warmup
+	// ticks just keep a quiet instance's feeds from going cold; on warm caches
+	// a tick does no network I/O.
+	DefaultBlacklistWarmupInterval = 24 * time.Hour
+)
+
 // BlacklistConfig holds what happyDeliver hands the domain-oriented
-// checker-blacklist provider. The credentials are those of the sources that
-// take themselves out without one: empty leaves the matching source disabled.
-// internal/reputation maps them onto the module's option IDs.
+// checker-blacklist provider, and whether to warm its feed caches. The
+// credentials are those of the sources that take themselves out without one:
+// empty leaves the matching source disabled. internal/reputation maps them
+// onto the module's option IDs.
 type BlacklistConfig struct {
+	// Warmup starts the feed downloads (OISD, Disconnect, OpenPhish,
+	// PhishTank) in background at startup, and keeps the module refreshing
+	// them. Off by default: it downloads several feeds on every start, which
+	// is an operator's call to make, not a thing to discover. Left off, the
+	// first check that needs a feed starts its download, and the checks until
+	// it ends get no answer from that feed.
+	Warmup bool
+	// WarmupInterval is how often the warmup repeats once enabled. 0 runs it
+	// at startup only.
+	WarmupInterval time.Duration
 }
 
 // DefaultConfig returns a configuration with sensible defaults
@@ -128,6 +148,10 @@ func DefaultConfig() *Config {
 			RBLs:        []string{},
 			DNSWLs:      []string{},
 			CheckAllIPs: false, // By default, only check the first IP
+			Blacklist: BlacklistConfig{
+				Warmup:         false, // Opt-in: warming downloads other people's feeds
+				WarmupInterval: DefaultBlacklistWarmupInterval,
+			},
 		},
 	}
 }

@@ -75,6 +75,11 @@ func RunServer(cfg *config.Config) error {
 	blacklistChecker := reputation.NewChecker(blacklist.Provider(), cfg.Analysis.Blacklist)
 	handler := api.NewAPIHandler(store, cfg, analyzerAdapter, blacklistChecker)
 
+	// Keep the blacklist feed caches warm so no check pays for filling them
+	warmupSvc := NewBlacklistWarmupService(blacklistChecker, cfg)
+	warmupSvc.Start(ctx)
+	defer warmupSvc.Stop()
+
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)

@@ -23,9 +23,11 @@ package reputation
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
+	blacklist "git.happydns.org/checker-blacklist/checker"
 	sdk "git.happydns.org/checker-sdk-go/checker"
 
 	"git.happydns.org/happyDeliver/internal/config"
@@ -78,11 +80,30 @@ func (c *Checker) Check(ctx context.Context, domain string) *model.DomainBlackli
 	defer cancel()
 
 	started := time.Now()
-	raw, err := c.provider.Collect(ctx, c.options(domain))
+	data, err := c.Collect(ctx, domain)
 	if err != nil {
 		log.Printf("Domain blacklist check of %s failed after %s: %v", domain, time.Since(started).Round(time.Millisecond), err)
 		return nil
 	}
 
-	return FromObservation(raw)
+	return buildResult(data)
+}
+
+// Collect runs one aggregation against the domain, within the caller's
+// context alone: Check puts the configured ceiling on it, the feed cache
+// warmup a budget of its own. Every collection goes through here so it
+// sends the very options a check would: OISD, for one, keeps a cache per
+// variant (checker/oisd.go), so a warmup sending anything else would fill a
+// sibling cache nobody reads.
+func (c *Checker) Collect(ctx context.Context, domain string) (*blacklist.BlacklistData, error) {
+	raw, err := c.provider.Collect(ctx, c.options(domain))
+	if err != nil {
+		return nil, err
+	}
+
+	data := dataOf(raw)
+	if data == nil {
+		return nil, fmt.Errorf("unexpected blacklist observation %T", raw)
+	}
+	return data, nil
 }

@@ -40,11 +40,18 @@ import (
 // DomainBlacklistResult. It returns nil when the payload is missing or of an
 // unexpected type, so callers can degrade gracefully.
 func FromObservation(raw interface{}) *model.DomainBlacklistResult {
-	data, ok := raw.(*blacklist.BlacklistData)
-	if !ok || data == nil {
+	data := dataOf(raw)
+	if data == nil {
 		return nil
 	}
 	return buildResult(data)
+}
+
+// dataOf reads a checker-blacklist observation payload, or nil when it is
+// missing or of an unexpected type.
+func dataOf(raw any) *blacklist.BlacklistData {
+	data, _ := raw.(*blacklist.BlacklistData)
+	return data
 }
 
 func buildResult(data *blacklist.BlacklistData) *model.DomainBlacklistResult {

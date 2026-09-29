@@ -44,6 +44,8 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.Analysis.RspamdAPIURL, "rspamd-api-url", o.Analysis.RspamdAPIURL, "rspamd API URL for symbol descriptions (default: use embedded list)")
 	flag.StringVar(&o.Analysis.RspamdScanURL, "rspamd-scan-url", o.Analysis.RspamdScanURL, "rspamd normal worker URL to submit uploaded messages to for a content scan, e.g. http://127.0.0.1:11333 (default: do not scan uploads)")
 	flag.StringVar(&o.Analysis.VMCRootsFile, "bimi-vmc-roots", o.Analysis.VMCRootsFile, `PEM file of trusted BIMI root certificates ("`+bimi.DisableVMCRoots+`" to skip the check; default: use embedded bundle)`)
+	flag.BoolVar(&o.Analysis.Blacklist.Warmup, "blacklist-warmup", o.Analysis.Blacklist.Warmup, "Download the blacklist feeds in background at startup instead of leaving it to the first check that needs them")
+	flag.DurationVar(&o.Analysis.Blacklist.WarmupInterval, "blacklist-warmup-interval", o.Analysis.Blacklist.WarmupInterval, "How often the blacklist feed cache warmup repeats once enabled, to keep the feeds refreshed on a quiet instance (keep it under 48h). 0 = at startup only")
 	flag.DurationVar(&o.ReportRetention, "report-retention", o.ReportRetention, "How long to keep reports (e.g., 720h, 30d). 0 = keep forever")
 	flag.UintVar(&o.RateLimit, "rate-limit", o.RateLimit, "API rate limit (requests per second per IP)")
 	flag.Var(&URL{&o.SurveyURL}, "survey-url", "URL for user feedback survey")
