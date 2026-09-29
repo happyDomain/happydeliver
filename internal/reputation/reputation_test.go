@@ -406,3 +406,43 @@ func TestFromObservationWebOnlySourcesAreInformational(t *testing.T) {
 		t.Errorf("web-only Verdict = %q, want %q", result.Verdict, model.DomainBlacklistResultVerdictInconclusive)
 	}
 }
+
+// URL feeds report every URL under the registered domain; only those on
+// the checked domain or on one of its parents list it.
+func TestFromObservationURLFeedsOnlyCountTheDomain(t *testing.T) {
+	tests := []struct {
+		url    string
+		listed bool
+	}{
+		{"https://news.example.com/pay", true},
+		{"https://NEWS.Example.com./pay", true},
+		{"http://example.com/login", true},
+		{"https://login.example.com/signin", false},
+		{"https://www.news.example.com/", false},
+		{"not a url%zz", false},
+	}
+	for _, source := range []string{"openphish", "phishtank"} {
+		for _, tt := range tests {
+			evidence := []blacklist.Evidence{{Label: "URL", Value: tt.url}}
+			data := &blacklist.BlacklistData{
+				Domain:           "news.example.com",
+				RegisteredDomain: "example.com",
+				CollectedAt:      time.Now(),
+				Results: []blacklist.SourceResult{
+					{SourceID: source, SourceName: source, Enabled: true, Reasons: []string{"Phishing"}, Evidence: evidence},
+				},
+			}
+
+			r := FromObservation(data).Results[0]
+			if r.Listed != tt.listed {
+				t.Errorf("%s %q: listed = %v, want %v", source, tt.url, r.Listed, tt.listed)
+			}
+			if !tt.listed && (r.Status != model.DomainBlacklistSourceResultStatusClean || r.Reasons != nil || r.Evidence != nil) {
+				t.Errorf("%s %q: got %+v, want a clean result without reasons nor evidence", source, tt.url, r)
+			}
+			if len(data.Results[0].Evidence) != 1 {
+				t.Errorf("%s %q: the observation evidence was modified", source, tt.url)
+			}
+		}
+	}
+}

@@ -27,9 +27,12 @@ package reputation
 import (
 	"encoding/json"
 	"maps"
+	"net/url"
 	"slices"
+	"strings"
 
 	blacklist "git.happydns.org/checker-blacklist/checker"
+	"golang.org/x/net/idna"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
@@ -60,7 +63,7 @@ func buildResult(data *blacklist.BlacklistData) *model.DomainBlacklistResult {
 	results := make([]model.DomainBlacklistSourceResult, 0, len(data.Results))
 	for _, r := range data.Results {
 		if r.Enabled {
-			results = append(results, toSourceResult(r))
+			results = append(results, toSourceResult(r, data.Domain))
 		}
 	}
 
@@ -165,6 +168,11 @@ func verdictOf(s blacklistTally) model.DomainBlacklistResultVerdict {
 // information only.
 var webOnlySources = map[string]bool{"oisd": true, "disconnect": true}
 
+// urlFeedSources report every feed URL under the registered domain, on
+// any of its subdomains: phishing hosted on sites.google.com says
+// nothing about mail from google.com.
+var urlFeedSources = map[string]bool{"openphish": true, "phishtank": true}
+
 // statusOf says how a source counts toward the verdict. A source whose
 // resolver was blocked (e.g. a DNSBL refusing public resolvers) counts as
 // errored, as in the checker's own rule engine: it did not answer, so it
@@ -185,7 +193,41 @@ func statusOf(r blacklist.SourceResult, listed bool) model.DomainBlacklistSource
 	}
 }
 
-func toSourceResult(r blacklist.SourceResult) model.DomainBlacklistSourceResult {
+// coveringURLs keeps the evidence URLs hosted on domain or on one of its
+// parents: the others are on sibling or child names of the registered
+// domain.
+func coveringURLs(evidence []blacklist.Evidence, domain string) []blacklist.Evidence {
+	return slices.DeleteFunc(slices.Clone(evidence), func(e blacklist.Evidence) bool {
+		host := hostOf(e.Value)
+		return host == "" || (host != domain && !strings.HasSuffix(domain, "."+host))
+	})
+}
+
+// hostOf returns the host of rawURL in the form checker-blacklist gives
+// the checked domain: ASCII, lower case, without a trailing dot.
+func hostOf(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	host := strings.TrimSuffix(u.Hostname(), ".")
+	if a, err := idna.Lookup.ToASCII(host); err == nil {
+		return a
+	}
+	return strings.ToLower(host)
+}
+
+// toSourceResult converts r, checked for domain, to the API model.
+func toSourceResult(r blacklist.SourceResult, domain string) model.DomainBlacklistSourceResult {
+	// Only the URLs on domain or on one of its parents make a listing;
+	// without any left, the reasons describing them go too.
+	if urlFeedSources[r.SourceID] && len(r.Evidence) > 0 {
+		r.Evidence = coveringURLs(r.Evidence, domain)
+		if len(r.Evidence) == 0 {
+			r.Reasons = nil
+		}
+	}
+
 	// Recompute the verdict via the source's own Evaluate so the response
 	// matches the rule engine's view (the SourceResult.Listed/Severity
 	// fields are not populated by Collect).
