@@ -13,6 +13,7 @@
         AttachmentAnalysisCard,
         ContentAnalysisCard,
         DnsRecordsCard,
+        DomainReputationCard,
         EmailPathCard,
         ErrorDisplay,
         HeaderAnalysisCard,
@@ -430,6 +431,18 @@
                         </div>
                     </div>
                 {/if}
+            {/if}
+
+            <!-- Domain Reputation -->
+            {#if report.domain_reputation}
+                <div class="row mb-4" id="domain-reputation">
+                    <div class="col-12">
+                        <DomainReputationCard
+                            blacklist={report.domain_reputation}
+                            domain={report.dns_results?.from_domain ?? ""}
+                        />
+                    </div>
+                </div>
             {/if}
 
             <!-- Header Analysis -->

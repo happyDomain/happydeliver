@@ -35,6 +35,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 	"github.com/google/uuid"
 
+	"git.happydns.org/happyDeliver/pkg/grade"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -164,6 +165,110 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("AttachmentsScore %v is out of bounds", report.Summary.AttachmentsScore)
 		}
 	}
+}
+
+// TestGenerateReportFoldsDomainReputationIntoBlacklistScore checks that a
+// sender domain's reputation (from the checker-blacklist aggregation) is
+// combined with the IP-level RBL score as the worse of the two, the same
+// pattern already used to fold the DNSWL grade into the blacklist grade.
+func TestGenerateReportFoldsDomainReputationIntoBlacklistScore(t *testing.T) {
+	gen := NewReportGenerator(GeneratorOptions{DNSTimeout: 10 * time.Second, HTTPTimeout: 10 * time.Second, RBLs: DefaultRBLs, DNSWLs: DefaultDNSWLs})
+
+	// Half of the non-informational RBLs report a listing: a deterministic,
+	// middling score/grade to combine the domain reputation against.
+	rblResults := &DNSListResults{
+		Checks:              map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "zen.spamhaus.org", Listed: true}}},
+		IPsChecked:          []string{"192.0.2.1"},
+		ListedCount:         6,
+		RelevantListedCount: 6,
+	}
+	baseScore, baseGrade := gen.rblChecker.CalculateScore(rblResults, false)
+	if baseGrade == "" {
+		t.Fatalf("baseGrade is empty, fixture did not produce a scorable RBL result")
+	}
+
+	t.Run("domain reputation worse than RBL", func(t *testing.T) {
+		repScore := 10
+		domainRep := &model.DomainBlacklistResult{Score: &repScore}
+		results := &AnalysisResults{RBL: rblResults, DNSWL: &DNSListResults{}, DomainReputation: domainRep}
+
+		report := gen.GenerateReport(uuid.New(), results)
+
+		wantScore := min(baseScore, repScore)
+		wantGrade := grade.Min(baseGrade, grade.Of(repScore))
+		if report.Summary.BlacklistScore != wantScore {
+			t.Errorf("BlacklistScore = %d, want %d", report.Summary.BlacklistScore, wantScore)
+		}
+		if string(report.Summary.BlacklistGrade) != wantGrade {
+			t.Errorf("BlacklistGrade = %s, want %s", report.Summary.BlacklistGrade, wantGrade)
+		}
+		if report.DomainReputation != domainRep {
+			t.Errorf("DomainReputation = %v, want %v", report.DomainReputation, domainRep)
+		}
+	})
+
+	t.Run("domain reputation better than RBL", func(t *testing.T) {
+		repScore := 100
+		domainRep := &model.DomainBlacklistResult{Score: &repScore}
+		results := &AnalysisResults{RBL: rblResults, DNSWL: &DNSListResults{}, DomainReputation: domainRep}
+
+		report := gen.GenerateReport(uuid.New(), results)
+
+		wantScore := min(baseScore, repScore)
+		wantGrade := grade.Min(baseGrade, grade.Of(repScore))
+		if report.Summary.BlacklistScore != wantScore {
+			t.Errorf("BlacklistScore = %d, want %d", report.Summary.BlacklistScore, wantScore)
+		}
+		if string(report.Summary.BlacklistGrade) != wantGrade {
+			t.Errorf("BlacklistGrade = %s, want %s", report.Summary.BlacklistGrade, wantGrade)
+		}
+	})
+
+	t.Run("domain reputation alone, no RBL data", func(t *testing.T) {
+		for _, repScore := range []int{42, 90, 100} {
+			domainRep := &model.DomainBlacklistResult{Score: &repScore}
+			results := &AnalysisResults{DomainReputation: domainRep}
+
+			report := gen.GenerateReport(uuid.New(), results)
+
+			if report.Summary.BlacklistScore != repScore {
+				t.Errorf("%d: BlacklistScore = %d, want %d", repScore, report.Summary.BlacklistScore, repScore)
+			}
+			if string(report.Summary.BlacklistGrade) != grade.Of(repScore) {
+				t.Errorf("%d: BlacklistGrade = %q, want %q", repScore, report.Summary.BlacklistGrade, grade.Of(repScore))
+			}
+		}
+	})
+
+	// The DNSWLs vouching for a clean IP raise it to A+; a clean domain
+	// does not cap it to its own A.
+	t.Run("clean domain keeps a whitelisted sender's A+", func(t *testing.T) {
+		repScore := 100
+		results := &AnalysisResults{
+			RBL:              &DNSListResults{IPsChecked: []string{"192.0.2.1"}},
+			DNSWL:            &DNSListResults{IPsChecked: []string{"192.0.2.1"}, ListedCount: 1},
+			DomainReputation: &model.DomainBlacklistResult{Score: &repScore},
+		}
+
+		report := gen.GenerateReport(uuid.New(), results)
+
+		if report.Summary.BlacklistScore != 100 || report.Summary.BlacklistGrade != "A+" {
+			t.Errorf("Blacklist = %d%% (%s), want 100%% (A+)", report.Summary.BlacklistScore, report.Summary.BlacklistGrade)
+		}
+	})
+
+	t.Run("no domain reputation", func(t *testing.T) {
+		results := &AnalysisResults{RBL: rblResults, DNSWL: &DNSListResults{}}
+
+		report := gen.GenerateReport(uuid.New(), results)
+
+		if report.Summary.BlacklistScore != baseScore {
+			t.Errorf("BlacklistScore = %d, want %d (unaffected by absent reputation)", report.Summary.BlacklistScore, baseScore)
+		}
+		if report.DomainReputation != nil {
+			t.Errorf("DomainReputation = %v, want nil", report.DomainReputation)
+		}
+	})
 }
 
 func TestGenerateReportAttachments(t *testing.T) {

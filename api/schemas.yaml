@@ -93,6 +93,12 @@ components:
           $ref: '#/components/schemas/RspamdResult'
         dns_results:
           $ref: '#/components/schemas/DNSResults'
+        domain_reputation:
+          $ref: '#/components/schemas/DomainBlacklistResult'
+          description: >
+            Sender-domain reputation/blacklist aggregation (checker-blacklist), distinct from
+            the per-IP blacklists/whitelists below. Omitted when the check could not be run or
+            the sending domain could not be determined.
         blacklists:
           type: object
           additionalProperties:

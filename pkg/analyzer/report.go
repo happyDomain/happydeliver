@@ -22,10 +22,12 @@
 package analyzer
 
 import (
+	"context"
 	"crypto/x509"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/utils"
 	"git.happydns.org/happyDeliver/pkg/rspamd"
 	"github.com/google/uuid"
@@ -46,6 +48,13 @@ type ReportGenerator struct {
 	dnswlChecker    *DNSListChecker
 	contentAnalyzer *content.Analyzer
 	headerAnalyzer  *HeaderAnalyzer
+
+	// reputationChecker scores the sender domain's aggregate reputation
+	// (checker-blacklist), independently of the per-IP RBL/DNSWL checks
+	// above. Nil-receiver safe: Check returns nil when unset, so a
+	// ReportGenerator built without one (every existing test) behaves
+	// exactly as before.
+	reputationChecker *reputation.Checker
 
 	// attachmentAnalyzer reads what the message carries alongside its body.
 	attachmentAnalyzer *attachment.Analyzer
@@ -96,6 +105,10 @@ type GeneratorOptions struct {
 	// VMCRoots is the trust anchor a BIMI Verified Mark Certificate must chain
 	// back to. Nil uses the embedded bundle.
 	VMCRoots *x509.CertPool
+
+	// ReputationChecker scores the sender domain's aggregate reputation. Nil
+	// leaves it out of both the report and the blacklist score.
+	ReputationChecker *reputation.Checker
 }
 
 // NewReportGenerator creates a new report generator
@@ -114,6 +127,7 @@ func NewReportGenerator(opts GeneratorOptions) *ReportGenerator {
 		dnswlChecker:       NewDNSWLChecker(opts.DNSTimeout, opts.DNSWLs, opts.CheckAllIPs),
 		contentAnalyzer:    content.NewAnalyzer(opts.HTTPTimeout),
 		headerAnalyzer:     NewHeaderAnalyzer(),
+		reputationChecker:  opts.ReputationChecker,
 		attachmentAnalyzer: attachment.New(attachment.Settings),
 	}
 }
@@ -151,14 +165,15 @@ type AnalysisResults struct {
 	// the report shows and what they cost its score. It is read once, after
 	// everything the checks look at has been observed, because a check may
 	// fetch a URL or hand a file to a scanner.
-	ContentReading content.Reading
-	DNS            *model.DNSResults
-	Headers        *model.HeaderAnalysis
-	RBL            *DNSListResults
-	DNSWL          *DNSListResults
-	SpamAssassin   *model.SpamAssassinResult
-	Rspamd         *model.RspamdResult
-	Attachments    *attachment.Results
+	ContentReading   content.Reading
+	DNS              *model.DNSResults
+	Headers          *model.HeaderAnalysis
+	RBL              *DNSListResults
+	DNSWL            *DNSListResults
+	DomainReputation *model.DomainBlacklistResult
+	SpamAssassin     *model.SpamAssassinResult
+	Rspamd           *model.RspamdResult
+	Attachments      *attachment.Results
 
 	// AttachmentReadings is what the attachment checks made of the above, one
 	// per attachment and in their order, held beside the observations for the
@@ -205,6 +220,9 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
 	}
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers, inboundHop)
+	if results.DNS != nil && results.DNS.FromDomain != "" {
+		results.DomainReputation = r.reputationChecker.Check(context.Background(), results.DNS.FromDomain)
+	}
 	results.RBL = r.rblChecker.CheckEmail(email)
 	results.DNSWL = r.dnswlChecker.CheckEmail(email)
 
@@ -302,6 +320,29 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		_, whitelistGrade = r.dnswlChecker.CalculateScore(results.DNSWL, true)
 	}
 
+	// Fold the sender domain's aggregate reputation in as worst-case, the
+	// same way whitelistGrade is folded in below: a domain flagged by
+	// threat-intel feeds must not be diluted by a clean IP-level check.
+	if dr := results.DomainReputation; dr != nil && dr.Score != nil {
+		domainRepGrade := grade.Of(*dr.Score)
+		if blacklistGrade == "" {
+			blacklistScore = *dr.Score
+			blacklistGrade = domainRepGrade
+		} else {
+			blacklistScore = min(blacklistScore, *dr.Score)
+			// A clean domain grades A, but lets a clean RBL check keep A+.
+			if *dr.Score < 100 {
+				blacklistGrade = grade.Min(blacklistGrade, domainRepGrade)
+			}
+		}
+	}
+
+	// Without RBL data there is no DNSWL grade either: an empty grade
+	// ranks lowest and would discard the domain reputation's.
+	if whitelistGrade != "" {
+		blacklistGrade = grade.Min(blacklistGrade, whitelistGrade)
+	}
+
 	attachmentsScore, attachmentsGrade := r.attachmentAnalyzer.Score(results.Attachments, results.AttachmentReadings)
 
 	saScore, saGrade := r.spamAnalyzer.CalculateSpamAssassinScore(results.SpamAssassin)
@@ -332,7 +373,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		AuthenticationScore: authScore,
 		AuthenticationGrade: model.ScoreSummaryAuthenticationGrade(authGrade),
 		BlacklistScore:      blacklistScore,
-		BlacklistGrade:      model.ScoreSummaryBlacklistGrade(grade.Min(blacklistGrade, whitelistGrade)),
+		BlacklistGrade:      model.ScoreSummaryBlacklistGrade(blacklistGrade),
 		ContentScore:        contentScore,
 		ContentGrade:        model.ScoreSummaryContentGrade(contentGrade),
 		HeaderScore:         headerScore,
@@ -360,6 +401,12 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	// Add DNS records
 	if results.DNS != nil {
 		report.DnsResults = results.DNS
+	}
+
+	// Add domain reputation (sender-domain aggregate, distinct from the
+	// per-IP blacklist/whitelist checks below).
+	if results.DomainReputation != nil {
+		report.DomainReputation = results.DomainReputation
 	}
 
 	// Add headers results
