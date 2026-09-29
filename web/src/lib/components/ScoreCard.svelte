@@ -1,5 +1,4 @@
 <script lang="ts">
-    import type { Tooltip } from "bootstrap";
     import type { AuthenticationResults, Report, ScoreSummary } from "$lib/api/types.gen";
     import {
         hasNoAuthenticationResults,
@@ -10,6 +9,7 @@
     import { hasNoSpamResults, noSpamResultsTitle } from "$lib/spam";
     import { theme } from "$lib/stores/theme";
     import GradeDisplay from "./GradeDisplay.svelte";
+    import ScoreLink from "./ScoreLink.svelte";
 
     interface Props {
         grade: string;
@@ -44,41 +44,6 @@
 
     // No IP could be extracted from the message to check against DNS blacklists.
     let blacklistUnavailable = $derived(hasNoBlacklistResults(blacklists));
-
-    interface TooltipParams {
-        enabled: boolean;
-        title: string;
-    }
-
-    function unavailableTooltip(node: HTMLElement, params: TooltipParams) {
-        let instance: Tooltip | undefined;
-        let destroyed = false;
-
-        async function sync({ enabled, title }: TooltipParams) {
-            instance?.dispose();
-            instance = undefined;
-
-            if (enabled) {
-                const { Tooltip } = await import("bootstrap");
-                if (destroyed) return;
-                instance = new Tooltip(node, {
-                    title,
-                    trigger: "click hover focus",
-                    customClass: "score-tooltip",
-                });
-            }
-        }
-
-        sync(params);
-
-        return {
-            update: sync,
-            destroy: () => {
-                destroyed = true;
-                instance?.dispose();
-            },
-        };
-    }
 
     function getScoreLabel(grade: string): string {
         switch (grade) {
@@ -120,110 +85,74 @@
         </h3>
         <p class="text-muted mb-4">Overall Deliverability Score</p>
 
-        {#snippet scoreLink(
-            href: string,
-            label: string,
-            grade: string | undefined,
-            score: number | undefined,
-            unavailable?: boolean,
-            tooltipTitle?: string,
-        )}
-            <div class="col-sm-6 col-md-4 col-lg">
-                <a
-                    {href}
-                    class="text-decoration-none"
-                    onclick={(e) => {
-                        if (unavailable) e.preventDefault();
-                    }}
-                    use:unavailableTooltip={{ enabled: !!unavailable, title: tooltipTitle ?? "" }}
-                >
-                    <div
-                        class="p-2 rounded text-center summary-card"
-                        class:bg-light={$theme === "light"}
-                        class:bg-secondary={$theme !== "light"}
-                    >
-                        {#if unavailable}
-                            <GradeDisplay grade="N/A" />
-                        {:else}
-                            <GradeDisplay {grade} {score} />
-                        {/if}
-                        <small class="text-muted d-block">{label}</small>
-                    </div>
-                </a>
-            </div>
-        {/snippet}
-
         {#if summary}
             <div class="row g-3 text-start">
-                {@render scoreLink("#dns-details", "DNS", summary.dns_grade, summary.dns_score)}
-                {@render scoreLink(
-                    "#authentication-details",
-                    "Authentication",
-                    summary.authentication_grade,
-                    summary.authentication_score,
-                    authenticationUnavailable,
-                    noAuthResultsTitle(source),
-                )}
-                {@render scoreLink(
-                    "#rbl-details",
-                    "Blacklists",
-                    summary.blacklist_grade,
-                    summary.blacklist_score,
-                    blacklistUnavailable,
-                    noBlacklistResultsTitle(),
-                )}
-                {@render scoreLink(
-                    "#header-details",
-                    "Headers",
-                    summary.header_grade,
-                    summary.header_score,
-                )}
-                {@render scoreLink(
-                    "#spam-details",
-                    "Spam Score",
-                    summary.spam_grade,
-                    summary.spam_score,
-                    spamUnavailable,
-                    noSpamResultsTitle(),
-                )}
-                {@render scoreLink(
-                    "#content-details",
-                    "Content",
-                    summary.content_grade,
-                    summary.content_score,
-                )}
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#dns-details"
+                        label="DNS"
+                        grade={summary.dns_grade}
+                        score={summary.dns_score}
+                    />
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#authentication-details"
+                        label="Authentication"
+                        grade={summary.authentication_grade}
+                        score={summary.authentication_score}
+                        unavailable={authenticationUnavailable}
+                        tooltipTitle={noAuthResultsTitle(source)}
+                    />
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#rbl-details"
+                        label="Blacklists"
+                        grade={summary.blacklist_grade}
+                        score={summary.blacklist_score}
+                        unavailable={blacklistUnavailable}
+                        tooltipTitle={noBlacklistResultsTitle()}
+                    />
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#header-details"
+                        label="Headers"
+                        grade={summary.header_grade}
+                        score={summary.header_score}
+                    />
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#spam-details"
+                        label="Spam Score"
+                        grade={summary.spam_grade}
+                        score={summary.spam_score}
+                        unavailable={spamUnavailable}
+                        tooltipTitle={noSpamResultsTitle()}
+                    />
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg">
+                    <ScoreLink
+                        href="#content-details"
+                        label="Content"
+                        grade={summary.content_grade}
+                        score={summary.content_score}
+                    />
+                </div>
                 {#if summary.attachments_grade}
-                    {@render scoreLink(
-                        "#attachment-details",
-                        "Attachments",
-                        summary.attachments_grade,
-                        summary.attachments_score,
-                    )}
+                    <div class="col-sm-6 col-md-4 col-lg">
+                        <ScoreLink
+                            href="#attachment-details"
+                            label="Attachments"
+                            grade={summary.attachments_grade}
+                            score={summary.attachments_score}
+                        />
+                    </div>
                 {/if}
             </div>
         {/if}
     </div>
 </div>
 
-<style>
-    .summary-card {
-        transition: all 0.2s ease-in-out;
-        cursor: pointer;
-    }
-
-    .summary-card:hover {
-        background-color: #e2e6ea !important;
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    :global([data-bs-theme="dark"]) .summary-card:hover {
-        background-color: #495057 !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    :global(.score-tooltip .tooltip-inner) {
-        max-width: 16rem;
-        text-align: left;
-    }
-</style>
