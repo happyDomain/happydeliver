@@ -5,12 +5,11 @@ go 1.26.0
 require (
 	git.happydns.org/checker-blacklist v0.5.1
 	git.happydns.org/checker-sdk-go v1.11.0
-	git.happydns.org/happyDomain v0.8.0-rc2.0.20260922103041-4cc15a04ea07
+	git.happydns.org/happyDomain v0.8.0-rc2.0.20261003135734-c2265239d70d
 	github.com/JGLTechnologies/gin-rate-limit v1.5.9
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-smtp v0.25.0
 	github.com/gabriel-vasile/mimetype v1.4.15
-	github.com/getkin/kin-openapi v0.149.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -26,7 +25,6 @@ require (
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
-	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.2 // indirect
 	github.com/bytedance/sonic/loader v0.5.1 // indirect
@@ -35,6 +33,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
+	github.com/getkin/kin-openapi v0.149.0 // indirect
 	github.com/gin-contrib/sse v1.1.1 // indirect
 	github.com/go-openapi/jsonpointer v0.23.1 // indirect
 	github.com/go-openapi/swag/jsonname v0.26.0 // indirect
