@@ -3,10 +3,10 @@
     import { resolve } from "$app/paths";
     import { onDestroy } from "svelte";
 
-    import { getReport, getTest, reanalyzeReport } from "$lib/api";
-    import type { BlacklistCheck, Report, Test } from "$lib/api/types.gen";
-    import { isUploadedMessage } from "$lib/authentication";
-    import { adviceAnchorsBySymbol } from "$lib/issues";
+    import { getReport, getTest, reanalyzeReport } from "#lib/api/index.js";
+    import type { BlacklistCheck, Report, Test } from "#lib/api/types.gen.js";
+    import { isUploadedMessage } from "#lib/authentication.js";
+    import { adviceAnchorsBySymbol } from "#lib/issues.js";
     import {
         AuthenticationCard,
         BlacklistCard,
@@ -24,7 +24,7 @@
         SummaryCard,
         TinySurvey,
         WhitelistCard,
-    } from "$lib/components";
+    } from "#lib/components/index.js";
 
     type BlacklistRecords = Record<string, BlacklistCheck[]>;
 
@@ -509,7 +509,7 @@
             <!-- Action Buttons -->
             <div class="row">
                 <div class="col-12 text-center">
-                    <a href={resolve("/test")} class="btn btn-primary btn-lg">
+                    <a href={resolve("test")} class="btn btn-primary btn-lg">
                         <i class="bi bi-arrow-repeat me-2"></i>
                         Test Another Email
                     </a>

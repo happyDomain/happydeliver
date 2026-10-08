@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DmarcRecord, SpfRecord } from "$lib/api/types.gen";
+    import type { DmarcRecord, SpfRecord } from "#lib/api/types.gen.js";
 
     interface Props {
         spfRecords?: SpfRecord[];
@@ -96,8 +96,8 @@
                                     {:else if spf.all_qualifier === "~"}
                                         Unauthorized servers will softfail. Consider using <code
                                             >-all</code
-                                        > for stricter policy, though this rarely affects legitimate
-                                        email deliverability.
+                                        > for stricter policy, though this rarely affects legitimate email
+                                        deliverability.
                                     {:else if spf.all_qualifier === "+"}
                                         All servers are allowed to send email. This severely weakens
                                         email authentication. Use <code>-all</code> for strict policy.

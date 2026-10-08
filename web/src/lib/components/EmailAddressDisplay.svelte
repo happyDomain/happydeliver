@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { theme } from "$lib/stores/theme";
+    import { theme } from "#lib/stores/theme.js";
 
     interface Props {
         email: string;

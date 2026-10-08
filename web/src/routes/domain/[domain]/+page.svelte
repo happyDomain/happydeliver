@@ -3,14 +3,14 @@
     import { resolve } from "$app/paths";
     import { onMount } from "svelte";
 
-    import { testDomain } from "$lib/api";
-    import type { DomainTestResponse } from "$lib/api/types.gen";
+    import { testDomain } from "#lib/api/index.js";
+    import type { DomainTestResponse } from "#lib/api/types.gen.js";
     import {
         DnsRecordsCard,
         DomainReputationCard,
         ScoreLink,
         TinySurvey,
-    } from "$lib/components";
+    } from "#lib/components/index.js";
 
     let domain = $derived(page.params.domain);
     let loading = $state(true);
@@ -31,9 +31,7 @@
         }
 
         try {
-            const response = await testDomain({
-                body: { domain: domain },
-            });
+            const response = await testDomain({ body: { domain } });
 
             if (response.data) {
                 result = response.data;
@@ -62,11 +60,9 @@
             <!-- Header -->
             <div class="mb-4">
                 <div class="d-flex align-items-center justify-content-between">
-                    <h1 class="h2 mb-0">
-                        <i class="bi bi-globe me-2"></i>
-                        Domain Analysis
-                    </h1>
-                    <a href={resolve("/domain")} class="btn btn-outline-secondary">
+                    <h1 class="h2 mb-0"><i class="bi bi-globe me-2"></i>Domain Analysis</h1>
+
+                    <a href={resolve("domain")} class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left me-2"></i>
                         Test Another Domain
                     </a>
@@ -126,7 +122,9 @@
                                     {/if}
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="score-tiles d-flex justify-content-md-end justify-content-center gap-3">
+                                    <div
+                                        class="score-tiles d-flex justify-content-md-end justify-content-center gap-3"
+                                    >
                                         <div class="score-tile">
                                             <ScoreLink
                                                 href="#dns-details"

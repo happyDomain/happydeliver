@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DkimRecord } from "$lib/api/types.gen";
+    import type { DkimRecord } from "#lib/api/types.gen.js";
 
     interface Props {
         dkimRecords?: DkimRecord[];

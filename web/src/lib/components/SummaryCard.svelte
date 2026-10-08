@@ -1,9 +1,9 @@
 <script lang="ts">
     import { resolve } from "$app/paths";
 
-    import type { Report } from "$lib/api/types.gen";
-    import { hasNoAuthenticationResults, isUploadedMessage } from "$lib/authentication";
-    import { hasNoSpamResults } from "$lib/spam";
+    import type { Report } from "#lib/api/types.gen.js";
+    import { hasNoAuthenticationResults, isUploadedMessage } from "#lib/authentication.js";
+    import { hasNoSpamResults } from "#lib/spam.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface TextSegment {
@@ -427,10 +427,8 @@
             });
             segments.push({ text: " " });
             if (arcResult.chain_valid) {
-                segments.push({
-                    text: "passed",
-                    highlight: { color: "good", bold: true },
-                });
+                segments.push({ text: "passed", highlight: { color: "good", bold: true } });
+
                 segments.push({
                     text: ` with ${arcResult.chain_length} set${arcResult.chain_length !== 1 ? "s" : ""}, indicating proper email forwarding`,
                 });
@@ -447,7 +445,6 @@
         const headers = report.header_analysis?.headers;
         const listUnsubscribe = headers?.["list-unsubscribe"];
         const listUnsubscribePost = headers?.["list-unsubscribe-post"];
-
         const hasNewsletterHeaders =
             (listUnsubscribe?.importance === "newsletter" && listUnsubscribe?.present) ||
             (listUnsubscribePost?.importance === "newsletter" && listUnsubscribePost?.present);
@@ -647,8 +644,9 @@
                         <code>{report.authserv_id}</code>, the server that originally received it.
                     {/if}
                     Anything missing reflects that message's own path, not a misconfiguration of this
-                    instance. <a href={resolve("/test")}>Send the message to a test address</a> to have
-                    it checked here instead.
+                    instance.
+                    <a href={resolve("test")}>Send the message to a test address</a>
+                    to have it checked here instead.
                 </p>
             </div>
         {/if}

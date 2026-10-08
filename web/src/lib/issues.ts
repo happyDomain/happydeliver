@@ -1,4 +1,4 @@
-import type { Issue } from "$lib/api/types.gen";
+import type { Issue } from "#lib/api/types.gen.js";
 
 /**
  * Readable name for an issue type.

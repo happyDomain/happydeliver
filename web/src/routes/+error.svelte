@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { ErrorDisplay } from "$lib/components";
+    import { ErrorDisplay } from "#lib/components/index.js";
 
     let status = $derived(page.status);
     let message = $derived(page.error?.message || "An unexpected error occurred");

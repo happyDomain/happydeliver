@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
 
-    import { appConfig } from "$lib/stores/config";
+    import { appConfig } from "#lib/stores/config.js";
 
     let ip = $state("");
     let error = $state<string | null>(null);
@@ -18,6 +18,7 @@
         // Basic IPv4/IPv6 validation
         const ipv4Pattern =
             /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
         const ipv6Pattern =
             /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
 
@@ -162,7 +163,8 @@
                     <i class="bi bi-envelope-plus me-1"></i>
                     Send Test Email
                 </a>
-                <a href={resolve("/domain")} class="btn btn-sm btn-outline-primary ms-1">
+
+                <a href={resolve("domain")} class="btn btn-sm btn-outline-primary ms-1">
                     <i class="bi bi-shield-shaded me-1"></i>
                     Check a Domain
                 </a>

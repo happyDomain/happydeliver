@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
 
-    import type { TestSummary } from "$lib/api/types.gen";
+    import type { TestSummary } from "#lib/api/types.gen.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {

@@ -2,9 +2,9 @@
     import { page } from "$app/state";
     import { resolve } from "$app/paths";
 
-    import { checkBimi } from "$lib/api";
-    import type { BimiCheckResponse } from "$lib/api/types.gen";
-    import { BimiRecordDisplay, DmarcRecordDisplay, TinySurvey } from "$lib/components";
+    import { checkBimi } from "#lib/api/index.js";
+    import type { BimiCheckResponse } from "#lib/api/types.gen.js";
+    import { BimiRecordDisplay, DmarcRecordDisplay, TinySurvey } from "#lib/components/index.js";
 
     let domain = $derived(page.params.domain ?? "");
     let selector = $derived(page.url.searchParams.get("selector") || "default");
@@ -171,7 +171,8 @@
                         <i class="bi bi-building-check me-2"></i>
                         BIMI Check
                     </h1>
-                    <a href={resolve("/bimi")} class="btn btn-outline-secondary">
+
+                    <a href={resolve("bimi")} class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left me-2"></i>
                         Check Another Domain
                     </a>

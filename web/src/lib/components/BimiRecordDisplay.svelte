@@ -4,7 +4,7 @@
         BimiRecord,
         DmarcRecord,
         SchemasBimiCheckMessage,
-    } from "$lib/api/types.gen";
+    } from "#lib/api/types.gen.js";
 
     interface Props {
         bimiRecord?: BimiRecord;

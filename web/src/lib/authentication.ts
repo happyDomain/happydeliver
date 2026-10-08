@@ -1,4 +1,4 @@
-import type { AuthenticationResults, Report } from "$lib/api/types.gen";
+import type { AuthenticationResults, Report } from "#lib/api/types.gen.js";
 
 /**
  * Where the analyzed message comes from.

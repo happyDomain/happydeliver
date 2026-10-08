@@ -1,4 +1,4 @@
-import type { Report } from "$lib/api/types.gen";
+import type { Report } from "#lib/api/types.gen.js";
 
 /**
  * True when no spam filter (SpamAssassin nor rspamd) produced a result for this message.

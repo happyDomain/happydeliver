@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Issue } from "$lib/api/types.gen";
+import type { Issue } from "#lib/api/types.gen.js";
 import {
     adviceAnchorsBySymbol,
     categoryLabel,
@@ -8,7 +8,7 @@ import {
     groupIssuesByCategory,
     issueLabel,
     issueObserver,
-} from "$lib/issues";
+} from "#lib/issues.js";
 
 /** A content issue with only the fields these tests care about. */
 function issue(fields: Partial<Issue>): Issue {

@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Tooltip } from "bootstrap";
-    import { theme } from "$lib/stores/theme";
+    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {

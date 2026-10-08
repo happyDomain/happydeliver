@@ -3,12 +3,12 @@
     import "bootstrap/dist/css/bootstrap.min.css";
     import "../app.css";
 
-    import favicon from "$lib/assets/favicon.svg";
+    import favicon from "#lib/assets/favicon.svg";
     import { resolve } from "$app/paths";
 
-    import Logo from "$lib/components/Logo.svelte";
-    import { appConfig } from "$lib/stores/config";
-    import { theme } from "$lib/stores/theme";
+    import Logo from "#lib/components/Logo.svelte";
+    import { appConfig } from "#lib/stores/config.js";
+    import { theme } from "#lib/stores/theme.js";
     import { onMount } from "svelte";
 
     interface Props {
@@ -44,10 +44,9 @@
             {#if $appConfig.test_list_enabled}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href={resolve("/history")}>
-                            <i class="bi bi-clock-history me-1"></i>
-                            History
-                        </a>
+                        <a class="nav-link" href={resolve("history")}
+                            ><i class="bi bi-clock-history me-1"></i>History</a
+                        >
                     </li>
                 </ul>
             {/if}
@@ -255,10 +254,8 @@
                     class="footer-git-link"
                     href="https://git.happydomain.org/happydeliver"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener">Free & open-source software</a
                 >
-                    Free &amp; open-source software
-                </a>
             </div>
         </div>
     </footer>

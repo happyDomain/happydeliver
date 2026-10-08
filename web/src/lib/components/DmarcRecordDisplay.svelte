@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DmarcRecord } from "$lib/api/types.gen";
+    import type { DmarcRecord } from "#lib/api/types.gen.js";
 
     interface Props {
         dmarcRecord?: DmarcRecord;
@@ -104,8 +104,8 @@
                             <strong>Good protection</strong> — emails failing DMARC checks are
                             quarantined (sent to spam). This is a safe middle ground.<br />
                             <i class="bi bi-arrow-up-circle me-1"></i>
-                            Once you've validated your configuration and ensured all legitimate mail
-                            passes, consider upgrading to <code>p=reject</code> for maximum protection.
+                            Once you've validated your configuration and ensured all legitimate mail passes,
+                            consider upgrading to <code>p=reject</code> for maximum protection.
                         </div>
                     {:else if dmarcRecord.policy === "none"}
                         <div class="alert alert-warning mt-2 mb-0 small">
@@ -307,8 +307,8 @@
                     <span class="badge bg-success">100% (default)</span>
                     <div class="alert alert-success mt-2 mb-0 small">
                         <i class="bi bi-check-circle me-1"></i>
-                        <strong>Full enforcement</strong> — all messages are subject to DMARC policy
-                        by default.
+                        <strong>Full enforcement</strong> — all messages are subject to DMARC policy by
+                        default.
                     </div>
                 </div>
             {/if}

@@ -2,10 +2,10 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
 
-    import { createTest as apiCreateTest, listTests, uploadEml } from "$lib/api";
-    import type { TestSummary } from "$lib/api/types.gen";
-    import { FeatureCard, HowItWorksStep, HistoryTable } from "$lib/components";
-    import { appConfig } from "$lib/stores/config";
+    import { createTest as apiCreateTest, listTests, uploadEml } from "#lib/api/index.js";
+    import type { TestSummary } from "#lib/api/types.gen.js";
+    import { FeatureCard, HowItWorksStep, HistoryTable } from "#lib/components/index.js";
+    import { appConfig } from "#lib/stores/config.js";
 
     let loading = $state(false);
     let error = $state<string | null>(null);
@@ -123,7 +123,7 @@
             description:
                 "Brand Indicators for Message Identification - verify your brand logo configuration.",
             variant: "info" as const,
-            href: resolve("/bimi"),
+            href: resolve("bimi"),
             linkLabel: "Check a BIMI record",
         },
         {
@@ -275,9 +275,11 @@
                             <i class="bi bi-file-earmark-arrow-up me-2"></i>
                             Analyze an .eml file
                         </button>
+
                         <p class="small mt-2 mb-0 opacity-90" style="text-wrap: balance;">
-                            Drop the raw file here{#if getMaxMessageSizeText()}&nbsp;({getMaxMessageSizeText()}
-                                max){/if}. Authentication results are then read from the server that
+                            Drop the raw file here{#if getMaxMessageSizeText()}
+                                ({getMaxMessageSizeText()} max)
+                            {/if}. Authentication results are then read from the server that
                             actually received it.
                         </p>
                     </div>
@@ -309,7 +311,7 @@
                 <div class="col-lg-10 mx-auto">
                     <HistoryTable tests={recentTests} />
                     <div class="text-center mt-4">
-                        <a href={resolve("/history")} class="btn btn-outline-primary">
+                        <a href={resolve("history")} class="btn btn-outline-primary">
                             <i class="bi bi-clock-history me-2"></i>
                             View All Tests
                         </a>
@@ -390,15 +392,17 @@
                     Analyze an .eml File
                 </button>
             {/if}
-            <a href={resolve("/domain")} class="btn btn-secondary btn-lg me-2">
-                <i class="bi bi-globe me-2"></i>
-                Test Domain Only
-            </a>
-            <a href={resolve("/bimi")} class="btn btn-secondary btn-lg me-2">
+
+            <a href={resolve("domain")} class="btn btn-secondary btn-lg me-2"
+                ><i class="bi bi-globe me-2"></i>Test Domain Only</a
+            >
+
+            <a href={resolve("bimi")} class="btn btn-secondary btn-lg me-2">
                 <i class="bi bi-building-check me-2"></i>
                 Check BIMI Only
             </a>
-            <a href={resolve("/blacklist")} class="btn btn-secondary btn-lg">
+
+            <a href={resolve("blacklist")} class="btn btn-secondary btn-lg">
                 <i class="bi bi-shield-exclamation me-2"></i>
                 Check IP Blacklist
             </a>

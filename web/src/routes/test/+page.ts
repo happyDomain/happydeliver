@@ -1,6 +1,6 @@
 import { error, redirect, type Load } from "@sveltejs/kit";
 
-import { createTest as apiCreateTest } from "$lib/api";
+import { createTest as apiCreateTest } from "#lib/api/index.js";
 
 export const prerender = false;
 export const ssr = false;
@@ -17,6 +17,6 @@ export const load: Load = async () => {
     if (response.response.ok && response.data) {
         redirect(302, `/test/${response.data.id}`);
     } else {
-        error(response.response.status, response.error);
+        error(response.response.status, response.error?.message);
     }
 };

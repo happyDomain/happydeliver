@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
 
-    import type { Test } from "$lib/api/types.gen";
+    import type { Test } from "#lib/api/types.gen.js";
     import EmailAddressDisplay from "./EmailAddressDisplay.svelte";
 
     const dispatch = createEventDispatcher();

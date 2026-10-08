@@ -2,9 +2,9 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
 
-    import { listTests, createTest as apiCreateTest } from "$lib/api";
-    import type { TestSummary } from "$lib/api/types.gen";
-    import { HistoryTable } from "$lib/components";
+    import { listTests, createTest as apiCreateTest } from "#lib/api/index.js";
+    import type { TestSummary } from "#lib/api/types.gen.js";
+    import { HistoryTable } from "#lib/components/index.js";
 
     let tests = $state<TestSummary[]>([]);
     let total = $state(0);

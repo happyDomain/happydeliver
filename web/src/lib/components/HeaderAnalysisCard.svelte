@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { DmarcRecord, HeaderAnalysis } from "$lib/api/types.gen";
-    import { compareBySeverity } from "$lib/issues";
-    import { getScoreColorClass } from "$lib/score";
-    import { theme } from "$lib/stores/theme";
+    import type { DmarcRecord, HeaderAnalysis } from "#lib/api/types.gen.js";
+    import { compareBySeverity } from "#lib/issues.js";
+    import { getScoreColorClass } from "#lib/score.js";
+    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import IssueAlert from "./IssueAlert.svelte";
 

@@ -1,13 +1,18 @@
 <script lang="ts">
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { resolve } from "$app/paths";
     import { onMount } from "svelte";
-    import { checkBlacklist } from "$lib/api";
-    import type { BlacklistCheckResponse } from "$lib/api/types.gen";
-    import { BlacklistCard, GradeDisplay, TinySurvey, WhitelistCard } from "$lib/components";
-    import { theme } from "$lib/stores/theme";
+    import { checkBlacklist } from "#lib/api/index.js";
+    import type { BlacklistCheckResponse } from "#lib/api/types.gen.js";
+    import {
+        BlacklistCard,
+        GradeDisplay,
+        TinySurvey,
+        WhitelistCard,
+    } from "#lib/components/index.js";
+    import { theme } from "#lib/stores/theme.js";
 
-    let ip = $derived($page.params.ip);
+    let ip = $derived(page.params.ip);
     let loading = $state(true);
     let error = $state<string | null>(null);
     let result = $state<BlacklistCheckResponse | null>(null);
@@ -24,9 +29,7 @@
         }
 
         try {
-            const response = await checkBlacklist({
-                body: { ip: ip },
-            });
+            const response = await checkBlacklist({ body: { ip } });
 
             if (response.response.ok) {
                 result = response.data ?? null;
@@ -59,7 +62,8 @@
                         <i class="bi bi-shield-exclamation me-2"></i>
                         Blacklist Analysis
                     </h1>
-                    <a href={resolve("/blacklist")} class="btn btn-outline-secondary">
+
+                    <a href={resolve("blacklist")} class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left me-2"></i>
                         Check Another IP
                     </a>

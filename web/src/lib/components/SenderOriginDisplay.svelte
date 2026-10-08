@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { IpOrigin } from "$lib/api/types.gen";
+    import type { IpOrigin } from "#lib/api/types.gen.js";
 
     interface Props {
         senderOrigin?: IpOrigin;

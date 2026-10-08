@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { AuthenticationResults, DnsResults } from "$lib/api/types.gen";
+    import type { AuthenticationResults, DnsResults } from "#lib/api/types.gen.js";
     import {
         hasNoAuthenticationResults,
         hasPartialAuthenticationResults,
         isUploadedMessage,
         type MessageSource,
-    } from "$lib/authentication";
-    import { getScoreColorClass } from "$lib/score";
-    import { theme } from "$lib/stores/theme";
+    } from "#lib/authentication.js";
+    import { getScoreColorClass } from "#lib/score.js";
+    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -172,9 +172,9 @@
                         The results shown here were produced by this happyDeliver instance's own
                         receiving mail server.
                     {/if}
-                    happyDeliver does not recompute this
-                    part. Mechanisms marked <strong>Not tested</strong> were not evaluated by that infrastructure.
-                    Send a test message directly to happyDeliver to have them verified here.
+                    happyDeliver does not recompute this part. Mechanisms marked
+                    <strong>Not tested</strong> were not evaluated by that infrastructure. Send a test
+                    message directly to happyDeliver to have them verified here.
                 </p>
             </div>
         </div>

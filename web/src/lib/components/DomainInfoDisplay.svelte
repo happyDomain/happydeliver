@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SenderDomainInfo } from "$lib/api/types.gen";
+    import type { SenderDomainInfo } from "#lib/api/types.gen.js";
 
     interface Props {
         domainInfo?: SenderDomainInfo;

@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { BlacklistCheck } from "$lib/api/types.gen";
-    import { getScoreColorClass } from "$lib/score";
-    import { theme } from "$lib/stores/theme";
+    import type { BlacklistCheck } from "#lib/api/types.gen.js";
+    import { getScoreColorClass } from "#lib/score.js";
+    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {

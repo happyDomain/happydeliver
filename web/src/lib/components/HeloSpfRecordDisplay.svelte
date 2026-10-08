@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SpfRecord } from "$lib/api/types.gen";
+    import type { SpfRecord } from "#lib/api/types.gen.js";
 
     interface Props {
         heloSpfRecord?: SpfRecord;

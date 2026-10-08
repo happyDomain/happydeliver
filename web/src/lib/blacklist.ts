@@ -1,4 +1,4 @@
-import type { Report } from "$lib/api/types.gen";
+import type { Report } from "#lib/api/types.gen.js";
 
 /**
  * True when no IP address could be extracted from the message to check against DNS

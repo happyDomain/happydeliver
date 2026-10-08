@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SchemasReturnOk, SchemasReturnOkDomain } from "$lib/api/types.gen";
+    import type { SchemasReturnOk, SchemasReturnOkDomain } from "#lib/api/types.gen.js";
 
     interface Props {
         returnOk?: SchemasReturnOk;
@@ -94,9 +94,9 @@
                     {:else if hasWarn}
                         <div class="alert alert-warning mb-0">
                             <i class="bi bi-exclamation-triangle me-1"></i>
-                            <strong>Warning:</strong> A sender domain has no MX record and relies on
-                            its A/AAAA record (implicit MX). Mail is still deliverable, but publishing
-                            an explicit MX record is recommended.
+                            <strong>Warning:</strong> A sender domain has no MX record and relies on its
+                            A/AAAA record (implicit MX). Mail is still deliverable, but publishing an
+                            explicit MX record is recommended.
                         </div>
                     {/if}
                 </div>

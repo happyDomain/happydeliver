@@ -39,7 +39,6 @@
         if (localPart.trim()) query.push(`local_part=${encodeURIComponent(localPart.trim())}`);
 
         const path = resolve("/bimi/[domain]", { domain: target });
-        // eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved route above, with a query string appended
         goto(query.length > 0 ? `${path}?${query.join("&")}` : path);
     }
 
@@ -65,8 +64,7 @@
                 </h1>
                 <p class="lead text-muted">
                     Validate the Assertion Record a domain publishes, the logo it points at and the
-                    Verified Mark Certificate that vouches for it &mdash; without sending a single
-                    email.
+                    Verified Mark Certificate that vouches for it — without sending a single email.
                 </p>
             </div>
 
@@ -222,7 +220,8 @@
                                 <i class="bi bi-envelope-plus me-1"></i>
                                 Test a Real Message
                             </a>
-                            <a href={resolve("/domain")} class="btn btn-sm btn-outline-secondary">
+
+                            <a href={resolve("domain")} class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-globe me-1"></i>
                                 Test the Whole Domain
                             </a>

@@ -2,7 +2,7 @@
     import type { Snippet } from "svelte";
     import type { ClassValue } from "svelte/elements";
 
-    import { appConfig } from "$lib/stores/config";
+    import { appConfig } from "#lib/stores/config.js";
 
     interface Props {
         class: ClassValue;
@@ -84,8 +84,7 @@
                 placeholder="Your thoughts..."
                 id="q6"
                 rows="2"
-                bind:value={responses.avis}
-            ></textarea>
+                bind:value={responses.avis}></textarea>
             <button class="btn btn-success mt-1"> Send! </button>
         {:else if step === 2}
             <p class="fw-bold mb-0">

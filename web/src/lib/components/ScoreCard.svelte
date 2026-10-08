@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { AuthenticationResults, Report, ScoreSummary } from "$lib/api/types.gen";
+    import type { AuthenticationResults, Report, ScoreSummary } from "#lib/api/types.gen.js";
     import {
         hasNoAuthenticationResults,
         noAuthResultsTitle,
         type MessageSource,
-    } from "$lib/authentication";
-    import { hasNoBlacklistResults, noBlacklistResultsTitle } from "$lib/blacklist";
-    import { hasNoSpamResults, noSpamResultsTitle } from "$lib/spam";
-    import { theme } from "$lib/stores/theme";
+    } from "#lib/authentication.js";
+    import { hasNoBlacklistResults, noBlacklistResultsTitle } from "#lib/blacklist.js";
+    import { hasNoSpamResults, noSpamResultsTitle } from "#lib/spam.js";
+    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import ScoreLink from "./ScoreLink.svelte";
 
@@ -155,4 +155,3 @@
         {/if}
     </div>
 </div>
-

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { BlacklistCheck } from "$lib/api/types.gen";
-    import { theme } from "$lib/stores/theme";
+    import type { BlacklistCheck } from "#lib/api/types.gen.js";
+    import { theme } from "#lib/stores/theme.js";
 
     interface Props {
         whitelists: Record<string, BlacklistCheck[]>;

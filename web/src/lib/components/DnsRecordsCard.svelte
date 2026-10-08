@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { DnsResults, DomainAlignment } from "$lib/api/types.gen";
-    import { getScoreColorClass } from "$lib/score";
-    import { theme } from "$lib/stores/theme";
+    import type { DnsResults, DomainAlignment } from "#lib/api/types.gen.js";
+    import { getScoreColorClass } from "#lib/score.js";
+    import { theme } from "#lib/stores/theme.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
