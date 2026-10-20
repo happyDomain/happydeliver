@@ -29,7 +29,7 @@ import (
 	"fmt"
 	"io"
 
-	"git.happydns.org/happyDeliver/pkg/bimi/svgps"
+	svgps "git.happydns.org/svg-tiny-ps"
 )
 
 // errNotUTF8 stops the walk of a document that is not encoded in UTF-8. Its

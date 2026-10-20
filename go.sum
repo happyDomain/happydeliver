@@ -4,6 +4,8 @@ git.happydns.org/checker-sdk-go v1.11.0 h1:+hs8OpcgvRMAoWyfqxih/Q0KYYUI1R8oFxO4R
 git.happydns.org/checker-sdk-go v1.11.0/go.mod h1:aNAcfYFfbhvH9kJhE0Njp5GX0dQbxdRB0rJ0KvSC5nI=
 git.happydns.org/happyDomain v0.8.0-rc2.0.20260922103041-4cc15a04ea07 h1:ouviZHUjdZK/stN3H3HmAiUtrFI2rr9nBaZLRPBXt5k=
 git.happydns.org/happyDomain v0.8.0-rc2.0.20260922103041-4cc15a04ea07/go.mod h1:96wyeCpspy0bprixBpmpWAIe/oOYj+2ZgPocpWILesw=
+git.happydns.org/svg-tiny-ps v1.0.0 h1:H/jdiD68G0TbGUbUHCPkY6GFkdR0uBq1Ryweq+CAJmM=
+git.happydns.org/svg-tiny-ps v1.0.0/go.mod h1:VfSKFdoqGZxI6wKXtxFukOOI5+fJJHDmER6TCBOYc54=
 github.com/JGLTechnologies/gin-rate-limit v1.5.9 h1:EXbE5sSHG/4oaWSrhFgm5ebFzIAdBwaeIgwia8esUvo=
 github.com/JGLTechnologies/gin-rate-limit v1.5.9/go.mod h1:t9eLOUxikPI0TzKy0VYRbZJr7hBP2Qg9E3JigoxF70g=
 github.com/RaveNoX/go-jsoncommentstrip v1.0.0/go.mod h1:78ihd09MekBnJnxpICcwzCMzGrKSKYe4AqU6PDYYpjk=

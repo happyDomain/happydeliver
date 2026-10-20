@@ -201,7 +201,7 @@ func TestCheckLogoXML(t *testing.T) {
 
 // TestCheckLogoSVGTinyPS covers the translation from a profile problem to an
 // evidence check. The profile rules themselves are exercised exhaustively in
-// pkg/bimi/svgps; what matters here is the status, the severity of each message
+// git.happydns.org/svg-tiny-ps; what matters here is the status, the severity of each message
 // and the way a problem is rendered.
 func TestCheckLogoSVGTinyPS(t *testing.T) {
 	tests := []struct {

@@ -42,8 +42,8 @@
 // checks can say anything about it.
 //
 // Conformance of the logo to the SVG Tiny Portable/Secure profile is decided by
-// the [git.happydns.org/happyDeliver/pkg/bimi/svgps] sub-package, which is
-// driven by the profile schema itself and can also be used on its own.
+// the [git.happydns.org/svg-tiny-ps] module, which is driven by the profile
+// schema itself.
 package bimi
 
 import (
