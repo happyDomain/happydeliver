@@ -14,7 +14,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
-	github.com/tdewolff/parse/v2 v2.8.17
+	github.com/tdewolff/parse/v2 v2.8.18
 	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
 	golang.org/x/sync v0.24.0
