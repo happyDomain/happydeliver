@@ -11,7 +11,7 @@ require (
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-smtp v0.25.0
 	github.com/gabriel-vasile/mimetype v1.4.16
-	github.com/getkin/kin-openapi v0.151.0
+	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.7.0
