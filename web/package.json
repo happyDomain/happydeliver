@@ -24,7 +24,7 @@
         "@sveltejs/load-config": "^0.2.2",
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "@types/bootstrap": "^5.2.11",
-        "@types/node": "^24.0.0",
+        "@types/node": "^26.0.0",
         "eslint": "^10.0.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-svelte": "^3.12.4",
