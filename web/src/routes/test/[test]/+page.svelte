@@ -2,6 +2,7 @@
     import { page } from "$app/state";
     import { resolve } from "$app/paths";
     import { onDestroy } from "svelte";
+    import TileLoader from "#lib/components/TileLoader.svelte";
 
     import { getReport, getTest, reanalyzeReport } from "#lib/api/index.js";
     import type { BlacklistCheck, Report, Test } from "#lib/api/types.gen.js";
@@ -230,13 +231,7 @@
 <div class="container py-5">
     {#if loading}
         <div class="text-center py-5">
-            <div
-                class="spinner-border text-primary"
-                role="status"
-                style="width: 3rem; height: 3rem;"
-            >
-                <span class="visually-hidden">Loading...</span>
-            </div>
+            <TileLoader />
             <p class="mt-3 text-muted">Loading test...</p>
         </div>
     {:else if error}
@@ -252,13 +247,7 @@
         />
     {:else if reportRateLimited}
         <div class="text-center py-5">
-            <div
-                class="spinner-border text-primary"
-                role="status"
-                style="width: 3rem; height: 3rem;"
-            >
-                <span class="visually-hidden">Loading...</span>
-            </div>
+            <TileLoader />
             <p class="mt-3 text-muted">Rate limited, retrying in a moment...</p>
         </div>
     {:else if report}

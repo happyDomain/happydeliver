@@ -8,6 +8,7 @@
         BimiRecordDisplay,
         DmarcRecordDisplay,
         ErrorDisplay,
+        TileLoader,
         TinySurvey,
     } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
@@ -193,9 +194,7 @@
                 <!-- Loading State -->
                 <div class="card">
                     <div class="card-body text-center py-5">
-                        <div class="spinner-border text-primary mb-3" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
+                        <TileLoader class="mb-3" />
                         <h3 class="h5">Checking {domain}...</h3>
                         <p class="text-muted mb-0">
                             Reading the record, then fetching the logo and the certificate it points

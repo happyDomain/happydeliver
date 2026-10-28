@@ -9,6 +9,7 @@
     import { hasNoSpamResults, noSpamResultsTitle } from "#lib/spam.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import ScoreLink from "./ScoreLink.svelte";
+    import TileLoader from "./TileLoader.svelte";
 
     interface Props {
         grade: string;
@@ -70,7 +71,7 @@
     <div class="card-body p-5 text-center">
         <div class="mb-3">
             {#if reanalyzing}
-                <div class="spinner-border spinner-border-lg text-muted display-1"></div>
+                <TileLoader width="6rem" label="Reanalyzing" />
             {:else}
                 <GradeDisplay {grade} {score} size="large" />
             {/if}

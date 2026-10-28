@@ -5,7 +5,7 @@
 
     import { listTests, createTest as apiCreateTest } from "#lib/api/index.js";
     import type { TestSummary } from "#lib/api/types.gen.js";
-    import { ErrorDisplay, HistoryTable } from "#lib/components/index.js";
+    import { ErrorDisplay, HistoryTable, TileLoader } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
 
     let tests = $state<TestSummary[]>([]);
@@ -95,13 +95,7 @@
 
             {#if loading}
                 <div class="text-center py-5">
-                    <div
-                        class="spinner-border text-primary"
-                        role="status"
-                        style="width: 3rem; height: 3rem;"
-                    >
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
+                    <TileLoader />
                     <p class="mt-3 text-muted">Loading tests...</p>
                 </div>
             {:else if error}

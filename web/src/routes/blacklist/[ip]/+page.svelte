@@ -2,6 +2,7 @@
     import { page } from "$app/state";
     import { resolve } from "$app/paths";
     import { onMount } from "svelte";
+    import TileLoader from "#lib/components/TileLoader.svelte";
     import { checkBlacklist } from "#lib/api/index.js";
     import type { BlacklistCheckResponse } from "#lib/api/types.gen.js";
     import {
@@ -79,9 +80,7 @@
                 <!-- Loading State -->
                 <div class="card">
                     <div class="card-body text-center py-5">
-                        <div class="spinner-border text-primary mb-3" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
+                        <TileLoader class="mb-3" />
                         <h3 class="h5">Checking {ip}...</h3>
                         <p class="text-muted mb-0">Querying DNS-based blacklists</p>
                     </div>
