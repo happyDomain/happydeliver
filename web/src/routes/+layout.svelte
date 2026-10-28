@@ -40,8 +40,8 @@
                 {#if $appConfig.custom_logo_url}
                     <img src={$appConfig.custom_logo_url} alt="Logo" style="height: 25px;" />
                 {:else}
-                    <i class="bi bi-envelope-check me-2"></i>
-                    <Logo color={$theme === "light" ? "black" : "white"} />
+                    <span class="d-sm-none"><Logo markOnly height={26} /></span>
+                    <span class="d-none d-sm-block"><Logo height={25} /></span>
                 {/if}
             </a>
             {#if $appConfig.test_list_enabled}
@@ -83,7 +83,7 @@
             target="_blank"
             rel="noopener"
         >
-            <i class="bi bi-envelope-check"></i>
+            <Logo markOnly height={14} />
             Powered by happyDeliver
         </a>
         <ul class="footer-nav d-flex list-unstyled mb-0">
