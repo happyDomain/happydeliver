@@ -84,7 +84,7 @@
             rel="noopener"
         >
             <Logo markOnly height={14} />
-            Powered by happyDeliver
+            Powered by HappyDeliver
         </a>
         <ul class="footer-nav d-flex list-unstyled mb-0">
             <li>
@@ -262,7 +262,7 @@
                 class="footer-bottom pt-3 d-flex flex-wrap justify-content-between align-items-center gap-2"
             >
                 <span class="footer-bottom-text">
-                    © {new Date().getFullYear()} happyDomain — Powered by happyDeliver
+                    © {new Date().getFullYear()} HappyDomain. Powered by HappyDeliver.
                 </span>
                 <a
                     class="footer-git-link"

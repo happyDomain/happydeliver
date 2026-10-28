@@ -58,7 +58,7 @@
 </script>
 
 <svelte:head>
-    <title>{domain} - Domain Test - happyDeliver</title>
+    <title>{domain} - Domain Test - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

@@ -33,7 +33,7 @@
 </script>
 
 <svelte:head>
-    <title>Domain Test - happyDeliver</title>
+    <title>Domain Test - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

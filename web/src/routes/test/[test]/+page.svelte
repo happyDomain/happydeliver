@@ -224,7 +224,7 @@
             ? `Test${report.dns_results ? ` of ${report.dns_results.from_domain}` : ""} ${report.test_id?.slice(0, 7) || ""}`
             : test
               ? `Test ${test.id.slice(0, 7)}`
-              : "Loading..."} - happyDeliver
+              : "Loading..."} - HappyDeliver
     </title>
 </svelte:head>
 

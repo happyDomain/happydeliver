@@ -163,17 +163,17 @@
                 <p class="mb-0 mt-1">
                     {#if uploaded && authservId}
                         The results shown here were produced by <code>{authservId}</code>, the
-                        server that received this message before it reached happyDeliver.
+                        server that received this message before it reached HappyDeliver.
                     {:else if uploaded}
                         The results shown here were produced by the infrastructure of your mail
-                        provider that received this message before it reached happyDeliver.
+                        provider that received this message before it reached HappyDeliver.
                     {:else}
-                        The results shown here were produced by this happyDeliver instance's own
+                        The results shown here were produced by this HappyDeliver instance's own
                         receiving mail server.
                     {/if}
-                    happyDeliver does not recompute this part. Mechanisms marked
+                    HappyDeliver does not recompute this part. Mechanisms marked
                     <strong>Not tested</strong> were not evaluated by that infrastructure. Send a test
-                    message directly to happyDeliver to have them verified here.
+                    message directly to HappyDeliver to have them verified here.
                 </p>
             </div>
         </div>

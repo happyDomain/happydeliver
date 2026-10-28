@@ -33,7 +33,7 @@ import (
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "happyDeliver - Email Deliverability Testing Platform")
+	fmt.Fprintln(os.Stderr, "HappyDeliver - Email Deliverability Testing Platform")
 	fmt.Fprintf(os.Stderr, "Version: %s\n", version.Version)
 
 	cfg, err := config.ConsolidateConfig()

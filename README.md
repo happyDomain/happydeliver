@@ -1,4 +1,4 @@
-# happyDeliver - Email Deliverability Tester
+# HappyDeliver - Email Deliverability Tester
 
 ![banner](banner.webp)
 
@@ -19,7 +19,7 @@ An open-source email deliverability testing platform that analyzes test emails a
 
 ### With Docker (Recommended)
 
-The easiest way to run happyDeliver is using the all-in-one Docker container that includes Postfix, authentication_milter, SpamAssassin, and the happyDeliver application.
+The easiest way to run HappyDeliver is using the all-in-one Docker container that includes Postfix, authentication_milter, SpamAssassin, and the HappyDeliver application.
 
 #### What's included in the Docker container:
 
@@ -27,7 +27,7 @@ The easiest way to run happyDeliver is using the all-in-one Docker container tha
 - **authentication_milter**: Entreprise grade email authentication
 - **SpamAssassin**: Spam scoring and analysis
 - **rspamd**: Second spam filter for cross-validated scoring
-- **happyDeliver API**: REST API server on port 8080
+- **HappyDeliver API**: REST API server on port 8080
 - **SQLite Database**: Persistent storage for tests and reports
 
 #### 1. Using docker-compose
@@ -164,13 +164,13 @@ The server will start on `http://localhost:8080` by default.
 #### 3. Integrate with your existing e-mail setup
 
 It is expected your setup annotate the email with eg. opendkim, spamassassin, rspamd, ...
-happyDeliver will not perform thoses checks, it relies instead on standard software to have real world annotations.
+HappyDeliver will not perform thoses checks, it relies instead on standard software to have real world annotations.
 
 #### Receiver Hostname
 
-happyDeliver filters `Authentication-Results` headers by hostname to only trust headers added by your MTA (and not headers that may have been injected by the sender). By default, it uses the system hostname (`os.Hostname()`).
+HappyDeliver filters `Authentication-Results` headers by hostname to only trust headers added by your MTA (and not headers that may have been injected by the sender). By default, it uses the system hostname (`os.Hostname()`).
 
-If your MTA's `authserv-id` (the hostname at the beginning of `Authentication-Results` headers) differs from the machine running happyDeliver, you must set it explicitly:
+If your MTA's `authserv-id` (the hostname at the beginning of `Authentication-Results` headers) differs from the machine running HappyDeliver, you must set it explicitly:
 
 ```bash
 ./happyDeliver server -receiver-hostname mail.example.com
@@ -183,15 +183,15 @@ HAPPYDELIVER_RECEIVER_HOSTNAME=mail.example.com ./happyDeliver server
 
 **How to find the correct value:** look at the `Authentication-Results` headers in a received email. They start with the authserv-id, e.g. `Authentication-Results: mail.example.com; spf=pass ...` — in this case, use `mail.example.com`.
 
-If the value is misconfigured, happyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
+If the value is misconfigured, HappyDeliver will log a warning when the last `Received` hop doesn't match the expected hostname.
 
-This setting only applies to messages delivered to happyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
+This setting only applies to messages delivered to HappyDeliver. For an uploaded `.eml` file the authserv-id cannot be known in advance, so it is detected from the file itself: the topmost `Authentication-Results` header wins, as it was written by the last server that handled the message. Both the source and the authserv-id that was trusted are recorded in the report (`source`, `authserv_id`, `authserv_ids_found`).
 
 #### Attachment Analysis
 
-happyDeliver reads the files a message carries alongside its body: file type mismatches (a `.pdf` that is really an executable, `.pdf.exe` double extensions), Office macros, PDF active content, scripts, nested and password-protected archives. Two optional external scanners improve detection:
+HappyDeliver reads the files a message carries alongside its body: file type mismatches (a `.pdf` that is really an executable, `.pdf.exe` double extensions), Office macros, PDF active content, scripts, nested and password-protected archives. Two optional external scanners improve detection:
 
-- **ClamAV**: point happyDeliver at a running `clamd` daemon:
+- **ClamAV**: point HappyDeliver at a running `clamd` daemon:
 
   ```bash
   ./happyDeliver server -clamav-address tcp://127.0.0.1:3310
@@ -209,7 +209,7 @@ happyDeliver reads the files a message carries alongside its body: file type mis
 
   Add `-virustotal-upload` to also submit files unknown to VirusTotal for analysis. **Warning:** uploaded files are shared with the VirusTotal community; do not enable it if test emails may contain confidential documents. Note the free API tier is limited to 4 requests/minute.
 
-Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks happyDeliver runs itself still apply and scanner verdicts are reported as `disabled` without affecting the score.
+Related options: `-scan-timeout` (default 30s) bounds the reading of one attachment, and `-max-attachment-size` (default 25 MiB) caps the size of the attachments whose content is analyzed. A file above that size is still named, sized and hashed in the report; only its content is left unread. When no scanner is configured, the checks HappyDeliver runs itself still apply and scanner verdicts are reported as `disabled` without affecting the score.
 
 #### Domain Blacklist Sources
 
@@ -230,7 +230,7 @@ As any other option, each can be given through the environment, e.g. `HAPPYDELIV
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.
 
-1. Start the happyDeliver server with LMTP enabled (default listens on `127.0.0.1:2525`):
+1. Start the HappyDeliver server with LMTP enabled (default listens on `127.0.0.1:2525`):
 
   ```bash
   ./happyDeliver server
@@ -351,7 +351,7 @@ cat inbox-message.eml | ./happyDeliver analyze -eml -json
 
 ## Go Libraries
 
-Beyond the server and CLI, happyDeliver publishes some of its email checks as
+Beyond the server and CLI, HappyDeliver publishes some of its email checks as
 standalone Go libraries under `pkg/`, so you can embed the same validation
 logic in your own tools without running the whole platform. They have no
 dependency on the server, its API or a database, and reach the network only
@@ -380,9 +380,9 @@ inputs: `ParseRecord` (a record string), `CheckLogoXML` / `CheckLogoSVGTinyPS`
 More checks (SPF, DKIM, DMARC, ...) will be made available as libraries here
 over time.
 
-## Use with happyDomain
+## Use with HappyDomain
 
-happyDeliver can be driven by [happyDomain](https://happydomain.org) through
+HappyDeliver can be driven by [HappyDomain](https://happydomain.org) through
 the [`checker-happydeliver`](https://git.nemunai.re/happyDomain/checker-happydeliver)
 plugin, so the deliverability of a domain you manage is monitored alongside
 its DNS and inbound SMTP posture.
@@ -390,19 +390,19 @@ its DNS and inbound SMTP posture.
 How it works:
 
 1. Attach the **Outbound deliverability** checker to the mail service of a zone
-   in happyDomain. Point it at a happyDeliver instance via `happydeliver_url`;
+   in HappyDomain. Point it at a HappyDeliver instance via `happydeliver_url`;
    operators can configure a default instance globally.
 2. On each run, the checker calls `POST /api/test` to allocate a fresh
    recipient address, prompts the user (or an automated sender) to mail it from
    the tested domain, then polls `GET /api/test/{id}` until the report is
    ready.
 3. The structured report from `GET /api/report/{id}` is translated into
-   happyDomain rule states: CRIT/WARN/INFO on SPF, DKIM, DMARC, alignment, spam
+   HappyDomain rule states: CRIT/WARN/INFO on SPF, DKIM, DMARC, alignment, spam
    score, blacklists and headers, plus an overall score threshold
    (`min_score`/`warn_score`).
 4. Runs repeat on a configurable interval so a regression in deliverability (a
    new RBL listing, a DKIM key rotation gone wrong, a broken SPF include, ...)
-   surfaces as a domain-level alert in happyDomain.
+   surfaces as a domain-level alert in HappyDomain.
 
 See the [`checker-happydeliver` repository](https://git.nemunai.re/happyDomain/checker-happydeliver)
 for build instructions and the full list of run options.

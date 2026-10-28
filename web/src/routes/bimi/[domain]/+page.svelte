@@ -169,7 +169,7 @@
 </script>
 
 <svelte:head>
-    <title>{domain} - BIMI Checker - happyDeliver</title>
+    <title>{domain} - BIMI Checker - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

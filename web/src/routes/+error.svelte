@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-    <title>Error {page.status} | happyDeliver</title>
+    <title>Error {page.status} | HappyDeliver</title>
 </svelte:head>
 
 <div class="flex-fill d-flex flex-column justify-content-center bg-primary-subtle">

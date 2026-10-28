@@ -51,7 +51,7 @@
 </script>
 
 <svelte:head>
-    <title>BIMI Checker - happyDeliver</title>
+    <title>BIMI Checker - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

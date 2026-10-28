@@ -39,7 +39,7 @@
 </script>
 
 <svelte:head>
-    <title>Blacklist Check - happyDeliver</title>
+    <title>Blacklist Check - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

@@ -55,7 +55,7 @@
 </script>
 
 <svelte:head>
-    <title>{ip} - Blacklist Check - happyDeliver</title>
+    <title>{ip} - Blacklist Check - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

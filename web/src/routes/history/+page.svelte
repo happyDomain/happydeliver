@@ -72,7 +72,7 @@
 </script>
 
 <svelte:head>
-    <title>Test History - happyDeliver</title>
+    <title>Test History - HappyDeliver</title>
 </svelte:head>
 
 <div class="container py-5">

@@ -218,7 +218,7 @@
 </script>
 
 <svelte:head>
-    <title>happyDeliver. Test Your Email Deliverability.</title>
+    <title>HappyDeliver. Test Your Email Deliverability.</title>
 </svelte:head>
 
 <!-- Hero Section -->

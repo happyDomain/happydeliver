@@ -74,7 +74,7 @@ var embeddedWorks = []notice{
 // alone, so this command is how their recipients get the attribution the
 // embedded data is licensed under.
 func RunLicenses(writer io.Writer) error {
-	fmt.Fprintln(writer, "happyDeliver is licensed under the GNU Affero General Public License v3.0")
+	fmt.Fprintln(writer, "HappyDeliver is licensed under the GNU Affero General Public License v3.0")
 	fmt.Fprintln(writer, "or later (AGPL-3.0-or-later), or under a commercial license obtained from")
 	fmt.Fprintln(writer, "happyDomain <contact@happydomain.org>.")
 	fmt.Fprintln(writer)
