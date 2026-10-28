@@ -5,6 +5,7 @@
     import { createTest as apiCreateTest, listTests, uploadEml } from "#lib/api/index.js";
     import type { TestSummary } from "#lib/api/types.gen.js";
     import { FeatureCard, HowItWorksStep, HistoryTable } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
     import { appConfig } from "#lib/stores/config.js";
 
     let loading = $state(false);
@@ -38,7 +39,10 @@
             const response = await apiCreateTest();
             if (response.data) {
                 goto(resolve("/test/[test]", { test: response.data.id }));
+                return;
             }
+            error = apiMessage(response.error) ?? "Failed to create test";
+            loading = false;
         } catch (err) {
             error = err instanceof Error ? err.message : "Failed to create test";
             loading = false;
@@ -55,7 +59,7 @@
                 goto(resolve("/test/[test]", { test: response.data.id }));
                 return;
             }
-            error = response.error?.message ?? "Failed to analyze this file";
+            error = apiMessage(response.error) ?? "Failed to analyze this file";
         } catch (err) {
             error = err instanceof Error ? err.message : "Failed to analyze this file";
         }

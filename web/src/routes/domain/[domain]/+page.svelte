@@ -8,13 +8,16 @@
     import {
         DnsRecordsCard,
         DomainReputationCard,
+        ErrorDisplay,
         ScoreLink,
         TinySurvey,
     } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
 
     let domain = $derived(page.params.domain);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let errorStatus = $state(500);
     let result = $state<DomainTestResponse | null>(null);
 
     let blacklist = $derived(result?.domain_reputation ?? null);
@@ -25,6 +28,7 @@
         result = null;
 
         if (!domain) {
+            errorStatus = 400;
             error = "Domain parameter is missing";
             loading = false;
             return;
@@ -33,12 +37,14 @@
         try {
             const response = await testDomain({ body: { domain } });
 
-            if (response.data) {
+            if (response.response?.ok && response.data) {
                 result = response.data;
-            } else if (response.error) {
-                error = response.error.message || "Failed to analyze domain";
+            } else {
+                errorStatus = response.response?.status ?? 500;
+                error = apiMessage(response.error) ?? "Failed to analyze domain";
             }
         } catch (err) {
+            errorStatus = 500;
             error = err instanceof Error ? err.message : "Failed to analyze domain";
         } finally {
             loading = false;
@@ -83,19 +89,14 @@
                     </div>
                 </div>
             {:else if error}
-                <!-- Error State -->
-                <div class="card border-0">
-                    <div class="card-body text-center py-5">
-                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
-                        ></i>
-                        <h3 class="h4 mt-4">Analysis Failed</h3>
-                        <p class="text-muted mb-4">{error}</p>
-                        <button class="btn btn-primary" onclick={analyzeDomain}>
-                            <i class="bi bi-arrow-clockwise me-2"></i>
+                <ErrorDisplay status={errorStatus} message={error} showActions={false}>
+                    {#snippet actions()}
+                        <button type="button" class="btn btn-primary" onclick={analyzeDomain}>
+                            <i class="bi bi-arrow-clockwise me-1"></i>
                             Try Again
                         </button>
-                    </div>
-                </div>
+                    {/snippet}
+                </ErrorDisplay>
             {:else if result}
                 <!-- Results -->
                 <div class="fade-in">

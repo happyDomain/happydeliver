@@ -24,6 +24,7 @@
         TinySurvey,
         WhitelistCard,
     } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
 
     type BlacklistRecords = Record<string, BlacklistCheck[]>;
 
@@ -42,34 +43,10 @@
     let fetching = $state(false);
     let reportRateLimited = $state(false);
 
-    // Helper function to handle API errors
-    function handleApiError(apiError: unknown, defaultMessage: string) {
-        if (apiError && typeof apiError === "object") {
-            if ("message" in apiError) {
-                error = String(apiError.message);
-            } else {
-                error = defaultMessage;
-            }
-
-            // Determine status code based on error type
-            if ("error" in apiError) {
-                if (apiError.error === "rate_limit_exceeded") {
-                    errorStatus = 429;
-                } else if (apiError.error === "not_found") {
-                    errorStatus = 404;
-                } else {
-                    errorStatus = 500;
-                }
-            } else {
-                errorStatus = 500;
-            }
-        } else if (apiError instanceof Error) {
-            error = apiError.message;
-            errorStatus = 500;
-        } else {
-            error = defaultMessage;
-            errorStatus = 500;
-        }
+    function showError(status: number | undefined, apiError: unknown, defaultMessage: string) {
+        errorStatus = status ?? 500;
+        error =
+            (apiError instanceof Error ? apiError.message : apiMessage(apiError)) ?? defaultMessage;
     }
 
     function isRateLimited(apiError: unknown): boolean {
@@ -95,12 +72,16 @@
                     reportRateLimited = true;
                     reportRetryTimeout = setTimeout(fetchReport, 2000);
                 } else {
-                    handleApiError(reportResponse.error, "Failed to fetch report");
+                    showError(
+                        reportResponse.response?.status,
+                        reportResponse.error,
+                        "Failed to fetch report",
+                    );
                     stopPolling();
                 }
             }
         } catch (err) {
-            handleApiError(err, "Failed to fetch report");
+            showError(500, err, "Failed to fetch report");
             stopPolling();
         }
     }
@@ -129,14 +110,18 @@
                     await fetchReport();
                 }
             } else if (testResponse.error) {
-                handleApiError(testResponse.error, "Failed to fetch test");
+                showError(
+                    testResponse.response?.status,
+                    testResponse.error,
+                    "Failed to fetch test",
+                );
                 loading = false;
                 stopPolling();
                 return;
             }
             loading = false;
         } catch (err) {
-            handleApiError(err, "Failed to fetch test");
+            showError(500, err, "Failed to fetch test");
             loading = false;
             stopPolling();
         } finally {
@@ -210,10 +195,10 @@
             if (response.data) {
                 report = response.data;
             } else if (response.error) {
-                handleApiError(response.error, "Failed to reanalyze report");
+                showError(response.response?.status, response.error, "Failed to reanalyze report");
             }
         } catch (err) {
-            handleApiError(err, "Failed to reanalyze report");
+            showError(500, err, "Failed to reanalyze report");
         } finally {
             reanalyzing = false;
         }

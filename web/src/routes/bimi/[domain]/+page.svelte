@@ -4,7 +4,13 @@
 
     import { checkBimi } from "#lib/api/index.js";
     import type { BimiCheckResponse } from "#lib/api/types.gen.js";
-    import { BimiRecordDisplay, DmarcRecordDisplay, TinySurvey } from "#lib/components/index.js";
+    import {
+        BimiRecordDisplay,
+        DmarcRecordDisplay,
+        ErrorDisplay,
+        TinySurvey,
+    } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
 
     let domain = $derived(page.params.domain ?? "");
     let selector = $derived(page.url.searchParams.get("selector") || "default");
@@ -12,6 +18,7 @@
 
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let errorStatus = $state(500);
     let result = $state<BimiCheckResponse | null>(null);
 
     async function runCheck(target: string, sel: string, lp: string) {
@@ -20,6 +27,7 @@
         result = null;
 
         if (!target) {
+            errorStatus = 400;
             error = "Domain parameter is missing";
             loading = false;
             return;
@@ -34,12 +42,14 @@
                 },
             });
 
-            if (response.data) {
+            if (response.response?.ok && response.data) {
                 result = response.data;
-            } else if (response.error) {
-                error = response.error.message || "Failed to check the BIMI record";
+            } else {
+                errorStatus = response.response?.status ?? 500;
+                error = apiMessage(response.error) ?? "Failed to check the BIMI record";
             }
         } catch (err) {
+            errorStatus = 500;
             error = err instanceof Error ? err.message : "Failed to check the BIMI record";
         } finally {
             loading = false;
@@ -194,22 +204,18 @@
                     </div>
                 </div>
             {:else if error}
-                <!-- Error State -->
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
-                        ></i>
-                        <h3 class="h4 mt-4">Check Failed</h3>
-                        <p class="text-muted mb-4">{error}</p>
+                <ErrorDisplay status={errorStatus} message={error} showActions={false}>
+                    {#snippet actions()}
                         <button
+                            type="button"
                             class="btn btn-primary"
                             onclick={() => runCheck(domain, selector, localPart)}
                         >
-                            <i class="bi bi-arrow-clockwise me-2"></i>
+                            <i class="bi bi-arrow-clockwise me-1"></i>
                             Try Again
                         </button>
-                    </div>
-                </div>
+                    {/snippet}
+                </ErrorDisplay>
             {:else if result && record}
                 <!-- Results -->
                 <div class="fade-in">

@@ -6,14 +6,17 @@
     import type { BlacklistCheckResponse } from "#lib/api/types.gen.js";
     import {
         BlacklistCard,
+        ErrorDisplay,
         GradeDisplay,
         TinySurvey,
         WhitelistCard,
     } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
 
     let ip = $derived(page.params.ip);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let errorStatus = $state(500);
     let result = $state<BlacklistCheckResponse | null>(null);
 
     async function analyzeIP() {
@@ -22,6 +25,7 @@
         result = null;
 
         if (!ip) {
+            errorStatus = 400;
             error = "IP parameter is missing";
             loading = false;
             return;
@@ -30,12 +34,14 @@
         try {
             const response = await checkBlacklist({ body: { ip } });
 
-            if (response.response?.ok) {
-                result = response.data ?? null;
-            } else if (response.error) {
-                error = response.error.message || "Failed to check IP address";
+            if (response.response?.ok && response.data) {
+                result = response.data;
+            } else {
+                errorStatus = response.response?.status ?? 500;
+                error = apiMessage(response.error) ?? "Failed to check IP address";
             }
         } catch (err) {
+            errorStatus = 500;
             error = err instanceof Error ? err.message : "Failed to check IP address";
         } finally {
             loading = false;
@@ -81,19 +87,14 @@
                     </div>
                 </div>
             {:else if error}
-                <!-- Error State -->
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
-                        ></i>
-                        <h3 class="h4 mt-4">Check Failed</h3>
-                        <p class="text-muted mb-4">{error}</p>
-                        <button class="btn btn-primary" onclick={analyzeIP}>
-                            <i class="bi bi-arrow-clockwise me-2"></i>
+                <ErrorDisplay status={errorStatus} message={error} showActions={false}>
+                    {#snippet actions()}
+                        <button type="button" class="btn btn-primary" onclick={analyzeIP}>
+                            <i class="bi bi-arrow-clockwise me-1"></i>
                             Try Again
                         </button>
-                    </div>
-                </div>
+                    {/snippet}
+                </ErrorDisplay>
             {:else if result}
                 <!-- Results -->
                 <div class="fade-in">

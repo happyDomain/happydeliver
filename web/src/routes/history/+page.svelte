@@ -6,6 +6,7 @@
     import { listTests, createTest as apiCreateTest } from "#lib/api/index.js";
     import type { TestSummary } from "#lib/api/types.gen.js";
     import { ErrorDisplay, HistoryTable } from "#lib/components/index.js";
+    import { apiMessage } from "#lib/errors.js";
 
     let tests = $state<TestSummary[]>([]);
     let total = $state(0);
@@ -18,12 +19,6 @@
     let error = $state<string | null>(null);
     let errorStatus = $state(500);
     let creatingTest = $state(false);
-
-    function apiMessage(apiError: unknown): string | null {
-        return apiError && typeof apiError === "object" && "message" in apiError
-            ? String(apiError.message)
-            : null;
-    }
 
     async function loadTests(offset: number) {
         loading = true;
