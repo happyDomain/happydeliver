@@ -610,7 +610,7 @@
     const summarySegments = $derived(buildSummary());
 </script>
 
-<div class="card shadow-sm border-0 mb-4">
+<div class="card border-0 mb-4">
     <div class="card-body p-4">
         <h5 class="card-title mb-3">
             <i class="bi bi-card-text me-2"></i>
@@ -673,7 +673,7 @@
                         href={segment.link}
                         class="summary-link {segment.highlight
                             ? getColorClass(segment.highlight.color)
-                            : ''} {segment.highlight?.bold ? 'highlighted' : ''} {segment.highlight
+                            : ''} {segment.highlight?.bold ? 'fw-semibold' : ''} {segment.highlight
                             ?.emphasis
                             ? 'fst-italic'
                             : ''} {segment.highlight?.monospace ? 'font-monospace' : ''}"
@@ -684,7 +684,7 @@
                 {:else if segment.highlight}
                     <span
                         class="{getColorClass(segment.highlight.color)} {segment.highlight.bold
-                            ? 'highlighted'
+                            ? 'fw-semibold'
                             : ''} {segment.highlight?.emphasis ? 'fst-italic' : ''} {segment
                             .highlight?.monospace
                             ? 'font-monospace'
@@ -728,9 +728,5 @@
     .summary-link:hover {
         opacity: 0.8;
         text-decoration: underline;
-    }
-
-    .highlighted {
-        font-weight: 600;
     }
 </style>

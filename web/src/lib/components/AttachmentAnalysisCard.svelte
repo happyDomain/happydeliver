@@ -7,7 +7,6 @@
         issueObserver,
     } from "#lib/issues.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import IssueAlert from "./IssueAlert.svelte";
 
@@ -76,7 +75,7 @@
 </script>
 
 <div class="card shadow-sm" id="attachment-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-paperclip me-2"></i>
@@ -110,7 +109,7 @@
                             <i class="bi bi-file-earmark me-1"></i>
                             {attachment.filename || "(unnamed attachment)"}
                             {#if attachment.inline}
-                                <span class="badge bg-light text-dark border ms-1">inline</span>
+                                <span class="badge bg-light border ms-1">inline</span>
                             {/if}
                         </h5>
                         <span class="text-muted small">{formatSize(attachment.size)}</span>

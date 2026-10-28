@@ -7,33 +7,11 @@
 
     let { grade, score, size = "medium" }: Props = $props();
 
+    // Gradient from green (A) to red (F), see the --hd-grade-* tokens.
     function getGradeColor(grade?: string): string {
-        if (!grade) return "#6b7280"; // Gray for no grade
-
-        const baseLetter = grade.charAt(0).toUpperCase();
-        const modifier = grade.length > 1 ? grade.charAt(1) : "";
-
-        // Gradient from green (A+) to red (F)
-        switch (baseLetter) {
-            case "A":
-                if (modifier === "+") return "#22c55e"; // Bright green
-                if (modifier === "-") return "#16a34a"; // Green
-                return "#22c55e"; // Green
-            case "B":
-                if (modifier === "-") return "#65a30d"; // Darker lime
-                return "#84cc16"; // Lime
-            case "C":
-                if (modifier === "-") return "#ca8a04"; // Darker yellow
-                return "#eab308"; // Yellow
-            case "D":
-                return "#f97316"; // Orange
-            case "E":
-                return "#ea580c"; // Red
-            case "F":
-                return "#dc2626"; // Red
-            default:
-                return "#6b7280"; // Gray
-        }
+        const baseLetter = grade?.charAt(0).toLowerCase();
+        if (baseLetter && "abcdef".includes(baseLetter)) return `var(--hd-grade-${baseLetter})`;
+        return "var(--hd-grade-none)";
     }
 
     function getSizeClass(size: "inline" | "small" | "medium" | "large"): string {

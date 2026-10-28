@@ -284,7 +284,7 @@
                 <div class="col-12">
                     <div class="position-relative">
                         <div class="position-absolute py-2 px-3" style="z-index: 2; right: 0">
-                            <div class="menu-container">
+                            <div class="dropdown">
                                 <button
                                     class="btn btn-outline-secondary"
                                     type="button"
@@ -294,23 +294,26 @@
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 {#if menuOpen}
-                                    <div class="menu-dropdown">
-                                        <button class="menu-item" onclick={handleExportJSON}>
+                                    <div
+                                        class="dropdown-menu dropdown-menu-end show"
+                                        data-bs-popper="static"
+                                    >
+                                        <button class="dropdown-item" onclick={handleExportJSON}>
                                             <i class="bi bi-download me-2"></i>
                                             Export JSON Report
                                         </button>
                                         <button
-                                            class="menu-item"
+                                            class="dropdown-item"
                                             onclick={handleReanalyze}
                                             disabled={reanalyzing}
                                         >
                                             <i class="bi bi-arrow-clockwise me-2"></i>
                                             Reanalyze with Latest Version
                                         </button>
-                                        <hr class="menu-divider" />
+                                        <hr class="dropdown-divider" />
                                         <!-- eslint-disable svelte/no-navigation-without-resolve -- API endpoint, not a SvelteKit route -->
                                         <a
-                                            class="menu-item"
+                                            class="dropdown-item"
                                             href={`/api/report/${testId}/raw.eml`}
                                             target="_blank"
                                             onclick={() => (menuOpen = false)}
@@ -517,67 +520,3 @@
         </div>
     {/if}
 </div>
-
-<style>
-    .fade-in {
-        animation: fadeIn 0.6s ease-out;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .menu-container {
-        position: relative;
-    }
-
-    .menu-dropdown {
-        position: absolute;
-        top: 100%;
-        right: 0;
-        margin-top: 0.25rem;
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-        min-width: 250px;
-        z-index: 1000;
-        padding: 0.5rem 0;
-    }
-
-    .menu-item {
-        display: block;
-        width: 100%;
-        padding: 0.5rem 1rem;
-        background: none;
-        border: none;
-        text-align: left;
-        color: #212529;
-        text-decoration: none;
-        cursor: pointer;
-        transition: background-color 0.15s ease-in-out;
-        font-size: 1rem;
-    }
-
-    .menu-item:hover:not(:disabled) {
-        background-color: #f8f9fa;
-    }
-
-    .menu-item:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .menu-divider {
-        margin: 0.5rem 0;
-        border: 0;
-        border-top: 1px solid #dee2e6;
-    }
-</style>

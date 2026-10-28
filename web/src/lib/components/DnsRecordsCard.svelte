@@ -1,7 +1,6 @@
 <script lang="ts">
     import type { DnsResults, DomainAlignment } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
@@ -32,7 +31,7 @@
 </script>
 
 <div class="card shadow-sm" id="dns-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-diagram-3 me-2"></i>

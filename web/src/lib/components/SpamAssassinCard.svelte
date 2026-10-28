@@ -1,7 +1,6 @@
 <script lang="ts">
     import type { SpamAssassinResult } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -12,7 +11,7 @@
 </script>
 
 <div class="card shadow-sm" id="spam-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-bug me-2"></i>
@@ -90,11 +89,7 @@
                 <strong>Tests Triggered:</strong>
                 <div class="mt-2">
                     {#each spamassassin.tests as test (test)}
-                        <span
-                            class="badge {$theme === 'light'
-                                ? 'bg-light text-dark'
-                                : 'bg-secondary'} me-1 mb-1">{test}</span
-                        >
+                        <span class="badge text-bg-light me-1 mb-1">{test}</span>
                     {/each}
                 </div>
             </div>
@@ -103,10 +98,7 @@
         {#if spamassassin.report}
             <details class="mt-3">
                 <summary class="cursor-pointer fw-bold">Raw Report</summary>
-                <pre
-                    class="mt-2 small {$theme === 'light'
-                        ? 'bg-light'
-                        : 'bg-secondary'} p-3 rounded">{spamassassin.report}</pre>
+                <pre class="mt-2 small p-3 rounded">{spamassassin.report}</pre>
             </details>
         {/if}
     </div>
@@ -123,16 +115,5 @@
 
     details summary:hover {
         color: var(--bs-primary);
-    }
-
-    /* Darker table colors in dark mode */
-    :global([data-bs-theme="dark"]) .table-warning {
-        --bs-table-bg: rgba(255, 193, 7, 0.2);
-        --bs-table-border-color: rgba(255, 193, 7, 0.3);
-    }
-
-    :global([data-bs-theme="dark"]) .table-success {
-        --bs-table-bg: rgba(25, 135, 84, 0.2);
-        --bs-table-border-color: rgba(25, 135, 84, 0.3);
     }
 </style>

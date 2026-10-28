@@ -10,7 +10,6 @@
         TinySurvey,
         WhitelistCard,
     } from "#lib/components/index.js";
-    import { theme } from "#lib/stores/theme.js";
 
     let ip = $derived(page.params.ip);
     let loading = $state(true);
@@ -72,7 +71,7 @@
 
             {#if loading}
                 <!-- Loading State -->
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-body text-center py-5">
                         <div class="spinner-border text-primary mb-3" role="status">
                             <span class="visually-hidden">Loading...</span>
@@ -83,7 +82,7 @@
                 </div>
             {:else if error}
                 <!-- Error State -->
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-body text-center py-5">
                         <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
                         ></i>
@@ -99,7 +98,7 @@
                 <!-- Results -->
                 <div class="fade-in">
                     <!-- Score Summary Card -->
-                    <div class="card shadow-sm mb-4">
+                    <div class="card mb-4">
                         <div class="card-body p-4">
                             <div class="row align-items-center">
                                 <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
@@ -137,9 +136,7 @@
                                 </div>
                                 <div class="offset-md-3 col-md-3 text-center">
                                     <div
-                                        class="p-2 rounded text-center summary-card"
-                                        class:bg-light={$theme === "light"}
-                                        class:bg-secondary={$theme !== "light"}
+                                        class="p-2 rounded text-center summary-card bg-body-tertiary"
                                     >
                                         <GradeDisplay score={result.score} grade={result.grade} />
                                         <small class="text-muted d-block">Blacklist Score</small>
@@ -174,7 +171,7 @@
                     </div>
 
                     <!-- Information Card -->
-                    <div class="card shadow-sm mt-4">
+                    <div class="card mt-4">
                         <div class="card-body">
                             <h3 class="h5 mb-3">
                                 <i class="bi bi-info-circle me-2"></i>
@@ -219,7 +216,7 @@
                     </div>
 
                     <!-- Next Steps -->
-                    <div class="card shadow-sm border-primary mt-4">
+                    <div class="card border-primary mt-4">
                         <div class="card-body">
                             <h3 class="h5 mb-3">
                                 <i class="bi bi-lightbulb me-2"></i>
@@ -243,35 +240,11 @@
 </div>
 
 <style>
-    .fade-in {
-        animation: fadeIn 0.5s ease-in;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
     .summary-card {
         transition: transform 0.2s ease;
     }
 
     .summary-card:hover {
         transform: scale(1.05);
-    }
-
-    .table td {
-        vertical-align: middle;
-    }
-
-    .badge {
-        font-size: 0.75rem;
-        padding: 0.35rem 0.65rem;
     }
 </style>

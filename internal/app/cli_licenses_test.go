@@ -75,6 +75,11 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		// are named for where they come from.
 		"Mark Verifying Authority root certificates",
 		"https://bimigroup.org/vmc-issuers/",
+		// The typefaces of the web interface, OFL-1.1, one copyright line each.
+		"The Lexend Project Authors",
+		"The Roboto Project Authors",
+		"The JetBrains Mono Project Authors",
+		"SIL OPEN FONT LICENSE Version 1.1",
 		// Bootstrap, Bootstrap Icons and Popper, MIT, compiled into the web
 		// interface.
 		"https://github.com/twbs/bootstrap",

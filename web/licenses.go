@@ -30,6 +30,27 @@ import (
 // texts those dependencies ship with are copied under licenses/ and embedded
 // from there.
 
+// FontsLicense is the SIL Open Font License 1.1 the three typefaces share,
+// which its condition 2 asks to be distributed with the fonts.
+//
+//go:embed licenses/OFL-1.1.txt
+var FontsLicense string
+
+// FontsAttribution is the copyright notice OFL condition 2 asks to be kept
+// with each typeface.
+const FontsAttribution = `Lexend, Roboto and JetBrains Mono typefaces
+-------------------------------------------
+
+Copyright 2019 The Lexend Project Authors (https://github.com/googlefonts/lexend)
+Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+Source:  https://github.com/fontsource/font-files, packages
+         @fontsource-variable/lexend, @fontsource-variable/roboto and
+         @fontsource-variable/jetbrains-mono
+License: SIL Open Font License 1.1 (OFL-1.1), https://openfontlicense.org/
+Changes: none, the WOFF2 files are embedded exactly as Fontsource publishes
+         them.`
+
 // BootstrapLicense is the MIT license Bootstrap ships with, its copyright
 // notice included.
 //

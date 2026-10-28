@@ -7,7 +7,6 @@
         type MessageSource,
     } from "#lib/authentication.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -98,7 +97,7 @@
 </script>
 
 <div class="card shadow-sm" id="authentication-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-check me-2"></i>
@@ -222,9 +221,7 @@
                         {/if}
                         {#if authentication.iprev.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.iprev.details}</pre>
                         {/if}
                     </div>
@@ -270,9 +267,7 @@
                         {/if}
                         {#if authentication.x_ptr.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.x_ptr.details}</pre>
                         {/if}
                     </div>
@@ -342,9 +337,7 @@
                         {/if}
                         {#if authentication.spf.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.spf.details}</pre>
                         {/if}
                     </div>
@@ -417,9 +410,7 @@
                         {/if}
                         {#if authentication.spf_helo.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.spf_helo
                                     .details}</pre>
                         {/if}
@@ -461,9 +452,7 @@
                             {/if}
                             {#if dkim.details}
                                 <pre
-                                    class="p-2 mb-0 {$theme === 'light'
-                                        ? 'bg-light'
-                                        : 'bg-secondary'} text-muted small"
+                                    class="p-2 mb-0 text-muted small"
                                     style="white-space: pre-wrap">{dkim.details}</pre>
                             {/if}
                         </div>
@@ -534,9 +523,7 @@
                         {/if}
                         {#if authentication.x_google_dkim.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.x_google_dkim
                                     .details}</pre>
                         {/if}
@@ -582,9 +569,7 @@
                         {/if}
                         {#if authentication.x_aligned_from.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.x_aligned_from
                                     .details}</pre>
                         {/if}
@@ -648,9 +633,7 @@
                         {/if}
                         {#if authentication.dmarc.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.dmarc.details}</pre>
                         {/if}
                     </div>
@@ -696,9 +679,7 @@
                         </span>
                         {#if authentication.bimi.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.bimi.details}</pre>
                         {/if}
                     </div>
@@ -712,9 +693,7 @@
                         </div>
                         {#if authentication.bimi.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.bimi.details}</pre>
                         {/if}
                     </div>
@@ -758,9 +737,7 @@
                         {/if}
                         {#if authentication.arc.details}
                             <pre
-                                class="p-2 mb-0 {$theme === 'light'
-                                    ? 'bg-light'
-                                    : 'bg-secondary'} text-muted small"
+                                class="p-2 mb-0 text-muted small"
                                 style="white-space: pre-wrap">{authentication.arc.details}</pre>
                         {/if}
                     </div>

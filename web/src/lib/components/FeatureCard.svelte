@@ -15,7 +15,9 @@
 </script>
 
 <div class="card h-100 text-center p-4">
-    <div class="feature-icon bg-{variant} bg-opacity-10 text-{variant} mx-auto">
+    <div
+        class="feature-icon d-flex align-items-center justify-content-center fs-4 mb-3 bg-{variant} bg-opacity-10 text-{variant} mx-auto"
+    >
         <i class="bi {icon}"></i>
     </div>
     <h5 class="fw-bold">{title}</h5>
@@ -38,10 +40,5 @@
         width: 4rem;
         height: 4rem;
         border-radius: 0.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
     }
 </style>

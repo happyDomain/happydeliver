@@ -3,7 +3,6 @@
 
     import type { DomainBlacklistResult, DomainBlacklistSourceResult } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -156,7 +155,7 @@
 </script>
 
 <div class="card shadow-sm mt-4" id="reputation-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-shaded me-2"></i>
@@ -310,7 +309,7 @@
                                                     </td>
                                                     <td class="text-nowrap">
                                                         {#if ev.status}
-                                                            <span class="badge bg-light text-dark">
+                                                            <span class="badge bg-light">
                                                                 {ev.status}
                                                             </span>
                                                         {:else}

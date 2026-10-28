@@ -1,7 +1,10 @@
 <script lang="ts">
     import "bootstrap-icons/font/bootstrap-icons.css";
-    import "bootstrap/dist/css/bootstrap.min.css";
-    import "../app.css";
+    import "@fontsource-variable/lexend";
+    import "@fontsource-variable/roboto";
+    import "@fontsource-variable/jetbrains-mono";
+    import "@fontsource-variable/jetbrains-mono/wght-italic.css";
+    import "../app.scss";
 
     import favicon from "#lib/assets/favicon.svg";
     import { resolve } from "$app/paths";
@@ -31,9 +34,9 @@
 </svelte:head>
 
 <div class="min-vh-100 d-flex flex-column">
-    <nav class="navbar navbar-expand-lg navbar-light shadow-sm">
+    <nav class="navbar navbar-expand-lg py-2" id="nav">
         <div class="container">
-            <a class="navbar-brand fw-bold" href={resolve("/")}>
+            <a class="navbar-brand p-0 me-3" href={resolve("/")}>
                 {#if $appConfig.custom_logo_url}
                     <img src={$appConfig.custom_logo_url} alt="Logo" style="height: 25px;" />
                 {:else}
@@ -44,18 +47,18 @@
             {#if $appConfig.test_list_enabled}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href={resolve("history")}
+                        <a class="btn btn-sm btn-link btn-nav-tool" href={resolve("history")}
                             ><i class="bi bi-clock-history me-1"></i>History</a
                         >
                     </li>
                 </ul>
             {/if}
-            <div class="d-flex align-items-center">
-                <span class="d-none d-md-inline navbar-text text-primary small">
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <span class="d-none d-md-inline navbar-text text-body-secondary small">
                     Open-Source Email Deliverability Tester
                 </span>
                 <button
-                    class="btn btn-link ms-auto {$theme == 'light' ? 'text-dark' : 'text-light'}"
+                    class="btn btn-sm btn-link btn-nav-tool"
                     onclick={toggleTheme}
                     aria-label="Toggle theme"
                     title="Toggle theme"
@@ -66,7 +69,7 @@
         </div>
     </nav>
 
-    <main class="flex-grow-1">
+    <main class="flex-grow-1 d-flex flex-column">
         {@render children?.()}
     </main>
 
@@ -75,7 +78,7 @@
         class="px-4 px-md-5 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
     >
         <a
-            class="footer-brand-link"
+            class="footer-brand-link d-inline-flex align-items-center gap-2 fw-medium"
             href="https://happydeliver.org/"
             target="_blank"
             rel="noopener"
@@ -83,9 +86,10 @@
             <i class="bi bi-envelope-check"></i>
             Powered by happyDeliver
         </a>
-        <ul class="d-flex footer-nav">
+        <ul class="footer-nav d-flex list-unstyled mb-0">
             <li>
                 <a
+                    class="d-inline-flex align-items-center gap-2"
                     href="https://git.happydomain.org/happydeliver/-/blob/master/api/openapi.yaml?ref_type=heads"
                     target="_blank"
                     rel="noopener"
@@ -95,13 +99,23 @@
                 </a>
             </li>
             <li>
-                <a href="https://git.happydomain.org/happydeliver" target="_blank" rel="noopener">
+                <a
+                    class="d-inline-flex align-items-center gap-2"
+                    href="https://git.happydomain.org/happydeliver"
+                    target="_blank"
+                    rel="noopener"
+                >
                     <i class="bi bi-git"></i>
                     Git
                 </a>
             </li>
             <li>
-                <a href="https://feedback.happydeliver.org/" target="_blank" rel="noopener">
+                <a
+                    class="d-inline-flex align-items-center gap-2"
+                    href="https://feedback.happydeliver.org/"
+                    target="_blank"
+                    rel="noopener"
+                >
                     <i class="bi bi-lightbulb"></i>
                     Feedback
                 </a>
@@ -114,9 +128,9 @@
             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 mb-4">
                 <div class="col footer-brand-col">
                     <div class="footer-logo mb-3">
-                        <Logo color="white" />
+                        <Logo color="var(--footer-fg)" />
                     </div>
-                    <p class="footer-tagline">
+                    <p class="footer-tagline mb-0">
                         Open-source email deliverability tester. Check your SPF, DKIM, DMARC and
                         more before you hit send.
                     </p>
@@ -160,8 +174,8 @@
                     </div>
                 </div>
                 <div class="col">
-                    <h4 class="footer-heading">Product</h4>
-                    <ul class="footer-links">
+                    <h4 class="footer-heading text-uppercase fw-semibold mb-3">Product</h4>
+                    <ul class="footer-links list-unstyled d-flex flex-column gap-2 mb-0">
                         <li><a href="{resolve('/')}#features">Features</a></li>
                         <li>
                             <a
@@ -180,8 +194,8 @@
                     </ul>
                 </div>
                 <div class="col">
-                    <h4 class="footer-heading">Our association</h4>
-                    <ul class="footer-links">
+                    <h4 class="footer-heading text-uppercase fw-semibold mb-3">Our association</h4>
+                    <ul class="footer-links list-unstyled d-flex flex-column gap-2 mb-0">
                         <li>
                             <a
                                 href="https://www.happydomain.org/en/who-we-are/"
@@ -212,8 +226,8 @@
                     </ul>
                 </div>
                 <div class="col">
-                    <h4 class="footer-heading">Resources</h4>
-                    <ul class="footer-links">
+                    <h4 class="footer-heading text-uppercase fw-semibold mb-3">Resources</h4>
+                    <ul class="footer-links list-unstyled d-flex flex-column gap-2 mb-0">
                         <li>
                             <a
                                 href="https://git.happydomain.org/happydeliver"
@@ -262,36 +276,48 @@
 </div>
 
 <style>
+    /* Utility links read like nav items, not like hyperlinks. */
+    :global(#nav .btn-nav-tool) {
+        color: var(--hd-fg-2);
+        font-weight: 600;
+        text-decoration: none;
+    }
+    :global(#nav .btn-nav-tool:hover),
+    :global(#nav .btn-nav-tool:focus-visible) {
+        color: var(--bs-body-color);
+        background-color: var(--hd-bg-overlay);
+    }
+
     footer a {
         text-decoration: none;
     }
 
+    /* Footers are always a band of brand Black, in both colour modes, so
+       their colours are pinned instead of following the theme. */
+    footer {
+        --footer-fg: var(--hd-base-3);
+        background-color: var(--hd-black);
+        color: var(--footer-fg);
+    }
+
     #footer-classic {
         font-size: 0.85rem;
-        /* Footer is always a dark band, so pin its colors instead of
-           using theme-reactive utilities. */
-        background-color: #212529;
-        color: #f8f9fa;
+    }
+
+    #footer-happydomain {
+        /* Footer is always a dark band (all child text is hardcoded light),
+           so pin its colors instead of using theme-reactive utilities. */
+        background-color: var(--hd-black);
+        color: var(--footer-fg);
     }
 
     .footer-brand-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-weight: 500;
-        color: rgba(255, 255, 255, 0.7);
+        color: color-mix(in srgb, var(--footer-fg) 70%, transparent);
         transition: color 0.2s;
     }
 
     .footer-brand-link:hover {
-        color: white;
-    }
-
-    .footer-nav {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        gap: 0;
+        color: var(--footer-fg);
     }
 
     .footer-nav li {
@@ -304,67 +330,44 @@
         width: 1px;
         height: 1rem;
         margin: 0 0.75rem;
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: color-mix(in srgb, var(--footer-fg) 20%, transparent);
     }
 
     .footer-nav a {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        color: rgba(255, 255, 255, 0.7);
+        color: color-mix(in srgb, var(--footer-fg) 70%, transparent);
         transition: color 0.2s;
     }
 
     .footer-nav a:hover {
-        color: white;
+        color: var(--footer-fg);
     }
 
     .footer-nav a i {
         opacity: 0.7;
     }
 
-    #footer-happydomain {
-        /* Footer is always a dark band (all child text is hardcoded white),
-           so pin its colors instead of using theme-reactive utilities. */
-        background-color: #212529;
-        color: #f8f9fa;
-    }
-
     .footer-tagline {
         font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.5);
+        color: color-mix(in srgb, var(--footer-fg) 50%, transparent);
         line-height: 1.55;
         max-width: 260px;
-        margin-bottom: 0;
     }
 
     .footer-heading {
         font-size: 0.7rem;
-        font-weight: 600;
         letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.45);
-        margin-bottom: 1rem;
-    }
-
-    .footer-links {
-        list-style: none;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin: 0;
+        color: color-mix(in srgb, var(--footer-fg) 45%, transparent);
     }
 
     .footer-links a {
-        color: rgba(255, 255, 255, 0.7);
+        color: color-mix(in srgb, var(--footer-fg) 70%, transparent);
         font-size: 0.875rem;
         text-decoration: none;
         transition: color 0.2s;
     }
 
     .footer-links a:hover {
-        color: white;
+        color: var(--footer-fg);
     }
 
     .footer-social a {
@@ -373,9 +376,9 @@
         justify-content: center;
         width: 32px;
         height: 32px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid color-mix(in srgb, var(--footer-fg) 20%, transparent);
         border-radius: 6px;
-        color: rgba(255, 255, 255, 0.6);
+        color: color-mix(in srgb, var(--footer-fg) 60%, transparent);
         text-decoration: none;
         font-size: 0.9rem;
         transition:
@@ -385,28 +388,28 @@
     }
 
     .footer-social a:hover {
-        color: white;
-        border-color: rgba(255, 255, 255, 0.5);
-        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--footer-fg);
+        border-color: color-mix(in srgb, var(--footer-fg) 50%, transparent);
+        background-color: color-mix(in srgb, var(--footer-fg) 8%, transparent);
     }
 
     .footer-bottom {
-        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: 1px solid color-mix(in srgb, var(--footer-fg) 12%, transparent);
     }
 
     .footer-bottom-text {
         font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.4);
+        color: color-mix(in srgb, var(--footer-fg) 40%, transparent);
     }
 
     .footer-git-link {
         font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.4);
+        color: color-mix(in srgb, var(--footer-fg) 40%, transparent);
         text-decoration: none;
         transition: color 0.2s;
     }
 
     .footer-git-link:hover {
-        color: rgba(255, 255, 255, 0.8);
+        color: color-mix(in srgb, var(--footer-fg) 80%, transparent);
     }
 </style>

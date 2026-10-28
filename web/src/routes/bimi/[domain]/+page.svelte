@@ -181,7 +181,7 @@
 
             {#if loading}
                 <!-- Loading State -->
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-body text-center py-5">
                         <div class="spinner-border text-primary mb-3" role="status">
                             <span class="visually-hidden">Loading...</span>
@@ -195,7 +195,7 @@
                 </div>
             {:else if error}
                 <!-- Error State -->
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-body text-center py-5">
                         <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"
                         ></i>
@@ -214,7 +214,7 @@
                 <!-- Results -->
                 <div class="fade-in">
                     <!-- Verdict -->
-                    <div class="card shadow-sm mb-4 border-{verdict?.level}">
+                    <div class="card mb-4 border-{verdict?.level}">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-start gap-3">
                                 <i
@@ -257,7 +257,7 @@
                     />
 
                     <!-- Next Steps -->
-                    <div class="card shadow-sm border-primary mt-4">
+                    <div class="card border-primary mt-4">
                         <div class="card-body">
                             <h3 class="h5 mb-3">
                                 <i class="bi bi-lightbulb me-2"></i>
@@ -286,20 +286,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .fade-in {
-        animation: fadeIn 0.5s ease-out;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(15px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-</style>

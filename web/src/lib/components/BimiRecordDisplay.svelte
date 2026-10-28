@@ -142,7 +142,7 @@
         pass: { badge: "bg-success", icon: "bi-check-circle-fill", text: "text-success" },
         fail: { badge: "bg-danger", icon: "bi-x-circle-fill", text: "text-danger" },
         warning: {
-            badge: "bg-warning text-dark",
+            badge: "bg-warning",
             icon: "bi-exclamation-triangle-fill",
             text: "text-warning",
         },
@@ -166,7 +166,7 @@
     >
         {#each dots as dot, i (i)}
             <span
-                class="status-dot rounded-circle {STATUS[dot.status].badge}"
+                class="status-dot d-inline-block rounded-circle {STATUS[dot.status].badge}"
                 title="{dot.label}: {dot.status}"
             ></span>
         {/each}
@@ -536,7 +536,6 @@
 
 <style>
     .status-dot {
-        display: inline-block;
         width: 0.5rem;
         height: 0.5rem;
     }

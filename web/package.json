@@ -31,6 +31,7 @@
         "globals": "^17.0.0",
         "prettier": "^3.6.2",
         "prettier-plugin-svelte": "^4.0.0",
+        "sass": "^1.106.1",
         "svelte": "^5.57.1",
         "svelte-check": "^4.7.5",
         "typescript": "^6.0.0",
@@ -39,6 +40,9 @@
         "vitest": "^4.0.0"
     },
     "dependencies": {
+        "@fontsource-variable/jetbrains-mono": "^5.3.0",
+        "@fontsource-variable/lexend": "^5.3.0",
+        "@fontsource-variable/roboto": "^5.3.0",
         "bootstrap": "^5.3.8",
         "bootstrap-icons": "^1.13.1"
     },

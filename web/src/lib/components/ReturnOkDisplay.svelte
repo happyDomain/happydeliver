@@ -27,7 +27,7 @@
 
     function badgeClass(status: string): string {
         if (status === "pass") return "bg-success";
-        if (status === "warn") return "bg-warning text-dark";
+        if (status === "warn") return "bg-warning";
         return "bg-danger";
     }
 

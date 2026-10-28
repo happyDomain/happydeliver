@@ -22,7 +22,7 @@
     }
 </script>
 
-<div class="table-responsive shadow-sm">
+<div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
         <thead>
             <tr>

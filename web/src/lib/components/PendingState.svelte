@@ -22,9 +22,9 @@
     }
 </script>
 
-<div class="row justify-content-center">
+<div class="row justify-content-center mt-5">
     <div class="col-lg-8 fade-in">
-        <div class="card shadow-lg">
+        <div class="card">
             <div class="card-body p-5 text-center">
                 <div class="pulse mb-4">
                     <i class="bi bi-envelope-paper display-1 text-primary"></i>
@@ -112,34 +112,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .fade-in {
-        animation: fadeIn 0.6s ease-out;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .pulse {
-        animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-        0%,
-        100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.5;
-        }
-    }
-</style>

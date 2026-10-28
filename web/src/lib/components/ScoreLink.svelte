@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { Tooltip } from "bootstrap";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -59,11 +58,7 @@
     }}
     use:unavailableTooltip={{ enabled: !!unavailable, title: tooltipTitle ?? "" }}
 >
-    <div
-        class="p-2 rounded text-center summary-card"
-        class:bg-light={$theme === "light"}
-        class:bg-secondary={$theme !== "light"}
-    >
+    <div class="p-2 rounded text-center summary-card bg-light">
         {#if unavailable}
             <GradeDisplay grade="N/A" />
         {:else}
@@ -77,19 +72,16 @@
 
 <style>
     .summary-card {
-        transition: all 0.2s ease-in-out;
+        border: 1px solid transparent;
+        transition:
+            background-color 0.2s ease-in-out,
+            border-color 0.2s ease-in-out;
         cursor: pointer;
     }
 
     .summary-card:hover {
-        background-color: #e2e6ea !important;
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    :global([data-bs-theme="dark"]) .summary-card:hover {
-        background-color: #495057 !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        background-color: var(--hd-secondary-hover) !important;
+        border-color: var(--hd-border-3);
     }
 
     :global(.score-tooltip .tooltip-inner) {

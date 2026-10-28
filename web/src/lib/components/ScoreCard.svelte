@@ -7,7 +7,6 @@
     } from "#lib/authentication.js";
     import { hasNoBlacklistResults, noBlacklistResultsTitle } from "#lib/blacklist.js";
     import { hasNoSpamResults, noSpamResultsTitle } from "#lib/spam.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import ScoreLink from "./ScoreLink.svelte";
 
@@ -67,7 +66,7 @@
     }
 </script>
 
-<div class="card shadow-lg {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+<div class="card">
     <div class="card-body p-5 text-center">
         <div class="mb-3">
             {#if reanalyzing}

@@ -1,0 +1,1995 @@
+// ============================================================================
+// HappyDeliver × Bootstrap 5: SCSS theme
+// The HappyDomain UI palette (Brand Guidelines 2026) with the two brand
+// colours swapped: purple for action, green only as a spark. One rule: never
+// pure black or pure white.
+// ============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1. BRAND TOKENS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Brand bases ──────────────────────────────────────────────────────────────
+$hd-base-1: #fffff7; // canvas and card surface
+$hd-base-2: #fffff0; // hover
+$hd-base-3: #f7f7e8; // alternate sections, sidebar
+$hd-marble: #f4f5f5; // technical UI: bars, code, console
+$hd-black: #282828;
+
+// Green (Brand Highlight for HappyDeliver): focus, selection, new, success ──
+$hd-green-50: #e5fdf3;
+$hd-green-100: #d4f6e8;
+$hd-green-200: #b5e8d3;
+$hd-green-300: #8bd7b9;
+$hd-green-400: #54c29b;
+$hd-green-500: #00aa7d; // brand; fills always carry #282828 text
+$hd-green-600: #008b65;
+$hd-green-700: #016f4f; // green as text on light
+$hd-green-800: #00543a;
+$hd-green-900: #073b29;
+$hd-green-950: #0e271c;
+
+// Purple (Brand Main for HappyDeliver): primary action, links, information ─
+$hd-purple-50: #f8f5fe;
+$hd-purple-100: #efe9ff;
+$hd-purple-200: #e0d2fe;
+$hd-purple-300: #ceb5fe;
+$hd-purple-400: #bb91fe;
+$hd-purple-500: #a454ff; // brand
+$hd-purple-600: #923de9;
+$hd-purple-700: #7726c2;
+$hd-purple-800: #59248d;
+$hd-purple-900: #3d1e5f;
+$hd-purple-950: #28183c;
+
+// Sand: warm neutral derived from the bases, borders and dividers ──────────
+$hd-sand-50: #f8f8ea;
+$hd-sand-100: #eeeee0;
+$hd-sand-200: #dcdcce;
+$hd-sand-300: #c5c5b8;
+$hd-sand-400: #acac9f;
+$hd-sand-500: #929285;
+$hd-sand-600: #77776b;
+$hd-sand-700: #5e5e56;
+$hd-sand-800: #474740;
+$hd-sand-900: #32322b;
+$hd-sand-950: #22221c;
+
+// Gray: Marble (50) to Black (900), text and technical UI ──────────────────
+$hd-gray-50: #f4f5f5;
+$hd-gray-100: #ebebeb;
+$hd-gray-200: #d7d7d7;
+$hd-gray-300: #bebebe;
+$hd-gray-400: #a1a1a1;
+$hd-gray-500: #838383;
+$hd-gray-600: #666666;
+$hd-gray-700: #4d4d4d;
+$hd-gray-800: #3a3a3a;
+$hd-gray-850: #313131;
+$hd-gray-900: #282828;
+$hd-gray-950: #1c1c1c;
+
+// Sky: only feeds Bootstrap's $blue and $cyan, never a semantic role
+$hd-sky-50: #f1f8fe;
+$hd-sky-100: #e0efff;
+$hd-sky-200: #c1defe;
+$hd-sky-300: #9fc8f5;
+$hd-sky-400: #78b0ea;
+$hd-sky-500: #5395d7;
+$hd-sky-600: #3879b9;
+$hd-sky-700: #256099;
+$hd-sky-800: #204970;
+$hd-sky-900: #1a334c;
+$hd-sky-950: #152331;
+
+// Amber: warning ───────────────────────────────────────────────────────────
+$hd-amber-50: #fef5e9;
+$hd-amber-100: #fdeacf;
+$hd-amber-200: #f3d6ad;
+$hd-amber-300: #e5bd81;
+$hd-amber-400: #d6a04a;
+$hd-amber-500: #bf8306;
+$hd-amber-600: #9d6b02;
+$hd-amber-700: #7d5401;
+$hd-amber-800: #5f3f00;
+$hd-amber-900: #442c02;
+$hd-amber-950: #2c1f0a;
+
+// Coral: errors and destructive actions, a warm red ────────────────────────
+$hd-coral-50: #fef4f3;
+$hd-coral-100: #fee7e3;
+$hd-coral-200: #ffcdc7;
+$hd-coral-300: #ffaba2;
+$hd-coral-400: #f5867b;
+$hd-coral-500: #e2635a;
+$hd-coral-600: #c24640;
+$hd-coral-700: #a0322d;
+$hd-coral-800: #762925;
+$hd-coral-900: #51201d;
+$hd-coral-950: #341916;
+
+// Surfaces (light) ─────────────────────────────────────────────────────────
+$hd-bg-canvas: $hd-base-1; // cards, panels, sheets
+$hd-bg-default: $hd-base-1; // page
+$hd-bg-subtle: $hd-base-3;
+$hd-bg-hover: $hd-base-2;
+$hd-bg-tint: $hd-purple-50;
+$hd-bg-chrome: $hd-marble;
+$hd-bg-inset: $hd-sand-100;
+$hd-bg-overlay: rgba($hd-black, 0.04);
+
+// Foreground (light) ───────────────────────────────────────────────────────
+$hd-fg-1: $hd-black;
+$hd-fg-2: $hd-gray-700;
+$hd-fg-3: $hd-gray-600;
+$hd-fg-4: $hd-gray-600;
+$hd-fg-disabled: $hd-gray-400;
+$hd-fg-inverse: $hd-base-2;
+
+// Borders (light) ──────────────────────────────────────────────────────────
+$hd-border-1: $hd-sand-200; // decorative: dividers, card outlines
+$hd-border-2: $hd-sand-300;
+$hd-border-3: $hd-gray-500; // controls
+
+// Accent: primary purple interactive ──────────────────────────────────────
+// Brand #a454ff reaches neither 4.5:1 with Base 1 (3.94:1) nor with #282828
+// (3.72:1): fills step down to purple-600, which carries Base 1 text at
+// 5.1:1, and darken on hover and press.
+$hd-accent: $hd-purple-600;
+$hd-accent-hover: $hd-purple-700;
+$hd-accent-active: $hd-purple-800;
+$hd-accent-fg: $hd-base-1;
+$hd-accent-subtle: $hd-purple-50;
+$hd-accent-muted: $hd-purple-100;
+$hd-accent-border: $hd-purple-300;
+$hd-accent-text: $hd-purple-700;
+$hd-accent-line: $hd-purple-600; // outline button border, 3:1 on the canvas
+$hd-link-hover: $hd-purple-800;
+// The focus ring is the green spark. Green-500 only reaches 2.95:1 on the
+// canvas, so the outline itself takes green-600 (4.3:1).
+$hd-focus-ring: rgba($hd-green-500, 0.3);
+$hd-focus: $hd-green-600;
+
+// Secondary: neutral gray ─────────────────────────────────────────────────
+$hd-secondary: $hd-gray-50;
+$hd-secondary-hover: $hd-gray-100;
+$hd-secondary-active: $hd-gray-200;
+$hd-secondary-fg: $hd-black;
+$hd-secondary-subtle: $hd-gray-50;
+$hd-secondary-muted: $hd-gray-100;
+$hd-secondary-border: $hd-gray-500;
+$hd-secondary-text: $hd-gray-600;
+
+// Brand green has no role of its own: it carries success, focus, selection
+// and the Beta / New badge outline (the badge text is --hd-success-text).
+// Information keeps the purple scale, sharing the accent hue just as success
+// shares it in HappyDomain.
+$hd-badge-border: $hd-green-600;
+
+// Semantic (light): 100 backgrounds with 800 text ──────────────────────────
+// -text is the 700 step, for coloured text straight on the canvas (outline
+// buttons); -solid colours dots, icons and outline borders.
+$hd-success: $hd-green-800;
+$hd-success-bg: $hd-green-100;
+$hd-success-border: $hd-green-200;
+$hd-success-text: $hd-green-700;
+// Green fills carry #282828 text (4.95:1), as in HappyDomain: lighten on hover.
+$hd-success-solid: $hd-green-500;
+$hd-success-on-solid: $hd-black;
+$hd-success-solid-hover: $hd-green-400;
+
+$hd-danger: $hd-coral-800;
+$hd-danger-bg: $hd-coral-100;
+$hd-danger-border: $hd-coral-200;
+$hd-danger-text: $hd-coral-700;
+$hd-danger-solid: $hd-coral-600;
+$hd-danger-on-solid: $hd-base-1;
+$hd-danger-solid-hover: $hd-coral-700;
+
+$hd-warning: $hd-amber-800;
+$hd-warning-bg: $hd-amber-100;
+$hd-warning-border: $hd-amber-200;
+$hd-warning-text: $hd-amber-700;
+$hd-warning-solid: $hd-amber-500;
+$hd-warning-on-solid: $hd-black;
+$hd-warning-solid-hover: $hd-amber-400;
+
+$hd-info: $hd-purple-800;
+$hd-info-bg: $hd-purple-100;
+$hd-info-border: $hd-purple-200;
+$hd-info-text: $hd-purple-700;
+$hd-info-solid: $hd-purple-600;
+$hd-info-on-solid: $hd-base-1;
+$hd-info-solid-hover: $hd-purple-700;
+
+// Form inputs (light) ──────────────────────────────────────────────────────
+$hd-input-bg: $hd-base-1;
+$hd-input-bg-disabled: $hd-gray-50;
+$hd-input-fg: $hd-black;
+$hd-input-placeholder: $hd-gray-600;
+$hd-input-border: $hd-gray-500;
+$hd-input-border-hover: $hd-gray-700;
+$hd-input-border-focus: $hd-green-600;
+$hd-input-ring: rgba($hd-green-500, 0.25);
+$hd-input-border-invalid: $hd-coral-600;
+$hd-input-ring-invalid: rgba($hd-coral-600, 0.2);
+$hd-input-label: $hd-gray-700;
+$hd-input-help: $hd-gray-600;
+$hd-input-fg-disabled: $hd-fg-disabled;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1b. DARK TOKENS: dark mode starts from brand Black (#282828), raised
+//      layers get lighter and body text is Base 3.
+// ─────────────────────────────────────────────────────────────────────────────
+
+$hd-dark-bg-inset: $hd-gray-800;
+$hd-dark-bg-default: $hd-black;
+$hd-dark-bg-canvas: $hd-gray-850;
+$hd-dark-bg-subtle: $hd-gray-950;
+$hd-dark-bg-hover: $hd-gray-800;
+$hd-dark-bg-tint: $hd-purple-950;
+$hd-dark-bg-chrome: $hd-gray-950;
+$hd-dark-bg-overlay: rgba($hd-base-3, 0.05);
+
+$hd-dark-fg-1: $hd-base-3;
+$hd-dark-fg-2: $hd-gray-300;
+$hd-dark-fg-3: $hd-gray-400;
+$hd-dark-fg-4: $hd-gray-400;
+$hd-dark-fg-disabled: $hd-gray-600;
+$hd-dark-fg-inverse: $hd-black;
+
+$hd-dark-border-1: $hd-gray-800;
+$hd-dark-border-2: $hd-gray-700;
+$hd-dark-border-3: $hd-gray-500;
+
+// On the dark canvas purple-600 sinks (2.9:1 against #282828): the fill moves
+// up to purple-400, which takes #282828 text (6:1) and lightens on hover.
+$hd-dark-accent: $hd-purple-400;
+$hd-dark-accent-hover: $hd-purple-300;
+$hd-dark-accent-active: $hd-purple-200;
+$hd-dark-accent-fg: $hd-black;
+$hd-dark-accent-subtle: $hd-purple-950;
+$hd-dark-accent-muted: $hd-purple-900;
+$hd-dark-accent-border: $hd-purple-800;
+$hd-dark-accent-text: $hd-purple-300;
+$hd-dark-accent-line: $hd-purple-400;
+$hd-dark-link-hover: $hd-purple-200;
+$hd-dark-focus-ring: rgba($hd-green-400, 0.35);
+$hd-dark-focus: $hd-green-400;
+
+$hd-dark-secondary: $hd-dark-bg-canvas;
+$hd-dark-secondary-hover: $hd-gray-800;
+$hd-dark-secondary-active: $hd-gray-700;
+$hd-dark-secondary-fg: $hd-base-3;
+$hd-dark-secondary-subtle: $hd-dark-bg-canvas;
+$hd-dark-secondary-muted: $hd-gray-800;
+$hd-dark-secondary-border: $hd-gray-500;
+$hd-dark-secondary-text: $hd-gray-400;
+
+$hd-dark-badge-border: $hd-green-400;
+
+$hd-dark-success: $hd-green-200;
+$hd-dark-success-bg: $hd-green-900;
+$hd-dark-success-border: $hd-green-800;
+$hd-dark-success-text: $hd-green-300;
+$hd-dark-success-solid: $hd-green-400;
+$hd-dark-success-on-solid: $hd-black;
+$hd-dark-success-solid-hover: $hd-green-300;
+
+$hd-dark-danger: $hd-coral-200;
+$hd-dark-danger-bg: $hd-coral-900;
+$hd-dark-danger-border: $hd-coral-800;
+$hd-dark-danger-text: $hd-coral-300;
+$hd-dark-danger-solid: $hd-coral-400;
+$hd-dark-danger-on-solid: $hd-black;
+$hd-dark-danger-solid-hover: $hd-coral-300;
+
+$hd-dark-warning: $hd-amber-200;
+$hd-dark-warning-bg: $hd-amber-900;
+$hd-dark-warning-border: $hd-amber-800;
+$hd-dark-warning-text: $hd-amber-300;
+$hd-dark-warning-solid: $hd-amber-400;
+$hd-dark-warning-on-solid: $hd-black;
+$hd-dark-warning-solid-hover: $hd-amber-300;
+
+$hd-dark-info: $hd-purple-200;
+$hd-dark-info-bg: $hd-purple-900;
+$hd-dark-info-border: $hd-purple-800;
+$hd-dark-info-text: $hd-purple-300;
+$hd-dark-info-solid: $hd-purple-400;
+$hd-dark-info-on-solid: $hd-black;
+$hd-dark-info-solid-hover: $hd-purple-300;
+
+$hd-dark-input-bg: $hd-dark-bg-canvas;
+$hd-dark-input-bg-disabled: $hd-gray-950;
+$hd-dark-input-fg: $hd-dark-fg-1;
+$hd-dark-input-placeholder: $hd-dark-fg-4;
+$hd-dark-input-border: $hd-gray-500;
+$hd-dark-input-border-hover: $hd-gray-400;
+$hd-dark-input-border-focus: $hd-green-400;
+$hd-dark-input-ring: rgba($hd-green-400, 0.3);
+$hd-dark-input-border-invalid: $hd-coral-400;
+$hd-dark-input-ring-invalid: rgba($hd-coral-400, 0.28);
+$hd-dark-input-label: $hd-dark-fg-2;
+$hd-dark-input-help: $hd-dark-fg-3;
+$hd-dark-input-fg-disabled: $hd-dark-fg-disabled;
+
+// Type stack ───────────────────────────────────────────────────────────────
+// Lexend, Roboto and JetBrains Mono are loaded via @fontsource-variable in +layout.svelte.
+$hd-font-title: "Lexend Variable", "Lexend", "Roboto Variable", system-ui, sans-serif;
+$hd-font-text:
+    "Roboto Variable",
+    "Roboto",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+$hd-font-mono:
+    "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas,
+    monospace;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  2. BOOTSTRAP VARIABLE OVERRIDES  (declared before importing bootstrap)
+// ─────────────────────────────────────────────────────────────────────────────
+
+$primary: $hd-accent;
+$secondary: $hd-gray-600;
+$success: $hd-success-solid;
+$info: $hd-info-solid;
+$warning: $hd-warning-solid;
+$danger: $hd-danger-solid;
+$light: $hd-bg-subtle;
+$dark: $hd-fg-1;
+
+// Never pure black or pure white.
+$white: $hd-base-1;
+$gray-100: $hd-gray-50;
+$gray-200: $hd-gray-100;
+$gray-300: $hd-gray-200;
+$gray-400: $hd-gray-300;
+$gray-500: $hd-gray-400;
+$gray-600: $hd-gray-600;
+$gray-700: $hd-gray-700;
+$gray-800: $hd-gray-800;
+$gray-900: $hd-gray-900;
+$black: $hd-black;
+
+// Bootstrap's base hues, so --bs-red, --bs-purple, etc. stay in the palette.
+$blue: $hd-sky-600;
+$indigo: $hd-purple-700;
+$purple: $hd-purple-500;
+$pink: $hd-coral-400;
+$red: $hd-coral-600;
+$orange: $hd-amber-400;
+$yellow: $hd-amber-500;
+$green: $hd-green-500;
+$teal: $hd-green-400;
+$cyan: $hd-sky-500;
+
+// Light subtle maps, explicit rather than tinted from the fills.
+$primary-text-emphasis: $hd-accent-text;
+$secondary-text-emphasis: $hd-fg-2;
+$success-text-emphasis: $hd-success;
+$info-text-emphasis: $hd-info;
+$warning-text-emphasis: $hd-warning;
+$danger-text-emphasis: $hd-danger;
+$light-text-emphasis: $hd-fg-2;
+$dark-text-emphasis: $hd-fg-1;
+
+$primary-bg-subtle: $hd-accent-subtle;
+$secondary-bg-subtle: $hd-bg-subtle;
+$success-bg-subtle: $hd-success-bg;
+$info-bg-subtle: $hd-info-bg;
+$warning-bg-subtle: $hd-warning-bg;
+$danger-bg-subtle: $hd-danger-bg;
+$light-bg-subtle: $hd-bg-subtle;
+$dark-bg-subtle: $hd-gray-300;
+
+$primary-border-subtle: $hd-accent-border;
+$secondary-border-subtle: $hd-border-2;
+$success-border-subtle: $hd-success-border;
+$info-border-subtle: $hd-info-border;
+$warning-border-subtle: $hd-warning-border;
+$danger-border-subtle: $hd-danger-border;
+$light-border-subtle: $hd-border-1;
+$dark-border-subtle: $hd-gray-500;
+
+$custom-theme-colors: (
+    "accent": $hd-accent,
+);
+
+$color-contrast-dark: $hd-fg-1;
+$color-contrast-light: $hd-fg-inverse;
+
+// Purple-600 takes light text, and so do the checkbox tick, the radio dot,
+// the switch knob and the active pill drawn on it. The dark mode, whose
+// accent is the lighter purple-400, swaps them back to #282828 (section 5).
+$component-active-color: $hd-base-1;
+
+$body-bg: $hd-bg-default;
+$body-color: $hd-fg-1;
+$body-secondary-color: $hd-fg-3;
+$body-secondary-bg: $hd-bg-subtle;
+$body-tertiary-color: $hd-fg-4;
+$body-tertiary-bg: $hd-bg-inset;
+$body-emphasis-color: $hd-fg-1;
+
+$border-color: $hd-border-1;
+$border-color-translucent: $hd-border-1;
+
+$border-radius: 6px;
+$border-radius-sm: 4px;
+$border-radius-lg: 8px;
+$border-radius-xl: 12px;
+$border-radius-xxl: 12px;
+$border-radius-pill: 9999px;
+
+// A link is never signalled by colour alone (1.4.1): underlined by default.
+$link-color: $hd-accent-text;
+$link-hover-color: $hd-link-hover;
+$link-decoration: underline;
+$link-shade-percentage: 0%;
+
+$font-family-sans-serif: $hd-font-text;
+$font-family-monospace: $hd-font-mono;
+$font-family-base: $font-family-sans-serif;
+
+$font-size-root: null;
+$font-size-base: 0.9375rem; // 15px
+$font-size-sm: 0.8125rem;
+$font-size-lg: 1.0625rem;
+
+$font-weight-lighter: 300;
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+$font-weight-base: $font-weight-normal;
+
+$line-height-base: 1.5;
+$line-height-sm: 1.375;
+$line-height-lg: 1.625;
+
+$h1-font-size: 2.25rem;
+$h2-font-size: 1.875rem;
+$h3-font-size: 1.5rem;
+$h4-font-size: 1.25rem;
+$h5-font-size: 1.0625rem;
+$h6-font-size: 0.9375rem;
+
+$headings-font-family: $hd-font-title;
+$headings-font-weight: 700;
+$headings-line-height: 1.2;
+$headings-color: $hd-fg-1;
+
+$display-font-family: $hd-font-title;
+$display-font-weight: 700;
+$display-line-height: 1.2;
+
+$small-font-size: 0.8125rem;
+$text-muted: $hd-fg-3;
+
+$spacer: 1rem;
+$spacers: (
+    0: 0,
+    1: $spacer * 0.25,
+    2: $spacer * 0.5,
+    3: $spacer * 0.75,
+    4: $spacer,
+    5: $spacer * 1.25,
+    6: $spacer * 1.5,
+    7: $spacer * 2,
+    8: $spacer * 2.5,
+    9: $spacer * 3,
+    10: $spacer * 4,
+    11: $spacer * 5,
+);
+
+// Flat system: separation by border, never by shadow.
+$enable-shadows: false;
+$enable-gradients: false;
+$enable-rounded: true;
+$enable-transitions: true;
+$enable-reduced-motion: true;
+$enable-smooth-scroll: true;
+$enable-cssgrid: true;
+$enable-responsive-font-sizes: true;
+
+$box-shadow: none;
+$box-shadow-sm: none;
+$box-shadow-lg: none;
+$box-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+
+$focus-ring-width: 3px;
+$focus-ring-opacity: 1;
+$focus-ring-color: $hd-focus-ring;
+$focus-ring-blur: 0;
+$focus-ring-box-shadow: 0 0 0 $focus-ring-width $focus-ring-color;
+
+// Buttons
+$btn-font-weight: 600;
+$btn-border-radius: $border-radius;
+$btn-border-radius-sm: $border-radius-sm;
+$btn-border-radius-lg: $border-radius-lg;
+$btn-padding-y: 0.5rem;
+$btn-padding-x: 0.875rem;
+$btn-focus-width: 3px;
+$btn-focus-box-shadow: $focus-ring-box-shadow;
+$btn-disabled-opacity: 0.5;
+$btn-transition:
+    color 0.12s ease-in-out,
+    background-color 0.12s ease-in-out,
+    border-color 0.12s ease-in-out;
+
+// Forms
+$input-bg: $hd-input-bg;
+$input-color: $hd-input-fg;
+$input-border-color: $hd-input-border;
+$input-border-radius: $border-radius;
+$input-border-radius-sm: $border-radius-sm;
+$input-border-radius-lg: $border-radius-lg;
+$input-padding-y: 0.5rem;
+$input-padding-x: 0.75rem;
+$input-placeholder-color: $hd-input-placeholder;
+$input-focus-border-color: $hd-input-border-focus;
+$input-focus-box-shadow: 0 0 0 3px $hd-input-ring;
+$input-disabled-bg: $hd-input-bg-disabled;
+$input-disabled-color: $hd-input-fg-disabled;
+$input-box-shadow: $box-shadow-inset;
+
+$form-label-color: $hd-input-label;
+$form-label-font-weight: 600;
+$form-label-font-size: $font-size-sm;
+$form-text-color: $hd-input-help;
+
+$form-check-input-border: 1px solid $hd-input-border;
+$form-check-input-checked-bg-color: $hd-accent;
+$form-check-input-focus-box-shadow: 0 0 0 3px $hd-input-ring;
+
+$form-feedback-invalid-color: $hd-danger;
+$form-feedback-valid-color: $hd-success;
+
+// Cards
+$card-bg: $hd-bg-canvas;
+$card-color: $hd-fg-1;
+$card-border-color: $hd-border-1;
+$card-border-radius: $border-radius;
+$card-cap-bg: $hd-bg-subtle;
+$card-cap-color: $hd-fg-1;
+$card-box-shadow: none;
+$card-spacer-y: 1rem;
+$card-spacer-x: 1.25rem;
+
+// Navbar
+$navbar-padding-y: 0.75rem;
+$navbar-light-color: $hd-fg-2;
+$navbar-light-hover-color: $hd-fg-1;
+$navbar-light-active-color: $hd-accent-text;
+$navbar-light-brand-color: $hd-fg-1;
+$navbar-light-brand-hover-color: $hd-fg-1;
+
+// Dropdowns
+$dropdown-bg: $hd-bg-canvas;
+$dropdown-border-color: $hd-border-1;
+$dropdown-border-radius: $border-radius-lg;
+$dropdown-box-shadow: none;
+$dropdown-link-hover-bg: $hd-bg-hover;
+$dropdown-link-active-bg: $hd-accent-subtle;
+$dropdown-link-active-color: $hd-accent-text;
+
+// Modals
+$modal-content-bg: $hd-bg-canvas;
+$modal-content-border-color: $hd-border-1;
+$modal-content-border-radius: $border-radius-lg;
+$modal-content-box-shadow-xs: none;
+$modal-content-box-shadow-sm-up: none;
+$modal-backdrop-bg: $hd-black;
+$modal-backdrop-opacity: 0.4;
+
+// Alerts
+$alert-border-radius: $border-radius;
+$alert-border-width: 1px;
+$alert-padding-y: 0.75rem;
+$alert-padding-x: 1rem;
+
+// Badges
+$badge-font-size: 0.75em;
+$badge-font-weight: 600;
+$badge-padding-y: 0.25em;
+$badge-padding-x: 0.5em;
+// Statuses are filled tints with 6px corners (see .text-bg-* below).
+$badge-border-radius: $border-radius;
+
+// Tables
+$table-border-color: $hd-border-1;
+$table-striped-bg: $hd-bg-overlay;
+$table-hover-bg: $hd-bg-hover;
+$table-color: $hd-fg-1;
+
+// Code
+$code-color: $hd-accent-text;
+$code-font-size: 0.9em;
+$kbd-bg: $hd-fg-1;
+$pre-color: $hd-fg-1;
+
+// Tooltip / popover
+$tooltip-bg: $hd-fg-1;
+$tooltip-color: $hd-fg-inverse;
+$tooltip-border-radius: $border-radius-sm;
+$tooltip-font-size: $font-size-sm;
+$popover-bg: $hd-bg-canvas;
+$popover-border-color: $hd-border-1;
+$popover-border-radius: $border-radius-lg;
+$popover-box-shadow: none;
+
+// ── Dark colour mode (feeds Bootstrap's own [data-bs-theme="dark"] block) ────
+$body-bg-dark: $hd-dark-bg-default;
+$body-color-dark: $hd-dark-fg-1;
+$body-secondary-color-dark: $hd-dark-fg-3;
+$body-secondary-bg-dark: $hd-dark-bg-subtle;
+$body-tertiary-color-dark: $hd-dark-fg-4;
+$body-tertiary-bg-dark: $hd-dark-bg-inset;
+$body-emphasis-color-dark: $hd-dark-fg-1;
+$border-color-dark: $hd-dark-border-1;
+$border-color-translucent-dark: rgba($hd-base-3, 0.12);
+$headings-color-dark: $hd-dark-fg-1;
+$link-color-dark: $hd-dark-accent-text;
+$link-hover-color-dark: $hd-dark-link-hover;
+$code-color-dark: $hd-dark-accent-text;
+$mark-bg-dark: $hd-dark-warning-bg;
+
+$primary-text-emphasis-dark: $hd-dark-accent-text;
+$secondary-text-emphasis-dark: $hd-dark-secondary-text;
+$success-text-emphasis-dark: $hd-dark-success;
+$info-text-emphasis-dark: $hd-dark-info;
+$warning-text-emphasis-dark: $hd-dark-warning;
+$danger-text-emphasis-dark: $hd-dark-danger;
+$light-text-emphasis-dark: $hd-dark-fg-1;
+$dark-text-emphasis-dark: $hd-dark-fg-3;
+
+$primary-bg-subtle-dark: $hd-dark-accent-subtle;
+$secondary-bg-subtle-dark: $hd-dark-bg-subtle;
+$success-bg-subtle-dark: $hd-dark-success-bg;
+$info-bg-subtle-dark: $hd-dark-info-bg;
+$warning-bg-subtle-dark: $hd-dark-warning-bg;
+$danger-bg-subtle-dark: $hd-dark-danger-bg;
+$light-bg-subtle-dark: $hd-dark-bg-subtle;
+$dark-bg-subtle-dark: $hd-dark-bg-inset;
+
+$primary-border-subtle-dark: $hd-dark-accent-border;
+$secondary-border-subtle-dark: $hd-dark-border-2;
+$success-border-subtle-dark: $hd-dark-success-border;
+$info-border-subtle-dark: $hd-dark-info-border;
+$warning-border-subtle-dark: $hd-dark-warning-border;
+$danger-border-subtle-dark: $hd-dark-danger-border;
+$light-border-subtle-dark: $hd-dark-border-2;
+$dark-border-subtle-dark: $hd-dark-border-1;
+
+$form-select-indicator-color-dark: $hd-dark-fg-2;
+$form-switch-color-dark: rgba($hd-base-3, 0.35);
+$form-valid-color-dark: $hd-dark-success;
+$form-valid-border-color-dark: $hd-dark-success;
+$form-invalid-color-dark: $hd-dark-danger;
+$form-invalid-border-color-dark: $hd-dark-danger;
+
+$accordion-icon-color-dark: $hd-dark-accent-text;
+$accordion-icon-active-color-dark: $hd-dark-accent-text;
+
+$carousel-indicator-active-bg-dark: $hd-dark-fg-1;
+$carousel-caption-color-dark: $hd-dark-fg-1;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  3. BOOTSTRAP IMPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/variables-dark";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/utilities";
+
+$theme-colors: map-merge($theme-colors, $custom-theme-colors);
+
+@import "bootstrap/scss/bootstrap";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  4. CSS CUSTOM PROPERTIES (--hd-*)
+//     Templates and components read --hd-*, never the Sass scalars above.
+// ─────────────────────────────────────────────────────────────────────────────
+
+:root,
+[data-bs-theme="light"] {
+    // Bootstrap derives the emphasis and link slots from $primary, a fill
+    // shade that fails 4.5:1 as text: re-point them at the text shade.
+    --bs-primary-text-emphasis: #{$hd-accent-text};
+    --bs-success-text-emphasis: #{$hd-success};
+    --bs-link-color: #{$hd-accent-text};
+    --bs-link-color-rgb:
+        #{red($hd-accent-text)}, #{green($hd-accent-text)}, #{blue($hd-accent-text)};
+    --bs-link-hover-color: #{$hd-link-hover};
+    --bs-link-hover-color-rgb:
+        #{red($hd-link-hover)}, #{green($hd-link-hover)}, #{blue($hd-link-hover)};
+
+    --hd-green-50: #{$hd-green-50};
+    --hd-green-100: #{$hd-green-100};
+    --hd-green-200: #{$hd-green-200};
+    --hd-green-300: #{$hd-green-300};
+    --hd-green-400: #{$hd-green-400};
+    --hd-green-500: #{$hd-green-500};
+    --hd-green-600: #{$hd-green-600};
+    --hd-green-700: #{$hd-green-700};
+    --hd-green-800: #{$hd-green-800};
+    --hd-green-900: #{$hd-green-900};
+    --hd-green-950: #{$hd-green-950};
+
+    --hd-purple-50: #{$hd-purple-50};
+    --hd-purple-100: #{$hd-purple-100};
+    --hd-purple-200: #{$hd-purple-200};
+    --hd-purple-300: #{$hd-purple-300};
+    --hd-purple-400: #{$hd-purple-400};
+    --hd-purple-500: #{$hd-purple-500};
+    --hd-purple-600: #{$hd-purple-600};
+    --hd-purple-700: #{$hd-purple-700};
+    --hd-purple-800: #{$hd-purple-800};
+    --hd-purple-900: #{$hd-purple-900};
+    --hd-purple-950: #{$hd-purple-950};
+
+    --hd-sand-50: #{$hd-sand-50};
+    --hd-sand-100: #{$hd-sand-100};
+    --hd-sand-200: #{$hd-sand-200};
+    --hd-sand-300: #{$hd-sand-300};
+    --hd-sand-400: #{$hd-sand-400};
+    --hd-sand-500: #{$hd-sand-500};
+    --hd-sand-600: #{$hd-sand-600};
+    --hd-sand-700: #{$hd-sand-700};
+    --hd-sand-800: #{$hd-sand-800};
+    --hd-sand-900: #{$hd-sand-900};
+    --hd-sand-950: #{$hd-sand-950};
+
+    --hd-gray-50: #{$hd-gray-50};
+    --hd-gray-100: #{$hd-gray-100};
+    --hd-gray-200: #{$hd-gray-200};
+    --hd-gray-300: #{$hd-gray-300};
+    --hd-gray-400: #{$hd-gray-400};
+    --hd-gray-500: #{$hd-gray-500};
+    --hd-gray-600: #{$hd-gray-600};
+    --hd-gray-700: #{$hd-gray-700};
+    --hd-gray-800: #{$hd-gray-800};
+    --hd-gray-900: #{$hd-gray-900};
+    --hd-gray-950: #{$hd-gray-950};
+
+    --hd-amber-50: #{$hd-amber-50};
+    --hd-amber-100: #{$hd-amber-100};
+    --hd-amber-200: #{$hd-amber-200};
+    --hd-amber-300: #{$hd-amber-300};
+    --hd-amber-400: #{$hd-amber-400};
+    --hd-amber-500: #{$hd-amber-500};
+    --hd-amber-600: #{$hd-amber-600};
+    --hd-amber-700: #{$hd-amber-700};
+    --hd-amber-800: #{$hd-amber-800};
+    --hd-amber-900: #{$hd-amber-900};
+    --hd-amber-950: #{$hd-amber-950};
+
+    --hd-coral-50: #{$hd-coral-50};
+    --hd-coral-100: #{$hd-coral-100};
+    --hd-coral-200: #{$hd-coral-200};
+    --hd-coral-300: #{$hd-coral-300};
+    --hd-coral-400: #{$hd-coral-400};
+    --hd-coral-500: #{$hd-coral-500};
+    --hd-coral-600: #{$hd-coral-600};
+    --hd-coral-700: #{$hd-coral-700};
+    --hd-coral-800: #{$hd-coral-800};
+    --hd-coral-900: #{$hd-coral-900};
+    --hd-coral-950: #{$hd-coral-950};
+
+    --hd-bg-canvas: #{$hd-bg-canvas};
+    --hd-bg-default: #{$hd-bg-default};
+    --hd-bg-subtle: #{$hd-bg-subtle};
+    --hd-bg-inset: #{$hd-bg-inset};
+    --hd-bg-overlay: #{$hd-bg-overlay};
+    --hd-bg-hover: #{$hd-bg-hover};
+    --hd-bg-tint: #{$hd-bg-tint};
+    --hd-bg-chrome: #{$hd-bg-chrome};
+    --hd-bg-field: #{$hd-input-bg};
+
+    --hd-fg-1: #{$hd-fg-1};
+    --hd-fg-2: #{$hd-fg-2};
+    --hd-fg-3: #{$hd-fg-3};
+    --hd-fg-4: #{$hd-fg-4};
+    --hd-fg-disabled: #{$hd-fg-disabled};
+    --hd-fg-inverse: #{$hd-fg-inverse};
+
+    --hd-border-1: #{$hd-border-1};
+    --hd-border-2: #{$hd-border-2};
+    --hd-border-3: #{$hd-border-3};
+
+    --hd-accent: #{$hd-accent};
+    --hd-accent-hover: #{$hd-accent-hover};
+    --hd-accent-active: #{$hd-accent-active};
+    --hd-accent-fg: #{$hd-accent-fg};
+    --hd-accent-subtle: #{$hd-accent-subtle};
+    --hd-accent-muted: #{$hd-accent-muted};
+    --hd-accent-border: #{$hd-accent-border};
+    --hd-accent-text: #{$hd-accent-text};
+    --hd-accent-line: #{$hd-accent-line};
+    --hd-link-hover: #{$hd-link-hover};
+    --hd-focus-ring: #{$hd-focus-ring};
+    --hd-focus: #{$hd-focus};
+
+    --hd-secondary: #{$hd-secondary};
+    --hd-secondary-hover: #{$hd-secondary-hover};
+    --hd-secondary-active: #{$hd-secondary-active};
+    --hd-secondary-fg: #{$hd-secondary-fg};
+    --hd-secondary-subtle: #{$hd-secondary-subtle};
+    --hd-secondary-muted: #{$hd-secondary-muted};
+    --hd-secondary-border: #{$hd-secondary-border};
+    --hd-secondary-text: #{$hd-secondary-text};
+
+    --hd-badge-border: #{$hd-badge-border};
+
+    --hd-success: #{$hd-success};
+    --hd-success-bg: #{$hd-success-bg};
+    --hd-success-border: #{$hd-success-border};
+    --hd-success-text: #{$hd-success-text};
+    --hd-success-solid: #{$hd-success-solid};
+    --hd-success-solid-hover: #{$hd-success-solid-hover};
+    --hd-success-on-solid: #{$hd-success-on-solid};
+    --hd-success-fill: #{$hd-success-solid};
+    --hd-success-fg: #{$hd-success-on-solid};
+
+    --hd-danger: #{$hd-danger};
+    --hd-danger-bg: #{$hd-danger-bg};
+    --hd-danger-border: #{$hd-danger-border};
+    --hd-danger-text: #{$hd-danger-text};
+    --hd-danger-solid: #{$hd-danger-solid};
+    --hd-danger-solid-hover: #{$hd-danger-solid-hover};
+    --hd-danger-on-solid: #{$hd-danger-on-solid};
+    --hd-danger-fill: #{$hd-danger-solid};
+    --hd-danger-fg: #{$hd-danger-on-solid};
+
+    --hd-warning: #{$hd-warning};
+    --hd-warning-bg: #{$hd-warning-bg};
+    --hd-warning-border: #{$hd-warning-border};
+    --hd-warning-text: #{$hd-warning-text};
+    --hd-warning-solid: #{$hd-warning-solid};
+    --hd-warning-solid-hover: #{$hd-warning-solid-hover};
+    --hd-warning-on-solid: #{$hd-warning-on-solid};
+    --hd-warning-fill: #{$hd-warning-solid};
+    --hd-warning-fg: #{$hd-warning-on-solid};
+
+    --hd-info: #{$hd-info};
+    --hd-info-bg: #{$hd-info-bg};
+    --hd-info-border: #{$hd-info-border};
+    --hd-info-text: #{$hd-info-text};
+    --hd-info-solid: #{$hd-info-solid};
+    --hd-info-solid-hover: #{$hd-info-solid-hover};
+    --hd-info-on-solid: #{$hd-info-on-solid};
+    --hd-info-fill: #{$hd-info-solid};
+    --hd-info-fg: #{$hd-info-on-solid};
+
+    --hd-input-bg: #{$hd-input-bg};
+    --hd-input-bg-disabled: #{$hd-input-bg-disabled};
+    --hd-input-fg: #{$hd-input-fg};
+    --hd-input-placeholder: #{$hd-input-placeholder};
+    --hd-input-border: #{$hd-input-border};
+    --hd-input-border-hover: #{$hd-input-border-hover};
+    --hd-input-border-focus: #{$hd-input-border-focus};
+    --hd-input-ring: #{$hd-input-ring};
+    --hd-input-border-invalid: #{$hd-input-border-invalid};
+    --hd-input-ring-invalid: #{$hd-input-ring-invalid};
+    --hd-input-label: #{$hd-input-label};
+    --hd-input-help: #{$hd-input-help};
+    --hd-input-fg-disabled: #{$hd-input-fg-disabled};
+
+    --hd-font-title: #{$hd-font-title};
+    --hd-font-text: #{$hd-font-text};
+    --hd-font-mono: #{$hd-font-mono};
+    --hd-font-brand: var(--hd-font-title);
+    --hd-font-ui: var(--hd-font-text);
+
+    --hd-text-xs: 0.6875rem;
+    --hd-text-sm: 0.8125rem;
+    --hd-text-base: 0.9375rem;
+    --hd-text-md: 1.0625rem;
+    --hd-text-lg: 1.25rem;
+    --hd-text-xl: 1.5rem;
+    --hd-text-2xl: 1.875rem;
+    --hd-text-3xl: 2.25rem;
+    --hd-text-4xl: 3rem;
+
+    --hd-leading-none: 1;
+    --hd-leading-tight: 1.2;
+    --hd-leading-snug: 1.375;
+    --hd-leading-normal: 1.5;
+    --hd-leading-relaxed: 1.625;
+
+    --hd-weight-light: 300;
+    --hd-weight-normal: 400;
+    --hd-weight-medium: 500;
+    --hd-weight-semi: 600;
+    --hd-weight-bold: 700;
+
+    --hd-tracking-tight: -0.02em;
+    --hd-tracking-normal: 0;
+    --hd-tracking-wide: 0.04em;
+    --hd-tracking-wider: 0.08em;
+    --hd-tracking-widest: 0.12em;
+
+    --hd-sp-1: 0.25rem;
+    --hd-sp-2: 0.5rem;
+    --hd-sp-3: 0.75rem;
+    --hd-sp-4: 1rem;
+    --hd-sp-5: 1.25rem;
+    --hd-sp-6: 1.5rem;
+    --hd-sp-8: 2rem;
+    --hd-sp-10: 2.5rem;
+    --hd-sp-12: 3rem;
+    --hd-sp-16: 4rem;
+    --hd-sp-20: 5rem;
+
+    --hd-radius-none: 0;
+    --hd-radius-xs: 2px;
+    --hd-radius-sm: 4px;
+    --hd-radius: 6px;
+    --hd-radius-md: 8px;
+    --hd-radius-lg: 12px;
+    --hd-radius-full: 9999px;
+
+    // Raw brand colours for components that must not follow the theme
+    // (footer band, logo, glows); blend them with color-mix() for alpha.
+    --hd-black: #{$hd-black};
+    --hd-base-1: #{$hd-base-1};
+    --hd-base-3: #{$hd-base-3};
+    --hd-green-500: #{$hd-green-500};
+    --hd-purple-500: #{$hd-purple-500};
+
+    // Hero veil laid over the report screenshot.
+    --hd-hero-veil-1: #{rgba($hd-base-1, 0.62)};
+    --hd-hero-veil-2: #{rgba($hd-purple-100, 0.58)};
+    --hd-hero-veil-3: #{rgba($hd-purple-300, 0.55)};
+
+    --hd-shadow-none: none;
+    --hd-shadow-focus: 0 0 0 3px var(--hd-focus-ring);
+    --hd-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    --hd-z-base: 0;
+    --hd-z-raised: 10;
+    --hd-z-dropdown: 100;
+    --hd-z-sticky: 200;
+    --hd-z-modal: 300;
+    --hd-z-toast: 400;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  5. DARK MODE  (Bootstrap 5.3 data-bs-theme="dark")
+// ─────────────────────────────────────────────────────────────────────────────
+
+[data-bs-theme="dark"] {
+    --bs-secondary: #{$hd-dark-secondary-text};
+    --bs-secondary-rgb:
+        #{red($hd-dark-secondary-text)}, #{green($hd-dark-secondary-text)},
+        #{blue($hd-dark-secondary-text)};
+    --bs-success: #{$hd-dark-success-solid};
+    --bs-success-rgb:
+        #{red($hd-dark-success-solid)}, #{green($hd-dark-success-solid)},
+        #{blue($hd-dark-success-solid)};
+    --bs-warning: #{$hd-dark-warning-solid};
+    --bs-warning-rgb:
+        #{red($hd-dark-warning-solid)}, #{green($hd-dark-warning-solid)},
+        #{blue($hd-dark-warning-solid)};
+    --bs-danger: #{$hd-dark-danger-solid};
+    --bs-danger-rgb:
+        #{red($hd-dark-danger-solid)}, #{green($hd-dark-danger-solid)},
+        #{blue($hd-dark-danger-solid)};
+    --bs-info: #{$hd-dark-info-solid};
+    --bs-info-rgb:
+        #{red($hd-dark-info-solid)}, #{green($hd-dark-info-solid)}, #{blue($hd-dark-info-solid)};
+    --bs-purple: #{$hd-purple-400};
+    --bs-purple-rgb: #{red($hd-purple-400)}, #{green($hd-purple-400)}, #{blue($hd-purple-400)};
+    --bs-light: #{$hd-dark-bg-subtle};
+    --bs-light-rgb:
+        #{red($hd-dark-bg-subtle)}, #{green($hd-dark-bg-subtle)}, #{blue($hd-dark-bg-subtle)};
+    --bs-dark: #{$hd-dark-fg-1};
+    --bs-dark-rgb: #{red($hd-dark-fg-1)}, #{green($hd-dark-fg-1)}, #{blue($hd-dark-fg-1)};
+
+    --bs-primary-text-emphasis: #{$hd-dark-accent-text};
+    --bs-success-text-emphasis: #{$hd-dark-success};
+    --bs-link-color: #{$hd-dark-accent-text};
+    --bs-link-color-rgb:
+        #{red($hd-dark-accent-text)}, #{green($hd-dark-accent-text)}, #{blue($hd-dark-accent-text)};
+    --bs-link-hover-color: #{$hd-dark-link-hover};
+    --bs-link-hover-color-rgb:
+        #{red($hd-dark-link-hover)}, #{green($hd-dark-link-hover)}, #{blue($hd-dark-link-hover)};
+
+    --hd-bg-canvas: #{$hd-dark-bg-canvas};
+    --hd-bg-default: #{$hd-dark-bg-default};
+    --hd-bg-subtle: #{$hd-dark-bg-subtle};
+    --hd-bg-inset: #{$hd-dark-bg-inset};
+    --hd-bg-overlay: #{$hd-dark-bg-overlay};
+    --hd-bg-hover: #{$hd-dark-bg-hover};
+    --hd-bg-tint: #{$hd-dark-bg-tint};
+    --hd-bg-chrome: #{$hd-dark-bg-chrome};
+    --hd-bg-field: #{$hd-dark-input-bg};
+
+    --hd-fg-1: #{$hd-dark-fg-1};
+    --hd-fg-2: #{$hd-dark-fg-2};
+    --hd-fg-3: #{$hd-dark-fg-3};
+    --hd-fg-4: #{$hd-dark-fg-4};
+    --hd-fg-disabled: #{$hd-dark-fg-disabled};
+    --hd-fg-inverse: #{$hd-dark-fg-inverse};
+
+    --hd-border-1: #{$hd-dark-border-1};
+    --hd-border-2: #{$hd-dark-border-2};
+    --hd-border-3: #{$hd-dark-border-3};
+
+    --hd-accent: #{$hd-dark-accent};
+    --hd-accent-hover: #{$hd-dark-accent-hover};
+    --hd-accent-active: #{$hd-dark-accent-active};
+    --hd-accent-fg: #{$hd-dark-accent-fg};
+    --hd-accent-subtle: #{$hd-dark-accent-subtle};
+    --hd-accent-muted: #{$hd-dark-accent-muted};
+    --hd-accent-border: #{$hd-dark-accent-border};
+    --hd-accent-text: #{$hd-dark-accent-text};
+    --hd-accent-line: #{$hd-dark-accent-line};
+    --hd-link-hover: #{$hd-dark-link-hover};
+    --hd-focus-ring: #{$hd-dark-focus-ring};
+    --hd-focus: #{$hd-dark-focus};
+
+    --hd-secondary: #{$hd-dark-secondary};
+    --hd-secondary-hover: #{$hd-dark-secondary-hover};
+    --hd-secondary-active: #{$hd-dark-secondary-active};
+    --hd-secondary-fg: #{$hd-dark-secondary-fg};
+    --hd-secondary-subtle: #{$hd-dark-secondary-subtle};
+    --hd-secondary-muted: #{$hd-dark-secondary-muted};
+    --hd-secondary-border: #{$hd-dark-secondary-border};
+    --hd-secondary-text: #{$hd-dark-secondary-text};
+
+    --hd-badge-border: #{$hd-dark-badge-border};
+
+    --hd-success: #{$hd-dark-success};
+    --hd-success-bg: #{$hd-dark-success-bg};
+    --hd-success-border: #{$hd-dark-success-border};
+    --hd-success-text: #{$hd-dark-success-text};
+    --hd-success-solid: #{$hd-dark-success-solid};
+    --hd-success-solid-hover: #{$hd-dark-success-solid-hover};
+    --hd-success-on-solid: #{$hd-dark-success-on-solid};
+    --hd-success-fill: #{$hd-dark-success-solid};
+    --hd-success-fg: #{$hd-dark-success-on-solid};
+
+    --hd-danger: #{$hd-dark-danger};
+    --hd-danger-bg: #{$hd-dark-danger-bg};
+    --hd-danger-border: #{$hd-dark-danger-border};
+    --hd-danger-text: #{$hd-dark-danger-text};
+    --hd-danger-solid: #{$hd-dark-danger-solid};
+    --hd-danger-solid-hover: #{$hd-dark-danger-solid-hover};
+    --hd-danger-on-solid: #{$hd-dark-danger-on-solid};
+    --hd-danger-fill: #{$hd-dark-danger-solid};
+    --hd-danger-fg: #{$hd-dark-danger-on-solid};
+
+    --hd-warning: #{$hd-dark-warning};
+    --hd-warning-bg: #{$hd-dark-warning-bg};
+    --hd-warning-border: #{$hd-dark-warning-border};
+    --hd-warning-text: #{$hd-dark-warning-text};
+    --hd-warning-solid: #{$hd-dark-warning-solid};
+    --hd-warning-solid-hover: #{$hd-dark-warning-solid-hover};
+    --hd-warning-on-solid: #{$hd-dark-warning-on-solid};
+    --hd-warning-fill: #{$hd-dark-warning-solid};
+    --hd-warning-fg: #{$hd-dark-warning-on-solid};
+
+    --hd-info: #{$hd-dark-info};
+    --hd-info-bg: #{$hd-dark-info-bg};
+    --hd-info-border: #{$hd-dark-info-border};
+    --hd-info-text: #{$hd-dark-info-text};
+    --hd-info-solid: #{$hd-dark-info-solid};
+    --hd-info-solid-hover: #{$hd-dark-info-solid-hover};
+    --hd-info-on-solid: #{$hd-dark-info-on-solid};
+    --hd-info-fill: #{$hd-dark-info-solid};
+    --hd-info-fg: #{$hd-dark-info-on-solid};
+
+    --hd-input-bg: #{$hd-dark-input-bg};
+    --hd-input-bg-disabled: #{$hd-dark-input-bg-disabled};
+    --hd-input-fg: #{$hd-dark-input-fg};
+    --hd-input-placeholder: #{$hd-dark-input-placeholder};
+    --hd-input-border: #{$hd-dark-input-border};
+    --hd-input-border-hover: #{$hd-dark-input-border-hover};
+    --hd-input-border-focus: #{$hd-dark-input-border-focus};
+    --hd-input-ring: #{$hd-dark-input-ring};
+    --hd-input-border-invalid: #{$hd-dark-input-border-invalid};
+    --hd-input-ring-invalid: #{$hd-dark-input-ring-invalid};
+    --hd-input-label: #{$hd-dark-input-label};
+    --hd-input-help: #{$hd-dark-input-help};
+    --hd-input-fg-disabled: #{$hd-dark-input-fg-disabled};
+
+    // Depth comes from the border and the fill step; a black shadow on a
+    // black ground is invisible.
+    --hd-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+
+    --hd-hero-veil-1: #{rgba($hd-black, 0.7)};
+    --hd-hero-veil-2: #{rgba($hd-purple-950, 0.68)};
+    --hd-hero-veil-3: #{rgba($hd-purple-900, 0.66)};
+}
+
+[data-bs-theme="dark"] {
+    .modal-backdrop {
+        --bs-backdrop-bg: #{$hd-gray-950};
+        --bs-backdrop-opacity: 0.7;
+    }
+
+    // The dark accent is the lighter purple-400: what Bootstrap draws on it
+    // (tick, dot, knob) turns #282828 instead of Base 1.
+    .form-check-input:checked[type="checkbox"] {
+        --bs-form-check-bg-image: #{escape-svg(
+                url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='none' stroke='#{$hd-black}' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/></svg>")
+            )};
+    }
+    .form-check-input:checked[type="radio"] {
+        --bs-form-check-bg-image: #{escape-svg(
+                url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'><circle r='2' fill='#{$hd-black}'/></svg>")
+            )};
+    }
+    .form-check-input[type="checkbox"]:indeterminate {
+        --bs-form-check-bg-image: #{escape-svg(
+                url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='none' stroke='#{$hd-black}' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10h8'/></svg>")
+            )};
+    }
+    .form-switch .form-check-input:checked {
+        --bs-form-switch-bg: #{escape-svg(
+                url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'><circle r='3' fill='#{$hd-black}'/></svg>")
+            )};
+    }
+}
+
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--hd-accent);
+    --bs-nav-pills-link-active-color: var(--hd-accent-fg);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  6. RESET-LEVEL RULES
+// ─────────────────────────────────────────────────────────────────────────────
+
+h1,
+h2,
+.h1,
+.h2,
+.display-1,
+.display-2,
+.display-3,
+.display-4,
+.display-5,
+.display-6 {
+    letter-spacing: var(--hd-tracking-tight);
+}
+
+// Selection is a green spark, the same in both colour modes.
+::selection {
+    background-color: var(--hd-green-100);
+    color: var(--hd-gray-900);
+}
+
+// 1.4.1 Use of Color: links are underlined by default ($link-decoration),
+// and thicken on hover. Chrome links opt out below; Bootstrap already opts
+// out .btn/.nav-link/.dropdown-item/.page-link/.list-group-item/.navbar-brand.
+a:hover {
+    text-decoration-thickness: 2px;
+}
+
+a {
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+}
+
+.hd-nav-link,
+.navbar a,
+footer a,
+.breadcrumb a,
+.card a.stretched-link {
+    text-decoration: none;
+}
+
+// Navbar controls (.btn, .nav-link, .dropdown-item, .navbar-brand) already
+// change state on hover: only plain text links get the underline back.
+.hd-nav-link:hover,
+.hd-nav-link:focus-visible,
+.navbar a:not(.btn, .nav-link, .dropdown-item, .navbar-brand):hover,
+.navbar a:not(.btn, .nav-link, .dropdown-item, .navbar-brand):focus-visible,
+footer a:hover,
+footer a:focus-visible,
+.breadcrumb a:hover,
+.breadcrumb a:focus-visible {
+    text-decoration: underline;
+}
+
+// 2.4.7 Focus Visible: one solid ring, never colour alone, on every control.
+:where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex],
+    [role="button"],
+    [role="link"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="switch"],
+    [role="checkbox"]
+):focus-visible,
+.hd-focus-ring:focus-visible {
+    outline: 3px solid var(--hd-focus);
+    outline-offset: 2px;
+    box-shadow: none;
+    border-radius: var(--hd-radius-xs);
+}
+
+.hd-on-accent:focus-visible,
+.hd-on-dark:focus-visible,
+.hd-brand-dark-surface :focus-visible {
+    outline-color: var(--hd-fg-inverse);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  7. COMPONENT REFINEMENTS : align Bootstrap with the design system
+// ─────────────────────────────────────────────────────────────────────────────
+
+.text-primary,
+.text-accent,
+.link-primary,
+.link-accent {
+    color: var(--hd-accent-text) !important;
+}
+
+// Status text and icons share one shade per state (700 / 300), which clears
+// 4.5:1 on every surface: Bootstrap's fills (amber-500 is 3.23:1) only reach
+// the 3:1 icon threshold.
+@each $name in (success, danger, warning, info) {
+    .text-#{$name},
+    .link-#{$name} {
+        color: var(--hd-#{$name}-text) !important;
+    }
+}
+
+// States as tints, not alarms: 100 background with 800 text. Saturated fills
+// are left to the indicator dot and icon (-solid). Primary badges follow the
+// same pattern on the lighter 50 step, so they sit beside the
+// statuses without reading as a button.
+.text-bg-primary,
+.text-bg-accent {
+    color: var(--hd-accent-text) !important;
+    background-color: var(--hd-accent-subtle) !important;
+}
+@each $name in (success, danger, warning, info) {
+    .text-bg-#{$name} {
+        color: var(--hd-#{$name}) !important;
+        background-color: var(--hd-#{$name}-bg) !important;
+    }
+}
+// Templates also write statuses as `badge bg-*`: give them the same tints,
+// whatever text utility rides along.
+.badge.bg-primary {
+    color: var(--hd-accent-text) !important;
+    background-color: var(--hd-accent-subtle) !important;
+}
+@each $name in (success, danger, warning, info) {
+    .badge.bg-#{$name} {
+        color: var(--hd-#{$name}) !important;
+        background-color: var(--hd-#{$name}-bg) !important;
+    }
+}
+.badge.bg-secondary {
+    color: var(--hd-fg-2) !important;
+    background-color: var(--hd-secondary-muted) !important;
+}
+.badge.bg-light {
+    color: var(--hd-fg-1) !important;
+    background-color: var(--hd-secondary-hover) !important;
+}
+.badge.bg-dark {
+    color: var(--hd-fg-inverse) !important;
+    background-color: var(--hd-fg-1) !important;
+}
+// Unknown or not run: the same tint, in neutral gray.
+.text-bg-secondary {
+    color: var(--hd-fg-2) !important;
+    background-color: var(--hd-secondary-muted) !important;
+}
+
+// ── Buttons ─────────────────────────────────────────────────────────────────
+.btn-primary,
+.btn-accent {
+    --bs-btn-bg: var(--hd-accent);
+    --bs-btn-border-color: var(--hd-accent);
+    --bs-btn-color: var(--hd-accent-fg);
+    --bs-btn-hover-bg: var(--hd-accent-hover);
+    --bs-btn-hover-border-color: var(--hd-accent-hover);
+    --bs-btn-hover-color: var(--hd-accent-fg);
+    --bs-btn-active-bg: var(--hd-accent-active);
+    --bs-btn-active-border-color: var(--hd-accent-active);
+    --bs-btn-active-color: var(--hd-accent-fg);
+    --bs-btn-disabled-bg: var(--hd-accent);
+    --bs-btn-disabled-border-color: var(--hd-accent);
+    --bs-btn-disabled-color: var(--hd-accent-fg);
+}
+
+// Outline buttons: no fill, text one shade deeper (700 / 300) and a border in
+// the -solid shade, so the edge reaches 3:1. Pressed, they turn into their
+// filled counterpart.
+.btn-outline-primary,
+.btn-outline-accent {
+    --bs-btn-color: var(--hd-accent-text);
+    --bs-btn-border-color: var(--hd-accent-line);
+    --bs-btn-hover-bg: var(--hd-accent-subtle);
+    --bs-btn-hover-border-color: var(--hd-accent-line);
+    --bs-btn-hover-color: var(--hd-accent-text);
+    --bs-btn-active-bg: var(--hd-accent);
+    --bs-btn-active-border-color: var(--hd-accent);
+    --bs-btn-active-color: var(--hd-accent-fg);
+    --bs-btn-disabled-color: var(--hd-accent-text);
+    --bs-btn-disabled-border-color: var(--hd-accent-line);
+}
+
+// Bootstrap compiles status buttons from the LIGHT palette and never
+// re-derives them per colour mode: route through -solid/-on-solid instead.
+@each $name in (success, danger, warning, info) {
+    .btn-#{$name} {
+        --bs-btn-bg: var(--hd-#{$name}-solid);
+        --bs-btn-border-color: var(--hd-#{$name}-solid);
+        --bs-btn-color: var(--hd-#{$name}-on-solid);
+        --bs-btn-hover-bg: var(--hd-#{$name}-solid-hover);
+        --bs-btn-hover-border-color: var(--hd-#{$name}-solid-hover);
+        --bs-btn-hover-color: var(--hd-#{$name}-on-solid);
+        --bs-btn-active-bg: var(--hd-#{$name}-solid-hover);
+        --bs-btn-active-border-color: var(--hd-#{$name}-solid-hover);
+        --bs-btn-active-color: var(--hd-#{$name}-on-solid);
+        --bs-btn-disabled-bg: var(--hd-#{$name}-solid);
+        --bs-btn-disabled-border-color: var(--hd-#{$name}-solid);
+        --bs-btn-disabled-color: var(--hd-#{$name}-on-solid);
+    }
+}
+
+@each $name in (success, danger, warning, info) {
+    .btn-outline-#{$name} {
+        --bs-btn-color: var(--hd-#{$name}-text);
+        --bs-btn-border-color: var(--hd-#{$name}-solid);
+        --bs-btn-hover-bg: var(--hd-#{$name}-bg);
+        --bs-btn-hover-border-color: var(--hd-#{$name}-solid);
+        --bs-btn-hover-color: var(--hd-#{$name});
+        --bs-btn-active-bg: var(--hd-#{$name}-solid);
+        --bs-btn-active-border-color: var(--hd-#{$name}-solid);
+        --bs-btn-active-color: var(--hd-#{$name}-on-solid);
+        --bs-btn-disabled-color: var(--hd-#{$name}-text);
+        --bs-btn-disabled-border-color: var(--hd-#{$name}-solid);
+    }
+}
+
+// Secondary is the quiet second action, as in the guide: no fill, body text,
+// a control-strength border and a Base 2 hover. Marble stays for technical UI.
+.btn-secondary {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--hd-border-3);
+    --bs-btn-color: var(--hd-fg-1);
+    --bs-btn-hover-bg: var(--hd-bg-hover);
+    --bs-btn-hover-border-color: var(--hd-border-3);
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-secondary-hover);
+    --bs-btn-active-border-color: var(--hd-border-3);
+    --bs-btn-active-color: var(--hd-fg-1);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: var(--hd-border-3);
+    --bs-btn-disabled-color: var(--hd-fg-disabled);
+}
+
+// Same quiet button, outlined: pressed, it takes the filled secondary surface.
+.btn-outline-secondary {
+    --bs-btn-color: var(--hd-fg-1);
+    --bs-btn-border-color: var(--hd-secondary-border);
+    --bs-btn-hover-bg: var(--hd-bg-hover);
+    --bs-btn-hover-border-color: var(--hd-secondary-border);
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-secondary-hover);
+    --bs-btn-active-border-color: var(--hd-secondary-border);
+    --bs-btn-active-color: var(--hd-fg-1);
+    --bs-btn-disabled-color: var(--hd-fg-1);
+    --bs-btn-disabled-border-color: var(--hd-secondary-border);
+}
+
+.btn-dark {
+    --bs-btn-bg: var(--hd-fg-1);
+    --bs-btn-border-color: var(--hd-fg-1);
+    --bs-btn-color: var(--hd-fg-inverse);
+    --bs-btn-hover-bg: var(--hd-fg-2);
+    --bs-btn-hover-border-color: var(--hd-fg-2);
+    --bs-btn-hover-color: var(--hd-fg-inverse);
+    --bs-btn-active-bg: var(--hd-fg-2);
+    --bs-btn-active-border-color: var(--hd-fg-2);
+    --bs-btn-active-color: var(--hd-fg-inverse);
+}
+
+.btn-outline-dark {
+    --bs-btn-color: var(--hd-fg-1);
+    --bs-btn-border-color: var(--hd-border-2);
+    --bs-btn-hover-bg: var(--hd-bg-hover);
+    --bs-btn-hover-border-color: var(--hd-border-3);
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-fg-1);
+    --bs-btn-active-border-color: var(--hd-fg-1);
+    --bs-btn-active-color: var(--hd-fg-inverse);
+}
+
+// Bootstrap compiles light/dark buttons and text-bg from fixed values; route
+// them through tokens so they swap with the colour mode, like --bs-light and
+// --bs-dark do.
+.btn-light {
+    --bs-btn-bg: var(--hd-secondary);
+    --bs-btn-border-color: var(--hd-secondary);
+    --bs-btn-color: var(--hd-fg-1);
+    --bs-btn-hover-bg: var(--hd-secondary-hover);
+    --bs-btn-hover-border-color: var(--hd-secondary-hover);
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-secondary-active);
+    --bs-btn-active-border-color: var(--hd-secondary-active);
+    --bs-btn-active-color: var(--hd-fg-1);
+    --bs-btn-disabled-bg: var(--hd-secondary);
+    --bs-btn-disabled-border-color: var(--hd-secondary);
+    --bs-btn-disabled-color: var(--hd-fg-disabled);
+}
+
+.btn-outline-light {
+    --bs-btn-color: var(--hd-fg-2);
+    --bs-btn-border-color: var(--hd-border-1);
+    --bs-btn-hover-bg: var(--hd-secondary);
+    --bs-btn-hover-border-color: var(--hd-border-2);
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-secondary-hover);
+    --bs-btn-active-border-color: var(--hd-border-2);
+    --bs-btn-active-color: var(--hd-fg-1);
+}
+
+.text-bg-light {
+    color: var(--hd-fg-1) !important;
+    background-color: var(--hd-secondary-hover) !important;
+}
+.text-bg-dark {
+    color: var(--hd-fg-inverse) !important;
+    background-color: var(--hd-fg-1) !important;
+}
+
+.btn-ghost {
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-color: var(--hd-fg-2);
+    --bs-btn-hover-bg: var(--hd-bg-hover);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-hover-color: var(--hd-fg-1);
+    --bs-btn-active-bg: var(--hd-bg-inset);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-active-color: var(--hd-fg-1);
+}
+
+.btn-subtle {
+    --bs-btn-bg: var(--hd-accent-subtle);
+    --bs-btn-border-color: var(--hd-accent-muted);
+    --bs-btn-color: var(--hd-accent-text);
+    --bs-btn-hover-bg: var(--hd-accent-muted);
+    --bs-btn-hover-border-color: var(--hd-accent-border);
+    --bs-btn-hover-color: var(--hd-accent-text);
+    --bs-btn-active-bg: var(--hd-accent-border);
+    --bs-btn-active-border-color: var(--hd-accent-border);
+    --bs-btn-active-color: var(--hd-accent-text);
+}
+
+// ── Surfaces Bootstrap compiles from fixed Sass values ──────────────────────
+.dropdown-menu {
+    --bs-dropdown-bg: var(--hd-bg-canvas);
+    --bs-dropdown-color: var(--hd-fg-1);
+    --bs-dropdown-border-color: var(--hd-border-1);
+    --bs-dropdown-divider-bg: var(--hd-border-1);
+    --bs-dropdown-link-color: var(--hd-fg-2);
+    --bs-dropdown-link-hover-bg: var(--hd-bg-hover);
+    --bs-dropdown-link-hover-color: var(--hd-fg-1);
+    --bs-dropdown-link-active-bg: var(--hd-accent-subtle);
+    --bs-dropdown-link-active-color: var(--hd-accent-text);
+    --bs-dropdown-link-disabled-color: var(--hd-fg-disabled);
+    --bs-dropdown-header-color: var(--hd-fg-3);
+    border: 1px solid var(--hd-border-1);
+    border-radius: var(--hd-radius-md);
+    padding: 0.35rem;
+}
+
+.dropdown-item {
+    border-radius: var(--hd-radius-sm);
+    padding: 0.4rem 0.75rem;
+}
+
+.modal-content {
+    --bs-modal-bg: var(--hd-bg-canvas);
+    --bs-modal-color: var(--hd-fg-1);
+    --bs-modal-border-color: var(--hd-border-1);
+    --bs-modal-header-border-color: var(--hd-border-1);
+    --bs-modal-footer-border-color: var(--hd-border-1);
+}
+
+.offcanvas,
+.offcanvas-sm,
+.offcanvas-md,
+.offcanvas-lg,
+.offcanvas-xl,
+.offcanvas-xxl {
+    --bs-offcanvas-bg: var(--hd-bg-canvas);
+    --bs-offcanvas-color: var(--hd-fg-1);
+    --bs-offcanvas-border-color: var(--hd-border-1);
+}
+
+.popover {
+    --bs-popover-bg: var(--hd-bg-canvas);
+    --bs-popover-body-color: var(--hd-fg-1);
+    --bs-popover-header-bg: var(--hd-bg-subtle);
+    --bs-popover-header-color: var(--hd-fg-1);
+    --bs-popover-border-color: var(--hd-border-1);
+}
+
+// The tooltip is the one inverted surface in the system: near-black on
+// light, a lifted panel on dark (an "inverted" tooltip on black would flash).
+.tooltip {
+    --bs-tooltip-bg: var(--hd-fg-1);
+    --bs-tooltip-color: var(--hd-fg-inverse);
+}
+[data-bs-theme="dark"] .tooltip {
+    --bs-tooltip-bg: #{$hd-dark-bg-subtle};
+    --bs-tooltip-color: #{$hd-dark-fg-1};
+}
+
+.toast {
+    --bs-toast-bg: var(--hd-bg-canvas);
+    --bs-toast-color: var(--hd-fg-1);
+    --bs-toast-border-color: var(--hd-border-1);
+    --bs-toast-header-bg: var(--hd-bg-subtle);
+    --bs-toast-header-color: var(--hd-fg-2);
+    --bs-toast-header-border-color: var(--hd-border-1);
+}
+
+.table {
+    --bs-table-color: var(--hd-fg-1);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--hd-border-1);
+    --bs-table-striped-color: var(--hd-fg-1);
+    --bs-table-striped-bg: var(--hd-bg-overlay);
+    --bs-table-hover-color: var(--hd-fg-1);
+    --bs-table-hover-bg: var(--hd-bg-hover);
+}
+
+.accordion {
+    --bs-accordion-bg: var(--hd-bg-canvas);
+    --bs-accordion-color: var(--hd-fg-1);
+    --bs-accordion-border-color: var(--hd-border-1);
+    --bs-accordion-btn-color: var(--hd-fg-1);
+    --bs-accordion-btn-bg: var(--hd-bg-canvas);
+    --bs-accordion-active-color: var(--hd-accent-text);
+    --bs-accordion-active-bg: var(--hd-accent-subtle);
+}
+
+.nav-tabs {
+    --bs-nav-tabs-border-color: var(--hd-border-1);
+    --bs-nav-tabs-link-hover-border-color: var(--hd-border-2);
+    --bs-nav-tabs-link-active-color: var(--hd-accent-text);
+    --bs-nav-tabs-link-active-bg: var(--hd-bg-canvas);
+    --bs-nav-tabs-link-active-border-color: var(--hd-border-1);
+    --bs-nav-link-color: var(--hd-fg-2);
+    --bs-nav-link-hover-color: var(--hd-fg-1);
+    --bs-nav-link-disabled-color: var(--hd-fg-disabled);
+}
+
+.pagination {
+    --bs-pagination-bg: var(--hd-bg-canvas);
+    --bs-pagination-color: var(--hd-fg-2);
+    --bs-pagination-border-color: var(--hd-border-1);
+    --bs-pagination-hover-bg: var(--hd-bg-hover);
+    --bs-pagination-hover-color: var(--hd-fg-1);
+    --bs-pagination-hover-border-color: var(--hd-border-2);
+    --bs-pagination-focus-bg: var(--hd-bg-hover);
+    --bs-pagination-focus-color: var(--hd-fg-1);
+    --bs-pagination-active-bg: var(--hd-accent);
+    --bs-pagination-active-border-color: var(--hd-accent);
+    --bs-pagination-active-color: var(--hd-accent-fg);
+    --bs-pagination-disabled-bg: var(--hd-bg-subtle);
+    --bs-pagination-disabled-color: var(--hd-fg-disabled);
+    --bs-pagination-disabled-border-color: var(--hd-border-1);
+}
+
+.breadcrumb {
+    --bs-breadcrumb-divider-color: var(--hd-fg-3);
+    --bs-breadcrumb-item-active-color: var(--hd-fg-2);
+}
+
+.progress,
+.progress-stacked {
+    --bs-progress-bg: var(--hd-bg-inset);
+    --bs-progress-bar-bg: var(--hd-accent);
+    --bs-progress-bar-color: var(--hd-accent-fg);
+}
+
+// Beta / New: an outlined green capsule, never a fill, so it cannot be
+// mistaken for a status (statuses are filled tints with 6px corners).
+.badge-new {
+    color: var(--hd-success-text);
+    background: transparent;
+    border: 1.5px solid var(--hd-badge-border);
+    border-radius: var(--hd-radius-full);
+}
+
+.badge-gray {
+    color: var(--hd-fg-inverse);
+    background-color: var(--hd-secondary-text);
+}
+
+// ── Forms ───────────────────────────────────────────────────────────────────
+.form-control,
+.form-select {
+    background-color: var(--hd-input-bg);
+    border-color: var(--hd-input-border);
+    color: var(--hd-input-fg);
+
+    &:hover:not(:disabled):not([readonly]) {
+        border-color: var(--hd-input-border-hover);
+    }
+
+    &:focus {
+        background-color: var(--hd-input-bg);
+        border-color: var(--hd-input-border-focus);
+        color: var(--hd-input-fg);
+        box-shadow: 0 0 0 3px var(--hd-input-ring);
+    }
+
+    &:disabled {
+        background-color: var(--hd-input-bg-disabled);
+        color: var(--hd-input-fg-disabled);
+    }
+
+    &::placeholder {
+        color: var(--hd-input-placeholder);
+    }
+
+    &.is-invalid,
+    &[aria-invalid="true"] {
+        border-color: var(--hd-input-border-invalid);
+
+        &:focus {
+            box-shadow: 0 0 0 3px var(--hd-input-ring-invalid);
+        }
+    }
+}
+
+.form-label {
+    color: var(--hd-input-label);
+}
+
+.form-text {
+    color: var(--hd-input-help);
+}
+
+.form-check-input {
+    background-color: var(--hd-input-bg);
+    border-color: var(--hd-input-border);
+
+    &:checked {
+        background-color: var(--hd-accent);
+        border-color: var(--hd-accent);
+    }
+
+    &:focus {
+        border-color: var(--hd-input-border-focus);
+        box-shadow: 0 0 0 3px var(--hd-input-ring);
+    }
+}
+
+.input-group-text {
+    background-color: var(--hd-bg-subtle);
+    border-color: var(--hd-input-border);
+    color: var(--hd-fg-2);
+}
+
+.invalid-feedback {
+    color: var(--hd-danger);
+    font-weight: 600;
+}
+
+.valid-feedback {
+    color: var(--hd-success);
+}
+
+// ── Cards: flat, separated by a 1px border ─────────────────────────────────
+.card {
+    --bs-card-bg: var(--hd-bg-canvas);
+    --bs-card-color: var(--hd-fg-1);
+    --bs-card-border-color: var(--hd-border-1);
+    --bs-card-cap-bg: var(--hd-bg-subtle);
+    --bs-card-cap-color: var(--hd-fg-1);
+    box-shadow: none;
+}
+
+.card-hover:hover {
+    background: var(--hd-bg-hover);
+}
+
+.card-lift {
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        border-color: var(--hd-accent-border);
+    }
+}
+
+// ── List group: the active row is a tint, not a saturated slab ─────────────
+.list-group {
+    --bs-list-group-bg: var(--hd-bg-canvas);
+    --bs-list-group-color: var(--hd-fg-1);
+    --bs-list-group-border-color: var(--hd-border-1);
+    --bs-list-group-action-hover-bg: var(--hd-bg-hover);
+    --bs-list-group-action-hover-color: var(--hd-fg-1);
+    --bs-list-group-disabled-color: var(--hd-fg-disabled);
+    --bs-list-group-active-bg: var(--hd-accent-subtle);
+    --bs-list-group-active-border-color: var(--hd-accent-border);
+    --bs-list-group-active-color: var(--hd-accent-text);
+}
+.list-group-item.active {
+    font-weight: 600;
+}
+.list-group-item-action {
+    transition: background-color 0.15s;
+}
+
+// Bootstrap compiles table variants from the light fills: route them through
+// the status tints so they swap with the colour mode.
+@each $name in (success, danger, warning, info) {
+    .table-#{$name} {
+        --bs-table-color: var(--hd-#{$name});
+        --bs-table-bg: var(--hd-#{$name}-bg);
+        --bs-table-border-color: var(--hd-#{$name}-border);
+        --bs-table-striped-color: var(--hd-#{$name});
+        --bs-table-hover-color: var(--hd-#{$name});
+        --bs-table-active-color: var(--hd-#{$name});
+    }
+}
+
+// ── Alerts ───────────────────────────────────────────────────────────────────
+.alert-primary {
+    background-color: var(--hd-accent-subtle);
+    border-color: var(--hd-accent-border);
+    color: var(--hd-accent-text);
+}
+.alert-success {
+    background-color: var(--hd-success-bg);
+    border-color: var(--hd-success-border);
+    color: var(--hd-success);
+}
+.alert-danger {
+    background-color: var(--hd-danger-bg);
+    border-color: var(--hd-danger-border);
+    color: var(--hd-danger);
+}
+.alert-warning {
+    background-color: var(--hd-warning-bg);
+    border-color: var(--hd-warning-border);
+    color: var(--hd-warning);
+}
+.alert-info {
+    background-color: var(--hd-info-bg);
+    border-color: var(--hd-info-border);
+    color: var(--hd-info);
+}
+
+.alert a:not(.btn) {
+    color: inherit;
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+// ── Code & DNS data ─────────────────────────────────────────────────────────
+code,
+.hd-code {
+    font-family: var(--hd-font-mono);
+    font-size: var(--hd-text-sm);
+    background: var(--hd-bg-chrome);
+    border: 1px solid var(--hd-border-1);
+    border-radius: var(--hd-radius-xs);
+    padding: 0.1em 0.35em;
+    color: var(--hd-fg-1);
+}
+
+// Code blocks are technical UI too: a Marble panel with a decorative edge.
+pre {
+    font-family: var(--hd-font-mono);
+    background: var(--hd-bg-chrome);
+    border: 1px solid var(--hd-border-1);
+    border-radius: var(--hd-radius-md);
+    padding: var(--hd-sp-3) var(--hd-sp-4);
+    color: var(--hd-fg-1);
+}
+
+pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  8. ACCESSIBILITY UTILITIES  (WCAG 2.2 AA)
+// ─────────────────────────────────────────────────────────────────────────────
+
+.hd-link {
+    color: var(--hd-accent-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: var(--hd-weight-semi);
+}
+.hd-link:hover {
+    color: var(--hd-link-hover);
+}
+
+.hd-sr-only,
+.hd-sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.hd-field-border {
+    border: 1px solid var(--hd-input-border-hover);
+}
+
+.hd-status {
+    font-family: var(--hd-font-text);
+    font-size: var(--hd-text-sm);
+    line-height: var(--hd-leading-normal);
+    padding: var(--hd-sp-3) var(--hd-sp-4);
+    border-radius: var(--hd-radius);
+    border: 1px solid transparent;
+}
+.hd-status--success {
+    background: var(--hd-success-bg);
+    color: var(--hd-success);
+    border-color: var(--hd-success-border);
+}
+.hd-status--danger {
+    background: var(--hd-danger-bg);
+    color: var(--hd-danger);
+    border-color: var(--hd-danger-border);
+}
+.hd-status--warning {
+    background: var(--hd-warning-bg);
+    color: var(--hd-warning);
+    border-color: var(--hd-warning-border);
+}
+.hd-status--info {
+    background: var(--hd-info-bg);
+    color: var(--hd-info);
+    border-color: var(--hd-info-border);
+}
+
+.hd-field-error {
+    color: var(--hd-danger);
+    font-family: var(--hd-font-text);
+    font-size: var(--hd-text-sm);
+    font-weight: var(--hd-weight-semi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  9. APP LAYOUT & STRUCTURE: HappyDeliver-specific (not in the DS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+nav.navbar {
+    background: var(--bs-body-bg);
+    // The one shadow the brand keeps: a purple glow under the navbar.
+    box-shadow: 0 1px 3px rgba($hd-accent, 0.65);
+    border-bottom: 1px solid rgba($hd-accent, 0.35);
+    z-index: 2;
+}
+
+footer {
+    border-top: 2px solid rgba($hd-green-500, 0.3);
+}
+
+// ── Animations ──────────────────────────────────────────────────────────────
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+$hd-grade-light-b: #5cb82e;
+$hd-grade-light-c: #e0a800;
+$hd-grade-light-d: #ef7d22;
+$hd-grade-light-e: #e2533f;
+$hd-grade-light-f: #c9302c;
+$hd-grade-dark-a: #2fc496;
+$hd-grade-dark-b: #7fd04f;
+$hd-grade-dark-c: #f2bf3a;
+$hd-grade-dark-d: #f7964a;
+$hd-grade-dark-e: #f37a68;
+$hd-grade-dark-f: #ef5a52;
+
+// ── Grades: A+ to F, from the brand green down to a warm red ──────────────
+// Grades are drawn large and bold and must read at a glance: the scale starts
+// on the brand green and runs through vivid lime, amber and orange, brighter
+// than the status shades, which are tuned for body text.
+:root,
+[data-bs-theme="light"] {
+    --hd-grade-a: #{$hd-green-500};
+    --hd-grade-b: #{$hd-grade-light-b};
+    --hd-grade-c: #{$hd-grade-light-c};
+    --hd-grade-d: #{$hd-grade-light-d};
+    --hd-grade-e: #{$hd-grade-light-e};
+    --hd-grade-f: #{$hd-grade-light-f};
+    --hd-grade-none: #{$hd-gray-500};
+}
+
+[data-bs-theme="dark"] {
+    --hd-grade-a: #{$hd-grade-dark-a};
+    --hd-grade-b: #{$hd-grade-dark-b};
+    --hd-grade-c: #{$hd-grade-dark-c};
+    --hd-grade-d: #{$hd-grade-dark-d};
+    --hd-grade-e: #{$hd-grade-dark-e};
+    --hd-grade-f: #{$hd-grade-dark-f};
+    --hd-grade-none: #{$hd-gray-400};
+}

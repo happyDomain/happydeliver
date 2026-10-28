@@ -8,7 +8,6 @@
         issueObserver,
     } from "#lib/issues.js";
     import { getScoreColorClass } from "#lib/score.js";
-    import { theme } from "#lib/stores/theme.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import IssueAlert from "./IssueAlert.svelte";
 
@@ -27,7 +26,7 @@
 </script>
 
 <div class="card shadow-sm" id="content-details">
-    <div class="card-header {$theme === 'light' ? 'bg-white' : 'bg-dark'}">
+    <div class="card-header">
         <h4 class="mb-0 d-flex justify-content-between align-items-center">
             <span>
                 <i class="bi bi-file-text me-2"></i>

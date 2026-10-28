@@ -58,16 +58,16 @@
             </div>
 
             <!-- Input Form -->
-            <div class="card shadow-lg border-0 mb-5">
+            <div class="card card-lift border-0 mb-5">
                 <div class="card-body p-5">
                     <h2 class="h5 mb-4">Enter IP Address</h2>
                     <div class="input-group input-group-lg mb-3">
-                        <span class="input-group-text bg-light">
+                        <span class="input-group-text bg-light border-end-0">
                             <i class="bi bi-hdd-network"></i>
                         </span>
                         <input
                             type="text"
-                            class="form-control"
+                            class="form-control border-start-0 border-end-0 shadow-none"
                             placeholder="192.0.2.1 or 2001:db8::1"
                             bind:value={ip}
                             onkeypress={handleKeyPress}
@@ -100,7 +100,7 @@
             <!-- Info Section -->
             <div class="row g-4 mb-4">
                 <div class="col-md-6">
-                    <div class="card h-100 border-0 bg-light">
+                    <div class="card card-lift h-100 border-0 bg-light">
                         <div class="card-body">
                             <h3 class="h6 mb-3">
                                 <i class="bi bi-check-circle-fill text-success me-2"></i>
@@ -118,7 +118,7 @@
                 </div>
 
                 <div class="col-md-6">
-                    <div class="card h-100 border-0 bg-light">
+                    <div class="card card-lift h-100 border-0 bg-light">
                         <div class="card-body">
                             <h3 class="h6 mb-3">
                                 <i class="bi bi-info-circle-fill text-primary me-2"></i>
@@ -174,31 +174,7 @@
 </div>
 
 <style>
-    .card {
-        transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.1) !important;
-    }
-
     .input-group-lg .form-control {
         font-size: 1.1rem;
-    }
-
-    .input-group-text {
-        border-right: none;
-    }
-
-    .input-group .form-control {
-        border-left: none;
-        border-right: none;
-    }
-
-    .input-group .form-control:focus {
-        box-shadow: none;
     }
 </style>

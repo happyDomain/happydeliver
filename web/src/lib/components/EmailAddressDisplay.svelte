@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { theme } from "#lib/stores/theme.js";
-
     interface Props {
         email: string;
     }
@@ -26,11 +24,7 @@
     }
 </script>
 
-<div
-    class="rounded rounded-4 p-4"
-    class:bg-light={$theme === "light"}
-    class:bg-secondary={$theme !== "light"}
->
+<div class="rounded rounded-4 p-4 bg-light">
     <div class="input-group">
         <input
             bind:this={inputElement}
@@ -42,8 +36,6 @@
         />
         <button
             class="btn btn-outline-primary clipboard-btn"
-            class:btn-outline-primary={$theme === "light"}
-            class:btn-primary={$theme !== "light"}
             onclick={copyToClipboard}
             title="Copy to clipboard"
         >

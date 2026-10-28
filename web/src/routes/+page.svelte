@@ -242,7 +242,7 @@
                     and more. Open-source, self-hosted, and privacy-focused.
                 </p>
                 <button
-                    class="btn btn-success btn-lg px-5 py-3 shadow cta-button"
+                    class="btn btn-success btn-lg px-5 py-3 cta-button"
                     onclick={createTest}
                     disabled={loading}
                 >
@@ -268,7 +268,7 @@
                             onchange={onFileSelected}
                         />
                         <button
-                            class="btn btn-outline-light btn-lg px-4"
+                            class="btn btn-secondary btn-lg px-4"
                             onclick={() => fileInput?.click()}
                             disabled={loading}
                         >
@@ -411,59 +411,74 @@
 </section>
 
 <style>
+    /* The hero shows a report in the background, under a light veil tinted
+       with the brand purple; the green call to action is the spark on it. */
     .hero {
-        background:
-            linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.9) 100%),
-            url("/img/report.webp");
-        background-size: cover;
-        background-position: center 25%;
-        background-repeat: no-repeat;
-        color: white;
+        position: relative;
+        isolation: isolate;
+        color: var(--hd-fg-1);
+        background-color: var(--hd-bg-default);
+    }
+
+    /* The screenshot is slightly blurred so its own text does not compete
+       with the headline. */
+    .hero::before,
+    .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+    }
+
+    .hero::before {
+        background: url("/img/report.webp") center 25% / cover no-repeat;
+        filter: blur(4px);
+    }
+
+    .hero::after {
+        background: linear-gradient(
+            135deg,
+            var(--hd-hero-veil-1) 0%,
+            var(--hd-hero-veil-2) 55%,
+            var(--hd-hero-veil-3) 100%
+        );
+    }
+
+    :global([data-bs-theme="dark"]) .hero::before {
+        filter: blur(4px) invert(1) hue-rotate(180deg);
+    }
+
+    :global([data-bs-theme="dark"]) .hero::after {
+        background: linear-gradient(
+            135deg,
+            var(--hd-hero-veil-1) 0%,
+            var(--hd-hero-veil-2) 55%,
+            var(--hd-hero-veil-3) 100%
+        );
+    }
+
+    .hero h1 {
+        color: inherit;
     }
 
     .hero h1,
     .hero p {
-        text-shadow: black 0 0 1px;
+        text-shadow: 0 0 12px var(--hd-bg-default);
     }
 
     .hero.dragging {
-        outline: 3px dashed rgba(255, 255, 255, 0.9);
+        outline: 3px dashed var(--hd-accent);
         outline-offset: -1rem;
     }
 
-    /* Dark mode hero adjustments */
-    :global([data-bs-theme="dark"]) .hero {
-        background:
-            linear-gradient(135deg, rgba(50, 65, 140, 0.85) 0%, rgba(65, 40, 95, 0.9) 100%),
-            url("/img/report.webp");
-        background-size: cover;
-        background-position: center 25%;
-        background-repeat: no-repeat;
-    }
-
-    :global([data-bs-theme="dark"]) .hero h1,
-    :global([data-bs-theme="dark"]) .hero p {
-        text-shadow: black 0 0 3px;
+    .hero .btn-secondary {
+        --bs-btn-bg: var(--hd-bg-canvas);
+        --bs-btn-hover-bg: var(--hd-bg-hover);
     }
 
     /* Dark mode section background */
     :global([data-bs-theme="dark"]) #steps {
         background-color: var(--bs-secondary-bg) !important;
-    }
-
-    .fade-in {
-        animation: fadeIn 0.6s ease-out;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 
     .cta-button {
@@ -485,28 +500,9 @@
         0%,
         100% {
             transform: scale(1);
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         }
         50% {
             transform: scale(1.08);
-            box-shadow: 0 1rem 2rem rgba(25, 135, 84, 0.5);
         }
-    }
-
-    @keyframes pulse-dark {
-        0%,
-        100% {
-            transform: scale(1);
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-        }
-        50% {
-            transform: scale(1.08);
-            box-shadow: 0 1rem 2rem rgba(25, 135, 84, 0.7);
-        }
-    }
-
-    /* Dark mode pulse animation */
-    :global([data-bs-theme="dark"]) .cta-button {
-        animation: pulse-dark 2s infinite;
     }
 </style>

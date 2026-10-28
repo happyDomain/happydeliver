@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { BlacklistCheck } from "#lib/api/types.gen.js";
-    import { theme } from "#lib/stores/theme.js";
 
     interface Props {
         whitelists: Record<string, BlacklistCheck[]>;
@@ -10,13 +9,13 @@
 </script>
 
 <div class="card shadow-sm" id="dnswl-details">
-    <div class="card-header" class:bg-white={$theme === "light"} class:bg-dark={$theme !== "light"}>
+    <div class="card-header">
         <h4 class="mb-0 d-flex flex-wrap justify-content-between align-items-center">
             <span>
                 <i class="bi bi-shield-check me-2"></i>
                 Whitelist Checks
             </span>
-            <span class="badge bg-info text-white">Informational</span>
+            <span class="badge bg-info">Informational</span>
         </h4>
     </div>
     <div class="card-body">

@@ -63,6 +63,7 @@ var embeddedWorks = []notice{
 	{Attribution: caniemail.Attribution, License: caniemail.License},
 	{Attribution: rspamd.Attribution, License: rspamd.License},
 	{Attribution: bimi.RootsAttribution},
+	{Attribution: web.FontsAttribution, License: web.FontsLicense},
 	{Attribution: web.BootstrapAttribution, License: web.BootstrapLicense},
 	{Attribution: web.BootstrapIconsAttribution, License: web.BootstrapIconsLicense},
 	{Attribution: web.PopperAttribution, License: web.PopperLicense},

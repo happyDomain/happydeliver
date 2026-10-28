@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { ReceivedHop } from "#lib/api/types.gen.js";
-    import { theme } from "#lib/stores/theme.js";
 
     interface Props {
         receivedChain: ReceivedHop[];
@@ -30,11 +29,7 @@
 
 {#if receivedChain && receivedChain.length > 0}
     <div class="card shadow-sm" id="email-path">
-        <div
-            class="card-header"
-            class:bg-white={$theme === "light"}
-            class:bg-dark={$theme !== "light"}
-        >
+        <div class="card-header">
             <h4 class="mb-0">
                 <i class="bi bi-pin-map me-2"></i>
                 Email Path
@@ -42,11 +37,7 @@
         </div>
         <div class="list-group list-group-flush">
             {#each receivedChain as hop, i (i)}
-                <div
-                    class="list-group-item"
-                    class:bg-light={i < entryIndex && $theme === "light"}
-                    class:bg-secondary={i < entryIndex && $theme !== "light"}
-                >
+                <div class="list-group-item" class:bg-light={i < entryIndex}>
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">
                             <span class="badge bg-primary me-2">{receivedChain.length - i}</span>
