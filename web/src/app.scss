@@ -1955,6 +1955,101 @@ details.check-card {
     }
 }
 
+// Checks about one subject, as rows of a list: the section around them is the
+// only card. A row's content is indented under its title, past the status icon.
+.check-list {
+    --check-indent: 2.5rem;
+
+    & + & {
+        margin-top: 1.75rem;
+    }
+
+    .check-list-title {
+        letter-spacing: 0.04em;
+
+        code {
+            text-transform: none;
+            letter-spacing: normal;
+        }
+    }
+}
+
+details.check-row {
+    border-top: 1px solid var(--bs-border-color-translucent);
+
+    &:last-child {
+        border-bottom: 1px solid var(--bs-border-color-translucent);
+    }
+
+    > summary {
+        border-radius: var(--hd-radius-md);
+    }
+
+    > :not(summary) {
+        padding-left: var(--check-indent);
+    }
+
+    &[open] > :last-child {
+        padding-bottom: 0.75rem;
+    }
+
+    > .card-body {
+        padding-top: 0.25rem;
+        padding-right: 0;
+        padding-bottom: 0.5rem;
+    }
+
+    .list-group-item {
+        padding-left: 0;
+        padding-right: 0;
+        background: transparent;
+    }
+}
+
+// What a check found, as label and value pairs: a framed panel, so the data reads
+// apart from the note above it and the explanation below it.
+dl.check-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--hd-bg-subtle);
+    border: 1px solid var(--hd-border-1);
+    border-radius: var(--hd-radius);
+
+    code {
+        background: var(--hd-bg-default);
+    }
+
+    dt {
+        font-weight: normal;
+        color: var(--hd-fg-3);
+    }
+
+    dd {
+        margin-bottom: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+// What a check verifies, for a reader who does not know: after the evidence, behind a
+// hairline, so it reads as context rather than as a finding. The references of the
+// check follow right under it, as part of the same block.
+.check-about {
+    color: var(--hd-fg-3);
+    font-size: $small-font-size;
+    margin-bottom: 0;
+
+    &:not(:first-child) {
+        margin-top: 0.75rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--hd-border-1);
+    }
+}
+
 // What passed, folded under the problems: a quiet line to open, not a heading.
 details.passed-items {
     > summary {
