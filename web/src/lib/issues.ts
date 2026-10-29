@@ -57,6 +57,7 @@ const issueLabels: Record<Issue["type"], string> = {
     spf_missing: "No SPF record",
     spf_invalid: "Invalid SPF record",
     spf_include_invalid: "Broken SPF include",
+    spf_too_many_lookups: "Too many SPF lookups",
     spf_all_pass: "SPF authorizes every server",
     spf_all_neutral: "SPF says nothing about other servers",
     spf_all_missing: "SPF says nothing about other servers",

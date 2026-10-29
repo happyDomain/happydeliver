@@ -186,27 +186,35 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			}
 		}
 
-		// SPF record of the announced HELO hostname: a recommendation, never a
-		// failure, so it is never marked as an error
-		if dns.HeloSpfRecord != nil {
-			helo := dns.HeloSpfRecord
-			status := "ℹ"
-			if helo.Valid {
-				status = "✓"
-			}
-			fmt.Fprintf(writer, "\n  SPF Record for the HELO hostname (optional):\n    %s ", status)
-			if helo.Domain != nil {
-				fmt.Fprintf(writer, "Hostname: %s", *helo.Domain)
-			}
-			if helo.AllQualifier != nil {
-				fmt.Fprintf(writer, " (all: %s)", *helo.AllQualifier)
-			}
-			fmt.Fprintln(writer)
-			if helo.Record != nil {
-				fmt.Fprintf(writer, "      %s\n", *helo.Record)
-			}
-			if helo.Error != nil {
-				fmt.Fprintf(writer, "      NOTE: %s\n", *helo.Error)
+		// SPF records of the announced HELO hostname: a recommendation, never a
+		// failure, so the hostname's own record is never marked as an error
+		if dns.HeloSpfRecords != nil && len(*dns.HeloSpfRecords) > 0 {
+			fmt.Fprintln(writer, "\n  SPF Records for the HELO hostname (optional):")
+			for i, helo := range *dns.HeloSpfRecords {
+				status, label, errLabel := "✓", "Domain", "ERROR"
+				if i == 0 {
+					label, errLabel = "Hostname", "NOTE"
+				}
+				if !helo.Valid {
+					status = "✗"
+					if i == 0 {
+						status = "ℹ"
+					}
+				}
+				fmt.Fprintf(writer, "    %s ", status)
+				if helo.Domain != nil {
+					fmt.Fprintf(writer, "%s: %s", label, *helo.Domain)
+				}
+				if helo.AllQualifier != nil {
+					fmt.Fprintf(writer, " (all: %s)", *helo.AllQualifier)
+				}
+				fmt.Fprintln(writer)
+				if helo.Record != nil {
+					fmt.Fprintf(writer, "      %s\n", *helo.Record)
+				}
+				if helo.Error != nil {
+					fmt.Fprintf(writer, "      %s: %s\n", errLabel, *helo.Error)
+				}
 			}
 		}
 

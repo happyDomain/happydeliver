@@ -377,7 +377,7 @@ func TestCheckHeloSPFRecord(t *testing.T) {
 			txt: map[string][]string{
 				"mail.example.com": {"v=spf1 ip4:192.0.2.10 -all", "v=spf1 ip4:192.0.2.11 -all"},
 			},
-			wantRecord:   utils.PtrTo("v=spf1 ip4:192.0.2.10 -all"),
+			wantRecord:   utils.PtrTo("v=spf1 ip4:192.0.2.11 -all"),
 			wantErrSubst: "Multiple SPF records found",
 		},
 		{
@@ -395,11 +395,12 @@ func TestCheckHeloSPFRecord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := newMockAnalyzer(tt.txt, tt.errMap)
 
-			result := analyzer.checkHeloSPFRecord(tt.helo)
+			records := analyzer.checkSPFRecords(tt.helo)
 
-			if result == nil {
-				t.Fatal("checkHeloSPFRecord() = nil, want a result")
+			if records == nil || len(*records) == 0 {
+				t.Fatal("checkSPFRecords() returned nothing, want a result")
 			}
+			result := (*records)[0]
 			if result.Domain == nil || *result.Domain != tt.helo {
 				t.Errorf("Domain = %v, want %v", result.Domain, tt.helo)
 			}
@@ -434,6 +435,26 @@ func TestCheckHeloSPFRecord(t *testing.T) {
 	}
 }
 
+// TestCheckHeloSPFRecordFollowsIncludes pins that the HELO policy is resolved
+// like the envelope sender one: receivers follow its includes all the same.
+func TestCheckHeloSPFRecordFollowsIncludes(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"mail.example.com": {"v=spf1 include:_spf.example.net -all"},
+		"_spf.example.net": {"v=spf1 ip4:192.0.2.0/24 a ~all"},
+	}, nil)
+
+	records := analyzer.checkSPFRecords("mail.example.com")
+	if records == nil || len(*records) != 2 {
+		t.Fatalf("checkSPFRecords() = %v, want the record and its include", records)
+	}
+	if d := (*records)[1].Domain; d == nil || *d != "_spf.example.net" {
+		t.Errorf("second record domain = %v, want _spf.example.net", d)
+	}
+	if n := (*records)[0].DnsLookups; n == nil || *n != 2 {
+		t.Errorf("DnsLookups = %v, want 2", n)
+	}
+}
+
 // TestCheckHeloSPFRecordDoesNotAffectScore pins the informational nature of the
 // check: whatever it finds, it must not move the DNS SPF score.
 func TestCheckHeloSPFRecordDoesNotAffectScore(t *testing.T) {
@@ -453,11 +474,11 @@ func TestCheckHeloSPFRecordDoesNotAffectScore(t *testing.T) {
 
 	want, _ := analyzer.calculateSPFScore(results)
 
-	for _, heloRecord := range []*model.SPFRecord{
+	for _, heloRecord := range []model.SPFRecord{
 		{Domain: utils.PtrTo("mail.example.com"), Error: utils.PtrTo("No SPF record found")},
 		{Domain: utils.PtrTo("mail.example.com"), Valid: true, Record: utils.PtrTo("v=spf1 -all")},
 	} {
-		results.HeloSpfRecord = heloRecord
+		results.HeloSpfRecords = &[]model.SPFRecord{heloRecord}
 
 		if got, _ := analyzer.calculateSPFScore(results); got != want {
 			t.Errorf("calculateSPFScore() = %d with a HELO record, want %d", got, want)
@@ -546,6 +567,192 @@ func TestHeloLookupName(t *testing.T) {
 				t.Errorf("heloLookupName(%q) = %q, want %q", tt.helo, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCountSPFLookups(t *testing.T) {
+	tests := []struct {
+		name        string
+		txt         map[string][]string
+		wantLookups int
+		wantPartial bool
+	}{
+		{
+			name: "mechanisms without lookups cost nothing",
+			txt: map[string][]string{
+				"example.com": {"v=spf1 ip4:192.0.2.1 ip6:2001:db8::/32 -all"},
+			},
+			wantLookups: 0,
+		},
+		{
+			name: "each lookup term counts, the included record's too",
+			txt: map[string][]string{
+				"example.com":      {"v=spf1 include:_spf.example.net ip4:192.0.2.1 mx a ptr -all"},
+				"_spf.example.net": {"v=spf1 ip4:198.51.100.1 mx a/24 ~all"},
+			},
+			// include, mx, a, ptr here; mx, a there
+			wantLookups: 6,
+		},
+		{
+			name: "a domain included twice is counted twice",
+			txt: map[string][]string{
+				"example.com":   {"v=spf1 include:a.example.net include:b.example.net -all"},
+				"a.example.net": {"v=spf1 include:c.example.net ~all"},
+				"b.example.net": {"v=spf1 include:c.example.net ~all"},
+				"c.example.net": {"v=spf1 exists:%{i}.example.net mx ~all"},
+			},
+			// 2 includes + (1 include + 2) twice
+			wantLookups: 8,
+		},
+		{
+			name: "includes before a redirect are evaluated too",
+			txt: map[string][]string{
+				"example.com":      {"v=spf1 include:_spf.example.net redirect=example.org"},
+				"_spf.example.net": {"v=spf1 a ~all"},
+				"example.org":      {"v=spf1 mx -all"},
+			},
+			wantLookups: 4,
+		},
+		{
+			name: "a record with all never reaches its redirect",
+			txt: map[string][]string{
+				"example.com": {"v=spf1 mx -all redirect=example.org"},
+				"example.org": {"v=spf1 mx a -all"},
+			},
+			wantLookups: 1,
+		},
+		{
+			name: "even when the redirect is written before all",
+			txt: map[string][]string{
+				"example.com": {"v=spf1 redirect=example.org mx -all"},
+				"example.org": {"v=spf1 mx a -all"},
+			},
+			wantLookups: 1,
+		},
+		{
+			name: "an include loop leaves the count partial",
+			txt: map[string][]string{
+				"example.com":   {"v=spf1 include:a.example.net -all"},
+				"a.example.net": {"v=spf1 include:b.example.net ~all"},
+				"b.example.net": {"v=spf1 include:a.example.net ~all"},
+			},
+			wantLookups: 3,
+			wantPartial: true,
+		},
+		{
+			name: "an include target is matched whatever its case",
+			txt: map[string][]string{
+				"example.com":      {"v=spf1 include:_spf.example.net include:_SPF.Example.NET -all"},
+				"_spf.example.net": {"v=spf1 mx ~all"},
+			},
+			// DNS names are case-insensitive: both includes cost the record
+			// fetched for the first
+			wantLookups: 4,
+		},
+		{
+			name: "a macro target cannot be followed",
+			txt: map[string][]string{
+				"example.com": {"v=spf1 include:%{d}._spf.example.net -all"},
+			},
+			wantLookups: 1,
+			wantPartial: true,
+		},
+		{
+			name: "an include that cannot be fetched leaves the count partial",
+			txt: map[string][]string{
+				"example.com": {"v=spf1 include:missing.example.net -all"},
+			},
+			wantLookups: 1,
+			wantPartial: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			records := newMockAnalyzer(tt.txt, nil).checkSPFRecords("example.com")
+			if records == nil || len(*records) == 0 {
+				t.Fatal("no SPF result")
+			}
+			root := (*records)[0]
+			if root.DnsLookups == nil || *root.DnsLookups != tt.wantLookups {
+				t.Errorf("DnsLookups = %v, want %d", root.DnsLookups, tt.wantLookups)
+			}
+			if partial := root.DnsLookupsPartial != nil && *root.DnsLookupsPartial; partial != tt.wantPartial {
+				t.Errorf("DnsLookupsPartial = %v, want %v", partial, tt.wantPartial)
+			}
+		})
+	}
+}
+
+func TestSPFTooManyLookups(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.net include:_spf.example.org -all"},
+		"_spf.example.net": {"v=spf1 a mx ptr exists:x.example.net a:mail.example.net ~all"},
+		"_spf.example.org": {"v=spf1 a mx mx:mx.example.org a:www.example.org ~all"},
+	}, nil)
+	records := analyzer.checkSPFRecords("example.com")
+	if got := *(*records)[0].DnsLookups; got != 11 {
+		t.Fatalf("DnsLookups = %d, want 11", got)
+	}
+
+	score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
+	if score > 25 {
+		t.Errorf("score = %d, want at most 25", score)
+	}
+	found := false
+	for _, issue := range issues {
+		found = found || issue.Type == model.IssueTypeSpfTooManyLookups
+	}
+	if !found {
+		t.Errorf("issues = %v, want one of type %s", issues, model.IssueTypeSpfTooManyLookups)
+	}
+}
+
+// Each record carries what it costs on its own, the includes it leads to
+// included, so that every branch of the tree tells its share.
+func TestCountSPFLookupsOfAnIncludedRecord(t *testing.T) {
+	records := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.net -all"},
+		"_spf.example.net": {"v=spf1 include:_spf.example.org mx ~all"},
+		"_spf.example.org": {"v=spf1 a ~all"},
+	}, nil).checkSPFRecords("example.com")
+
+	for _, want := range []struct {
+		domain  string
+		lookups int
+	}{{"example.com", 4}, {"_spf.example.net", 3}, {"_spf.example.org", 1}} {
+		found := false
+		for _, r := range *records {
+			if r.Domain != nil && *r.Domain == want.domain {
+				found = true
+				if r.DnsLookups == nil || *r.DnsLookups != want.lookups {
+					t.Errorf("%s: DnsLookups = %v, want %d", want.domain, r.DnsLookups, want.lookups)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("no record for %s", want.domain)
+		}
+	}
+}
+
+// The limit is ten lookups: the tenth is still within it.
+func TestSPFTenLookupsAreWithinTheLimit(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.net include:_spf.example.org -all"},
+		"_spf.example.net": {"v=spf1 a mx ptr exists:x.example.net ~all"},
+		"_spf.example.org": {"v=spf1 a mx mx:mx.example.org a:www.example.org ~all"},
+	}, nil)
+	records := analyzer.checkSPFRecords("example.com")
+	if got := *(*records)[0].DnsLookups; got != 10 {
+		t.Fatalf("DnsLookups = %d, want 10", got)
+	}
+
+	_, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
+	for _, issue := range issues {
+		if issue.Type == model.IssueTypeSpfTooManyLookups {
+			t.Errorf("issues = %v, want none of type %s", issueTypes(issues), model.IssueTypeSpfTooManyLookups)
+		}
 	}
 }
 

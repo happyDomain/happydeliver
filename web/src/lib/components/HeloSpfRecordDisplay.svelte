@@ -2,47 +2,35 @@
     import type { Issue, SpfRecord } from "#lib/api/types.gen.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
+    import SpfRecordTree from "./SpfRecordTree.svelte";
 
     interface Props {
-        heloSpfRecord?: SpfRecord;
+        heloSpfRecords?: SpfRecord[];
         issues?: Issue[];
     }
 
-    let { heloSpfRecord, issues }: Props = $props();
+    let { heloSpfRecords, issues }: Props = $props();
+
+    const root = $derived(heloSpfRecords?.[0]);
 
     // A published policy is a bonus, never a requirement: its absence is a suggestion,
-    // so nothing here is ever styled as an error.
-    const hasPolicy = $derived(!!heloSpfRecord?.valid);
+    // so the card itself is never styled as an error.
+    const hasPolicy = $derived(!!root?.valid);
 </script>
 
-{#if heloSpfRecord}
+{#if heloSpfRecords && root}
     <CheckCard
         id="dns-helo-spf"
         title="SPF for the HELO Hostname"
         tag="SPF"
         status={hasPolicy ? "pass" : "info"}
-        summary={heloSpfRecord.record ?? "No policy published (optional)"}
-        summaryFoldedOnly={!!heloSpfRecord.record}
-        docs={[docs.spfHelo]}
+        summary={root.record ?? "No policy published (optional)"}
+        summaryFoldedOnly={!!root.record}
+        docs={[docs.spfHelo, docs.spfLookupLimit]}
         {issues}
     >
         <div class="card-body">
-            <dl class="check-facts">
-                {#if heloSpfRecord.domain}
-                    <dt>Announced HELO</dt>
-                    <dd><span class="font-monospace">{heloSpfRecord.domain}</span></dd>
-                {/if}
-                <dt>Policy</dt>
-                <dd>
-                    {#if heloSpfRecord.record}
-                        <code>{heloSpfRecord.record}</code>
-                    {:else}
-                        <!-- What the lookup actually returned: "none" would hide a hostname
-                             that does not resolve at all -->
-                        {heloSpfRecord.error ?? "none"}
-                    {/if}
-                </dd>
-            </dl>
+            <SpfRecordTree records={heloSpfRecords} optional />
             <p class="check-about">
                 SPF can authenticate, besides the envelope sender, the hostname the server announces
                 at HELO (<a

@@ -211,9 +211,11 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.H
 	// which lets receivers authenticate the HELO identity as well. Purely
 	// informational: it is a recommendation, never a failure. Skipped entirely
 	// when nothing publishable was announced, as no record could be recommended.
+	// Its includes are followed as for the envelope sender: receivers evaluate
+	// it the same way, lookup limit included.
 	if results.HeloHostname != nil {
 		if helo := heloLookupName(*results.HeloHostname); helo != "" {
-			results.HeloSpfRecord = d.checkHeloSPFRecord(helo)
+			results.HeloSpfRecords = d.checkSPFRecords(helo)
 		}
 	}
 
@@ -399,7 +401,7 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		Dkim:   weighIssues(dkimIssues, 20, totalWeight),
 		Dmarc:  weighIssues(dmarcIssues, 20, totalWeight),
 	}
-	if results.HeloSpfRecord != nil {
+	if results.HeloSpfRecords != nil {
 		results.Issues.HeloSpf = issueList(heloSPFIssues(results))
 	}
 	if senderIP != "" {

@@ -109,7 +109,7 @@
                         issues={issues.helo_ptr}
                     />
                     <HeloSpfRecordDisplay
-                        heloSpfRecord={dnsResults.helo_spf_record}
+                        heloSpfRecords={dnsResults.helo_spf_records}
                         issues={issues.helo_spf}
                     />
                 </CheckList>

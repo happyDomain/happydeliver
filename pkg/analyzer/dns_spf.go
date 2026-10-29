@@ -36,7 +36,129 @@ import (
 // checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
 func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]model.SPFRecord {
 	visited := make(map[string]bool)
-	return d.resolveSPFRecords(domain, visited, 0, true)
+	records := d.resolveSPFRecords(domain, visited, 0, true)
+	if records != nil {
+		countSPFLookups(*records)
+	}
+	return records
+}
+
+// spfLookupLimit is how many DNS-querying terms one SPF evaluation may go
+// through before receivers give up with a permerror (RFC 7208 section 4.6.4).
+const spfLookupLimit = 10
+
+// countSPFLookups fills in, on every record, how many DNS lookups a receiver
+// goes through to evaluate it when nothing matches: the worst case, the one
+// the limit is about. The records already fetched are all it takes, since
+// every term that costs a lookup is written in them; a domain included
+// twice is only fetched once, but counted each time it is included.
+func countSPFLookups(records []model.SPFRecord) {
+	byDomain := make(map[string]int, len(records))
+	for i, r := range records {
+		if r.Domain == nil {
+			continue
+		}
+		if _, seen := byDomain[strings.ToLower(*r.Domain)]; !seen {
+			byDomain[strings.ToLower(*r.Domain)] = i
+		}
+	}
+
+	type tally struct {
+		lookups int
+		partial bool
+	}
+	memo := make(map[int]tally, len(records))
+
+	var count func(i int, path map[int]bool) tally
+	count = func(i int, path map[int]bool) tally {
+		if t, done := memo[i]; done {
+			return t
+		}
+		if records[i].Record == nil {
+			// What the record would have cost is unknown
+			return tally{partial: true}
+		}
+
+		path[i] = true
+		defer delete(path, i)
+
+		var t tally
+		follow := func(target string) {
+			j, known := byDomain[strings.ToLower(target)]
+			switch {
+			case strings.Contains(target, "%"):
+				// A macro: the name depends on the message being evaluated
+				t.partial = true
+			case !known || path[j]:
+				t.partial = true
+			default:
+				sub := count(j, path)
+				t.lookups += sub.lookups
+				t.partial = t.partial || sub.partial
+			}
+		}
+
+		hasAll := false
+		redirect := ""
+		for _, token := range strings.Fields(*records[i].Record)[1:] {
+			name, value, modifier := splitSPFTerm(strings.TrimLeft(token, "+-~?"))
+			switch {
+			case modifier && name == "redirect":
+				redirect = value
+			case modifier:
+			case name == "include":
+				t.lookups++
+				follow(value)
+			case name == "a", name == "mx", name == "ptr", name == "exists":
+				t.lookups++
+			case name == "all":
+				hasAll = true
+			}
+		}
+		// redirect is ignored when the record has an all mechanism anywhere
+		// (RFC 7208 section 6.1)
+		if redirect != "" && !hasAll {
+			t.lookups++
+			follow(redirect)
+		}
+
+		memo[i] = t
+		return t
+	}
+
+	for i := range records {
+		t := count(i, map[int]bool{})
+		if records[i].Record == nil {
+			continue
+		}
+		records[i].DnsLookups = utils.PtrTo(t.lookups)
+		if t.partial {
+			records[i].DnsLookupsPartial = utils.PtrTo(true)
+		}
+	}
+}
+
+// splitSPFTerm splits an SPF term, its qualifier removed, into its name and
+// its value, telling a modifier (name=value) from a mechanism (name:value,
+// name/cidr). The name is lowercased.
+func splitSPFTerm(term string) (name, value string, modifier bool) {
+	end := strings.IndexAny(term, ":=/")
+	if end == -1 {
+		return strings.ToLower(term), "", false
+	}
+	name = strings.ToLower(term[:end])
+	switch term[end] {
+	case '=':
+		return name, term[end+1:], true
+	case ':':
+		value, _, _ = strings.Cut(term[end+1:], "/")
+		if strings.HasPrefix(name, "ip") {
+			// ip6:2001:db8::/32 holds colons and slashes of its own
+			value = term[end+1:]
+		}
+		return name, value, false
+	}
+	return name, "", false
 }
 
 // resolveSPFRecords recursively resolves SPF records including include: directives
@@ -233,56 +355,6 @@ func heloLookupName(helo string) string {
 	}
 
 	return name
-}
-
-// checkHeloSPFRecord looks up the SPF policy published for the hostname the
-// sending server announced at HELO/EHLO.
-//
-// This is purely informational and never feeds a score: most relays publish no
-// policy for their own hostname, which is not a misconfiguration. Publishing one
-// simply lets receivers authenticate the HELO identity too, which matters for
-// bounces, where the envelope sender is empty and HELO is all SPF can check.
-// Unlike the envelope sender policy, include: directives are not resolved here.
-func (d *DNSAnalyzer) checkHeloSPFRecord(helo string) *model.SPFRecord {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
-	defer cancel()
-
-	result := &model.SPFRecord{Domain: &helo}
-
-	txtRecords, err := d.resolver.LookupTXT(ctx, helo)
-	if err != nil {
-		result.Error = utils.PtrTo(fmt.Sprintf("Failed to lookup TXT records: %s", formatDNSError(err)))
-		return result
-	}
-
-	var spfRecords []string
-	for _, txt := range txtRecords {
-		if strings.HasPrefix(txt, "v=spf1") {
-			spfRecords = append(spfRecords, txt)
-		}
-	}
-
-	if len(spfRecords) == 0 {
-		result.Error = utils.PtrTo(noSPFRecordError(txtRecords))
-		return result
-	}
-
-	result.Record = &spfRecords[0]
-
-	if len(spfRecords) > 1 {
-		result.Error = utils.PtrTo("Multiple SPF records found (RFC violation)")
-		return result
-	}
-
-	if err := d.validateSPF(spfRecords[0], true); err != nil {
-		result.Error = utils.PtrTo(err.Error())
-		return result
-	}
-
-	result.Valid = true
-	result.AllQualifier = extractSPFAllQualifier(spfRecords[0])
-
-	return result
 }
 
 // noSPFRecordError explains the absence of an SPF record, hinting at the likely
@@ -503,6 +575,19 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 		return c.score, c.issues
 	}
 
+	// Past the lookup limit, receivers stop evaluating with a permerror,
+	// whichever server sent the message: the sender's record is what counts,
+	// every include and redirect it leads to included.
+	if root := (*results.SpfRecords)[0]; root.DnsLookups != nil && *root.DnsLookups > spfLookupLimit {
+		rootDomain := domain
+		if root.Domain != nil {
+			rootDomain = *root.Domain
+		}
+		c.cap(25, newIssue(model.IssueTypeSpfTooManyLookups, model.IssueSeverityHigh, rootDomain,
+			fmt.Sprintf("Evaluating the SPF record of %s takes %d DNS lookups, more than the %d receivers allow: they stop with a permanent error, so SPF fails for every message.", rootDomain, *root.DnsLookups, spfLookupLimit),
+			"Remove the include: of services that no longer send your mail, replace a, mx and ptr with the ip4: and ip6: addresses they stand for, or ask a provider for a lighter include."))
+	}
+
 	// Check if DMARC is configured with strict policy as all mechanism is less significant
 	dmarcStrict := results.DmarcRecord != nil &&
 		results.DmarcRecord.Valid && results.DmarcRecord.Policy != nil &&
@@ -576,11 +661,17 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 }
 
 // heloSPFIssues is what the policy of the HELO hostname calls for, which
-// costs nothing: it is never scored. Who can publish it depends on whose
-// hostname it is.
+// costs nothing: it is never scored. Most relays publish no policy for their
+// own hostname, which is not a misconfiguration; publishing one lets receivers
+// authenticate the HELO identity too, which matters for bounces, where the
+// envelope sender is empty and HELO is all SPF can check. Who can publish it
+// depends on whose hostname it is.
 func heloSPFIssues(results *model.DNSResults) (issues []model.Issue) {
-	helo := results.HeloSpfRecord
-	if helo == nil || helo.Domain == nil || *helo.Domain == "" {
+	if results.HeloSpfRecords == nil || len(*results.HeloSpfRecords) == 0 {
+		return nil
+	}
+	helo := &(*results.HeloSpfRecords)[0]
+	if helo.Domain == nil || *helo.Domain == "" {
 		return nil
 	}
 	if helo.Valid {

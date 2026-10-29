@@ -167,6 +167,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     spf_missing: [docs.spf, docs.googleSenders],
     spf_invalid: [docs.spf],
     spf_include_invalid: [docs.spf, docs.spfLookupLimit],
+    spf_too_many_lookups: [docs.spfLookupLimit],
     spf_all_pass: [docs.spfAll],
     spf_all_neutral: [docs.spfAll],
     spf_all_missing: [docs.spfAll],
