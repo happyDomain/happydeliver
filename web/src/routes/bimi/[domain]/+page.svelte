@@ -264,6 +264,7 @@
                     <DmarcRecordDisplay
                         dmarcRecord={result.dmarc_record}
                         fromDomain={result.domain}
+                        issues={result.issues?.dmarc}
                     />
 
                     <!-- Next Steps -->

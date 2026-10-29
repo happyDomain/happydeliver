@@ -1,22 +1,22 @@
 <script lang="ts">
-    import type { DnsResults, DomainAlignment, Issue } from "#lib/api/types.gen.js";
+    import type { DnsResults, Issue } from "#lib/api/types.gen.js";
     import type { SectionStatus } from "#lib/sections.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
+    import CheckList from "./CheckList.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import DomainInfoDisplay from "./DomainInfoDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
+    import IssueNote from "./IssueNote.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
     import ReportSection from "./ReportSection.svelte";
-    import ReturnOkDisplay from "./ReturnOkDisplay.svelte";
     import SenderOriginDisplay from "./SenderOriginDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
 
     interface Props {
-        domainAlignment?: DomainAlignment;
         /**
          * What the alignment of the authenticating domains costs, as the header analysis
          * reports it: whether the Return-Path is one DMARC can count.
@@ -31,7 +31,6 @@
     }
 
     let {
-        domainAlignment,
         alignmentIssues,
         dnsResults,
         dnsGrade,
@@ -45,9 +44,12 @@
     const senderIp = $derived(dnsResults?.sender_ip);
     const heloHostname = $derived(dnsResults?.helo_hostname);
 
-    const sameDomain = $derived(
-        !dnsResults?.rp_domain || dnsResults.rp_domain === dnsResults.from_domain,
-    );
+    // What the analyser found to change, by the check showing it
+    const issues = $derived(dnsResults?.issues ?? {});
+
+    // One domain serving as both identities is shown once, its checks under one heading.
+    const rpDomain = $derived(dnsResults?.rp_domain || dnsResults?.from_domain);
+    const sameDomain = $derived(domainOnly || rpDomain === dnsResults?.from_domain);
 
     // A Return-Path of its own that DMARC does not count, alone or along with everything else.
     const rpMisaligned = $derived(
@@ -71,146 +73,123 @@
         {#if !dnsResults}
             <p class="text-muted mb-0">No DNS results available</p>
         {:else}
-            {#if dnsResults.errors && dnsResults.errors.length > 0}
-                <div class="alert alert-warning mb-3">
-                    <strong>Errors:</strong>
-                    <ul class="mb-0">
-                        {#each dnsResults.errors as error, i (i)}
-                            <li>{error}</li>
-                        {/each}
-                    </ul>
-                </div>
+            <!-- What the checks below could not see -->
+            {#each issues.lookups ?? [] as issue, i (i)}
+                <IssueNote {issue} />
+            {:else}
+                <!-- An analysis that stopped early reports its failures without issues -->
+                {#each dnsResults.errors ?? [] as error, i (i)}
+                    <p class="text-danger">{error}</p>
+                {/each}
+            {/each}
+
+            {#if !domainOnly && (senderIp || heloHostname)}
+                <CheckList title="Sending server" subject={heloHostname ?? senderIp}>
+                    {#snippet aside()}
+                        {#if heloHostname && senderIp}
+                            <code class="text-body-secondary">{senderIp}</code>
+                        {/if}
+                    {/snippet}
+                    <SenderOriginDisplay senderOrigin={dnsResults.sender_origin} />
+                    <PtrRecordsDisplay
+                        ptrRecords={dnsResults.ptr_records}
+                        {senderIp}
+                        issues={issues.ptr}
+                    />
+                    <PtrForwardRecordsDisplay
+                        ptrRecords={dnsResults.ptr_records}
+                        ptrForwardRecords={dnsResults.ptr_forward_records}
+                        {senderIp}
+                        issues={issues.fcrdns}
+                    />
+                    <HeloPtrMatchDisplay
+                        {heloHostname}
+                        ptrRecords={dnsResults.ptr_records}
+                        heloPtrMatch={dnsResults.helo_ptr_match}
+                        issues={issues.helo_ptr}
+                    />
+                    <HeloSpfRecordDisplay
+                        heloSpfRecord={dnsResults.helo_spf_record}
+                        issues={issues.helo_spf}
+                    />
+                </CheckList>
             {/if}
 
-            {#if !domainOnly}
-                <!-- Reverse IP Section -->
-                {#if senderIp}
-                    <div class="mb-3 pb-2 border-bottom">
-                        <h5 class="mb-0 text-truncate">
-                            Sending server: <code
-                                >{heloHostname} ({dnsResults.ptr_records?.[0] || "Unknown"} [{senderIp}])</code
-                            >
-                        </h5>
-                    </div>
-                {/if}
-
-                <!-- PTR Records Section -->
-                <PtrRecordsDisplay ptrRecords={dnsResults.ptr_records} {senderIp} />
-
-                <!-- Forward-Confirmed Reverse DNS -->
-                <PtrForwardRecordsDisplay
-                    ptrRecords={dnsResults.ptr_records}
-                    ptrForwardRecords={dnsResults.ptr_forward_records}
-                    {senderIp}
-                />
-
-                <!-- Where the sending address comes from -->
-                <SenderOriginDisplay senderOrigin={dnsResults.sender_origin} />
-
-                <!-- HELO / PTR Consistency -->
-                <HeloPtrMatchDisplay
-                    {heloHostname}
-                    ptrRecords={dnsResults.ptr_records}
-                    heloPtrMatch={dnsResults.helo_ptr_match}
-                />
-
-                <!-- SPF policy published for the announced HELO hostname (optional) -->
-                <HeloSpfRecordDisplay
-                    heloSpfRecord={dnsResults.helo_spf_record}
-                    senderDomain={dnsResults.rp_domain ?? dnsResults.from_domain}
-                    senderOrgDomain={domainAlignment?.return_path_org_domain ??
-                        domainAlignment?.from_org_domain}
-                />
-
-                <!-- Return Address Reachability (ReturnOK) -->
-                <ReturnOkDisplay returnOk={dnsResults.return_ok} />
-
-                <!-- Return-Path Domain Section -->
-                <div class="mb-3 pb-2 border-bottom mt-4">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="mb-0 text-truncate">
-                            Return-Path domain:
-                            <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
-                        </h5>
+            {#if !sameDomain}
+                <CheckList title="Return-Path domain" subject={rpDomain}>
+                    {#snippet aside()}
                         {#if rpMisaligned}
-                            <span class="badge bg-danger ms-2">
-                                <i class="bi bi-exclamation-triangle-fill"></i> Differs from From domain
-                            </span>
-                            <small>
-                                <i class="bi bi-chevron-right"></i>
-                                <a href="#domain-alignment">See domain alignment</a>
-                            </small>
-                        {:else}
-                            <span class="badge bg-success ms-2">Same as From domain</span>
+                            <a class="small text-danger" href="#domain-alignment"
+                                >not aligned with the From domain</a
+                            >
                         {/if}
-                    </div>
-                </div>
-
-                <!-- What the Return-Path domain is, when another organization's -->
-                <DomainInfoDisplay domainInfo={dnsResults.rp_domain_info} role="return-path" />
-
-                <!-- MX Records for Return-Path Domain -->
-                {#if dnsResults.rp_mx_records && dnsResults.rp_mx_records.length > 0}
+                    {/snippet}
+                    <DomainInfoDisplay
+                        domainInfo={dnsResults.rp_domain_info}
+                        role="return-path"
+                        issues={issues.registration_return_path}
+                    />
                     <MxRecordsDisplay
                         id="dns-mx-return-path"
-                        class="mb-3"
                         mxRecords={dnsResults.rp_mx_records}
-                        title="Mail Exchange Records for Return-Path Domain"
-                        description="These MX records handle bounce messages and non-delivery reports."
+                        returnOk={dnsResults.return_ok?.return_path}
+                        description="These servers receive the bounces of your messages."
+                        issues={issues.mx_return_path}
                     />
-                {/if}
+                    <SpfRecordsDisplay spfRecords={dnsResults.spf_records} issues={issues.spf} />
+                </CheckList>
             {/if}
 
-            <!-- SPF Records (for Return-Path Domain) -->
-            <SpfRecordsDisplay
-                spfRecords={dnsResults.spf_records}
-                issues={dnsResults.issues?.spf}
-            />
-
-            {#if !domainOnly}
-                <!-- From Domain Section -->
-                <div class="mb-3 pb-2 border-bottom mt-4 d-flex align-items-center gap-2">
-                    <h5 class="mb-0 text-truncate">
-                        From domain: <code>{dnsResults.from_domain}</code>
-                    </h5>
-                    {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
-                        <span class="badge bg-danger ms-2">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain
-                        </span>
+            <!-- Without a From domain, nothing below was looked up -->
+            {#if dnsResults.from_domain}
+                <CheckList
+                    title={sameDomain && !domainOnly ? "Sender domain" : "From domain"}
+                    subject={dnsResults.from_domain}
+                >
+                    {#snippet aside()}
+                        {#if sameDomain && !domainOnly}
+                            <span class="text-body-secondary">From and Return-Path</span>
+                        {/if}
+                    {/snippet}
+                    <DomainInfoDisplay
+                        domainInfo={dnsResults.from_domain_info}
+                        role="from"
+                        issues={issues.registration_from}
+                    />
+                    <MxRecordsDisplay
+                        id="dns-mx-from"
+                        mxRecords={dnsResults.from_mx_records}
+                        returnOk={dnsResults.return_ok?.from ?? dnsResults.return_ok?.return_path}
+                        description={sameDomain && !domainOnly
+                            ? "These servers receive the replies and the bounces of your messages."
+                            : "These servers receive the replies to your messages."}
+                        issues={sameDomain
+                            ? [...(issues.mx_from ?? []), ...(issues.mx_return_path ?? [])]
+                            : issues.mx_from}
+                    />
+                    {#if sameDomain}
+                        <SpfRecordsDisplay
+                            spfRecords={dnsResults.spf_records}
+                            issues={issues.spf}
+                        />
                     {/if}
-                </div>
+                    {#if !domainOnly}
+                        <DkimRecordsDisplay
+                            dkimRecords={dnsResults.dkim_records}
+                            issues={issues.dkim}
+                        />
+                    {/if}
+                    <DmarcRecordDisplay
+                        dmarcRecord={dnsResults.dmarc_record}
+                        fromDomain={dnsResults.from_domain}
+                        issues={issues.dmarc}
+                    />
+                    <BimiRecordDisplay
+                        bimiRecord={dnsResults.bimi_record}
+                        dmarcRecord={dnsResults.dmarc_record}
+                    />
+                </CheckList>
             {/if}
-
-            <!-- What the From domain is -->
-            <DomainInfoDisplay domainInfo={dnsResults.from_domain_info} role="from" />
-
-            <!-- MX Records for From Domain -->
-            {#if dnsResults.from_mx_records && dnsResults.from_mx_records.length > 0}
-                <MxRecordsDisplay
-                    id="dns-mx-from"
-                    class="mb-3"
-                    mxRecords={dnsResults.from_mx_records}
-                    title="Mail Exchange Records for From Domain"
-                    description="These MX records handle replies to emails sent from this domain."
-                />
-            {/if}
-
-            {#if !domainOnly}
-                <!-- DKIM Records -->
-                <DkimRecordsDisplay dkimRecords={dnsResults.dkim_records} />
-            {/if}
-
-            <!-- DMARC Record -->
-            <DmarcRecordDisplay
-                dmarcRecord={dnsResults.dmarc_record}
-                fromDomain={dnsResults.from_domain}
-            />
-
-            <!-- BIMI Record -->
-            <BimiRecordDisplay
-                bimiRecord={dnsResults.bimi_record}
-                dmarcRecord={dnsResults.dmarc_record}
-            />
         {/if}
     </div>
 </ReportSection>

@@ -1,82 +1,48 @@
 <script lang="ts">
+    import type { Issue } from "#lib/api/types.gen.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         ptrRecords?: string[];
         senderIp?: string;
+        issues?: Issue[];
     }
 
-    let { ptrRecords, senderIp }: Props = $props();
+    let { ptrRecords, senderIp, issues }: Props = $props();
 
-    // PTR records are valid if at least one exists
-    const ptrIsValid = $derived(ptrRecords && ptrRecords.length > 0);
+    const found = $derived(ptrRecords && ptrRecords.length > 0);
 </script>
 
-{#if ptrRecords && ptrRecords.length > 0}
+{#if found || senderIp}
     <CheckCard
         id="dns-ptr"
         title="Reverse DNS"
         tag="PTR"
-        status={!ptrIsValid ? "fail" : ptrRecords.length > 1 ? "warn" : "pass"}
-        summary={ptrRecords.join(", ")}
+        status={!found ? "fail" : ptrRecords!.length > 1 ? "warn" : "pass"}
+        summary={found ? ptrRecords!.join(", ") : `No PTR record for ${senderIp}`}
         docs={[docs.reverseDns]}
+        {issues}
     >
         <div class="card-body">
-            <p class="card-text small text-muted mb-0">
-                PTR (pointer record), also known as reverse DNS, maps IP addresses back to
-                hostnames. Having proper PTR records is important as many mail servers verify that
-                the sending IP has a valid reverse DNS entry.
+            <dl class="check-facts">
+                {#if senderIp}
+                    <dt>Sender IP</dt>
+                    <dd><code>{senderIp}</code></dd>
+                {/if}
+                <dt>PTR</dt>
+                <dd>
+                    {#each ptrRecords ?? [] as ptr, i (i)}
+                        <code class="d-block">{ptr}</code>
+                    {:else}
+                        none
+                    {/each}
+                </dd>
+            </dl>
+            <p class="check-about">
+                A PTR record, or reverse DNS, maps the sending IP address back to a hostname. Many
+                receivers check that the sending IP has one, and expect exactly one.
             </p>
-            {#if senderIp}
-                <div class="mt-2">
-                    <strong>Sender IP:</strong> <code>{senderIp}</code>
-                </div>
-            {/if}
-        </div>
-        <div class="list-group list-group-flush">
-            {#each ptrRecords as ptr, i (i)}
-                <div class="list-group-item">
-                    <div class="d-flex gap-2 align-items-center">
-                        <span class="badge bg-success">Found</span>
-                        <code>{ptr}</code>
-                    </div>
-                </div>
-            {/each}
-            {#if ptrRecords.length > 1}
-                <div class="list-group-item">
-                    <div class="alert alert-warning mb-0">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        <strong>Warning:</strong> Multiple PTR records found. While not strictly an error,
-                        having multiple PTR records can cause issues with some mail servers. It's recommended
-                        to have exactly one PTR record per IP address.
-                    </div>
-                </div>
-            {/if}
-        </div>
-    </CheckCard>
-{:else if senderIp}
-    <CheckCard
-        id="dns-ptr"
-        title="Reverse DNS"
-        tag="PTR"
-        status="fail"
-        summary="No PTR record for {senderIp}"
-        docs={[docs.reverseDns]}
-    >
-        <div class="card-body">
-            <p class="card-text small text-muted mb-0">
-                PTR records (reverse DNS) map IP addresses back to hostnames. Having proper PTR
-                records is important for email deliverability.
-            </p>
-            <div class="mt-2">
-                <strong>Sender IP:</strong> <code>{senderIp}</code>
-            </div>
-            <div class="alert alert-danger mb-0 mt-2">
-                <i class="bi bi-x-circle me-1"></i>
-                <strong>Error:</strong> No PTR records found for the sender IP. Contact your email service
-                provider to configure reverse DNS.
-            </div>
         </div>
     </CheckCard>
 {/if}

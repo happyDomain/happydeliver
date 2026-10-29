@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { Issue } from "#lib/api/types.gen.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
 
@@ -6,14 +7,15 @@
         heloHostname?: string;
         ptrRecords?: string[];
         heloPtrMatch?: boolean;
+        issues?: Issue[];
     }
 
-    let { heloHostname, ptrRecords, heloPtrMatch }: Props = $props();
+    let { heloHostname, ptrRecords, heloPtrMatch, issues }: Props = $props();
 
     const normalize = (host: string) => host.replace(/\.$/, "").trim().toLowerCase();
 
-    // Local comparison, identical to the per-record badge logic below, so the
-    // summary alert can never contradict the individual "Match" badges.
+    // Local comparison, identical to the per-record marks below, so the summary can never
+    // contradict them.
     const localMatch = $derived(
         !!heloHostname &&
             !!ptrRecords &&
@@ -23,62 +25,49 @@
     // Prefer the backend verdict when it is present; otherwise fall back to the
     // local comparison (e.g. for results produced before helo_ptr_match existed).
     const isMatch = $derived(heloPtrMatch ?? localMatch);
+    const hasPtr = $derived(!!ptrRecords && ptrRecords.length > 0);
 </script>
 
 {#if heloHostname}
+    <!-- Without a PTR record there is nothing to compare: the reverse DNS check says why. -->
     <CheckCard
         id="dns-helo-ptr"
         title="HELO / PTR Consistency"
         tag="HELO"
-        status={isMatch ? "pass" : "warn"}
-        summary={isMatch ? heloHostname : `${heloHostname} differs from the reverse DNS`}
+        status={!hasPtr ? "neutral" : isMatch ? "pass" : "warn"}
+        summary={!hasPtr
+            ? `${heloHostname}, no PTR to compare with`
+            : isMatch
+              ? heloHostname
+              : `${heloHostname} differs from the reverse DNS`}
         docs={[docs.ehlo]}
+        {issues}
     >
         <div class="card-body">
-            <p class="card-text small text-muted mb-0">
-                The HELO/EHLO hostname is the name the sending server announces when it connects.
-                Many mail servers check that this name matches the sender IP's reverse DNS (PTR)
-                record. A mismatch is a common spam signal and can hurt deliverability.
+            <dl class="check-facts">
+                <dt>Announced HELO</dt>
+                <dd><code>{heloHostname}</code></dd>
+                {#if hasPtr}
+                    <dt>PTR</dt>
+                    <dd>
+                        {#each ptrRecords! as ptr, i (i)}
+                            <div>
+                                <code>{ptr}</code>
+                                {#if normalize(heloHostname) === normalize(ptr)}
+                                    <span class="small text-success ms-1">same</span>
+                                {:else}
+                                    <span class="small text-body-secondary ms-1">different</span>
+                                {/if}
+                            </div>
+                        {/each}
+                    </dd>
+                {/if}
+            </dl>
+            <p class="check-about">
+                The HELO (or EHLO) hostname is the name the sending server announces when it
+                connects. Many receivers check that it matches the reverse DNS of the sending IP; a
+                mismatch is a common spam signal.
             </p>
-            <div class="mt-2">
-                <strong>Announced HELO:</strong> <code>{heloHostname}</code>
-            </div>
-            {#if ptrRecords && ptrRecords.length > 0}
-                <div class="mt-1">
-                    <strong>PTR Hostname(s):</strong>
-                    {#each ptrRecords as ptr, i (i)}
-                        <div class="d-flex gap-2 align-items-center mt-1">
-                            {#if normalize(heloHostname) === normalize(ptr)}
-                                <span class="badge bg-success">Match</span>
-                            {:else}
-                                <span class="badge bg-secondary">Different</span>
-                            {/if}
-                            <code>{ptr}</code>
-                        </div>
-                    {/each}
-                </div>
-            {/if}
         </div>
-        {#if !isMatch}
-            <div class="list-group list-group-flush">
-                <div class="list-group-item">
-                    <div class="alert alert-warning mb-0">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        <strong>Warning:</strong> The announced HELO hostname
-                        <code>{heloHostname}</code>
-                        {#if ptrRecords && ptrRecords.length > 0}
-                            does not match the sender's PTR record{ptrRecords.length > 1 ? "s" : ""}
-                            ({#each ptrRecords as ptr, i (i)}<code>{ptr}</code>{i <
-                                ptrRecords.length - 1
-                                    ? ", "
-                                    : ""}{/each}).
-                        {:else}
-                            could not be matched against a PTR record.
-                        {/if}
-                        Configuring the HELO name to match reverse DNS improves deliverability.
-                    </div>
-                </div>
-            </div>
-        {/if}
     </CheckCard>
 {/if}

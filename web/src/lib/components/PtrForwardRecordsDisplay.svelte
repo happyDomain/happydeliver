@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { Issue } from "#lib/api/types.gen.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
 
@@ -6,29 +7,17 @@
         ptrRecords?: string[];
         ptrForwardRecords?: string[];
         senderIp?: string;
+        issues?: Issue[];
     }
 
-    let { ptrRecords, ptrForwardRecords, senderIp }: Props = $props();
+    let { ptrRecords, ptrForwardRecords, senderIp, issues }: Props = $props();
 
-    // Forward-confirmed reverse DNS is valid if:
-    // 1. PTR records exist
-    // 2. Forward records exist
-    // 3. At least one forward record matches the original sender IP
-    const fcrDnsIsValid = $derived(
-        ptrRecords &&
-            ptrRecords.length > 0 &&
-            ptrForwardRecords &&
-            ptrForwardRecords.length > 0 &&
-            senderIp &&
-            ptrForwardRecords.includes(senderIp),
-    );
-
-    const hasForwardRecords = $derived(ptrForwardRecords && ptrForwardRecords.length > 0);
+    // Confirmed when one of the addresses the PTR hostname resolves to is the sender's.
+    const confirmed = $derived(!!senderIp && (ptrForwardRecords ?? []).includes(senderIp));
+    const forward = $derived(ptrForwardRecords ?? []);
 
     let showDifferent = $state(false);
-    const differentCount = $derived(
-        ptrForwardRecords ? ptrForwardRecords.filter((ip) => ip !== senderIp).length : 0,
-    );
+    const differentCount = $derived(forward.filter((ip) => ip !== senderIp).length);
 </script>
 
 {#if ptrRecords && ptrRecords.length > 0}
@@ -36,92 +25,60 @@
         id="dns-fcrdns"
         title="Forward-Confirmed Reverse DNS"
         tag="FCrDNS"
-        status={fcrDnsIsValid ? "pass" : hasForwardRecords ? "warn" : "fail"}
-        summary={fcrDnsIsValid
+        status={confirmed ? "pass" : "warn"}
+        summary={confirmed
             ? `${ptrRecords[0]} → ${senderIp}`
-            : hasForwardRecords
-              ? `${ptrRecords[0]} does not resolve back to the sender IP`
+            : forward.length > 0
+              ? `${ptrRecords[0]} → ${forward.join(", ")}`
               : `${ptrRecords[0]} does not resolve`}
         docs={[docs.reverseDns]}
+        {issues}
     >
         <div class="card-body">
-            <p class="card-text small text-muted mb-0">
-                Forward-confirmed reverse DNS (FCrDNS) verifies that the PTR hostname resolves back
-                to the original sender IP. This double-check helps establish sender legitimacy.
-            </p>
-            {#if senderIp}
-                <div class="mt-2">
-                    <strong>Original Sender IP:</strong> <code>{senderIp}</code>
-                </div>
-            {/if}
-        </div>
-        {#if hasForwardRecords}
-            <div class="list-group list-group-flush">
-                <div class="list-group-item">
-                    <div class="mb-2">
-                        <strong>PTR Hostname(s):</strong>
-                        {#each ptrRecords as ptr, i (i)}
-                            <div class="mt-1">
-                                <code>{ptr}</code>
-                            </div>
-                        {/each}
-                    </div>
-                    <div class="mb-2">
-                        <strong>Forward Resolution (A/AAAA):</strong>
-                        {#each ptrForwardRecords as ip, j (j)}
-                            {#if ip === senderIp || !fcrDnsIsValid || showDifferent}
-                                <div class="d-flex gap-2 align-items-center mt-1">
-                                    {#if senderIp && ip === senderIp}
-                                        <span class="badge bg-success">Match</span>
-                                    {:else}
-                                        <span class="badge bg-secondary">Different</span>
-                                    {/if}
-                                    <code>{ip}</code>
-                                </div>
-                            {/if}
-                        {/each}
-                        {#if fcrDnsIsValid && differentCount > 0}
-                            <div class="mt-1">
-                                <button
-                                    class="btn btn-link btn-sm p-0 text-muted"
-                                    onclick={() => (showDifferent = !showDifferent)}
-                                >
-                                    {#if showDifferent}
-                                        Hide other IPs
-                                    {:else}
-                                        Show {differentCount} other IP{differentCount > 1
-                                            ? "s"
-                                            : ""} (not the sender)
-                                    {/if}
-                                </button>
+            <dl class="check-facts">
+                <dt>PTR</dt>
+                <dd>
+                    {#each ptrRecords as ptr, i (i)}
+                        <code class="d-block">{ptr}</code>
+                    {/each}
+                </dd>
+                <dt>Resolves to</dt>
+                <dd>
+                    {#each forward as ip, j (j)}
+                        {#if ip === senderIp || !confirmed || showDifferent}
+                            <div>
+                                <code>{ip}</code>
+                                {#if ip === senderIp}
+                                    <span class="small text-success ms-1">sender IP</span>
+                                {:else if !confirmed}
+                                    <span class="small text-body-secondary ms-1"
+                                        >not {senderIp ?? "the sender IP"}</span
+                                    >
+                                {/if}
                             </div>
                         {/if}
-                    </div>
-                    {#if fcrDnsIsValid}
-                        <div class="alert alert-success mb-0 mt-2">
-                            <i class="bi bi-check-circle me-1"></i>
-                            <strong>Success:</strong> Forward-confirmed reverse DNS is properly configured.
-                            The PTR hostname resolves back to the sender IP.
-                        </div>
                     {:else}
-                        <div class="alert alert-warning mb-0 mt-2">
-                            <i class="bi bi-exclamation-triangle me-1"></i>
-                            <strong>Warning:</strong> The PTR hostname does not resolve back to the sender
-                            IP. This may impact deliverability.
-                        </div>
+                        no A or AAAA record
+                    {/each}
+                    {#if confirmed && differentCount > 0}
+                        <button
+                            class="btn btn-link btn-sm p-0 text-muted"
+                            onclick={() => (showDifferent = !showDifferent)}
+                        >
+                            {#if showDifferent}
+                                Hide other IPs
+                            {:else}
+                                Show {differentCount} other IP{differentCount > 1 ? "s" : ""}
+                            {/if}
+                        </button>
                     {/if}
-                </div>
-            </div>
-        {:else}
-            <div class="list-group list-group-flush">
-                <div class="list-group-item">
-                    <div class="alert alert-danger mb-0">
-                        <i class="bi bi-x-circle me-1"></i>
-                        <strong>Error:</strong> PTR hostname(s) found but could not resolve to any IP
-                        addresses. Check your DNS configuration.
-                    </div>
-                </div>
-            </div>
-        {/if}
+                </dd>
+            </dl>
+            <p class="check-about">
+                Forward-confirmed reverse DNS checks that the PTR hostname resolves back to the
+                sending IP: anyone can set a PTR record to any name, only the owner of that name can
+                make it point back.
+            </p>
+        </div>
     </CheckCard>
 {/if}

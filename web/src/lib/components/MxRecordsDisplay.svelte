@@ -1,53 +1,85 @@
 <script lang="ts">
     import type { ClassValue } from "svelte/elements";
 
-    import type { MxRecord } from "#lib/api/types.gen.js";
+    import type { Issue, MxRecord, ReturnOkDomain } from "#lib/api/types.gen.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         id?: string;
-        class: ClassValue;
-        mxRecords: MxRecord[];
-        title: string;
+        class?: ClassValue;
+        mxRecords?: MxRecord[];
+        /** Whether the domain can receive mail at all, MX or not. */
+        returnOk?: ReturnOkDomain;
+        title?: string;
+        /** What mail these servers receive: replies, bounces. */
         description?: string;
+        issues?: Issue[];
     }
 
-    let { id, class: className, mxRecords, title, description }: Props = $props();
+    let {
+        id,
+        class: className,
+        mxRecords = [],
+        returnOk,
+        title = "Mail Exchangers",
+        description,
+        issues,
+    }: Props = $props();
 
-    let mxsAreValids = $derived(mxRecords.reduce((acc, r) => acc && r.valid, true));
+    const allValid = $derived(mxRecords.every((r) => r.valid));
+    const sorted = $derived([...mxRecords].sort((a, b) => a.priority - b.priority));
+
+    const summary = $derived(
+        mxRecords.length > 0
+            ? sorted.map((mx) => mx.host).join(", ")
+            : returnOk?.status === "warn"
+              ? "No MX record, mail goes to the A/AAAA address"
+              : returnOk?.status === "fail"
+                ? "No MX nor A/AAAA record: cannot receive mail"
+                : "No MX record",
+    );
 </script>
 
-<CheckCard
-    {id}
-    class={className}
-    {title}
-    tag="MX"
-    status={mxsAreValids ? "pass" : "fail"}
-    summary={mxRecords.map((mx) => mx.host).join(", ")}
-    docs={[docs.mxLookup]}
->
-    <div class="card-body">
-        {#if description}
-            <p class="card-text small text-muted mb-0">{description}</p>
-        {/if}
-    </div>
-    <div class="list-group list-group-flush">
-        {#each mxRecords as mx, i (i)}
-            <div class="list-group-item">
-                <div class="d-flex gap-2 align-items-center">
-                    {#if mx.valid}
-                        <span class="badge bg-success">Valid</span>
-                    {:else}
-                        <span class="badge bg-danger">Invalid</span>
-                    {/if}
-                    <div>Host: <code>{mx.host}</code></div>
-                    <div>Priority: <strong>{mx.priority}</strong></div>
-                </div>
-                {#if mx.error}
-                    <small class="text-danger">{mx.error}</small>
-                {/if}
-            </div>
-        {/each}
-    </div>
-</CheckCard>
+{#if mxRecords.length > 0 || returnOk}
+    <CheckCard
+        {id}
+        class={className}
+        {title}
+        tag="MX"
+        status={returnOk?.status === "fail" || !allValid
+            ? "fail"
+            : returnOk?.status === "warn"
+              ? "warn"
+              : "pass"}
+        {summary}
+        docs={[docs.mxLookup]}
+        {issues}
+    >
+        <div class="card-body">
+            {#if sorted.length > 0}
+                <dl class="check-facts">
+                    {#each sorted as mx, i (i)}
+                        <dt>{mx.priority}</dt>
+                        <dd>
+                            <code>{mx.host}</code>
+                            {#if !mx.valid}
+                                <span class="small text-danger ms-1">{mx.error ?? "invalid"}</span>
+                            {/if}
+                        </dd>
+                    {/each}
+                </dl>
+            {/if}
+            {#if returnOk?.org_domain}
+                <p class="small mb-2">
+                    Found through the organizational domain <code>{returnOk.org_domain}</code>.
+                </p>
+            {/if}
+            <p class="check-about">
+                {#if description}{description}{/if}
+                A domain should publish MX records; an A/AAAA record works as an implicit fallback, and
+                a domain with neither cannot receive any mail.
+            </p>
+        </div>
+    </CheckCard>
+{/if}

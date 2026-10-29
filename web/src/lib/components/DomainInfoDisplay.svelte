@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SenderDomainInfo } from "#lib/api/types.gen.js";
+    import type { Issue, SenderDomainInfo } from "#lib/api/types.gen.js";
     import CheckCard from "./CheckCard.svelte";
 
     interface Props {
@@ -7,9 +7,10 @@
         // Which sender identity the domain is: changes what a throwaway
         // provider means.
         role?: "from" | "return-path";
+        issues?: Issue[];
     }
 
-    let { domainInfo, role = "from" }: Props = $props();
+    let { domainInfo, role = "from", issues }: Props = $props();
 
     const created = $derived(
         domainInfo?.creation_date ? new Date(domainInfo.creation_date) : undefined,
@@ -63,131 +64,94 @@
     );
 </script>
 
-{#if domainInfo}
-    {#if domainInfo.disposable}
-        <div class="alert alert-danger mb-3">
-            <i class="bi bi-trash3 me-1"></i>
-            <strong>Disposable address provider:</strong>
-            <code>{domainInfo.domain}</code> hands out throwaway addresses.
-            {#if role === "from"}
-                Receivers refuse or quarantine mail whose visible sender is a throwaway address.
-                Send from a domain you control.
-            {:else}
-                Bounces and delivery reports for this message go to a mailbox nobody will read. Use
-                a Return-Path at a domain you control.
-            {/if}
-        </div>
-    {:else if domainInfo.free_provider}
-        <div class="alert alert-info mb-3">
-            <i class="bi bi-person me-1"></i>
-            <strong>Free mailbox provider:</strong>
-            <code>{domainInfo.domain}</code> is a public mailbox service. That is fine for personal mail
-            sent through the provider itself; bulk or transactional mail in its name from another server
-            fails the provider's own DMARC policy. Use a domain you control for that.
-        </div>
-    {/if}
-
-    {#if domainInfo.error}
-        <p class="small text-muted mb-3">
-            <i class="bi bi-info-circle me-1"></i>
-            Registration of <code>{domainInfo.domain}</code>: {domainInfo.error}
-        </p>
-    {:else if hasRegistration}
-        <CheckCard
-            id="dns-registration-{role}"
-            title="Domain Registration"
-            tag="RDAP / WHOIS"
-            status={lapsing || expired ? "fail" : concerning ? "warn" : "pass"}
-            summary={[
-                domainInfo.domain,
-                [ageLabel?.toLowerCase(), domainInfo.registrar && `at ${domainInfo.registrar}`]
-                    .filter(Boolean)
-                    .join(" "),
-            ]
-                .filter(Boolean)
-                .join(", ")}
-        >
-            <div class="card-body">
-                <p class="card-text small text-muted mb-0">
-                    What the registry publishes about <code>{domainInfo.domain}</code>. Receivers
-                    distrust domains registered recently, a week-old domain being what a campaign
-                    registers the day before it sends; and mail from a domain whose registration is
-                    lapsing is about to stop working.
-                </p>
-            </div>
-            <div class="list-group list-group-flush">
+<!-- Who the domain is: a throwaway or public mailbox provider, and what the registry says
+     about it. -->
+{#if domainInfo && (hasRegistration || domainInfo.error || domainInfo.disposable || domainInfo.free_provider)}
+    <CheckCard
+        id="dns-registration-{role}"
+        title="Domain Registration"
+        tag="RDAP / WHOIS"
+        status={domainInfo.error && !domainInfo.disposable && !domainInfo.free_provider
+            ? "neutral"
+            : domainInfo.disposable || lapsing || expired
+              ? "fail"
+              : concerning
+                ? "warn"
+                : domainInfo.free_provider
+                  ? "info"
+                  : "pass"}
+        summary={domainInfo.error
+            ? `${domainInfo.domain}: ${domainInfo.error}`
+            : [
+                  domainInfo.domain,
+                  [ageLabel?.toLowerCase(), domainInfo.registrar && `at ${domainInfo.registrar}`]
+                      .filter(Boolean)
+                      .join(" "),
+              ]
+                  .filter(Boolean)
+                  .join(", ")}
+        summaryFoldedOnly={!!domainInfo.error}
+        {issues}
+    >
+        <div class="card-body">
+            <dl class="check-facts">
+                {#if domainInfo.disposable || domainInfo.free_provider}
+                    <dt>Provider</dt>
+                    <dd>
+                        {domainInfo.disposable ? "disposable addresses" : "public mailbox service"}
+                    </dd>
+                {/if}
                 {#if created}
-                    <div class="list-group-item">
-                        <i
-                            class="bi me-1"
-                            class:bi-check-circle-fill={!young}
-                            class:text-success={!young}
-                            class:bi-exclamation-triangle-fill={young}
-                            class:text-warning={young}
-                        ></i>
-                        <strong>{ageLabel ?? "Registered"}</strong>
-                        <span class="text-muted">({created.toLocaleDateString()})</span>
-                        <div class="small text-muted mt-1">
-                            {#if young}
-                                Young domains have no reputation yet; expect stricter filtering for
-                                the first months.
-                            {:else}
-                                Old enough for receivers to have a history to weigh.
-                            {/if}
-                        </div>
-                    </div>
+                    <dt>Registered</dt>
+                    <dd>
+                        <span class:text-warning-emphasis={young}>{ageLabel}</span>
+                        <span class="text-body-secondary">({created.toLocaleDateString()})</span>
+                    </dd>
                 {/if}
                 {#if expires && (expired || expiringSoon)}
-                    <div class="list-group-item">
-                        <i
-                            class="bi me-1"
-                            class:bi-x-circle-fill={expired}
-                            class:text-danger={expired}
-                            class:bi-exclamation-triangle-fill={!expired}
-                            class:text-warning={!expired}
-                        ></i>
-                        <strong>{expiryLabel}</strong>
-                        <span class="text-muted">({expires.toLocaleDateString()})</span>
-                        <div class="small text-muted mt-1">
-                            Renew the registration before the domain is deleted and its mail stops
-                            working.
-                        </div>
-                    </div>
+                    <dt>Expires</dt>
+                    <dd>
+                        <span class={expired ? "text-danger" : "text-warning-emphasis"}
+                            >{expiryLabel}</span
+                        >
+                        <span class="text-body-secondary">({expires.toLocaleDateString()})</span>
+                    </dd>
+                {/if}
+                {#if lapsing}
+                    <dt>Status</dt>
+                    <dd class="text-danger">being deleted or held out of the DNS</dd>
                 {/if}
                 {#if domainInfo.registrar}
-                    <div class="list-group-item">
-                        <strong>Registrar:</strong>
+                    <dt>Registrar</dt>
+                    <dd>
                         {#if domainInfo.registrar_url}
                             <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
                             <a
                                 href={domainInfo.registrar_url}
                                 target="_blank"
-                                rel="noopener noreferrer"
+                                rel="noopener noreferrer">{domainInfo.registrar}</a
                             >
-                                {domainInfo.registrar}
-                            </a>
                             <!-- eslint-enable svelte/no-navigation-without-resolve -->
                         {:else}
                             {domainInfo.registrar}
                         {/if}
-                    </div>
+                    </dd>
                 {/if}
                 {#if domainInfo.registrant_country}
-                    <div class="list-group-item">
-                        <strong>Registrant country:</strong>
-                        {domainInfo.registrant_country}
-                    </div>
+                    <dt>Registrant country</dt>
+                    <dd>{domainInfo.registrant_country}</dd>
                 {/if}
-                {#if lapsing}
-                    <div class="list-group-item">
-                        <div class="alert alert-danger mb-0">
-                            <i class="bi bi-x-circle me-1"></i>
-                            The registry is deleting this domain or holding it out of the DNS: mail to
-                            and from it is about to stop working.
-                        </div>
-                    </div>
+                {#if domainInfo.error}
+                    <dt>Lookup</dt>
+                    <dd>{domainInfo.error}</dd>
                 {/if}
-            </div>
-        </CheckCard>
-    {/if}
+            </dl>
+            <p class="check-about">
+                What the registry publishes about <code>{domainInfo.domain}</code>. Receivers
+                distrust domains registered recently, a week-old domain being what a campaign
+                registers the day before it sends; and mail from a domain whose registration is
+                lapsing is about to stop working.
+            </p>
+        </div>
+    </CheckCard>
 {/if}
