@@ -22,6 +22,8 @@
 package content
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,5 +131,29 @@ func TestPlaceIssuesOnRowsOnly(t *testing.T) {
 	}
 	if links[0].Issues == nil || images[0].Issues != nil || images[1].Issues != nil {
 		t.Errorf("the issue is not on the link alone: link %v, images %v and %v", links[0].Issues, images[0].Issues, images[1].Issues)
+	}
+}
+
+// An image inlined without an alt is located by a short name rather than by
+// its whole data: URI, which its row already holds, and is still shown on
+// that row.
+func TestMissingAltOnInlineImage(t *testing.T) {
+	src := "data:image/png;base64," + strings.Repeat("iVBORw0KGgo", 100)
+	in := &contentInput{Results: &Results{Images: []ImageCheck{{Src: src}}}}
+
+	findings, err := missingAltCheck.Run(context.Background(), in)
+	if err != nil || len(findings) != 1 {
+		t.Fatalf("missingAltCheck = %v, %v; want one finding", findings, err)
+	}
+	if loc := findings[0].Location; loc == nil || *loc != shortSource(src) {
+		t.Errorf("location = %v, want %q", loc, shortSource(src))
+	}
+
+	images := []model.ImageCheck{{Src: &src}}
+	if placed := placeIssues(findings, nil, images); placed != nil {
+		t.Errorf("placed = %+v, want the issue on the image's row", placed)
+	}
+	if images[0].Issues == nil || len(*images[0].Issues) != 1 {
+		t.Errorf("the missing alt is not shown on the image: %v", images[0].Issues)
 	}
 }

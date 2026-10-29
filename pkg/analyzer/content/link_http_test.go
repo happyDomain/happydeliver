@@ -605,6 +605,7 @@ func TestGenerateContentAnalysisReportsHTTPFindings(t *testing.T) {
 
 	results := &Results{
 		HTMLContent: "<html><body></body></html>",
+		TextContent: "Text",
 		Links: []LinkCheck{
 			{
 				URL: deadURL, Valid: true, IsSafe: true,
@@ -713,6 +714,7 @@ func TestGenerateContentAnalysisFilesADeadImageUnderRendering(t *testing.T) {
 
 	analysis := analyzer.analysisOf(&Results{
 		HTMLContent: "<html><body></body></html>",
+		TextContent: "Text",
 		Images: []ImageCheck{{
 			Src: "https://example.com/logo.png", HasAlt: true,
 			probedURL: probedURL{Status: 404, HTTPFindings: []LinkHTTPFinding{notFound}},
@@ -735,6 +737,7 @@ func TestGenerateContentAnalysisFilesRedirectFindingsApart(t *testing.T) {
 
 	analysis := analyzer.analysisOf(&Results{
 		HTMLContent: "<html><body></body></html>",
+		TextContent: "Text",
 		Links: []LinkCheck{{
 			URL: "https://example.com/start", Valid: true, IsSafe: true,
 			probedURL: probedURL{

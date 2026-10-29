@@ -72,6 +72,16 @@ type Finding struct {
 	// two producers can be counted on to agree on it, which for anything
 	// scoped to a URL means agreeing on the URL itself.
 	Concern string
+
+	// Subject is the URL of the link or image the finding is about, when the
+	// report should show it on that row. It is empty by default, and empty
+	// means the finding is placed by its location instead.
+	//
+	// It exists apart from the location because the two need not read alike:
+	// an image inlined as a data: URI is located by a short name, its source
+	// being as long as the image and already quoted in full on its row, but
+	// it must still be found by that source.
+	Subject string
 }
 
 // Category says which reading of a message a check answers, and so which of
@@ -242,7 +252,7 @@ type Evaluation struct {
 // defect. What a reader would see is the whole answer: findings reading alike
 // in the same place are the same finding.
 func saysTheSame(a, b Finding) bool {
-	if a.Message != b.Message {
+	if a.Message != b.Message || a.Subject != b.Subject {
 		return false
 	}
 

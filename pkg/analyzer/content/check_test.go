@@ -542,3 +542,76 @@ func TestExcessiveLinksCheck(t *testing.T) {
 		t.Errorf("%d links: issues = %v, want one excessive_links", maxLinks+1, issues)
 	}
 }
+
+// A message without a plain text part is told so, one without any text at
+// all is told that instead, and nothing observed is no message to judge.
+func TestMissingPlaintextCheck(t *testing.T) {
+	if issues := runCheck(t, missingPlaintextCheck, &Results{HTMLContent: "<p>hi</p>", TextContent: "hi"}); len(issues) != 0 {
+		t.Errorf("with a text part: issues = %v, want none", issues)
+	}
+
+	issues := runCheck(t, missingPlaintextCheck, &Results{HTMLContent: "<p>hi</p>"})
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeMissingPlaintext || issues[0].Severity != model.IssueSeverityMedium {
+		t.Fatalf("HTML only: issues = %v, want one medium missing_plaintext", issues)
+	}
+
+	issues = runCheck(t, missingPlaintextCheck, &Results{email: &mailmsg.Message{}})
+	if len(issues) != 1 || !strings.Contains(issues[0].Message, "no readable text") {
+		t.Errorf("no text at all: issues = %v, want one saying there is no readable text", issues)
+	}
+
+	if issues := runCheck(t, missingPlaintextCheck, &Results{}); len(issues) != 0 {
+		t.Errorf("nothing observed: issues = %v, want none", issues)
+	}
+}
+
+// A URL that does not parse leads nowhere, and is told as such; one that
+// still carries a merge field is told once, as a merge field.
+func TestTemplatePlaceholderCheckReportsInvalidURLs(t *testing.T) {
+	issues := runCheck(t, templatePlaceholderCheck, &Results{Links: []LinkCheck{
+		{URL: "http://exa mple.com", Error: "invalid character"},
+		{URL: "https://example.com/{{unsubscribe}}", IsTemplate: true},
+	}})
+
+	if len(issues) != 2 || issues[0].Type != model.IssueTypeUnreachableLink || issues[1].Type != model.IssueTypeUnreplacedTemplate {
+		t.Fatalf("issues = %v, want unreachable_link then unreplaced_template", issues)
+	}
+	if loc := issues[0].Location; loc == nil || *loc != "http://exa mple.com" {
+		t.Errorf("the invalid URL is located at %v", loc)
+	}
+}
+
+// Each image without alt text is told on its own row; a tracking pixel is
+// not meant to be seen, and needs none.
+func TestMissingAltCheckReportsEachImage(t *testing.T) {
+	issues := runCheck(t, missingAltCheck, &Results{Images: []ImageCheck{
+		{Src: "https://example.com/a.png"},
+		{Src: "https://example.com/b.png", HasAlt: true},
+		{Src: "https://example.com/c.png"},
+		{Src: "https://example.com/pixel.gif", IsTrackingPixel: true},
+	}})
+
+	var at []string
+	for _, issue := range issues {
+		at = append(at, *issue.Location)
+	}
+	if !slices.Equal(at, []string{"https://example.com/a.png", "https://example.com/c.png"}) {
+		t.Errorf("missing alt reported at %v, want a.png and c.png", at)
+	}
+}
+
+// Images weigh on the message from a ratio of 5, and gravely past 10.
+func TestExcessiveImagesCheckSeverity(t *testing.T) {
+	for ratio, want := range map[float32]model.IssueSeverity{5: "", 7: model.IssueSeverityLow, 11: model.IssueSeverityMedium} {
+		issues := runCheck(t, excessiveImagesCheck, &Results{ImageTextRatio: ratio})
+		if want == "" {
+			if len(issues) != 0 {
+				t.Errorf("ratio %v: issues = %v, want none", ratio, issues)
+			}
+			continue
+		}
+		if len(issues) != 1 || issues[0].Severity != want {
+			t.Errorf("ratio %v: issues = %v, want one of severity %s", ratio, issues, want)
+		}
+	}
+}

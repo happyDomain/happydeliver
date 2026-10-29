@@ -67,8 +67,9 @@ var contentCriteria = []contentCriterion{
 	{
 		// A plain text alternative, for the clients and the readers that want
 		// one.
-		Name:   "plaintext_alternative",
-		Weight: 10,
+		Name:    "plaintext_alternative",
+		Weight:  10,
+		Answers: []*reading.Defect{defectMissingPlaintext},
 		Points: func(in *contentInput) (int, bool) {
 			if in.Results.HasPlaintext() {
 				return 10, true

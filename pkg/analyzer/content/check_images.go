@@ -23,16 +23,13 @@ package content
 
 import (
 	"context"
-	"fmt"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
-// missingAltCheck reports the images carrying no alt attribute, as one finding
-// for the message rather than one per image: the answer is the same for all of
-// them, and a message of thirty bare images would otherwise bury the rest of
-// the report.
+// missingAltCheck reports each image carrying no alt attribute, on the row of
+// that image.
 //
 // It deducts nothing here: the images criterion of Score
 // already awards its fifteen points in proportion to how many carry an alt.
@@ -41,25 +38,30 @@ var missingAltCheck = contentCheck{
 	Category: reading.CategoryAccessibility,
 	Reports:  []*reading.Defect{defectMissingAlt},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
-		missing := 0
+		var issues []reading.Finding
+
 		for _, img := range in.Results.VisibleImages() {
-			if !img.HasAlt {
-				missing++
+			if img.HasAlt {
+				continue
 			}
-		}
-		if missing == 0 {
-			return nil, nil
+
+			found := reading.NewFinding(
+				defectMissingAlt,
+				model.IssueTypeMissingAlt,
+				model.IssueSeverityMedium,
+				shortSource(img.Src),
+				"The image carries no alt attribute: a recipient who cannot see it is told nothing of it.",
+				"Add an alt text saying what the image shows, or an empty one (alt=\"\") for a decoration",
+			)
+			// Placed by its full source, the location only quoting it: a
+			// data: URI would otherwise be copied whole into the issue, when
+			// the image row already holds it.
+			found.Subject = img.Src
+
+			issues = append(issues, found)
 		}
 
-		return []reading.Finding{reading.NewFinding(
-			defectMissingAlt,
-			model.IssueTypeMissingAlt,
-			model.IssueSeverityMedium,
-			"",
-			fmt.Sprintf("%s %s no alt attribute",
-				counted(missing, "One image", "images"), agree(missing, "carries", "carry")),
-			"Add descriptive alt text to all images for better accessibility and deliverability",
-		)}, nil
+		return issues, nil
 	},
 }
 
@@ -72,16 +74,21 @@ var excessiveImagesCheck = contentCheck{
 	Category: reading.CategoryDeliverability,
 	Reports:  []*reading.Defect{defectExcessiveImages},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
-		if in.Results.ImageTextRatio <= 10.0 {
+		if in.Results.ImageTextRatio <= 5.0 {
 			return nil, nil
+		}
+
+		severity, message := model.IssueSeverityLow, "Email carries much image for its text"
+		if in.Results.ImageTextRatio > 10.0 {
+			severity, message = model.IssueSeverityMedium, "Email is excessively image-heavy"
 		}
 
 		found := reading.NewFinding(
 			defectExcessiveImages,
 			model.IssueTypeExcessiveImages,
-			model.IssueSeverityMedium,
+			severity,
 			"",
-			"Email is excessively image-heavy",
+			message,
 			"Reduce the number of images relative to text content",
 		)
 		// A statement about the whole message, which needs no instance key:

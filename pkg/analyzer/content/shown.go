@@ -51,6 +51,7 @@ const (
 var defectShownUnder = map[*reading.Defect]shownUnder{
 	defectTruncatedBody:      shownStructure,
 	defectBrokenHTML:         shownStructure,
+	defectMissingPlaintext:   shownStructure,
 	defectTextHTMLMismatch:   shownTextAlternative,
 	defectTextLinkMissing:    shownTextAlternative,
 	defectUnreplacedTemplate: shownLinks,
@@ -104,8 +105,8 @@ func shownUnderOf(finding reading.Finding) shownUnder {
 }
 
 // placeIssues shows each finding where it belongs: on the link or the image
-// it is about, when it is located at the URL of one of them, and otherwise
-// under the check of its defect.
+// it is about, when its subject, or failing one its location, is the URL of
+// one of them, and otherwise under the check of its defect.
 //
 // A URL written several times is shown once with its issues, on its first
 // occurrence: the issue is about the URL, and repeating it on every row would
@@ -129,12 +130,16 @@ func placeIssues(findings []reading.Finding, links []model.LinkCheck, images []m
 
 	byCheck := make(map[shownUnder][]model.Issue)
 	for _, finding := range findings {
-		if finding.Location != nil {
-			if i, ok := linkAt[*finding.Location]; ok {
+		subject := finding.Subject
+		if subject == "" && finding.Location != nil {
+			subject = *finding.Location
+		}
+		if subject != "" {
+			if i, ok := linkAt[subject]; ok {
 				links[i].Issues = appendIssue(links[i].Issues, finding.Issue)
 				continue
 			}
-			if i, ok := imageAt[*finding.Location]; ok {
+			if i, ok := imageAt[subject]; ok {
 				images[i].Issues = appendIssue(images[i].Issues, finding.Issue)
 				continue
 			}

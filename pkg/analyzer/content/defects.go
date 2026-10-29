@@ -28,6 +28,7 @@ import "git.happydns.org/happyDeliver/pkg/reading"
 var contentDefects = []*reading.Defect{
 	defectTruncatedBody,
 	defectBrokenHTML,
+	defectMissingPlaintext,
 	defectHTMLRemark,
 	defectDangerousHTML,
 	defectMissingAlt,
@@ -63,6 +64,9 @@ var (
 
 	// defectBrokenHTML: markup the parser could not read through.
 	defectBrokenHTML = &reading.Defect{Name: "broken_html"}
+
+	// defectMissingPlaintext: a message without a plain text part.
+	defectMissingPlaintext = &reading.Defect{Name: "missing_plaintext"}
 
 	// defectHTMLRemark: a lesser remark the HTML pass gathered along the way,
 	// an external stylesheet being the one it raises today.
@@ -111,8 +115,8 @@ var (
 	// nature whether it is written in an href or in a src.
 	defectSuspiciousURL = &reading.Defect{Name: "suspicious_url", Family: familyURLSuspicion}
 
-	// defectDeadLink: a body link that does not answer, or whose redirections
-	// never end.
+	// defectDeadLink: a body link that does not answer, whose redirections
+	// never end, or whose URL does not parse.
 	defectDeadLink = &reading.Defect{Name: "dead_link"}
 
 	// defectExcessiveLinks: a message carrying so many links that it reads

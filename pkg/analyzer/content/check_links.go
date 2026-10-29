@@ -30,18 +30,30 @@ import (
 )
 
 // templatePlaceholderCheck reports a link whose URL still carries a merge
-// field, which means the send went out before the field was substituted.
+// field, which means the send went out before the field was substituted, and
+// one whose URL does not parse at all.
 //
 // It deducts nothing here: such a URL designates no destination, so it is
 // counted as a broken link by the links criterion of Score.
 var templatePlaceholderCheck = contentCheck{
 	Name:     "unreplaced_template",
 	Category: reading.CategoryContent,
-	Reports:  []*reading.Defect{defectUnreplacedTemplate},
+	Reports:  []*reading.Defect{defectUnreplacedTemplate, defectDeadLink},
 	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
 		var issues []reading.Finding
 
 		for _, link := range in.Results.Links {
+			if !link.Valid && !link.IsTemplate {
+				issues = append(issues, reading.NewFinding(
+					defectDeadLink,
+					model.IssueTypeUnreachableLink,
+					model.IssueSeverityHigh,
+					link.URL,
+					fmt.Sprintf("Link is not a valid URL: %s", link.Error),
+					"Fix the URL in the template; a link that does not parse leads nowhere",
+				))
+				continue
+			}
 			if !link.IsTemplate {
 				continue
 			}

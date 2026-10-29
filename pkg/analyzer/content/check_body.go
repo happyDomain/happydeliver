@@ -23,6 +23,7 @@ package content
 
 import (
 	"context"
+
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
@@ -49,6 +50,42 @@ var truncatedBodyCheck = contentCheck{
 			"",
 			"The message body stops before its end: it was cut short in transit, or its MIME structure announces a part that never follows. Only the parts that arrived were analysed.",
 			"Check the message size against the limits of the relays it goes through, and that the MIME boundaries it declares are all closed",
+		)}, nil
+	},
+}
+
+// missingPlaintextCheck reports a message carrying no plain text part: an
+// HTML message without its alternative, or one carrying no readable text at
+// all.
+//
+// It deducts nothing here: the plaintext_alternative criterion of Score
+// withholds its ten points for the same absence, which this finding says.
+var missingPlaintextCheck = contentCheck{
+	Name:     "missing_plaintext",
+	Category: reading.CategoryDeliverability,
+	Reports:  []*reading.Defect{defectMissingPlaintext},
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		if in.Results.HasPlaintext() {
+			return nil, nil
+		}
+
+		message := "The message carries no plain text part."
+		if in.Results.HTMLContent == "" {
+			// Nothing observed at all is not a message without text: there
+			// is no message.
+			if in.Message == nil {
+				return nil, nil
+			}
+			message = "The message carries no readable text: neither a plain text nor an HTML part."
+		}
+
+		return []reading.Finding{reading.NewFinding(
+			defectMissingPlaintext,
+			model.IssueTypeMissingPlaintext,
+			model.IssueSeverityMedium,
+			"",
+			message,
+			"Send a text/plain part, generated from the HTML when there is one; clients and readers preferring text display it, and filters expect it",
 		)}, nil
 	},
 }

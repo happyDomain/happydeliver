@@ -9,6 +9,7 @@ import type { Issue } from "#lib/api/types.gen.js";
  */
 const issueLabels: Record<Issue["type"], string> = {
     broken_html: "Broken HTML",
+    missing_plaintext: "No plain text part",
     missing_alt: "Missing alt text",
     excessive_images: "Too many images",
     excessive_links: "Too many links",
