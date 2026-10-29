@@ -23,6 +23,9 @@ package analyzer
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/domainname"
@@ -79,37 +82,46 @@ func checkHeloPtrMatch(helo string, ptrRecords []string) bool {
 }
 
 // Proper reverse DNS (PTR) and forward-confirmed reverse DNS (FCrDNS) is important for deliverability
-func (d *DNSAnalyzer) calculatePTRScore(results *model.DNSResults, senderIP string) (score int) {
-	if results.PtrRecords != nil && len(*results.PtrRecords) > 0 {
-		// 50 points for having PTR records
-		score += 50
+func (d *DNSAnalyzer) calculatePTRScore(results *model.DNSResults, senderIP string) (int, []model.Issue) {
+	c := checkScore{score: 100}
 
-		if len(*results.PtrRecords) > 1 {
-			// Penalty has it's bad to have multiple PTR records
-			score -= 15
-		}
+	if results.PtrRecords == nil || len(*results.PtrRecords) == 0 {
+		c.cap(0, newIssue(model.IssueTypePtrMissing, model.IssueSeverityHigh, senderIP,
+			fmt.Sprintf("%s has no PTR record pointing to a hostname that resolves back to it. Many receivers reject such mail outright.", senderIP),
+			"Ask whoever owns the IP address (your hosting provider or ISP) to set its PTR record to your mail server's hostname, and make sure that hostname resolves back to the same IP."))
+		return c.score, c.issues
+	}
+	ptr := (*results.PtrRecords)[0]
 
-		// Penalty when the announced HELO name doesn't match the PTR hostname
-		if results.HeloPtrMatch != nil && !*results.HeloPtrMatch {
-			score -= 15
-		}
-
-		// Additional 50 points for forward-confirmed reverse DNS (FCrDNS)
-		// This means the PTR hostname resolves back to IPs that include the original sender IP
-		if results.PtrForwardRecords != nil && len(*results.PtrForwardRecords) > 0 && senderIP != "" {
-			// Verify that the sender IP is in the list of forward-resolved IPs
-			fcrDnsValid := false
-			for _, forwardIP := range *results.PtrForwardRecords {
-				if forwardIP == senderIP {
-					fcrDnsValid = true
-					break
-				}
-			}
-			if fcrDnsValid {
-				score += 50
-			}
-		}
+	// Half the points for forward-confirmed reverse DNS (FCrDNS): the PTR
+	// hostname resolves back to IPs that include the original sender IP
+	fcrDnsValid := false
+	if results.PtrForwardRecords != nil && senderIP != "" {
+		fcrDnsValid = slices.Contains(*results.PtrForwardRecords, senderIP)
+	}
+	if !fcrDnsValid {
+		c.deduct(50, newIssue(model.IssueTypeFcrdnsMismatch, model.IssueSeverityMedium, ptr,
+			fmt.Sprintf("%s does not resolve back to %s.", ptr, senderIP),
+			fmt.Sprintf("Add an A or AAAA record for %s pointing to %s, or change the PTR record to a hostname that does.", ptr, senderIP)))
 	}
 
-	return
+	// Several PTR records leave receivers to pick any of them
+	if len(*results.PtrRecords) > 1 {
+		c.deduct(15, newIssue(model.IssueTypePtrMultiple, model.IssueSeverityLow, senderIP,
+			fmt.Sprintf("%s maps to %d hostnames; receivers may pick any of them.", senderIP, len(*results.PtrRecords)),
+			"Keep exactly one PTR record, naming your mail server."))
+	}
+
+	// Penalty when the announced HELO name doesn't match the PTR hostname
+	if results.HeloPtrMatch != nil && !*results.HeloPtrMatch {
+		helo := ""
+		if results.HeloHostname != nil {
+			helo = *results.HeloHostname
+		}
+		c.deduct(15, newIssue(model.IssueTypeHeloPtrMismatch, model.IssueSeverityLow, helo,
+			fmt.Sprintf("The server announced itself as %s, but %s resolves to %s.", helo, senderIP, strings.Join(*results.PtrRecords, ", ")),
+			"Configure your mail server to announce the hostname its PTR record names."))
+	}
+
+	return c.score, c.issues
 }

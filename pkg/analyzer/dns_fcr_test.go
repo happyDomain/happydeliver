@@ -96,7 +96,7 @@ func TestCalculatePTRScoreHeloMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := d.calculatePTRScore(tt.results, senderIP); got != tt.want {
+			if got, _ := d.calculatePTRScore(tt.results, senderIP); got != tt.want {
 				t.Errorf("calculatePTRScore() = %d, want %d", got, tt.want)
 			}
 		})

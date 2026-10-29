@@ -269,6 +269,53 @@ func TestDMARCScoreIssues(t *testing.T) {
 	}
 }
 
+func TestPTRMissingIssue(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{FromDomain: "example.com"}
+	analyzer.CalculateDNSScore(results, "192.0.2.1")
+	ptr := *results.Issues.Ptr
+	if len(ptr) != 1 || ptr[0].Type != model.IssueTypePtrMissing || *ptr[0].Penalty != 20 {
+		t.Errorf("PTR issues = %v, want ptr_missing costing the whole check, 20 points", ptr)
+	}
+	if len(*results.Issues.Fcrdns) != 0 || len(*results.Issues.HeloPtr) != 0 {
+		t.Errorf("FCrDNS/HELO issues = %v/%v, want none without a PTR record", *results.Issues.Fcrdns, *results.Issues.HeloPtr)
+	}
+
+	noIP := &model.DNSResults{FromDomain: "example.com"}
+	analyzer.CalculateDNSScore(noIP, "")
+	if noIP.Issues.Ptr != nil || noIP.Issues.Fcrdns != nil || noIP.Issues.HeloPtr != nil {
+		t.Errorf("reverse DNS issues reported though no sender IP was checked")
+	}
+}
+
+func TestPTRScoreIssuesByCheck(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain:        "example.com",
+		SenderIp:          utils.PtrTo("192.0.2.1"),
+		PtrRecords:        &[]string{"a.example.com", "b.example.com"},
+		PtrForwardRecords: &[]string{"192.0.2.2"},
+		HeloHostname:      utils.PtrTo("mail.example.com"),
+		HeloPtrMatch:      utils.PtrTo(false),
+	}
+
+	analyzer.CalculateDNSScore(results, "192.0.2.1")
+
+	for name, got := range map[string]*[]model.Issue{
+		"ptr":      results.Issues.Ptr,
+		"fcrdns":   results.Issues.Fcrdns,
+		"helo_ptr": results.Issues.HeloPtr,
+	} {
+		if got == nil || len(*got) != 1 {
+			t.Errorf("%s issues = %v, want one", name, got)
+		}
+	}
+	// Five checks of 20 points: a check's 100 is 20 section points.
+	if p := *(*results.Issues.Fcrdns)[0].Penalty; p != 10 {
+		t.Errorf("FCrDNS costs %d section points, want 10", p)
+	}
+}
+
 func TestMXIssuesWithoutAValidRecord(t *testing.T) {
 	analyzer := newMockAnalyzer(nil, nil)
 	results := &model.DNSResults{

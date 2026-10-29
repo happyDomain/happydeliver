@@ -70,6 +70,10 @@ const issueLabels: Record<Issue["type"], string> = {
     dmarc_sp_weaker: "Subdomains are less protected than the domain",
     dmarc_np_weaker: "Non-existent subdomains are less protected",
     dmarc_deprecated_tags: "DMARC record uses deprecated tags",
+    ptr_missing: "Sending IP has no valid reverse DNS",
+    ptr_multiple: "Sending IP has several PTR records",
+    fcrdns_mismatch: "Reverse DNS is not forward-confirmed",
+    helo_ptr_mismatch: "HELO hostname differs from reverse DNS",
 };
 
 export function issueLabel(type: Issue["type"]): string {

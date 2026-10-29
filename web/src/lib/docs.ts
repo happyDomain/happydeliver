@@ -185,6 +185,10 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dmarc_sp_weaker: [docs.dmarcPolicy],
     dmarc_np_weaker: [docs.dmarcbis],
     dmarc_deprecated_tags: [docs.dmarcbis],
+    ptr_missing: [docs.reverseDns, docs.googleSenders],
+    ptr_multiple: [docs.reverseDns],
+    fcrdns_mismatch: [docs.reverseDns, docs.googleSenders],
+    helo_ptr_mismatch: [docs.ehlo],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

@@ -24,6 +24,7 @@ package analyzer
 import (
 	"crypto/x509"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -378,8 +379,11 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	weightedScore += 20 * dmarcScore
 	totalWeight := 80
 
+	var ptrIssues []model.Issue
 	if senderIP != "" {
-		weightedScore += 20 * d.calculatePTRScore(results, senderIP)
+		var ptrScore int
+		ptrScore, ptrIssues = d.calculatePTRScore(results, senderIP)
+		weightedScore += 20 * ptrScore
 		totalWeight += 20
 	}
 
@@ -390,6 +394,12 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		Spf:    weighIssues(spfIssues, 20, totalWeight),
 		Dkim:   weighIssues(dkimIssues, 20, totalWeight),
 		Dmarc:  weighIssues(dmarcIssues, 20, totalWeight),
+	}
+	if senderIP != "" {
+		ptr := weighIssues(ptrIssues, 20, totalWeight)
+		results.Issues.Ptr = issueList(issuesOfType(*ptr, model.IssueTypePtrMissing, model.IssueTypePtrMultiple))
+		results.Issues.Fcrdns = issueList(issuesOfType(*ptr, model.IssueTypeFcrdnsMismatch))
+		results.Issues.HeloPtr = issueList(issuesOfType(*ptr, model.IssueTypeHeloPtrMismatch))
 	}
 	d.addSectionIssues(results, mxRP, 20, totalWeight)
 
@@ -451,4 +461,15 @@ func issueList(issues []model.Issue) *[]model.Issue {
 		return &[]model.Issue{}
 	}
 	return &issues
+}
+
+// issuesOfType keeps the issues of the given types, in order.
+func issuesOfType(issues []model.Issue, types ...model.IssueType) []model.Issue {
+	kept := []model.Issue{}
+	for _, issue := range issues {
+		if slices.Contains(types, issue.Type) {
+			kept = append(kept, issue)
+		}
+	}
+	return kept
 }
