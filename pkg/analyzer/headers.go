@@ -45,8 +45,10 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 	return &HeaderAnalyzer{}
 }
 
-// CalculateHeaderScore evaluates email structural quality from header analysis
-func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (int, rune) {
+// CalculateHeaderScore evaluates email structural quality from header analysis.
+// dmarc is the DMARC record of the From domain, whose alignment modes decide
+// which authenticating domains count as aligned; nil when it publishes none.
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis, dmarc *model.DMARCRecord) (int, rune) {
 	if analysis == nil || analysis.Headers == nil {
 		return 0, ' '
 	}
@@ -56,7 +58,7 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (i
 	headers := *analysis.Headers
 
 	// RP and From alignment (25 points)
-	alignmentScore, alignmentIssues := calculateAlignmentScore(analysis.DomainAlignment)
+	alignmentScore, alignmentIssues := calculateAlignmentScore(analysis.DomainAlignment, dmarc)
 	score += alignmentScore
 	if alignmentScore == 0 {
 		// Bad domain alignment, cap grade to C
@@ -542,64 +544,128 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	return alignment
 }
 
+// alignedIdentity is a domain authenticating the message, as DMARC aligns it
+// with the From domain.
+type alignedIdentity struct {
+	domain string
+	// relation is "same", "organizational" or "unrelated".
+	relation string
+	// strict is whether the DMARC policy asks this identity for the same domain.
+	strict bool
+	// tag is the DMARC tag setting its mode: aspf or adkim.
+	tag string
+}
+
+// counts tells whether DMARC accepts the identity as aligned.
+func (i alignedIdentity) counts() bool {
+	return i.relation == "same" || (i.relation == "organizational" && !i.strict)
+}
+
 // calculateAlignmentScore scores, out of 25 points of the header score,
-// whether the domains authenticating the message align with the From domain,
-// which DMARC needs of one of them at least. The issues say what each costs,
-// along with a method that does not align while the other does, which costs
-// nothing but leaves DMARC resting on one leg.
-func calculateAlignmentScore(alignment *model.DomainAlignment) (int, []model.Issue) {
+// whether the domains authenticating the message align with the From domain
+// as its DMARC policy wants them to, which DMARC needs of one of them at
+// least: the same domain, or by default one sharing its organizational
+// domain. Short of the same domain, a few points go: it is what alignment can
+// still gain. A method that does not align while the other does costs
+// nothing, but leaves DMARC resting on one leg.
+func calculateAlignmentScore(alignment *model.DomainAlignment, dmarc *model.DMARCRecord) (int, []model.Issue) {
 	c := checkScore{score: 25}
 
-	if alignment == nil || alignment.Aligned == nil || alignment.RelaxedAligned == nil {
+	if alignment == nil {
 		c.cap(0, newIssue(model.IssueTypeDomainMisaligned, model.IssueSeverityHigh, "",
 			"The domains authenticating the message could not be compared with the From domain, so DMARC alignment is unknown.",
 			""))
 		return c.score, c.issues
 	}
 
+	// Without a usable record, DMARC aligns in relaxed mode.
+	spfStrict, dkimStrict := false, false
+	if dmarc != nil && dmarc.Valid {
+		spfStrict = dmarc.SpfAlignment != nil && *dmarc.SpfAlignment == model.DMARCRecordSpfAlignmentStrict
+		dkimStrict = dmarc.DkimAlignment != nil && *dmarc.DkimAlignment == model.DMARCRecordDkimAlignmentStrict
+	}
+
 	from := utils.Deref(alignment.FromDomain)
 	fromOrg := utils.Deref(alignment.FromOrgDomain)
-	rp := utils.Deref(alignment.ReturnPathDomain)
-	var dkimDomains, dkimAligned []string
-	if alignment.DkimDomains != nil {
+	relationOf := func(domain, orgDomain string) string {
+		switch {
+		case strings.EqualFold(domain, from):
+			return "same"
+		case orgDomain != "" && strings.EqualFold(orgDomain, fromOrg):
+			return "organizational"
+		}
+		return "unrelated"
+	}
+
+	var rp *alignedIdentity
+	if domain := utils.Deref(alignment.ReturnPathDomain); domain != "" && from != "" {
+		rp = &alignedIdentity{domain, relationOf(domain, utils.Deref(alignment.ReturnPathOrgDomain)), spfStrict, "aspf"}
+	}
+	var dkim []alignedIdentity
+	if alignment.DkimDomains != nil && from != "" {
 		for _, d := range *alignment.DkimDomains {
-			dkimDomains = append(dkimDomains, d.Domain)
-			if strings.EqualFold(d.OrgDomain, fromOrg) {
-				dkimAligned = append(dkimAligned, d.Domain)
-			}
+			dkim = append(dkim, alignedIdentity{d.Domain, relationOf(d.Domain, d.OrgDomain), dkimStrict, "adkim"})
 		}
 	}
-	rpAligned := rp != "" && strings.EqualFold(utils.Deref(alignment.ReturnPathOrgDomain), fromOrg)
+
+	// Nothing to align: no Return-Path nor DKIM signature to hold against the message
+	if rp == nil && len(dkim) == 0 {
+		return c.score, c.issues
+	}
+
+	rpCounts := rp != nil && rp.counts()
+	dkimCounts, dkimSame := false, false
+	var dkimDomains []string
+	for _, d := range dkim {
+		dkimCounts = dkimCounts || d.counts()
+		dkimSame = dkimSame || d.relation == "same"
+		dkimDomains = append(dkimDomains, d.domain)
+	}
+
+	// Why an identity sharing the organizational domain does not count
+	strictNote := func(identities ...alignedIdentity) string {
+		for _, i := range identities {
+			if i.relation == "organizational" && i.strict {
+				return fmt.Sprintf(" Your DMARC policy sets %s=s, so only %s itself counts.", i.tag, from)
+			}
+		}
+		return ""
+	}
+	var all []alignedIdentity
+	if rp != nil {
+		all = append(all, *rp)
+	}
+	all = append(all, dkim...)
 
 	switch {
-	case !*alignment.RelaxedAligned:
+	case !rpCounts && !dkimCounts:
 		var neither []string
-		if rp != "" {
-			neither = append(neither, fmt.Sprintf("the Return-Path domain (%s)", rp))
+		if rp != nil {
+			neither = append(neither, fmt.Sprintf("the Return-Path domain (%s)", rp.domain))
 		}
-		if len(dkimDomains) > 0 {
+		if len(dkim) > 0 {
 			neither = append(neither, fmt.Sprintf("the DKIM signing domains (%s)", strings.Join(dkimDomains, ", ")))
 		}
 		c.cap(0, newIssue(model.IssueTypeDomainMisaligned, model.IssueSeverityHigh, from,
-			fmt.Sprintf("Neither %s shares the organizational domain of the From address (%s), so DMARC cannot pass.", strings.Join(neither, " nor "), from),
+			fmt.Sprintf("Neither %s aligns with the From domain (%s), so DMARC cannot pass.%s", strings.Join(neither, " nor "), from, strictNote(all...)),
 			"Have your email provider sign with DKIM for your own domain (a CNAME or TXT record they give you), or use a Return-Path on a subdomain of yours."))
 		return c.score, c.issues
 
-	case !*alignment.Aligned:
+	case !(rp != nil && rp.relation == "same") && !dkimSame:
 		c.cap(20, newIssue(model.IssueTypeDomainRelaxedAligned, model.IssueSeverityLow, from,
-			fmt.Sprintf("No authenticating domain is exactly %s, only within its organizational domain (%s): a DMARC policy requiring strict alignment (aspf=s, adkim=s) would fail.", from, fromOrg),
+			fmt.Sprintf("No authenticating domain is exactly %s, only within its organizational domain (%s): DMARC accepts it in relaxed mode, but a policy requiring strict alignment (aspf=s, adkim=s) would fail.", from, fromOrg),
 			fmt.Sprintf("Sign with DKIM for %s itself, or use it as the Return-Path domain.", from)))
 	}
 
 	// One method aligns: the other does not have to, but DMARC then rests on it alone.
-	if rp != "" && !rpAligned {
-		c.note(newIssue(model.IssueTypeReturnPathMisaligned, model.IssueSeverityInfo, rp,
-			fmt.Sprintf("The Return-Path domain (%s) does not share the organizational domain of %s: SPF does not count toward DMARC, which rests on DKIM alone.", rp, from),
+	if rp != nil && !rpCounts {
+		c.note(newIssue(model.IssueTypeReturnPathMisaligned, model.IssueSeverityInfo, rp.domain,
+			fmt.Sprintf("The Return-Path domain (%s) does not align with %s: SPF does not count toward DMARC, which rests on DKIM alone.%s", rp.domain, from, strictNote(*rp)),
 			fmt.Sprintf("Use a Return-Path on a subdomain of %s; providers call it a custom bounce or MAIL FROM domain.", fromOrg)))
 	}
-	if len(dkimDomains) > 0 && len(dkimAligned) == 0 {
+	if len(dkim) > 0 && !dkimCounts {
 		c.note(newIssue(model.IssueTypeDkimMisaligned, model.IssueSeverityInfo, strings.Join(dkimDomains, ", "),
-			fmt.Sprintf("No DKIM signature is made for %s or a domain sharing its organizational domain: DMARC rests on SPF alone, which breaks when the message is forwarded.", from),
+			fmt.Sprintf("No DKIM signature is made for a domain aligned with %s: DMARC rests on SPF alone, which breaks when the message is forwarded.%s", from, strictNote(dkim...)),
 			"Have your email provider sign with DKIM for your own domain (a CNAME or TXT record they give you)."))
 	}
 

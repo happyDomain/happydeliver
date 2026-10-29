@@ -343,6 +343,7 @@
                     <div class="col-12">
                         <DnsRecordsCard
                             domainAlignment={report.header_analysis?.domain_alignment}
+                            alignmentIssues={report.header_analysis?.issues?.domain_alignment}
                             dnsResults={report.dns_results}
                             dnsGrade={report.summary?.dns_grade}
                             dnsScore={report.summary?.dns_score}

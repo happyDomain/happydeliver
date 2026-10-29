@@ -310,7 +310,11 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	headerScore := 0
 	var headerGrade rune
 	if results.Headers != nil {
-		headerScore, headerGrade = r.headerAnalyzer.CalculateHeaderScore(results.Headers)
+		var dmarc *model.DMARCRecord
+		if results.DNS != nil {
+			dmarc = results.DNS.DmarcRecord
+		}
+		headerScore, headerGrade = r.headerAnalyzer.CalculateHeaderScore(results.Headers, dmarc)
 	}
 
 	blacklistScore := 0

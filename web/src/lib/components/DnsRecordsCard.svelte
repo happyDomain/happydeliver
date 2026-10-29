@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DnsResults, DomainAlignment } from "#lib/api/types.gen.js";
+    import type { DnsResults, DomainAlignment, Issue } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
@@ -17,17 +17,41 @@
 
     interface Props {
         domainAlignment?: DomainAlignment;
+        /**
+         * What the alignment of the authenticating domains costs, as the header analysis
+         * reports it: whether the Return-Path is one DMARC can count.
+         */
+        alignmentIssues?: Issue[];
         dnsResults?: DnsResults;
         dnsGrade?: string;
         dnsScore?: number;
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
     }
 
-    let { domainAlignment, dnsResults, dnsGrade, dnsScore, domainOnly = false }: Props = $props();
+    let {
+        domainAlignment,
+        alignmentIssues,
+        dnsResults,
+        dnsGrade,
+        dnsScore,
+        domainOnly = false,
+    }: Props = $props();
 
     // Both come from the hop the backend marked as inbound.
     const senderIp = $derived(dnsResults?.sender_ip);
     const heloHostname = $derived(dnsResults?.helo_hostname);
+
+    const sameDomain = $derived(
+        !dnsResults?.rp_domain || dnsResults.rp_domain === dnsResults.from_domain,
+    );
+
+    // A Return-Path of its own that DMARC does not count, alone or along with everything else.
+    const rpMisaligned = $derived(
+        !sameDomain &&
+            (alignmentIssues ?? []).some(
+                (i) => i.type === "return_path_misaligned" || i.type === "domain_misaligned",
+            ),
+    );
 </script>
 
 <div class="card shadow-sm" id="dns-details">
@@ -116,7 +140,7 @@
                             Return-Path Domain:
                             <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
                         </h4>
-                        {#if (domainAlignment && !domainAlignment.aligned && !domainAlignment.relaxed_aligned) || (domainAlignment && !domainAlignment.aligned && domainAlignment.relaxed_aligned && dnsResults.dmarc_record && dnsResults.dmarc_record.spf_alignment === "strict") || (!domainAlignment && dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain)}
+                        {#if rpMisaligned}
                             <span class="badge bg-danger ms-2">
                                 <i class="bi bi-exclamation-triangle-fill"></i> Differs from From domain
                             </span>

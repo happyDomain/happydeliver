@@ -649,7 +649,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
-          description: About whether the domains authenticating the message align with the From domain, each with the points of the header score it costs.
+          description: About whether the domains authenticating the message align with the From domain in the modes its DMARC policy sets (aspf, adkim), each with the points of the header score it costs.
         headers:
           type: array
           items:
@@ -782,11 +782,11 @@ components:
           description: Domains from DKIM signatures with their organizational domains
         aligned:
           type: boolean
-          description: Whether all domains align (strict alignment - exact match)
+          description: Whether one authenticating domain is the From domain itself. A comparison of domains, which the DMARC policy of the From domain does not enter; the issues under domain_alignment do.
           example: true
         relaxed_aligned:
           type: boolean
-          description: Whether domains satisfy relaxed alignment (organizational domain match)
+          description: Whether one authenticating domain shares the organizational domain of the From domain. A comparison of domains, which the DMARC policy of the From domain does not enter; the issues under domain_alignment do.
           example: true
 
     AuthenticationResults:

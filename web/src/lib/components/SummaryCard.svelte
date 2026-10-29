@@ -1,7 +1,6 @@
 <script lang="ts">
     import { resolve } from "$app/paths";
 
-    import { dmarcAlignment } from "#lib/alignment.js";
     import type { Report } from "#lib/api/types.gen.js";
     import { hasNoAuthenticationResults, isUploadedMessage } from "#lib/authentication.js";
     import { hasNoSpamResults } from "#lib/spam.js";
@@ -248,18 +247,18 @@
             }
         }
 
-        // Domain alignment, as the DMARC policy of the From domain counts it
+        // Domain alignment, as the header analysis charged it under the DMARC policy
         const domainAlignment = report.header_analysis?.domain_alignment;
+        const alignmentIssues = report.header_analysis?.issues?.domain_alignment ?? [];
         if (domainAlignment) {
-            const alignment = dmarcAlignment(domainAlignment, report.dns_results?.dmarc_record);
             segments.push({ text: ". Domain alignment is " });
-            if (alignment !== "none") {
+            if (!alignmentIssues.some((i) => i.type === "domain_misaligned")) {
                 segments.push({
                     text: "good",
                     highlight: { color: "good", bold: true },
                     link: "#domain-alignment",
                 });
-                if (alignment === "organizational") {
+                if (alignmentIssues.some((i) => i.type === "domain_relaxed_aligned")) {
                     segments.push({ text: " using organizational domain" });
                 }
             } else {

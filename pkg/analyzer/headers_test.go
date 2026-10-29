@@ -116,7 +116,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate header analysis first
 			analysis := analyzer.GenerateHeaderAnalysis(tt.email, nil)
-			score, _ := analyzer.CalculateHeaderScore(analysis)
+			score, _ := analyzer.CalculateHeaderScore(analysis, nil)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
@@ -412,7 +412,7 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 				t.Errorf("Aligned = %v, want %v", *alignment.Aligned, tt.expectAligned)
 			}
 
-			if _, issues := calculateAlignmentScore(alignment); fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.expectIssues) {
+			if _, issues := calculateAlignmentScore(alignment, nil); fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.expectIssues) {
 				t.Errorf("issues = %v, want %v", issueTypes(issues), tt.expectIssues)
 			}
 		})
@@ -422,7 +422,7 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 // The alignment issues end up in the analysis, and a message without
 // alignment data is told it is misaligned.
 func TestAlignmentIssuesStoredByHeaderScore(t *testing.T) {
-	if score, issues := calculateAlignmentScore(nil); score != 0 || fmt.Sprint(issueTypes(issues)) != fmt.Sprint([]model.IssueType{model.IssueTypeDomainMisaligned}) {
+	if score, issues := calculateAlignmentScore(nil, nil); score != 0 || fmt.Sprint(issueTypes(issues)) != fmt.Sprint([]model.IssueType{model.IssueTypeDomainMisaligned}) {
 		t.Errorf("nil alignment: score %d, issues %v", score, issueTypes(issues))
 	}
 	email := &mailmsg.Message{Header: createHeaderWithFields(map[string]string{
@@ -430,7 +430,7 @@ func TestAlignmentIssuesStoredByHeaderScore(t *testing.T) {
 	})}
 	a := NewHeaderAnalyzer()
 	analysis := a.GenerateHeaderAnalysis(email, nil)
-	a.CalculateHeaderScore(analysis)
+	a.CalculateHeaderScore(analysis, nil)
 	if analysis.Issues.DomainAlignment == nil || (*analysis.Issues.DomainAlignment)[0].Type != model.IssueTypeDomainMisaligned {
 		t.Errorf("domain_alignment issues = %v", analysis.Issues.DomainAlignment)
 	}
@@ -1431,7 +1431,7 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 				}
 			}
 
-			score, issues := calculateAlignmentScore(alignment)
+			score, issues := calculateAlignmentScore(alignment, nil)
 			if score != tt.expectScore {
 				t.Errorf("score = %d, want %d", score, tt.expectScore)
 			}
@@ -1442,5 +1442,74 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 				t.Errorf("penalties add up to %d, the alignment lost %d", got, 25-score)
 			}
 		})
+	}
+}
+
+// DMARC aligns each identity in the mode its policy sets for it: a domain
+// sharing the organizational domain only counts in relaxed mode.
+func TestAlignmentScoreFollowsDMARCModes(t *testing.T) {
+	alignment := &model.DomainAlignment{
+		FromDomain:          utils.PtrTo("example.com"),
+		FromOrgDomain:       utils.PtrTo("example.com"),
+		ReturnPathDomain:    utils.PtrTo("mailer.example.net"),
+		ReturnPathOrgDomain: utils.PtrTo("example.net"),
+		DkimDomains:         &[]model.DKIMDomainInfo{{Domain: "news.example.com", OrgDomain: "example.com"}},
+	}
+	record := func(aspf, adkim string) *model.DMARCRecord {
+		return &model.DMARCRecord{
+			Valid:         true,
+			SpfAlignment:  utils.PtrTo(model.DMARCRecordSpfAlignment(aspf)),
+			DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignment(adkim)),
+		}
+	}
+
+	tests := []struct {
+		name   string
+		dmarc  *model.DMARCRecord
+		score  int
+		issues []model.IssueType
+	}{
+		{"no record", nil, 20, []model.IssueType{model.IssueTypeDomainRelaxedAligned, model.IssueTypeReturnPathMisaligned}},
+		{"relaxed", record("relaxed", "relaxed"), 20, []model.IssueType{model.IssueTypeDomainRelaxedAligned, model.IssueTypeReturnPathMisaligned}},
+		{"strict DKIM", record("relaxed", "strict"), 0, []model.IssueType{model.IssueTypeDomainMisaligned}},
+		// An invalid record has no mode to impose
+		{"invalid record", &model.DMARCRecord{DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict)}, 20, []model.IssueType{model.IssueTypeDomainRelaxedAligned, model.IssueTypeReturnPathMisaligned}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			score, issues := calculateAlignmentScore(alignment, tt.dmarc)
+			if score != tt.score {
+				t.Errorf("score = %d, want %d", score, tt.score)
+			}
+			if fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.issues) {
+				t.Errorf("issues = %v, want %v", issueTypes(issues), tt.issues)
+			}
+			if got := penalties(issues); got != 25-score {
+				t.Errorf("penalties add up to %d, the alignment lost %d", got, 25-score)
+			}
+		})
+	}
+
+	// Strict SPF with the same Return-Path domain: aligned, while a DKIM
+	// signature of a subdomain only counts as long as adkim is relaxed.
+	sameRP := *alignment
+	sameRP.ReturnPathDomain, sameRP.ReturnPathOrgDomain = utils.PtrTo("example.com"), utils.PtrTo("example.com")
+	score, issues := calculateAlignmentScore(&sameRP, record("strict", "strict"))
+	if score != 25 || fmt.Sprint(issueTypes(issues)) != fmt.Sprint([]model.IssueType{model.IssueTypeDkimMisaligned}) {
+		t.Errorf("score = %d, issues = %v, want 25 and dkim_misaligned", score, issueTypes(issues))
+	}
+	if !strings.Contains(issues[0].Message, "adkim=s") {
+		t.Errorf("message = %q, want it to name adkim=s", issues[0].Message)
+	}
+
+	// Strict SPF with a Return-Path on a subdomain: misaligned, and the
+	// message says aspf=s is why.
+	subRP := *alignment
+	subRP.ReturnPathDomain, subRP.ReturnPathOrgDomain = utils.PtrTo("bounce.example.com"), utils.PtrTo("example.com")
+	subRP.DkimDomains = &[]model.DKIMDomainInfo{{Domain: "esp.example.net", OrgDomain: "example.net"}}
+	score, issues = calculateAlignmentScore(&subRP, record("strict", "relaxed"))
+	if score != 0 || len(issues) != 1 || issues[0].Type != model.IssueTypeDomainMisaligned || !strings.Contains(issues[0].Message, "aspf=s") {
+		t.Errorf("score = %d, issues = %+v, want 0 and domain_misaligned naming aspf=s", score, issues)
 	}
 }
