@@ -997,15 +997,15 @@ func TestGenerateContentAnalysis_TemplateLinkNotUnsubscribe(t *testing.T) {
 
 	// An unreplaced template issue must be reported
 	foundIssue := false
-	if analysis.HtmlIssues != nil {
-		for _, issue := range *analysis.HtmlIssues {
+	if len(Issues(analysis)) > 0 {
+		for _, issue := range Issues(analysis) {
 			if issue.Type == model.IssueTypeUnreplacedTemplate {
 				foundIssue = true
 			}
 		}
 	}
 	if !foundIssue {
-		t.Errorf("expected an unreplaced_template content issue, got %v", analysis.HtmlIssues)
+		t.Errorf("expected an unreplaced_template content issue, got %v", Issues(analysis))
 	}
 }
 
@@ -1041,15 +1041,15 @@ func TestAnalyzeContentIncompleteBodyNotPerfectRatio(t *testing.T) {
 	// The truncation must be told, not silently folded into the score.
 	analysis := analyzer.analysisOf(results)
 	found := false
-	if analysis.HtmlIssues != nil {
-		for _, issue := range *analysis.HtmlIssues {
+	if len(Issues(analysis)) > 0 {
+		for _, issue := range Issues(analysis) {
 			if issue.Type == model.IssueTypeTruncatedBody {
 				found = true
 			}
 		}
 	}
 	if !found {
-		t.Errorf("expected a truncated_body content issue, got %v", analysis.HtmlIssues)
+		t.Errorf("expected a truncated_body content issue, got %v", Issues(analysis))
 	}
 }
 
@@ -1172,8 +1172,8 @@ func TestAnalyzeContent_TrackingPixelNotAnImageIssue(t *testing.T) {
 	if img := (*analysis.Images)[0]; img.IsTrackingPixel == nil || !*img.IsTrackingPixel {
 		t.Errorf("reported image = %+v, want it flagged as a tracking pixel", img)
 	}
-	if analysis.HtmlIssues != nil {
-		for _, issue := range *analysis.HtmlIssues {
+	if len(Issues(analysis)) > 0 {
+		for _, issue := range Issues(analysis) {
 			if issue.Type == model.IssueTypeMissingAlt {
 				t.Errorf("got a missing_alt issue for a tracking pixel: %s", issue.Message)
 			}

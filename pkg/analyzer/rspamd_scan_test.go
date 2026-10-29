@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/pkg/analyzer/content"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -89,12 +90,12 @@ func TestRspamdScanReachesTheContentFindings(t *testing.T) {
 	}
 
 	analysis := generator.contentAnalyzer.Analysis(results.Content, results.ContentReading)
-	if analysis == nil || analysis.HtmlIssues == nil {
+	if analysis == nil || len(content.Issues(analysis)) == 0 {
 		t.Fatal("no content issue came out of the scan")
 	}
 
 	var found bool
-	for _, issue := range *analysis.HtmlIssues {
+	for _, issue := range content.Issues(analysis) {
 		if issue.Symbol != nil && *issue.Symbol == "ZERO_FONT" {
 			found = true
 			if issue.Advice == nil || *issue.Advice == "" {

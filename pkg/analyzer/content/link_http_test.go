@@ -449,7 +449,7 @@ func TestAnalyzeContentReportsBrokenImages(t *testing.T) {
 	}
 
 	analysis := analyzer.analysisOf(results)
-	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+	if !slices.ContainsFunc(Issues(analysis), func(i model.Issue) bool {
 		return i.Type == model.IssueTypeUnreachableLink && i.Location != nil && strings.HasSuffix(*i.Location, "/missing.png")
 	}) {
 		t.Error("no unreachable_link issue was raised for the broken image")
@@ -530,7 +530,7 @@ func TestAnalyzeContentChecksListUnsubscribeURLs(t *testing.T) {
 					t.Errorf("Severity = %q, want high", findings[0].Severity)
 				}
 				analysis := analyzer.analysisOf(results)
-				if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+				if !slices.ContainsFunc(Issues(analysis), func(i model.Issue) bool {
 					return i.Type == model.IssueTypeUnreachableLink
 				}) {
 					t.Error("the dead unsubscribe endpoint raised no issue")
@@ -633,9 +633,9 @@ func TestGenerateContentAnalysisReportsHTTPFindings(t *testing.T) {
 
 	analysis := analyzer.analysisOf(results)
 
-	issues := *analysis.HtmlIssues
+	issues := Issues(analysis)
 	if len(issues) != 1 {
-		t.Fatalf("HtmlIssues = %+v, want exactly one", issues)
+		t.Fatalf("issues = %+v, want exactly one", issues)
 	}
 	if issues[0].Type != model.IssueTypeUnreachableLink {
 		t.Errorf("Type = %q, want %q", issues[0].Type, model.IssueTypeUnreachableLink)
@@ -719,9 +719,9 @@ func TestGenerateContentAnalysisFilesADeadImageUnderRendering(t *testing.T) {
 		}},
 	})
 
-	issues := *analysis.HtmlIssues
+	issues := Issues(analysis)
 	if len(issues) != 1 {
-		t.Fatalf("HtmlIssues = %+v, want exactly one", issues)
+		t.Fatalf("issues = %+v, want exactly one", issues)
 	}
 	if issues[0].Category != reading.CategoryRendering {
 		t.Errorf("Category = %q, want %q", issues[0].Category, reading.CategoryRendering)
@@ -745,9 +745,9 @@ func TestGenerateContentAnalysisFilesRedirectFindingsApart(t *testing.T) {
 		}},
 	})
 
-	issues := *analysis.HtmlIssues
+	issues := Issues(analysis)
 	if len(issues) != 1 || issues[0].Type != model.IssueTypeExcessiveRedirects {
-		t.Errorf("HtmlIssues = %+v, want a single excessive_redirects issue", issues)
+		t.Errorf("issues = %+v, want a single excessive_redirects issue", issues)
 	}
 }
 
@@ -998,7 +998,7 @@ func TestAnalyzeContentCapsTheURLsItFetches(t *testing.T) {
 
 	// What was left out has to be said, not passed off as checked.
 	analysis := analyzer.analysisOf(results)
-	if !slices.ContainsFunc(*analysis.HtmlIssues, func(i model.Issue) bool {
+	if !slices.ContainsFunc(Issues(analysis), func(i model.Issue) bool {
 		return i.Severity == model.IssueSeverityInfo && strings.Contains(i.Message, "left unchecked")
 	}) {
 		t.Error("the URLs left unfetched were not reported")
@@ -1031,7 +1031,7 @@ func TestRepeatedURLIsReportedOnce(t *testing.T) {
 		}},
 	}
 
-	issues := *analyzer.analysisOf(results).HtmlIssues
+	issues := Issues(analyzer.analysisOf(results))
 	unreachable := 0
 	for _, issue := range issues {
 		if issue.Type == model.IssueTypeUnreachableLink {

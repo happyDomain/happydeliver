@@ -558,12 +558,12 @@ func TestGenerateContentAnalysis_SuspiciousLinkIssues(t *testing.T) {
 
 	analysis := analyzer.analysisOf(results)
 
-	if analysis.HtmlIssues == nil {
+	if len(Issues(analysis)) == 0 {
 		t.Fatal("expected suspicious_link issues, got none")
 	}
 
 	var suspicious []model.Issue
-	for _, issue := range *analysis.HtmlIssues {
+	for _, issue := range Issues(analysis) {
 		if issue.Type == model.IssueTypeSuspiciousLink {
 			suspicious = append(suspicious, issue)
 		}
@@ -603,8 +603,8 @@ func TestGenerateContentAnalysis_CleanLinkHasNoIssue(t *testing.T) {
 
 	analysis := analyzer.analysisOf(results)
 
-	if analysis.HtmlIssues != nil {
-		for _, issue := range *analysis.HtmlIssues {
+	if len(Issues(analysis)) > 0 {
+		for _, issue := range Issues(analysis) {
 			if issue.Type == model.IssueTypeSuspiciousLink {
 				t.Errorf("unexpected suspicious_link issue: %s", issue.Message)
 			}
@@ -754,12 +754,12 @@ func TestGenerateContentAnalysis_InsecureImageIssue(t *testing.T) {
 
 	analysis := analyzer.analysisOf(results)
 
-	if analysis.HtmlIssues == nil {
+	if len(Issues(analysis)) == 0 {
 		t.Fatal("expected an issue for the insecure image, got none")
 	}
 
 	var suspicious []model.Issue
-	for _, issue := range *analysis.HtmlIssues {
+	for _, issue := range Issues(analysis) {
 		if issue.Type == model.IssueTypeSuspiciousLink {
 			suspicious = append(suspicious, issue)
 		}

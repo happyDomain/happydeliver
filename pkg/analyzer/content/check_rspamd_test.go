@@ -313,14 +313,14 @@ func TestRspamdFindingsReachTheReport(t *testing.T) {
 	results.Rspamd = rspamd
 
 	analysis := analyzer.analysisOf(results)
-	if analysis == nil || analysis.HtmlIssues == nil {
+	if analysis == nil || len(Issues(analysis)) == 0 {
 		t.Fatal("the report holds no content issue")
 	}
 
 	var found *model.Issue
-	for i, issue := range *analysis.HtmlIssues {
+	for _, issue := range Issues(analysis) {
 		if issue.Symbol != nil && *issue.Symbol == "ZERO_FONT" {
-			found = &(*analysis.HtmlIssues)[i]
+			found = &issue
 		}
 		if issue.Symbol != nil && *issue.Symbol == "R_SPF_ALLOW" {
 			t.Error("an authentication symbol reached the content report")

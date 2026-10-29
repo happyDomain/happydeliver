@@ -790,14 +790,6 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 		}
 	}
 
-	// Every check of the registry reports here, in the order their findings
-	// are read. What they cost is read by the score, from this same reading.
-	htmlIssues := read.Issues
-
-	if len(htmlIssues) > 0 {
-		analysis.HtmlIssues = &htmlIssues
-	}
-
 	// Convert links
 	if len(results.Links) > 0 {
 		links := make([]model.LinkCheck, 0, len(results.Links))
@@ -881,6 +873,19 @@ func (c *Analyzer) Analysis(results *Results, read Reading) *model.ContentAnalys
 		}
 		analysis.Images = &images
 	}
+
+	// Every check of the registry reports here, each finding on the link or
+	// the image it is about, or under the check of the report it belongs to.
+	// What they cost is read by the score, from this same reading.
+	var links []model.LinkCheck
+	if analysis.Links != nil {
+		links = *analysis.Links
+	}
+	var images []model.ImageCheck
+	if analysis.Images != nil {
+		images = *analysis.Images
+	}
+	analysis.Issues = placeIssues(read.Findings, links, images)
 
 	// Unsubscribe methods
 	if results.HasUnsubscribe {

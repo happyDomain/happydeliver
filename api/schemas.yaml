@@ -285,7 +285,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
-          description: Issues found in HTML content
+          description: >-
+            Every issue found in the content, in one list. Kept for the reports
+            produced before issues were listed by check; a new report lists
+            them under issues and on the links and images they are about.
+          deprecated: true
+        issues:
+          $ref: '#/components/schemas/ContentIssues'
         links:
           type: array
           items:
@@ -312,6 +318,56 @@ components:
             enum: [link, mailto, list-unsubscribe-header, one-click]
           description: Available unsubscribe methods
           example: ["link", "list-unsubscribe-header"]
+
+    ContentIssues:
+      type: object
+      description: >-
+        What each check of the content found to change, by the check of the
+        report showing it. An issue about one link or one image is listed on
+        it, in LinkCheck and ImageCheck, rather than here: these are the
+        issues about the message as a whole, or about a URL it does not show
+        as a link or an image.
+      properties:
+        structure:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the parts the message is made of, and whether its HTML parses and arrived whole.
+        text_alternative:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About whether the plain text part says what the HTML part says.
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the links of the message taken together, and those its link table does not show.
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the images of the message taken together, and how much of it they make.
+        unsubscribe:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the addresses a recipient unsubscribes at.
+        rendering:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About what an email client will not render as it was sent, and text a reader cannot make out.
+        markup:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About markup clients block or filters read as concealment, hidden text included.
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the files the message carries, as the spam filter saw them.
 
     Issue:
       type: object
@@ -575,6 +631,11 @@ components:
           type: boolean
           description: Whether this is a URL shortener
           example: false
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: What was found about this link, each located at its URL.
 
     ImageCheck:
       type: object
@@ -605,6 +666,11 @@ components:
           type: boolean
           description: Whether the image source could not be fetched, leaving a hole where the image should render
           example: false
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: What was found about this image, each located at its source.
 
     HeaderAnalysis:
       type: object

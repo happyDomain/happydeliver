@@ -34,6 +34,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
+	contentanalyzer "git.happydns.org/happyDeliver/pkg/analyzer/content"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
@@ -690,13 +691,13 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			}
 		}
 
-		// HTML Issues
-		if content.HtmlIssues != nil && len(*content.HtmlIssues) > 0 {
+		// Content issues, those of the links and images included
+		if issues := contentanalyzer.Issues(content); len(issues) > 0 {
 			fmt.Fprintln(writer, "\n  Content Issues:")
-			for _, issue := range *content.HtmlIssues {
-				// The category is printed beside the type so that the text
-				// report says what the web one shows by grouping: which
-				// reading of the message the finding answers.
+			for _, issue := range issues {
+				// The category is printed beside the type: it says which reading
+				// of the message the finding answers, which the list by check no
+				// longer shows.
 				fmt.Fprintf(writer, "    [%s] %s/%s: %s\n",
 					strings.ToUpper(string(issue.Severity)), issue.Category, issue.Type, issue.Message)
 				// Say when a finding comes from the spam filter rather than
