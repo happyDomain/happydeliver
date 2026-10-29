@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Tooltip } from "bootstrap";
+
+    import type { SectionStatus } from "#lib/sections.js";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -9,9 +11,19 @@
         score?: number;
         unavailable?: boolean;
         tooltipTitle?: string;
+        /** What the section has to change, under its name. */
+        status?: SectionStatus;
     }
 
-    let { href, label, grade, score, unavailable, tooltipTitle }: Props = $props();
+    let { href, label, grade, score, unavailable, tooltipTitle, status }: Props = $props();
+
+    const statusClass: Record<SectionStatus["tone"], string> = {
+        success: "text-success",
+        info: "text-info",
+        warning: "text-warning",
+        danger: "text-danger",
+        muted: "text-muted",
+    };
 
     interface TooltipParams {
         enabled: boolean;
@@ -65,6 +77,11 @@
             <GradeDisplay {grade} {score} />
         {/if}
         <small class="text-muted d-block">{label}</small>
+        {#if status && !unavailable}
+            <small class="d-block fw-semibold {statusClass[status.tone]}">
+                {status.label === "All checks passed" ? "All passed" : status.label}
+            </small>
+        {/if}
     </div>
 </a>
 

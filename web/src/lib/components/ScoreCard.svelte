@@ -6,6 +6,7 @@
         type MessageSource,
     } from "#lib/authentication.js";
     import { hasNoBlacklistResults, noBlacklistResultsTitle } from "#lib/blacklist.js";
+    import type { SectionKey, SectionStatus } from "#lib/sections.js";
     import { hasNoSpamResults, noSpamResultsTitle } from "#lib/spam.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import ScoreLink from "./ScoreLink.svelte";
@@ -20,6 +21,8 @@
         source?: MessageSource;
         spamFilters?: Pick<Report, "spamassassin" | "rspamd">;
         blacklists?: Pick<Report, "blacklists">;
+        /** What each section has to change, shown under its grade. */
+        statuses?: Partial<Record<SectionKey, SectionStatus>>;
     }
 
     let {
@@ -31,6 +34,7 @@
         source,
         spamFilters,
         blacklists,
+        statuses = {},
     }: Props = $props();
 
     // Without an Authentication-Results header there is nothing to grade: the computed F
@@ -87,65 +91,72 @@
 
         {#if summary}
             <div class="row g-3 text-start">
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#dns-details"
                         label="DNS"
+                        status={statuses.dns}
                         grade={summary.dns_grade}
                         score={summary.dns_score}
                     />
                 </div>
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#authentication-details"
                         label="Authentication"
+                        status={statuses.authentication}
                         grade={summary.authentication_grade}
                         score={summary.authentication_score}
                         unavailable={authenticationUnavailable}
                         tooltipTitle={noAuthResultsTitle(source)}
                     />
                 </div>
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#rbl-details"
                         label="Blacklists"
+                        status={statuses.blacklist}
                         grade={summary.blacklist_grade}
                         score={summary.blacklist_score}
                         unavailable={blacklistUnavailable}
                         tooltipTitle={noBlacklistResultsTitle()}
                     />
                 </div>
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#header-details"
                         label="Headers"
+                        status={statuses.headers}
                         grade={summary.header_grade}
                         score={summary.header_score}
                     />
                 </div>
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#spam-details"
                         label="Spam Score"
+                        status={statuses.spam}
                         grade={summary.spam_grade}
                         score={summary.spam_score}
                         unavailable={spamUnavailable}
                         tooltipTitle={noSpamResultsTitle()}
                     />
                 </div>
-                <div class="col-sm-6 col-md-4 col-lg">
+                <div class="col-6 col-md-4 col-lg">
                     <ScoreLink
                         href="#content-details"
                         label="Content"
+                        status={statuses.content}
                         grade={summary.content_grade}
                         score={summary.content_score}
                     />
                 </div>
                 {#if summary.attachments_grade}
-                    <div class="col-sm-6 col-md-4 col-lg">
+                    <div class="col-6 col-md-4 col-lg">
                         <ScoreLink
                             href="#attachment-details"
                             label="Attachments"
+                            status={statuses.attachments}
                             grade={summary.attachments_grade}
                             score={summary.attachments_score}
                         />

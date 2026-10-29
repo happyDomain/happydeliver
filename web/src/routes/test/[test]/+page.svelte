@@ -319,6 +319,7 @@
                         source={report.source}
                         spamFilters={report}
                         blacklists={report}
+                        {statuses}
                         {reanalyzing}
                     />
                 </div>
