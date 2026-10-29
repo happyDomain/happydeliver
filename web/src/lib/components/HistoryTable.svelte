@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
 
     import type { TestSummary } from "#lib/api/types.gen.js";
@@ -36,41 +35,49 @@
         </thead>
         <tbody>
             {#each tests as test (test.test_id)}
-                <tr
-                    class="cursor-pointer"
-                    onclick={() => goto(resolve("/test/[test]", { test: test.test_id }))}
-                >
-                    <td class="ps-4">
-                        <GradeDisplay grade={test.grade} size="small" />
+                {@const href = resolve("/test/[test]", { test: test.test_id })}
+                <tr>
+                    <td class="p-0">
+                        <a
+                            {href}
+                            class="d-block p-2 ps-4 text-reset text-decoration-none"
+                            tabindex="-1"
+                            aria-label="Open test"
+                        >
+                            <GradeDisplay grade={test.grade} size="small" />
+                        </a>
                     </td>
-                    <td>
-                        <span class="badge bg-secondary">{test.score}%</span>
+                    <td class="p-0">
+                        <a {href} class="d-block p-2 text-reset text-decoration-none" tabindex="-1">
+                            <span class="badge bg-secondary">{test.score}%</span>
+                        </a>
                     </td>
-                    <td>
-                        {#if test.from_domain}
-                            <code>{test.from_domain}</code>
-                        {:else}
-                            <span class="text-muted">-</span>
-                        {/if}
+                    <td class="p-0">
+                        <a {href} class="d-block p-2 text-reset text-decoration-none">
+                            {#if test.from_domain}
+                                <code>{test.from_domain}</code>
+                            {:else}
+                                <span class="text-muted">-</span>
+                            {/if}
+                        </a>
                     </td>
-                    <td class="text-muted">
-                        {formatDate(test.created_at)}
+                    <td class="p-0">
+                        <a {href} class="d-block p-2 text-muted text-decoration-none" tabindex="-1">
+                            {formatDate(test.created_at)}
+                        </a>
                     </td>
-                    <td>
-                        <i class="bi bi-chevron-right text-muted"></i>
+                    <td class="p-0">
+                        <a
+                            {href}
+                            class="d-block p-2 text-reset text-decoration-none"
+                            tabindex="-1"
+                            aria-hidden="true"
+                        >
+                            <i class="bi bi-chevron-right text-muted"></i>
+                        </a>
                     </td>
                 </tr>
             {/each}
         </tbody>
     </table>
 </div>
-
-<style>
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    .cursor-pointer:hover td {
-        background-color: var(--bs-tertiary-bg);
-    }
-</style>

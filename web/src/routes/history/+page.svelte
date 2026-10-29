@@ -1,41 +1,45 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
+    import { page } from "$app/state";
 
     import { listTests, createTest as apiCreateTest } from "#lib/api/index.js";
     import type { TestSummary } from "#lib/api/types.gen.js";
-    import { HistoryTable } from "#lib/components/index.js";
+    import { ErrorDisplay, HistoryTable } from "#lib/components/index.js";
 
     let tests = $state<TestSummary[]>([]);
     let total = $state(0);
-    let offset = $state(0);
-    let limit = $state(20);
+    const limit = 20;
+    let requestedPage = $derived(
+        Math.max(1, parseInt(page.url.searchParams.get("page") ?? "1", 10) || 1),
+    );
+    let offset = $derived((requestedPage - 1) * limit);
     let loading = $state(true);
     let error = $state<string | null>(null);
+    let errorStatus = $state(500);
     let creatingTest = $state(false);
 
-    async function loadTests() {
+    function apiMessage(apiError: unknown): string | null {
+        return apiError && typeof apiError === "object" && "message" in apiError
+            ? String(apiError.message)
+            : null;
+    }
+
+    async function loadTests(offset: number) {
         loading = true;
         error = null;
 
         try {
             const response = await listTests({ query: { offset, limit } });
-            if (response.data) {
+            if (response.response?.ok && response.data) {
                 tests = response.data.tests;
                 total = response.data.total;
-            } else if (response.error) {
-                if (
-                    response.error &&
-                    typeof response.error === "object" &&
-                    "error" in response.error &&
-                    response.error.error === "feature_disabled"
-                ) {
-                    error = "Test listing is disabled on this instance.";
-                } else {
-                    error = "Failed to load tests.";
-                }
+            } else {
+                errorStatus = response.response?.status ?? 500;
+                error = apiMessage(response.error) ?? "Failed to load tests.";
             }
         } catch (err) {
+            errorStatus = 500;
             error = err instanceof Error ? err.message : "Failed to load tests.";
         } finally {
             loading = false;
@@ -43,22 +47,25 @@
     }
 
     $effect(() => {
-        loadTests();
+        loadTests(offset);
     });
 
-    function goToPage(newOffset: number) {
-        offset = newOffset;
-        loadTests();
+    function pageHref(n: number): string {
+        return n <= 1 ? resolve("/history") : `${resolve("/history")}?page=${n}`;
     }
 
     async function createTest() {
         creatingTest = true;
         try {
             const response = await apiCreateTest();
-            if (response.data) {
+            if (response.response?.ok && response.data) {
                 goto(resolve("/test/[test]", { test: response.data.id }));
+            } else {
+                errorStatus = response.response?.status ?? 500;
+                error = apiMessage(response.error) ?? "Failed to create test";
             }
         } catch (err) {
+            errorStatus = 500;
             error = err instanceof Error ? err.message : "Failed to create test";
         } finally {
             creatingTest = false;
@@ -103,9 +110,20 @@
                     <p class="mt-3 text-muted">Loading tests...</p>
                 </div>
             {:else if error}
-                <div class="alert alert-warning text-center" role="alert">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    {error}
+                <ErrorDisplay status={errorStatus} message={error} showActions={false} />
+            {:else if tests.length === 0 && total > 0}
+                <div class="text-center py-5">
+                    <i class="bi bi-signpost-split display-1 text-muted mb-3 d-block"></i>
+                    <h2 class="h4 text-muted mb-3">No tests on page {currentPage}</h2>
+                    <p class="text-muted mb-4">
+                        The history only has {totalPages}
+                        {totalPages === 1 ? "page" : "pages"}.
+                    </p>
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- pageHref resolves the route -->
+                    <a class="btn btn-primary" href={pageHref(totalPages)}>
+                        <i class="bi bi-chevron-left me-1"></i>
+                        Go to the last page
+                    </a>
                 </div>
             {:else if tests.length === 0}
                 <div class="text-center py-5">
@@ -132,16 +150,18 @@
                         <small class="text-muted">
                             Showing {offset + 1}-{Math.min(offset + limit, total)} of {total} tests
                         </small>
+                        <!-- eslint-disable svelte/no-navigation-without-resolve -- pageHref resolves the route -->
                         <ul class="pagination mb-0">
                             <li class="page-item" class:disabled={currentPage === 1}>
-                                <button
+                                <a
                                     class="page-link"
-                                    onclick={() => goToPage(Math.max(0, offset - limit))}
-                                    disabled={currentPage === 1}
+                                    href={pageHref(currentPage - 1)}
+                                    aria-disabled={currentPage === 1}
+                                    tabindex={currentPage === 1 ? -1 : undefined}
                                 >
                                     <i class="bi bi-chevron-left"></i>
                                     Previous
-                                </button>
+                                </a>
                             </li>
                             <li class="page-item disabled">
                                 <span class="page-link">
@@ -149,16 +169,18 @@
                                 </span>
                             </li>
                             <li class="page-item" class:disabled={currentPage === totalPages}>
-                                <button
+                                <a
                                     class="page-link"
-                                    onclick={() => goToPage(offset + limit)}
-                                    disabled={currentPage === totalPages}
+                                    href={pageHref(currentPage + 1)}
+                                    aria-disabled={currentPage === totalPages}
+                                    tabindex={currentPage === totalPages ? -1 : undefined}
                                 >
                                     Next
                                     <i class="bi bi-chevron-right"></i>
-                                </button>
+                                </a>
                             </li>
                         </ul>
+                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                     </nav>
                 {/if}
             {/if}
