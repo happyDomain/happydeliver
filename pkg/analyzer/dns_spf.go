@@ -126,16 +126,15 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 		Error:        errMsg,
 	})
 
-	// Check for redirect= modifier first (it replaces the entire SPF policy)
+	// redirect= only applies once every mechanism failed to match (RFC 7208
+	// section 6.1), so the includes before it are evaluated all the same. Its
+	// target still comes right after this record: the scoring reads it there.
 	redirectDomain := d.extractSPFRedirect(spfRecord)
 	if redirectDomain != "" {
-		// redirect= replaces the current domain's policy entirely
-		// Only follow if no other mechanisms matched (per RFC 7208)
 		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1, false)
 		if redirectRecords != nil {
 			results = append(results, *redirectRecords...)
 		}
-		return &results
 	}
 
 	// Extract and resolve include: directives
@@ -447,11 +446,14 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (score int) {
 		for i := 0; i < len(*results.SpfRecords); i++ {
 			spfRecord := (*results.SpfRecords)[i]
 			if spfRecord.Record != nil && strings.Contains(*spfRecord.Record, "redirect=") {
-				// This is a redirect, check if there's a next record
-				if i+1 < len(*results.SpfRecords) {
-					mainSPFIndex = i + 1
+				// The redirect target comes right after the record, unless it could
+				// not be fetched or was already visited: the next record is then the
+				// first include, which is no policy for the domain.
+				next := i + 1
+				if next < len(*results.SpfRecords) && (*results.SpfRecords)[next].Domain != nil &&
+					strings.EqualFold(*(*results.SpfRecords)[next].Domain, d.extractSPFRedirect(*spfRecord.Record)) {
+					mainSPFIndex = next
 				} else {
-					// Redirect exists but no target record found
 					break
 				}
 			} else {

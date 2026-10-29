@@ -548,3 +548,39 @@ func TestHeloLookupName(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckSPFRecordsFollowsIncludesBeforeRedirect(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.net redirect=example.org"},
+		"_spf.example.net": {"v=spf1 a ~all"},
+		"example.org":      {"v=spf1 mx -all"},
+	}, nil)
+
+	records := analyzer.checkSPFRecords("example.com")
+	var domains []string
+	for _, r := range *records {
+		domains = append(domains, *r.Domain)
+	}
+	// The redirect target comes right after the record, where the scoring reads it
+	want := []string{"example.com", "example.org", "_spf.example.net"}
+	if strings.Join(domains, " ") != strings.Join(want, " ") {
+		t.Errorf("domains = %v, want %v", domains, want)
+	}
+}
+
+// A redirect back to the record itself is a loop the resolution cuts short:
+// the record after it is then its first include, which must not be scored
+// as the domain's policy.
+func TestSPFScoreTakesNoIncludeForTheRedirectTarget(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.net redirect=example.com"},
+		"_spf.example.net": {"v=spf1 a -all"},
+	}, nil)
+
+	results := &model.DNSResults{FromDomain: "example.com", SpfRecords: analyzer.checkSPFRecords("example.com")}
+	score := analyzer.calculateSPFScore(results)
+
+	if score == 100 {
+		t.Errorf("score = %d, want the record itself scored, not its include's -all", score)
+	}
+}
