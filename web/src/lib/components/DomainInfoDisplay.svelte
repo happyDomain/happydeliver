@@ -147,10 +147,11 @@
                 {/if}
             </dl>
             <p class="check-about">
-                What the registry publishes about <code>{domainInfo.domain}</code>. Receivers
-                distrust domains registered recently, a week-old domain being what a campaign
-                registers the day before it sends; and mail from a domain whose registration is
-                lapsing is about to stop working.
+                What the registry publishes about <span class="font-monospace"
+                    >{domainInfo.domain}</span
+                >. Receivers distrust domains registered recently, a week-old domain being what a
+                campaign registers the day before it sends; and mail from a domain whose
+                registration is lapsing is about to stop working.
             </p>
         </div>
     </CheckCard>

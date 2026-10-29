@@ -30,10 +30,23 @@
         >
             {title}
             {#if subject}
-                <code class="text-body fs-6">{subject}</code>
+                <span class="check-list-subject font-monospace text-lowercase text-body"
+                    >{subject}</span
+                >
             {/if}
             {@render aside?.()}
         </h5>
     {/if}
     {@render children()}
 </section>
+
+<style>
+    /* The value a list is about (a domain, an address): a light frame sets it apart from the
+       title it follows. */
+    .check-list-subject {
+        padding: 0.05em 0.4em;
+        border: 1px solid var(--hd-border-1);
+        border-radius: var(--hd-radius-sm);
+        font-size: 0.95rem;
+    }
+</style>

@@ -94,8 +94,9 @@
                     </a>
                     {#if senderOrigin.prefix}
                         <div class="small text-muted mt-1">
-                            The address sits in <code>{senderOrigin.prefix}</code>, the block this
-                            operator announces to the rest of the Internet.
+                            The address sits in <span class="font-monospace"
+                                >{senderOrigin.prefix}</span
+                            >, the block this operator announces to the rest of the Internet.
                         </div>
                     {/if}
                 </div>

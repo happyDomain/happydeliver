@@ -304,7 +304,8 @@
             {#snippet aside()}
                 {#if registered && domain}
                     <span class="registered small ms-auto">
-                        Queried as <code>{registered}</code>, its registered domain
+                        Queried as <span class="font-monospace">{registered}</span>, its registered
+                        domain
                     </span>
                 {/if}
             {/snippet}

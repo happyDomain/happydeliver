@@ -62,7 +62,7 @@
                     {#each sorted as mx, i (i)}
                         <dt>{mx.priority}</dt>
                         <dd>
-                            <code>{mx.host}</code>
+                            <span class="font-monospace">{mx.host}</span>
                             {#if !mx.valid}
                                 <span class="small text-danger ms-1">{mx.error ?? "invalid"}</span>
                             {/if}
@@ -72,7 +72,9 @@
             {/if}
             {#if returnOk?.org_domain}
                 <p class="small mb-2">
-                    Found through the organizational domain <code>{returnOk.org_domain}</code>.
+                    Found through the organizational domain <span class="font-monospace"
+                        >{returnOk.org_domain}</span
+                    >.
                 </p>
             {/if}
             <p class="check-about">

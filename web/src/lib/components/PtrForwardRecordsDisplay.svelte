@@ -39,7 +39,7 @@
                 <dt>PTR</dt>
                 <dd>
                     {#each ptrRecords as ptr, i (i)}
-                        <code class="d-block">{ptr}</code>
+                        <span class="font-monospace d-block">{ptr}</span>
                     {/each}
                 </dd>
                 <dt>Resolves to</dt>
@@ -47,7 +47,7 @@
                     {#each forward as ip, j (j)}
                         {#if ip === senderIp || !confirmed || showDifferent}
                             <div>
-                                <code>{ip}</code>
+                                <span class="font-monospace">{ip}</span>
                                 {#if ip === senderIp}
                                     <span class="small text-success ms-1">sender IP</span>
                                 {:else if !confirmed}

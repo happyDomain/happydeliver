@@ -37,7 +37,9 @@
         {#if records.length > 0}
             <dl class="check-facts">
                 {#each records as dkim, i (dkim.selector + "-" + dkim.domain + "-" + i)}
-                    <dt><code>{dkim.selector}._domainkey.{dkim.domain}</code></dt>
+                    <dt>
+                        <span class="font-monospace">{dkim.selector}._domainkey.{dkim.domain}</span>
+                    </dt>
                     <dd>
                         {#if dkim.key_size}
                             {dkim.key_size}-bit {(dkim.key_type ?? "rsa").toUpperCase()}

@@ -28,12 +28,12 @@
             <dl class="check-facts">
                 {#if senderIp}
                     <dt>Sender IP</dt>
-                    <dd><code>{senderIp}</code></dd>
+                    <dd><span class="font-monospace">{senderIp}</span></dd>
                 {/if}
                 <dt>PTR</dt>
                 <dd>
                     {#each ptrRecords ?? [] as ptr, i (i)}
-                        <code class="d-block">{ptr}</code>
+                        <span class="font-monospace d-block">{ptr}</span>
                     {:else}
                         none
                     {/each}

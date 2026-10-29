@@ -642,7 +642,8 @@
                     </strong>
                     {#if report.authserv_id}
                         Authentication results were read from
-                        <code>{report.authserv_id}</code>, the server that originally received it.
+                        <span class="font-monospace">{report.authserv_id}</span>, the server that
+                        originally received it.
                     {/if}
                     Anything missing reflects that message's own path, not a misconfiguration of this
                     instance.

@@ -30,7 +30,7 @@
             <dl class="check-facts">
                 {#if heloSpfRecord.domain}
                     <dt>Announced HELO</dt>
-                    <dd><code>{heloSpfRecord.domain}</code></dd>
+                    <dd><span class="font-monospace">{heloSpfRecord.domain}</span></dd>
                 {/if}
                 <dt>Policy</dt>
                 <dd>

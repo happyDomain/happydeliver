@@ -46,13 +46,13 @@
         <div class="card-body">
             <dl class="check-facts">
                 <dt>Announced HELO</dt>
-                <dd><code>{heloHostname}</code></dd>
+                <dd><span class="font-monospace">{heloHostname}</span></dd>
                 {#if hasPtr}
                     <dt>PTR</dt>
                     <dd>
                         {#each ptrRecords! as ptr, i (i)}
                             <div>
-                                <code>{ptr}</code>
+                                <span class="font-monospace">{ptr}</span>
                                 {#if normalize(heloHostname) === normalize(ptr)}
                                     <span class="small text-success ms-1">same</span>
                                 {:else}

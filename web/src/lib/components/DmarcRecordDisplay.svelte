@@ -60,7 +60,7 @@
                 {#if isFallback}
                     <dt>Found at</dt>
                     <dd>
-                        <code>{dmarcRecord.domain}</code>
+                        <span class="font-monospace">{dmarcRecord.domain}</span>
                         <div class="small text-body-secondary">
                             {fromDomain} has no record of its own: this one is inherited from {isPsdFallback
                                 ? "the Public Suffix Domain"

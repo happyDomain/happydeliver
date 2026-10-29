@@ -87,7 +87,7 @@
                 <CheckList title="Sending server" subject={heloHostname ?? senderIp}>
                     {#snippet aside()}
                         {#if heloHostname && senderIp}
-                            <code class="text-body-secondary">{senderIp}</code>
+                            <span class="font-monospace text-body-secondary">{senderIp}</span>
                         {/if}
                     {/snippet}
                     <SenderOriginDisplay senderOrigin={dnsResults.sender_origin} />

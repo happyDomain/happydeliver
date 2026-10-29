@@ -120,7 +120,10 @@
                                 {:else if !hop.reverse && !hop.from}-{/if}
                             </span>
                             {#if hop.from && hop.from !== hop.reverse}
-                                <span><span class="label">helo</span> <code>{hop.from}</code></span>
+                                <span
+                                    ><span class="label">helo</span>
+                                    <span class="font-monospace">{hop.from}</span></span
+                                >
                             {/if}
                             {#if hop.with}
                                 <span><span class="label">via</span> <code>{hop.with}</code></span>

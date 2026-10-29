@@ -346,11 +346,17 @@
         <div class="card-body">
             <dl class="check-facts">
                 <dt>Queried</dt>
-                <dd><code>{bimiRecord.selector}._bimi.{bimiRecord.domain}</code></dd>
+                <dd>
+                    <span class="font-monospace"
+                        >{bimiRecord.selector}._bimi.{bimiRecord.domain}</span
+                    >
+                </dd>
                 {#if inheritedFrom}
                     <dt>Found at</dt>
                     <dd>
-                        <code>{bimiRecord.selector}._bimi.{inheritedFrom}</code>
+                        <span class="font-monospace"
+                            >{bimiRecord.selector}._bimi.{inheritedFrom}</span
+                        >
                         <div class="small text-body-secondary">
                             {bimiRecord.domain} has no record of its own: this one is inherited from its
                             organizational domain. Publish one, or a declination record, to give it its

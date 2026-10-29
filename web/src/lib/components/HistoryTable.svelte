@@ -55,7 +55,7 @@
                     <td class="p-0">
                         <a {href} class="d-block p-2 text-reset text-decoration-none">
                             {#if test.from_domain}
-                                <code>{test.from_domain}</code>
+                                <span class="font-monospace">{test.from_domain}</span>
                             {:else}
                                 <span class="text-muted">-</span>
                             {/if}

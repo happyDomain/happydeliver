@@ -256,7 +256,7 @@
                                 {#each identities as identity, i (i)}
                                     <dt>{identity.label}</dt>
                                     <dd>
-                                        <code>{identity.domain}</code>
+                                        <span class="font-monospace">{identity.domain}</span>
                                         <span class="small text-body-secondary ms-1 text-nowrap">
                                             <i
                                                 class="bi me-1 {identity.counts

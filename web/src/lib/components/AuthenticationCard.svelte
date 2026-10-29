@@ -114,7 +114,7 @@
                 <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
                 These verdicts were produced by
                 {#if authservId}
-                    <code>{authservId}</code>, the server
+                    <span class="font-monospace">{authservId}</span>, the server
                 {:else}
                     the server of your mail provider
                 {/if}
@@ -139,11 +139,11 @@
                             <dl class="check-facts">
                                 {#if iprev.ip}
                                     <dt>IP address</dt>
-                                    <dd><code>{iprev.ip}</code></dd>
+                                    <dd><span class="font-monospace">{iprev.ip}</span></dd>
                                 {/if}
                                 {#if iprev.hostname}
                                     <dt>Hostname</dt>
-                                    <dd><code>{iprev.hostname}</code></dd>
+                                    <dd><span class="font-monospace">{iprev.hostname}</span></dd>
                                 {/if}
                             </dl>
                             <p class="check-about">
@@ -172,11 +172,11 @@
                             <dl class="check-facts">
                                 {#if xptr.helo}
                                     <dt>Announced</dt>
-                                    <dd><code>{xptr.helo}</code></dd>
+                                    <dd><span class="font-monospace">{xptr.helo}</span></dd>
                                 {/if}
                                 {#if xptr.ptr}
                                     <dt>Reverse DNS</dt>
-                                    <dd><code>{xptr.ptr}</code></dd>
+                                    <dd><span class="font-monospace">{xptr.ptr}</span></dd>
                                 {/if}
                             </dl>
                             <p class="check-about">

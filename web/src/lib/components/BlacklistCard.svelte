@@ -152,7 +152,7 @@
                 >
                     <i class="bi {verdict.icon}" aria-hidden="true"></i>{verdict.label}
                 </span>
-                <code>{check.rbl}</code>
+                <span class="font-monospace">{check.rbl}</span>
                 <span class="detail text-body-secondary" title={check.error}>{verdict.detail}</span>
                 <span class="action">
                     {#if lookup}
@@ -282,11 +282,7 @@
             }
         }
 
-        code {
-            color: var(--bs-body-color);
-            background: none;
-            border: none;
-            padding: 0;
+        .font-monospace {
             font-size: 0.875rem;
         }
 
