@@ -193,6 +193,14 @@ export function isActionable(issue: Severe): boolean {
 }
 
 /**
+ * The issues of a check, or nothing when it has none: a check given no issues says how it
+ * came out by its own status, as not every verdict calls for a change.
+ */
+export function listed(issues?: Issue[]): Issue[] | undefined {
+    return issues && issues.length > 0 ? issues : undefined;
+}
+
+/**
  * Orders findings gravest first, leaving those the severity does not separate in the order
  * they were given. A severity this front end does not know sorts last rather than first, so
  * that a level the API adds cannot quietly take the top of every list.

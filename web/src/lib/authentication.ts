@@ -1,4 +1,5 @@
 import type { AuthenticationResults, Report } from "#lib/api/types.gen.js";
+import type { CheckStatus } from "#lib/components/CheckCard.svelte";
 
 /**
  * Where the analyzed message comes from.
@@ -59,16 +60,29 @@ function reportedMechanisms(authentication: AuthenticationResults): boolean[] {
     ];
 }
 
-/**
- * True when some, but not all, of the required authentication mechanisms were reported.
- *
- * The verdicts present come from the infrastructure that received the message before
- * happyDeliver, which does not recompute them; the missing ones show as "Not tested".
- */
-export function hasPartialAuthenticationResults(authentication?: AuthenticationResults): boolean {
-    if (!authentication) return false;
-
-    const reported = reportedMechanisms(authentication);
-
-    return reported.some((ok) => ok) && !reported.every((ok) => ok);
+/** How a verdict reads, for a mechanism the score requires or one that is optional. */
+export function verdictStatus(result: string | undefined, required: boolean): CheckStatus {
+    switch (result) {
+        case "pass":
+        case "domain_pass":
+        case "orgdomain_pass":
+            return "pass";
+        case "fail":
+        case "permerror":
+        case "invalid":
+            return "fail";
+        case "softfail":
+        case "neutral":
+        case "temperror":
+            return "warn";
+        case "declined":
+        case "skipped":
+            return "info";
+        case undefined:
+        case "none":
+        case "missing":
+            return required ? "fail" : "neutral";
+        default:
+            return "neutral";
+    }
 }

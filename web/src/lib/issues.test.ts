@@ -11,6 +11,7 @@ import {
     isActionable,
     issueLabel,
     issueObserver,
+    listed,
 } from "#lib/issues.js";
 
 /** A content issue with only the fields these tests care about. */
@@ -323,5 +324,13 @@ describe("isActionable", () => {
             (severity) => isActionable({ severity }),
         );
         expect(actionable).toEqual(["critical", "high", "medium"]);
+    });
+});
+
+describe("listed", () => {
+    it("gives nothing for a check without issues", () => {
+        expect(listed([])).toBeUndefined();
+        expect(listed(undefined)).toBeUndefined();
+        expect(listed([issue({})])).toHaveLength(1);
     });
 });

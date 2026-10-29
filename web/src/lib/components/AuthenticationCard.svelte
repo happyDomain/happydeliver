@@ -1,14 +1,22 @@
 <script lang="ts">
-    import type { AuthenticationResults, DnsResults } from "#lib/api/types.gen.js";
+    import type {
+        AuthenticationIssues,
+        AuthenticationResults,
+        DnsResults,
+        Issue,
+    } from "#lib/api/types.gen.js";
     import {
         hasNoAuthenticationResults,
-        hasPartialAuthenticationResults,
         isUploadedMessage,
+        verdictStatus,
         type MessageSource,
     } from "#lib/authentication.js";
     import { docs } from "#lib/docs.js";
+    import { listed } from "#lib/issues.js";
     import type { SectionStatus } from "#lib/sections.js";
-    import DocLinks from "./DocLinks.svelte";
+    import CheckCard from "./CheckCard.svelte";
+    import CheckList from "./CheckList.svelte";
+    import IssueNote from "./IssueNote.svelte";
     import ReportSection from "./ReportSection.svelte";
 
     interface Props {
@@ -34,80 +42,54 @@
     }: Props = $props();
 
     let allRequiredMissing = $derived(hasNoAuthenticationResults(authentication));
-    let partialResults = $derived(hasPartialAuthenticationResults(authentication));
     let uploaded = $derived(isUploadedMessage(source));
 
-    function getAuthResultClass(result: string, noneIsFail: boolean): string {
-        switch (result) {
-            case "pass":
-            case "domain_pass":
-            case "orgdomain_pass":
-                return "text-success";
-            case "permerror":
-            case "error":
-            case "fail":
-            case "missing":
-            case "invalid":
-            case "null":
-            case "null_smtp":
-            case "null_header":
-                return "text-danger";
-            case "softfail":
-            case "neutral":
-                return "text-warning";
-            case "declined":
-                return "text-info";
-            case "none":
-                return noneIsFail ? "text-danger" : "text-muted";
-            default:
-                return "text-muted";
-        }
+    /**
+     * The issues of a check, or nothing when it has none: its verdict then says how it
+     * came out, as not every verdict the receiver reports calls for a change.
+     */
+    function at(check: keyof AuthenticationIssues): Issue[] | undefined {
+        return listed(authentication.issues?.[check]);
     }
 
-    function getAuthResultIcon(result: string, noneIsFail: boolean): string {
-        switch (result) {
-            case "pass":
-            case "domain_pass":
-            case "orgdomain_pass":
-                return "bi-check-circle-fill";
-            case "fail":
-                return "bi-x-circle-fill";
-            case "softfail":
-            case "neutral":
-            case "invalid":
-            case "null":
-            case "permerror":
-            case "error":
-            case "null_smtp":
-            case "null_header":
-                return "bi-exclamation-circle-fill";
-            case "missing":
-                return "bi-dash-circle-fill";
-            case "declined":
-                return "bi-dash-circle";
-            case "none":
-                return noneIsFail ? "bi-x-circle-fill" : "bi-question-circle";
-            default:
-                return "bi-question-circle";
-        }
+    /** The verdict, with the domain it is about when there is one. */
+    function verdict(result: string | undefined, domain?: string): string {
+        if (!result || result === "missing") return "Not tested";
+        return domain ? `${result} for ${domain}` : result;
     }
 
-    function getAuthResultText(result: string): string {
-        switch (result) {
-            case "missing":
-                return "Not tested";
-            default:
-                return result;
-        }
-    }
+    // One passing signature is all DMARC needs: the others only matter for their findings.
+    const dkim = $derived(authentication.dkim ?? []);
+    const dkimResult = $derived(dkim.find((d) => d.result === "pass")?.result ?? dkim[0]?.result);
+    const dkimSummary = $derived(
+        dkim.length > 1
+            ? `${dkim.filter((d) => d.result === "pass").length} of ${dkim.length} signatures pass`
+            : verdict(dkim[0]?.result, dkim[0]?.domain),
+    );
+
+    // The policy the receiver applied, or failing that the one the domain publishes
+    const dmarcPolicy = $derived.by(() => {
+        const dmarc = authentication.dmarc;
+        if (!dmarc || dmarc.result === "none") return undefined;
+        const applied = dmarc.details?.match(/policy\.published-domain-policy=([^\s;]+)/)?.[1];
+        return applied ?? (dmarc.domain ? dnsResults?.dmarc_record?.policy : undefined);
+    });
+
+    const serverSubject = $derived(
+        authentication.x_ptr?.helo ?? authentication.iprev?.hostname ?? authentication.iprev?.ip,
+    );
 </script>
 
 <!-- The receiver's raw verdict: needed to debug a failure, noise on a pass. -->
-{#snippet rawResult(details: string)}
-    <details class="passed-items mt-1">
-        <summary>Raw result</summary>
-        <pre class="p-2 mb-0 mt-1 text-muted small" style="white-space: pre-wrap">{details}</pre>
-    </details>
+{#snippet rawResult(details: string | undefined)}
+    {#if details}
+        <details class="passed-items mt-1">
+            <summary>Raw result</summary>
+            <pre
+                class="p-2 mb-0 mt-1 text-muted small"
+                style="white-space: pre-wrap">{details}</pre>
+        </details>
+    {/if}
 {/snippet}
 
 <!-- No Authentication-Results header: the score is not the sender's, so it shows as N/A. -->
@@ -121,610 +103,324 @@
     {status}
     {open}
 >
-    {#if allRequiredMissing}
-        <div class="card-body border-bottom">
-            <div class="alert alert-warning mb-0">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                <strong>No authentication results found.</strong>
-                {#if uploaded}
-                    <p class="mb-0 mt-1">
-                        The uploaded file carries no usable <code>Authentication-Results</code>
-                        header, so SPF, DKIM and DMARC could not be evaluated and the authentication grade
-                        is reported as <strong>N/A</strong>. Whether those verdicts exist depends on
-                        the server that originally received the message. Send the message to a test
-                        address to have them verified here.
-                    </p>
+    <div class="card-body">
+        {#each authentication.issues?.details ?? [] as issue, i (i)}
+            <IssueNote {issue} />
+        {/each}
+
+        {#if uploaded && !allRequiredMissing}
+            <!-- Not this instance's verdicts: the reader has to know whose they are. -->
+            <p class="small text-body-secondary">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                These verdicts were produced by
+                {#if authservId}
+                    <code>{authservId}</code>, the server
                 {:else}
-                    <p class="mb-0 mt-1">
-                        This is not a problem with the analysed email: this server could not
-                        evaluate SPF, DKIM and DMARC, so the authentication grade is reported as
-                        <strong>N/A</strong>. The administrator of this HappyDeliver instance should
-                        look at it, as it usually means either:
-                    </p>
-                    <ul class="mb-0 mt-1">
-                        <li>
-                            The receiving mail server is not configured to verify email
-                            authentication (no <code>Authentication-Results</code> header was found in
-                            the message).
-                        </li>
-                        <li>
-                            The <code>Authentication-Results</code> header exists but the receiver
-                            hostname does not match the configured
-                            <code>--receiver-hostname</code> value.
-                        </li>
-                    </ul>
+                    the server of your mail provider
                 {/if}
-            </div>
-        </div>
-    {:else if partialResults}
-        <div class="card-body border-bottom">
-            <div class="alert alert-warning mb-0">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                <strong>Some authentication results are missing.</strong>
-                <p class="mb-0 mt-1">
-                    {#if uploaded && authservId}
-                        The results shown here were produced by <code>{authservId}</code>, the
-                        server that received this message before it reached HappyDeliver.
-                    {:else if uploaded}
-                        The results shown here were produced by the infrastructure of your mail
-                        provider that received this message before it reached HappyDeliver.
-                    {:else}
-                        The results shown here were produced by this HappyDeliver instance's own
-                        receiving mail server.
-                    {/if}
-                    HappyDeliver does not recompute this part. Mechanisms marked
-                    <strong>Not tested</strong> were not evaluated by that infrastructure. Send a test
-                    message directly to HappyDeliver to have them verified here.
-                </p>
-            </div>
-        </div>
-    {:else if uploaded && authservId}
-        <div class="card-body border-bottom py-2">
-            <p class="mb-0 small text-muted">
-                <i class="bi bi-info-circle me-2"></i>
-                These verdicts were produced by <code>{authservId}</code>, the server that received
-                the uploaded message, not by this instance.
+                that received the uploaded message, not by this instance.
             </p>
-        </div>
-    {/if}
-    <div class="list-group list-group-flush">
-        <!-- IPREV -->
-        {#if authentication.iprev}
-            <div class="list-group-item" id="authentication-iprev">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.iprev.result,
-                            true,
-                        )} {getAuthResultClass(authentication.iprev.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>IP Reverse DNS</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.iprev.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.iprev.result}
-                        </span>
-                        {#if authentication.iprev.ip}
-                            <div class="small">
-                                <strong>IP Address:</strong>
-                                <span class="text-muted">{authentication.iprev.ip}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.iprev.hostname}
-                            <div class="small">
-                                <strong>Hostname:</strong>
-                                <span class="text-muted">{authentication.iprev.hostname}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.iprev.details}
-                            {@render rawResult(authentication.iprev.details)}
-                        {/if}
-                    </div>
-                </div>
-            </div>
         {/if}
 
-        <!-- X-Ptr (HELO / reverse DNS consistency) -->
-        {#if authentication.x_ptr}
-            <div class="list-group-item" id="authentication-x-ptr">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.x_ptr.result,
-                            true,
-                        )} {getAuthResultClass(authentication.x_ptr.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>HELO / PTR</strong>
-                        <i
-                            class="bi bi-info-circle text-muted ms-1"
-                            title="Checks that the HELO/EHLO hostname announced by the sending server matches the sender IP's reverse DNS (PTR) record."
-                        ></i>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.x_ptr.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.x_ptr.result}
-                        </span>
-                        {#if authentication.x_ptr.helo}
-                            <div class="small">
-                                <strong>Announced HELO:</strong>
-                                <span class="text-muted">{authentication.x_ptr.helo}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.x_ptr.ptr}
-                            <div class="small">
-                                <strong>Reverse DNS (PTR):</strong>
-                                <span class="text-muted">{authentication.x_ptr.ptr}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.x_ptr.details}
-                            {@render rawResult(authentication.x_ptr.details)}
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {/if}
-
-        <!-- X-TLS (Transport encryption) -->
-        {#if authentication.x_tls}
-            <div class="list-group-item" id="authentication-x-tls">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.x_tls.result,
-                            true,
-                        )} {getAuthResultClass(authentication.x_tls.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>Transport TLS</strong>
-                        <i
-                            class="bi bi-info-circle text-muted ms-1"
-                            title="Whether the inbound connection that delivered this message used TLS encryption (x-tls). Falls back to the inbound Received hop when no x-tls header is present."
-                        ></i>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.x_tls.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.x_tls.result}
-                        </span>
-                        {#if authentication.x_tls.details}
-                            <div class="small text-muted mt-1">
-                                {authentication.x_tls.details}
-                            </div>
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {/if}
-
-        <!-- SPF (Required) -->
-        <div class="list-group-item" id="authentication-spf">
-            <div class="d-flex align-items-start">
-                {#if authentication.spf}
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.spf.result,
-                            true,
-                        )} {getAuthResultClass(authentication.spf.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>SPF</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.spf.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.spf.result}
-                        </span>
-                        {#if authentication.spf.domain}
-                            <div class="small">
-                                <strong>Domain:</strong>
-                                <span class="text-muted">{authentication.spf.domain}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.spf.details}
-                            {@render rawResult(authentication.spf.details)}
-                        {/if}
-                    </div>
-                {:else if authentication.spf_helo}
-                    <!-- Only the HELO identity was checked: SPF ran, it just reported nothing
-                         about the envelope sender, which is not the same as a missing policy. -->
-                    <i
-                        class="bi {getAuthResultIcon('none', false)} {getAuthResultClass(
-                            'none',
-                            false,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>SPF</strong>
-                        <span class="text-uppercase ms-2 {getAuthResultClass('none', false)}">
-                            Not checked
-                        </span>
-                        <div class="text-muted small">
-                            The receiver only checked the HELO identity below, so it reported no
-                            verdict for the envelope sender.
+        {#if authentication.iprev || authentication.x_ptr || authentication.x_tls || authentication.spf_helo}
+            <CheckList title="Sending server" subject={serverSubject}>
+                {#if authentication.iprev}
+                    {@const iprev = authentication.iprev}
+                    <CheckCard
+                        id="authentication-iprev"
+                        title="Reverse DNS"
+                        tag="iprev"
+                        status={verdictStatus(iprev.result, true)}
+                        summary={verdict(iprev.result, iprev.ip)}
+                        docs={[docs.reverseDns]}
+                        issues={at("iprev")}
+                    >
+                        <div class="card-body">
+                            <dl class="check-facts">
+                                {#if iprev.ip}
+                                    <dt>IP address</dt>
+                                    <dd><code>{iprev.ip}</code></dd>
+                                {/if}
+                                {#if iprev.hostname}
+                                    <dt>Hostname</dt>
+                                    <dd><code>{iprev.hostname}</code></dd>
+                                {/if}
+                            </dl>
+                            <p class="check-about">
+                                Receivers look up the name of the sending IP, and check that this
+                                name resolves back to the same IP: a server without it looks like a
+                                compromised home connection.
+                            </p>
+                            {@render rawResult(iprev.details)}
                         </div>
-                    </div>
-                {:else}
-                    <i
-                        class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass(
-                            'missing',
-                            true,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>SPF</strong>
-                        <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
-                            {getAuthResultText("missing")}
-                        </span>
-                        <div class="text-muted small">
-                            SPF record is required for proper email authentication
-                        </div>
-                    </div>
+                    </CheckCard>
                 {/if}
-            </div>
 
-            <!-- SPF checked against the HELO identity, when the receiver reports it -->
-            {#if authentication.spf_helo}
-                <div class="d-flex align-items-start mt-3">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.spf_helo.result,
-                            true,
-                        )} {getAuthResultClass(authentication.spf_helo.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>SPF (HELO)</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.spf_helo.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.spf_helo.result}
-                        </span>
-                        <div class="text-muted small">
-                            Checked against the hostname the sending server announced, not against
-                            the envelope sender.
+                {#if authentication.x_ptr}
+                    {@const xptr = authentication.x_ptr}
+                    <CheckCard
+                        id="authentication-x-ptr"
+                        title="HELO hostname"
+                        tag="HELO / PTR"
+                        status={verdictStatus(xptr.result, false)}
+                        summary={xptr.result === "fail" && xptr.helo && xptr.ptr
+                            ? `${xptr.helo}, not ${xptr.ptr}`
+                            : verdict(xptr.result, xptr.helo)}
+                        docs={[docs.ehlo]}
+                    >
+                        <div class="card-body">
+                            <dl class="check-facts">
+                                {#if xptr.helo}
+                                    <dt>Announced</dt>
+                                    <dd><code>{xptr.helo}</code></dd>
+                                {/if}
+                                {#if xptr.ptr}
+                                    <dt>Reverse DNS</dt>
+                                    <dd><code>{xptr.ptr}</code></dd>
+                                {/if}
+                            </dl>
+                            <p class="check-about">
+                                When it connects, the sending server announces its hostname (HELO or
+                                EHLO). Many receivers check that it is the name its IP has in
+                                reverse DNS; a mismatch is a common spam signal.
+                            </p>
+                            {@render rawResult(xptr.details)}
                         </div>
-                        {#if authentication.spf_helo.domain}
-                            <div class="small">
-                                <strong>Hostname:</strong>
-                                <span class="text-muted">{authentication.spf_helo.domain}</span>
-                            </div>
-                        {/if}
-                        {#if authentication.spf_helo.details}
-                            {@render rawResult(authentication.spf_helo.details)}
-                        {/if}
-                    </div>
+                    </CheckCard>
+                {/if}
+
+                {#if authentication.spf_helo}
+                    {@const helo = authentication.spf_helo}
+                    <CheckCard
+                        id="authentication-spf-helo"
+                        title="SPF of the HELO hostname"
+                        tag="SPF"
+                        status={verdictStatus(helo.result, false)}
+                        summary={verdict(helo.result, helo.domain)}
+                        docs={[docs.spfHelo]}
+                        issues={at("spf_helo")}
+                    >
+                        <div class="card-body">
+                            <p class="check-about">
+                                The same check as SPF, on the hostname the sending server announced
+                                rather than on the envelope sender: it covers the bounces, which
+                                have no envelope sender.
+                            </p>
+                            {@render rawResult(helo.details)}
+                        </div>
+                    </CheckCard>
+                {/if}
+
+                {#if authentication.x_tls}
+                    {@const tls = authentication.x_tls}
+                    <CheckCard
+                        id="authentication-x-tls"
+                        title="Transport encryption"
+                        tag="TLS"
+                        status={verdictStatus(tls.result, true)}
+                        summary={tls.details ?? verdict(tls.result)}
+                        docs={[docs.starttls]}
+                        issues={at("x_tls")}
+                    >
+                        <div class="card-body">
+                            <p class="check-about">
+                                Whether the connection that delivered this message to the receiver
+                                was encrypted (STARTTLS), so that nobody along the way could read
+                                it.
+                            </p>
+                        </div>
+                    </CheckCard>
+                {/if}
+            </CheckList>
+        {/if}
+
+        <!-- Each verdict names the domain it is about: SPF the envelope sender's, DKIM the
+             signer's, DMARC and BIMI the From domain's. -->
+        <CheckList title="Sender identity">
+            <CheckCard
+                id="authentication-spf"
+                title="Sender Policy Framework"
+                tag="SPF"
+                status={authentication.spf
+                    ? verdictStatus(authentication.spf.result, true)
+                    : authentication.spf_helo
+                      ? "neutral"
+                      : "fail"}
+                summary={authentication.spf
+                    ? verdict(authentication.spf.result, authentication.spf.domain)
+                    : authentication.spf_helo
+                      ? "Not checked for the envelope sender"
+                      : "Not tested"}
+                docs={[docs.spf]}
+                issues={at("spf")}
+            >
+                <div class="card-body">
+                    {#if !authentication.spf && authentication.spf_helo}
+                        <p class="check-about">
+                            The receiver only checked the HELO identity, so it reported no verdict
+                            for the envelope sender.
+                        </p>
+                    {:else}
+                        <p class="check-about">
+                            The receiver checked that the sending IP is one the SPF record of the
+                            envelope sender domain (the Return-Path, where bounces go) allows.
+                        </p>
+                    {/if}
+                    {@render rawResult(authentication.spf?.details)}
                 </div>
+            </CheckCard>
+
+            <CheckCard
+                id="authentication-dkim"
+                title="DomainKeys Identified Mail"
+                tag="DKIM"
+                status={verdictStatus(dkimResult, true)}
+                summary={dkimSummary}
+                docs={[docs.dkim]}
+                issues={at("dkim")}
+            >
+                <div class="card-body">
+                    {#if dkim.length > 0}
+                        <dl class="check-facts">
+                            {#each dkim as signature, i (i)}
+                                <dt>
+                                    {signature.domain ?? "Signature"}
+                                    {#if signature.selector}
+                                        <span class="d-block small">{signature.selector}</span>
+                                    {/if}
+                                </dt>
+                                <dd>
+                                    <span
+                                        class={verdictStatus(signature.result, true) === "pass"
+                                            ? "text-success"
+                                            : "text-danger"}>{signature.result}</span
+                                    >
+                                    {@render rawResult(signature.details)}
+                                </dd>
+                            {/each}
+                        </dl>
+                    {/if}
+                    <p class="check-about">
+                        The receiver checked each signature against the public key its domain
+                        publishes in DNS.
+                    </p>
+                </div>
+            </CheckCard>
+
+            <CheckCard
+                id="authentication-dmarc"
+                title="Domain-based Message Authentication"
+                tag="DMARC"
+                status={verdictStatus(authentication.dmarc?.result, true)}
+                summary={verdict(authentication.dmarc?.result, authentication.dmarc?.domain)}
+                docs={[docs.dmarc]}
+                issues={at("dmarc")}
+            >
+                <div class="card-body">
+                    {#if dmarcPolicy}
+                        <dl class="check-facts">
+                            <dt>Policy</dt>
+                            <dd><code>{dmarcPolicy}</code></dd>
+                        </dl>
+                    {/if}
+                    <p class="check-about">
+                        DMARC passes when SPF or DKIM passes for a domain aligned with the From
+                        address, the one the recipient sees. Otherwise the receiver applies the
+                        policy the From domain publishes.
+                    </p>
+                    {@render rawResult(authentication.dmarc?.details)}
+                </div>
+            </CheckCard>
+
+            {#if authentication.x_aligned_from}
+                {@const aligned = authentication.x_aligned_from}
+                <CheckCard
+                    id="authentication-x-aligned-from"
+                    title="Aligned From"
+                    tag="X-Aligned-From"
+                    status={verdictStatus(aligned.result, false)}
+                    summary={verdict(aligned.result, aligned.domain)}
+                    docs={[docs.dmarcAlignment]}
+                    issues={at("x_aligned_from")}
+                >
+                    <div class="card-body">
+                        <p class="check-about">
+                            Whether the envelope sender and the From address are in the same domain.
+                            See <a href="#domain-alignment">Domain Alignment</a>.
+                        </p>
+                        {@render rawResult(aligned.details)}
+                    </div>
+                </CheckCard>
             {/if}
-        </div>
 
-        <!-- DKIM (Required) -->
-        <div class="list-group-item" id="authentication-dkim">
-            {#if authentication.dkim && authentication.dkim.length > 0}
-                {#each authentication.dkim as dkim, i (i)}
-                    <div class="d-flex align-items-start" class:mt-3={i > 0}>
-                        <i
-                            class="bi {getAuthResultIcon(dkim.result, true)} {getAuthResultClass(
-                                dkim.result,
-                                true,
-                            )} me-2 fs-5"
-                        ></i>
-                        <div>
-                            <strong>DKIM{authentication.dkim.length > 1 ? ` #${i + 1}` : ""}</strong
-                            >
-                            <span
-                                class="text-uppercase ms-2 {getAuthResultClass(dkim.result, true)}"
-                            >
-                                {dkim.result}
-                            </span>
-                            {#if dkim.domain}
-                                <div class="small">
-                                    <strong>Domain:</strong>
-                                    <span class="text-muted">{dkim.domain}</span>
-                                </div>
-                            {/if}
-                            {#if dkim.selector}
-                                <div class="small">
-                                    <strong>Selector:</strong>
-                                    <span class="text-muted">{dkim.selector}</span>
-                                </div>
-                            {/if}
-                            {#if dkim.details}
-                                {@render rawResult(dkim.details)}
-                            {/if}
-                        </div>
-                    </div>
-                {/each}
-            {:else}
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass(
-                            'missing',
-                            true,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>DKIM</strong>
-                        <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
-                            {getAuthResultText("missing")}
-                        </span>
-                        <div class="text-muted small">
-                            DKIM signature is required for proper email authentication
-                        </div>
-                    </div>
+            <CheckCard
+                id="authentication-bimi"
+                title="Brand Indicators"
+                tag="BIMI"
+                status={verdictStatus(authentication.bimi?.result, false)}
+                summary={authentication.bimi ? verdict(authentication.bimi.result) : "Optional"}
+                docs={[docs.bimi]}
+                issues={at("bimi")}
+            >
+                <div class="card-body">
+                    <p class="check-about">
+                        Whether the receiver would display your brand logo next to the message. The
+                        record and the logo are checked with the <a href="#dns-bimi">DNS records</a
+                        >.
+                    </p>
+                    {@render rawResult(authentication.bimi?.details)}
                 </div>
-            {/if}
-        </div>
+            </CheckCard>
+        </CheckList>
 
-        <!-- X-Google-DKIM (Optional) -->
-        {#if authentication.x_google_dkim}
-            <div class="list-group-item" id="authentication-x-google-dkim">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.x_google_dkim.result,
-                            false,
-                        )} {getAuthResultClass(
-                            authentication.x_google_dkim.result,
-                            false,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>X-Google-DKIM</strong>
-                        <i
-                            class="bi bi-info-circle text-muted ms-1"
-                            title="Google's internal DKIM signature for messages routed through Gmail infrastructure"
-                        ></i>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.x_google_dkim.result,
-                                false,
-                            )}"
-                        >
-                            {authentication.x_google_dkim.result}
-                        </span>
-                        {#if authentication.x_google_dkim.domain}
-                            <div class="small">
-                                <strong>Domain:</strong>
-                                <span class="text-muted">{authentication.x_google_dkim.domain}</span
-                                >
-                            </div>
-                        {/if}
-                        {#if authentication.x_google_dkim.selector}
-                            <div class="small">
-                                <strong>Selector:</strong>
-                                <span class="text-muted"
-                                    >{authentication.x_google_dkim.selector}</span
-                                >
-                            </div>
-                        {/if}
-                        {#if authentication.x_google_dkim.details}
-                            {@render rawResult(authentication.x_google_dkim.details)}
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {/if}
-
-        <!-- X-Aligned-From (Disabled) -->
-        {#if authentication.x_aligned_from}
-            <div class="list-group-item" id="authentication-x-aligned-from">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.x_aligned_from.result,
-                            false,
-                        )} {getAuthResultClass(
-                            authentication.x_aligned_from.result,
-                            false,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>X-Aligned-From</strong>
-                        <i
-                            class="bi bi-info-circle text-muted ms-1"
-                            title="Check that Mail From and Header From addresses are in alignment. See Domain Alignment section."
-                        ></i>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.x_aligned_from.result,
-                                false,
-                            )}"
-                        >
-                            {authentication.x_aligned_from.result}
-                        </span>
-                        {#if authentication.x_aligned_from.domain}
-                            <div class="small">
-                                <strong>Domain:</strong>
-                                <span class="text-muted"
-                                    >{authentication.x_aligned_from.domain}</span
-                                >
-                            </div>
-                        {/if}
-                        {#if authentication.x_aligned_from.details}
-                            {@render rawResult(authentication.x_aligned_from.details)}
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {/if}
-
-        <!-- DMARC (Required) -->
-        <div class="list-group-item" id="authentication-dmarc">
-            <div class="d-flex align-items-start">
-                {#if authentication.dmarc}
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.dmarc.result,
-                            true,
-                        )} {getAuthResultClass(authentication.dmarc.result, true)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>DMARC</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.dmarc.result,
-                                true,
-                            )}"
-                        >
-                            {authentication.dmarc.result}
-                        </span>
-                        {#if authentication.dmarc.domain}
-                            <div class="small">
-                                <strong>Domain:</strong>
-                                <span class="text-muted">{authentication.dmarc.domain}</span>
-                            </div>
-                        {/if}
-                        {#snippet DMARCPolicy(policy: string)}
-                            <div class="small">
-                                <strong>Policy:</strong>
-                                <span
-                                    class="fw-bold"
-                                    class:text-success={policy == "reject"}
-                                    class:text-warning={policy == "quarantine"}
-                                    class:text-danger={policy == "none"}
-                                    class:bg-warning={policy != "none" &&
-                                        policy != "quarantine" &&
-                                        policy != "reject"}
-                                >
-                                    {policy}
-                                </span>
-                            </div>
-                        {/snippet}
-                        {#if authentication.dmarc.result != "none"}
-                            {#if authentication.dmarc.details && authentication.dmarc.details.indexOf("policy.published-domain-policy=") > 0}
-                                {@const policy = authentication.dmarc.details.replace(
-                                    /^.*policy.published-domain-policy=([^\s]+).*$/,
-                                    "$1",
-                                )}
-                                {@render DMARCPolicy(policy)}
-                            {:else if authentication.dmarc.domain && dnsResults?.dmarc_record?.policy}
-                                {@render DMARCPolicy(dnsResults.dmarc_record.policy)}
-                            {/if}
-                        {/if}
-                        {#if authentication.dmarc.details}
-                            {@render rawResult(authentication.dmarc.details)}
-                        {/if}
-                    </div>
-                {:else}
-                    <i
-                        class="bi {getAuthResultIcon('missing', true)} {getAuthResultClass(
-                            'missing',
-                            true,
-                        )} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>DMARC</strong>
-                        <span class="text-uppercase ms-2 {getAuthResultClass('missing', true)}">
-                            {getAuthResultText("missing")}
-                        </span>
-                        <div class="text-muted small">
-                            DMARC policy is required for proper email authentication
+        <!-- What happened between the sender and the receiver: Google seals what it routes,
+             a list or a forwarder seals what it passes on. Not the sender domain's doing. -->
+        {#if authentication.x_google_dkim || authentication.arc}
+            <CheckList title="In transit">
+                {#if authentication.x_google_dkim}
+                    {@const google = authentication.x_google_dkim}
+                    <CheckCard
+                        id="authentication-x-google-dkim"
+                        title="Google's internal signature"
+                        tag="X-Google-DKIM"
+                        status={verdictStatus(google.result, false)}
+                        summary={verdict(google.result, google.domain)}
+                        docs={[docs.dkim]}
+                        issues={at("x_google_dkim")}
+                    >
+                        <div class="card-body">
+                            <p class="check-about">
+                                Google signs the messages it routes; a signature that no longer
+                                verifies means something changed the message afterwards.
+                            </p>
+                            {@render rawResult(google.details)}
                         </div>
-                    </div>
+                    </CheckCard>
                 {/if}
-            </div>
-        </div>
 
-        <!-- BIMI (Optional) -->
-        <div class="list-group-item" id="authentication-bimi">
-            <div class="d-flex align-items-start">
-                {#if authentication.bimi && authentication.bimi.result != "none"}
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.bimi.result,
-                            false,
-                        )} {getAuthResultClass(authentication.bimi.result, false)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>BIMI</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.bimi.result,
-                                false,
-                            )}"
-                        >
-                            {authentication.bimi.result}
-                        </span>
-                        {#if authentication.bimi.details}
-                            {@render rawResult(authentication.bimi.details)}
-                        {/if}
-                    </div>
-                {:else if authentication.bimi && authentication.bimi.result == "none"}
-                    <i class="bi bi-exclamation-circle-fill text-warning me-2 fs-5"></i>
-                    <div>
-                        <strong>BIMI</strong>
-                        <span class="text-uppercase ms-2 text-warning"> NONE </span>
-                        <div class="text-muted small">
-                            Brand Indicators for Message Identification
+                {#if authentication.arc}
+                    {@const arc = authentication.arc}
+                    <CheckCard
+                        id="authentication-arc"
+                        title="Authenticated Received Chain"
+                        tag="ARC"
+                        status={verdictStatus(arc.result, false)}
+                        summary={arc.chain_length
+                            ? `${arc.result}, chain of ${arc.chain_length}`
+                            : verdict(arc.result)}
+                        docs={[docs.arc]}
+                        issues={at("arc")}
+                    >
+                        <div class="card-body">
+                            <p class="check-about">
+                                The seals of the intermediaries that forwarded the message, vouching
+                                for the authentication results it had when they received it.
+                            </p>
+                            {@render rawResult(arc.details)}
                         </div>
-                        {#if authentication.bimi.details}
-                            {@render rawResult(authentication.bimi.details)}
-                        {/if}
-                    </div>
-                {:else}
-                    <i class="bi bi-info-circle text-muted me-2 fs-5"></i>
-                    <div>
-                        <strong>BIMI</strong>
-                        <span class="text-uppercase ms-2 text-muted"> Optional </span>
-                        <div class="text-muted small">
-                            Brand Indicators for Message Identification (optional enhancement)
-                        </div>
-                    </div>
+                    </CheckCard>
                 {/if}
-            </div>
-        </div>
-
-        <!-- ARC (Optional) -->
-        {#if authentication.arc}
-            <div class="list-group-item" id="authentication-arc">
-                <div class="d-flex align-items-start">
-                    <i
-                        class="bi {getAuthResultIcon(
-                            authentication.arc.result,
-                            false,
-                        )} {getAuthResultClass(authentication.arc.result, false)} me-2 fs-5"
-                    ></i>
-                    <div>
-                        <strong>ARC</strong>
-                        <span
-                            class="text-uppercase ms-2 {getAuthResultClass(
-                                authentication.arc.result,
-                                false,
-                            )}"
-                        >
-                            {authentication.arc.result}
-                        </span>
-                        {#if authentication.arc.chain_length}
-                            <div class="text-muted small">
-                                Chain length: {authentication.arc.chain_length}
-                            </div>
-                        {/if}
-                        {#if authentication.arc.details}
-                            {@render rawResult(authentication.arc.details)}
-                        {/if}
-                    </div>
-                </div>
-            </div>
+            </CheckList>
         {/if}
-    </div>
-    <div class="card-footer">
-        <DocLinks
-            label="Standards:"
-            docs={[docs.spf, docs.dkim, docs.dmarc, docs.arc, docs.bimi, docs.authResults]}
-        />
     </div>
 </ReportSection>
