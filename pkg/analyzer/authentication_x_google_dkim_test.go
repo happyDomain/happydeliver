@@ -101,5 +101,10 @@ func TestCalculateXGoogleDKIMScore(t *testing.T) {
 		if got := a.calculateXGoogleDKIMScore(results); got != want {
 			t.Errorf("calculateXGoogleDKIMScore(%s) = %d, want %d", result, got, want)
 		}
+
+		a.ReportIssues(results, nil, model.ReportSourceUploaded)
+		if issues := *results.Issues.XGoogleDkim; (len(issues) > 0) != (want != 0) {
+			t.Errorf("%s: issues = %v, want one only when it costs points", result, issues)
+		}
 	}
 }
