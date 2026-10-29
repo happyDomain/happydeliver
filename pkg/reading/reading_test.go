@@ -187,6 +187,31 @@ func TestRunChargesEachIssueItsShare(t *testing.T) {
 	}
 }
 
+// TestEvaluateKeepsTheDefectOfEachIssue pins that Evaluate hands back, beside
+// each issue it charged, the defect it was reported as, in the same order.
+func TestEvaluateKeepsTheDefectOfEachIssue(t *testing.T) {
+	family := &Family{Name: "test", Cap: 5}
+	critical := model.IssueSeverityCritical
+
+	evaluation := Evaluate(context.Background(), []Check[message]{
+		reports("noisy", family, critical, critical),
+		reports("reporter", nil, critical),
+	}, message{})
+
+	if len(evaluation.Findings) != len(evaluation.Issues) {
+		t.Fatalf("%d findings for %d issues", len(evaluation.Findings), len(evaluation.Issues))
+	}
+	want := []string{"noisy", "noisy", "reporter"}
+	for i, finding := range evaluation.Findings {
+		if finding.Defect == nil || finding.Defect.Name != want[i] {
+			t.Errorf("finding %d was reported as %v, want %q", i, finding.Defect, want[i])
+		}
+		if *finding.Penalty != *evaluation.Issues[i].Penalty {
+			t.Errorf("finding %d is charged %d point(s), its issue %d", i, *finding.Penalty, *evaluation.Issues[i].Penalty)
+		}
+	}
+}
+
 // TestRunKeepsRegistryOrder pins that findings come out in the order the
 // registry lists the checks: that order is how a reading puts what qualifies
 // the rest first, and what merely remarks last.

@@ -228,6 +228,10 @@ type Evaluation struct {
 	// Issues is what the report shows, in the order the checks were run.
 	Issues []model.Issue
 
+	// Findings are the same issues, each with the defect it was reported as,
+	// so that a report can show each one where its defect belongs.
+	Findings []Finding
+
 	// Penalty is what those findings deduct from the score, each
 	// family already capped.
 	Penalty int
@@ -259,6 +263,12 @@ func saysTheSame(a, b Finding) bool {
 // Findings describing the same defect are merged before anything is charged,
 // so that a defect two checks both saw is reported once and paid for once.
 func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model.Issue, penalty int) {
+	evaluation := Evaluate(ctx, checks, in)
+	return evaluation.Issues, evaluation.Penalty
+}
+
+// Evaluate is Run, keeping the defect each issue was reported as.
+func Evaluate[In any](ctx context.Context, checks []Check[In], in In) (evaluation Evaluation) {
 	type observed struct {
 		finding Finding
 		// source names this observer in another finding's corroborated_by. It
@@ -349,7 +359,8 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 	// penalty, so a reader can tell what fixing each one brings back.
 	charged := make(map[*Family]int, len(checks))
 
-	issues = make([]model.Issue, 0, len(kept))
+	evaluation.Issues = make([]model.Issue, 0, len(kept))
+	evaluation.Findings = make([]Finding, 0, len(kept))
 	for _, o := range kept {
 		issue := o.finding.Issue
 		charge := 0
@@ -373,9 +384,10 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 		}
 
 		issue.Penalty = &charge
-		penalty += charge
-		issues = append(issues, issue)
+		evaluation.Penalty += charge
+		evaluation.Issues = append(evaluation.Issues, issue)
+		evaluation.Findings = append(evaluation.Findings, Finding{Issue: issue, Defect: o.finding.Defect, Concern: o.finding.Concern})
 	}
 
-	return issues, penalty
+	return evaluation
 }
