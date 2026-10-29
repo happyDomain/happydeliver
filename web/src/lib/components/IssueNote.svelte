@@ -4,12 +4,24 @@
 
     interface Props {
         issue: Issue;
+        /**
+         * What was observed, when the note stands for several issues shown on rows below it:
+         * how many rows it is about. Defaults to the issue's own message.
+         */
+        detail?: string;
+        /** What fixing it brings back, when the note stands for several issues. */
+        penalty?: number;
     }
 
-    let { issue }: Props = $props();
-    const penalty = $derived(issue.penalty);
+    // Not a default value of the prop: that one is read once, and the note would keep the
+    // penalty of the issue it was first given.
+    let { issue, detail, penalty: sharedPenalty }: Props = $props();
+    const penalty = $derived(sharedPenalty ?? issue.penalty);
 
     const observer = $derived(issueObserver(issue));
+    const shownDetail = $derived(
+        detail ?? `${issue.message}${observer ? ` (reported by ${observer})` : ""}`,
+    );
 
     // The same tones as the icon of the check the note sits in, so the two read as one.
     const tone = $derived(
@@ -36,7 +48,7 @@
             >
         {/if}
     </div>
-    <div class="small">{issue.message}{observer ? ` (reported by ${observer})` : ""}</div>
+    <div class="small">{shownDetail}</div>
     {#if issue.advice}
         <div class="small mt-1">
             <i class="bi bi-arrow-right-short" aria-hidden="true"></i>

@@ -30,7 +30,7 @@
 
     import type { Issue } from "#lib/api/types.gen.js";
     import { issueDocLinks, type DocLink } from "#lib/docs.js";
-    import { compareBySeverity, type Severity } from "#lib/issues.js";
+    import { compareBySeverity, groupByChange, type Severity } from "#lib/issues.js";
     import { checkListKey } from "./CheckList.svelte";
     import DocLinks from "./DocLinks.svelte";
     import IssueNote from "./IssueNote.svelte";
@@ -61,6 +61,12 @@
          * with what it warns about.
          */
         issues?: Issue[];
+        /**
+         * The issues of the rows the check lists, and what a row is, one and many ("link",
+         * "links"): each row shows its own, and the check one note per change to make,
+         * saying how many rows it is about. They take part in the status as its own do.
+         */
+        rows?: { issues?: Issue[]; one: string; many: string };
         /** Defaults to unfolded when there is something to act on. */
         open?: boolean;
         class?: ClassValue;
@@ -78,6 +84,7 @@
         aside,
         docs,
         issues,
+        rows,
         open,
         class: className = "mb-3",
         children,
@@ -94,10 +101,36 @@
         info: "info",
     };
 
-    const sorted = $derived(issues ? [...issues].sort(compareBySeverity) : []);
+    const graded = $derived(issues !== undefined || rows?.issues !== undefined);
+    const sorted = $derived([...(issues ?? []), ...(rows?.issues ?? [])].sort(compareBySeverity));
+
+    // The check's own issues as they are; those of its rows one per change to make: the same
+    // defect with the same advice is one change, whichever rows it is found on, and the
+    // gravest of them stands for the others.
+    const notes = $derived.by(() => {
+        const own = (issues ?? []).map((issue) => ({
+            issue,
+            detail: undefined as string | undefined,
+            penalty: undefined as number | undefined,
+        }));
+        if (!rows) return own.sort((a, b) => compareBySeverity(a.issue, b.issue));
+
+        const folded = groupByChange(rows.issues ?? []).map((alike) => {
+            const gravest = [...alike].sort(compareBySeverity)[0];
+            return {
+                issue: gravest,
+                detail:
+                    alike.length > 1
+                        ? `On ${alike.length} ${rows.many}, marked below.`
+                        : `On one ${rows.one}, marked below.`,
+                penalty: alike.reduce((sum, issue) => sum + (issue.penalty ?? 0), 0),
+            };
+        });
+        return [...own, ...folded].sort((a, b) => compareBySeverity(a.issue, b.issue));
+    });
 
     const shownStatus = $derived.by<CheckStatus>(() => {
-        if (issues === undefined) return status;
+        if (!graded) return status;
         if (sorted.length > 0) return severityStatus[sorted[0].severity];
         return status === "neutral" || status === "info" ? status : "pass";
     });
@@ -149,10 +182,10 @@
         {/if}
         <i class="bi bi-chevron-down disclosure" aria-hidden="true"></i>
     </summary>
-    {#if sorted.length > 0}
+    {#if notes.length > 0}
         <div class={row ? "check-findings" : "check-findings card-body pb-0"}>
-            {#each sorted as issue, i (i)}
-                <IssueNote {issue} />
+            {#each notes as note, i (i)}
+                <IssueNote issue={note.issue} detail={note.detail} penalty={note.penalty} />
             {/each}
         </div>
     {/if}
