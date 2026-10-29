@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { Issue } from "#lib/api/types.gen.js";
+import type { ContentAnalysis, Issue } from "#lib/api/types.gen.js";
 import {
     adviceAnchorsBySymbol,
     categoryLabel,
     contentIssueAnchor,
+    contentIssues,
+    groupByChange,
     groupIssuesByCategory,
+    isActionable,
     issueLabel,
     issueObserver,
 } from "#lib/issues.js";
@@ -279,5 +282,46 @@ describe("groupIssuesByCategory", () => {
         ]);
 
         expect(groups.map((group) => group.category)).toEqual(["security", undefined]);
+    });
+});
+
+describe("groupByChange", () => {
+    it("takes the same defect with the same advice as one change", () => {
+        const groups = groupByChange([
+            issue({ type: "unreachable_link", advice: "Fix it", location: "a" }),
+            issue({ type: "missing_alt", advice: "Describe it", location: "img" }),
+            issue({ type: "unreachable_link", advice: "Fix it", location: "b" }),
+            issue({ type: "unreachable_link", advice: "Other", location: "c" }),
+        ]);
+
+        expect(groups.map((g) => g.map((i) => i.location))).toEqual([["a", "b"], ["img"], ["c"]]);
+    });
+});
+
+describe("contentIssues", () => {
+    it("reads the checks, then the links and the images, and a report from before them", () => {
+        const all = contentIssues({
+            html_issues: [issue({ location: "legacy" })],
+            issues: { structure: [issue({ location: "structure" })] },
+            links: [
+                {
+                    url: "https://example.com",
+                    status: "valid",
+                    issues: [issue({ location: "link" })],
+                },
+            ],
+            images: [{ has_alt: true, issues: [issue({ location: "image" })] }],
+        } as ContentAnalysis);
+
+        expect(all.map((i) => i.location)).toEqual(["legacy", "structure", "link", "image"]);
+    });
+});
+
+describe("isActionable", () => {
+    it("calls for a change from medium up, and only suggests one below", () => {
+        const actionable = (["critical", "high", "medium", "low", "info"] as const).filter(
+            (severity) => isActionable({ severity }),
+        );
+        expect(actionable).toEqual(["critical", "high", "medium"]);
     });
 });

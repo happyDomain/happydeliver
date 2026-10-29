@@ -1,4 +1,4 @@
-import type { Issue } from "#lib/api/types.gen.js";
+import type { ContentAnalysis, Issue } from "#lib/api/types.gen.js";
 
 /**
  * Readable name for an issue type.
@@ -180,8 +180,17 @@ const severityRank: Record<Issue["severity"], number> = {
     info: 4,
 };
 
+export type Severity = Issue["severity"];
+
 /** Anything the report shows in an alert: a content issue, a header one. */
-type Severe = { severity: Issue["severity"] };
+type Severe = { severity: Severity };
+
+/** Severities that call for a change, as opposed to those that suggest one. */
+export function isActionable(issue: Severe): boolean {
+    return (
+        issue.severity === "critical" || issue.severity === "high" || issue.severity === "medium"
+    );
+}
 
 /**
  * Orders findings gravest first, leaving those the severity does not separate in the order
@@ -193,6 +202,20 @@ export function compareBySeverity(a: Severe, b: Severe): number {
         (severityRank[a.severity] ?? Number.MAX_SAFE_INTEGER) -
         (severityRank[b.severity] ?? Number.MAX_SAFE_INTEGER)
     );
+}
+
+/**
+ * The issues calling for the same change, together, in the order each first appears: the
+ * same defect with the same advice is one change, however many records, links or lists it is
+ * found on.
+ */
+export function groupByChange(issues: Issue[]): Issue[][] {
+    const groups = new Map<string, Issue[]>();
+    for (const issue of issues) {
+        const key = `${issue.type}\n${issue.advice ?? ""}`;
+        groups.set(key, [...(groups.get(key) ?? []), issue]);
+    }
+    return [...groups.values()];
 }
 
 /** One issue together with its position in html_issues, which is what its anchor is made of. */
@@ -269,6 +292,19 @@ export function groupIssuesByCategory(issues?: Issue[]): IssueGroup[] {
  */
 export function issueObserver(issue: Pick<Issue, "source">): string | undefined {
     return !issue.source || issue.source === "self" ? undefined : issue.source;
+}
+
+/**
+ * Every issue of a content analysis: those of its checks, then those of its links and its
+ * images. A report from before the issues were listed by check has them all in html_issues.
+ */
+export function contentIssues(content?: ContentAnalysis): Issue[] {
+    return [
+        ...(content?.html_issues ?? []),
+        ...Object.values(content?.issues ?? {}).flatMap((issues) => issues ?? []),
+        ...(content?.links ?? []).flatMap((link) => link.issues ?? []),
+        ...(content?.images ?? []).flatMap((image) => image.issues ?? []),
+    ];
 }
 
 /**
