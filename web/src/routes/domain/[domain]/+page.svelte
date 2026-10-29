@@ -164,7 +164,7 @@
 
                     <!-- Domain Reputation / Blacklist -->
                     {#if blacklist}
-                        <DomainReputationCard {blacklist} domain={result.domain} />
+                        <DomainReputationCard {blacklist} domain={result.domain} open />
                     {/if}
 
                     <!-- Next Steps -->
