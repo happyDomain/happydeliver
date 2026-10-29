@@ -396,6 +396,8 @@ components:
       $ref: './schemas.yaml#/components/schemas/DNSIssues'
     AuthenticationIssues:
       $ref: './schemas.yaml#/components/schemas/AuthenticationIssues'
+    HeaderIssues:
+      $ref: './schemas.yaml#/components/schemas/HeaderIssues'
     LinkCheck:
       $ref: './schemas.yaml#/components/schemas/LinkCheck'
     ImageCheck:

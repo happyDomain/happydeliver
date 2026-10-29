@@ -520,9 +520,9 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 		}
 
 		// Header Issues
-		if header.Issues != nil && len(*header.Issues) > 0 {
+		if header.Issues != nil && header.Issues.Headers != nil && len(*header.Issues.Headers) > 0 {
 			fmt.Fprintln(writer, "\n  Header Issues:")
-			for _, issue := range *header.Issues {
+			for _, issue := range *header.Issues.Headers {
 				header := ""
 				if issue.Location != nil {
 					header = *issue.Location

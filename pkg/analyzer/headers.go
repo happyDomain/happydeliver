@@ -328,9 +328,8 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *mailmsg.Message, authResu
 	}
 
 	// Header issues
-	issues := h.findHeaderIssues(email)
-	if len(issues) > 0 {
-		analysis.Issues = &issues
+	analysis.Issues = &model.HeaderIssues{
+		Headers: issueList(h.findHeaderIssues(email)),
 	}
 
 	return analysis

@@ -637,10 +637,19 @@ components:
         domain_alignment:
           $ref: '#/components/schemas/DomainAlignment'
         issues:
+          $ref: '#/components/schemas/HeaderIssues'
+
+    HeaderIssues:
+      type: object
+      description: >-
+        What each check of the headers found to change, by the check of the
+        report showing it.
+      properties:
+        headers:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
-          description: Issues found in headers, the header concerned as their location
+          description: About the headers themselves, each located at the header it is about.
 
     HeaderCheck:
       type: object

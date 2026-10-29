@@ -18,7 +18,7 @@
 
     // Gravest first, as in the content card. The alert's colour no longer competes with a
     // badge naming the level, so the order is what tells a reader where to start.
-    const issues = $derived((headerAnalysis.issues ?? []).slice().sort(compareBySeverity));
+    const issues = $derived((headerAnalysis.issues?.headers ?? []).slice().sort(compareBySeverity));
 </script>
 
 <div class="card shadow-sm" id="header-details">
