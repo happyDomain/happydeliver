@@ -437,70 +437,139 @@ func (d *DNSAnalyzer) hasSPFStrictFail(record string) bool {
 	return strings.HasSuffix(record, " -all")
 }
 
-func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model.Issue) {
+	domain := results.FromDomain
+	if results.RpDomain != nil && *results.RpDomain != "" {
+		domain = *results.RpDomain
+	}
+	publish := fmt.Sprintf(`Publish a TXT record on %s listing your sending servers, ending with -all: for instance "v=spf1 include:<your provider> -all".`, domain)
+
+	c := checkScore{score: 100}
+
 	// SPF is essential for email authentication
-	if results.SpfRecords != nil && len(*results.SpfRecords) > 0 {
-		// Find the main SPF record by skipping redirects
-		// Loop through records to find the last redirect or the first non-redirect
-		mainSPFIndex := 0
-		for i := 0; i < len(*results.SpfRecords); i++ {
-			spfRecord := (*results.SpfRecords)[i]
-			if spfRecord.Record != nil && strings.Contains(*spfRecord.Record, "redirect=") {
-				// The redirect target comes right after the record, unless it could
-				// not be fetched or was already visited: the next record is then the
-				// first include, which is no policy for the domain.
-				next := i + 1
-				if next < len(*results.SpfRecords) && (*results.SpfRecords)[next].Domain != nil &&
-					strings.EqualFold(*(*results.SpfRecords)[next].Domain, d.extractSPFRedirect(*spfRecord.Record)) {
-					mainSPFIndex = next
-				} else {
-					break
-				}
+	if results.SpfRecords == nil || len(*results.SpfRecords) == 0 {
+		c.cap(0, newIssue(model.IssueTypeSpfMissing, model.IssueSeverityHigh, domain,
+			fmt.Sprintf("%s publishes no SPF record, so receivers cannot tell which servers may send its mail.", domain),
+			publish))
+		return c.score, c.issues
+	}
+
+	// Find the main SPF record by skipping redirects
+	// Loop through records to find the last redirect or the first non-redirect
+	mainSPFIndex := 0
+	for i := 0; i < len(*results.SpfRecords); i++ {
+		spfRecord := (*results.SpfRecords)[i]
+		if spfRecord.Record != nil && strings.Contains(*spfRecord.Record, "redirect=") {
+			// The redirect target comes right after the record, unless it could
+			// not be fetched or was already visited: the next record is then the
+			// first include, which is no policy for the domain.
+			next := i + 1
+			if next < len(*results.SpfRecords) && (*results.SpfRecords)[next].Domain != nil &&
+				strings.EqualFold(*(*results.SpfRecords)[next].Domain, d.extractSPFRedirect(*spfRecord.Record)) {
+				mainSPFIndex = next
 			} else {
-				// Found a non-redirect record
-				mainSPFIndex = i
 				break
 			}
-		}
-
-		mainSPF := (*results.SpfRecords)[mainSPFIndex]
-		if mainSPF.Valid {
-			// Full points for valid SPF
-			score += 75
-
-			// Check if DMARC is configured with strict policy as all mechanism is less significant
-			dmarcStrict := results.DmarcRecord != nil &&
-				results.DmarcRecord.Valid && results.DmarcRecord.Policy != nil &&
-				(*results.DmarcRecord.Policy == "quarantine" ||
-					*results.DmarcRecord.Policy == "reject")
-
-			// Deduct points based on the all mechanism qualifier
-			if mainSPF.AllQualifier != nil {
-				switch *mainSPF.AllQualifier {
-				case "-":
-					// Strict fail - no deduction, this is the recommended policy
-					score += 25
-				case "~":
-					// Softfail - if DMARC is quarantine or reject, treat it mostly like strict fail
-					if dmarcStrict {
-						score += 20
-					}
-					// Otherwise, moderate penalty (no points added or deducted)
-				case "+", "?":
-					// Pass/neutral - severe penalty
-					if !dmarcStrict {
-						score -= 25
-					}
-				}
-			} else {
-				// No 'all' mechanism qualifier extracted - severe penalty
-				score -= 25
-			}
-		} else if mainSPF.Record != nil {
-			// Partial credit if SPF record exists but has issues
-			score += 25
+		} else {
+			// Found a non-redirect record
+			mainSPFIndex = i
+			break
 		}
 	}
 
-	return
+	mainSPF := (*results.SpfRecords)[mainSPFIndex]
+	if mainSPF.Domain != nil {
+		domain = *mainSPF.Domain
+	}
+
+	if !mainSPF.Valid {
+		reason := "invalid record"
+		if mainSPF.Error != nil {
+			reason = *mainSPF.Error
+		}
+		if mainSPF.Record == nil {
+			message := fmt.Sprintf("%s publishes no SPF record, so receivers cannot tell which servers may send its mail.", domain)
+			if mainSPF.Error != nil && !strings.HasPrefix(*mainSPF.Error, "No SPF record") {
+				message = fmt.Sprintf("The SPF record of %s cannot be read: %s.", domain, reason)
+			}
+			c.cap(0, newIssue(model.IssueTypeSpfMissing, model.IssueSeverityHigh, domain, message, publish))
+		} else {
+			// Partial credit if SPF record exists but has issues
+			c.cap(25, newIssue(model.IssueTypeSpfInvalid, model.IssueSeverityHigh, domain,
+				fmt.Sprintf("The SPF record of %s is invalid: %s.", domain, reason),
+				"Fix the record so that receivers can evaluate it; until then they treat it as a permanent error."))
+		}
+		return c.score, c.issues
+	}
+
+	// Check if DMARC is configured with strict policy as all mechanism is less significant
+	dmarcStrict := results.DmarcRecord != nil &&
+		results.DmarcRecord.Valid && results.DmarcRecord.Policy != nil &&
+		(*results.DmarcRecord.Policy == "quarantine" ||
+			*results.DmarcRecord.Policy == "reject")
+
+	// Deduct points based on the all mechanism qualifier
+	endStrict := "End the record with -all."
+	if mainSPF.AllQualifier == nil {
+		// No 'all' mechanism qualifier extracted - severe penalty
+		c.cap(50, newIssue(model.IssueTypeSpfAllMissing, model.IssueSeverityMedium, domain,
+			fmt.Sprintf("The SPF record of %s ends with no all mechanism, so unlisted servers are neither accepted nor rejected.", domain),
+			endStrict))
+	} else {
+		switch *mainSPF.AllQualifier {
+		case "-":
+			// Strict fail - no deduction, this is the recommended policy
+		case "~":
+			// Softfail - if DMARC is quarantine or reject, treat it mostly like strict fail
+			advice := "End the record with -all once you are sure it lists every server that sends your mail."
+			if dmarcStrict {
+				c.cap(95, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
+					"Mail from unlisted servers only soft-fails; your enforced DMARC policy does most of the rejecting.", advice))
+			} else {
+				c.cap(75, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityMedium, domain,
+					"Mail from unlisted servers only soft-fails, and no enforcing DMARC policy backs it up.", advice))
+			}
+		case "+":
+			// Pass - severe penalty, unless DMARC catches what it lets through
+			message := fmt.Sprintf("The SPF record of %s ends with +all: anyone on the Internet may send mail in its name.", domain)
+			advice := "End the record with -all, after listing the servers that actually send your mail."
+			if dmarcStrict {
+				c.cap(75, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain,
+					message+" Your enforced DMARC policy limits the damage.", advice))
+			} else {
+				c.cap(50, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain, message, advice))
+			}
+		case "?":
+			// Neutral - severe penalty, unless DMARC catches what it lets through
+			message := fmt.Sprintf("The SPF record of %s ends with ?all, so unlisted servers are neither accepted nor rejected.", domain)
+			if dmarcStrict {
+				c.cap(75, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityLow, domain,
+					message+" Your enforced DMARC policy does the rejecting instead.", endStrict))
+			} else {
+				c.cap(50, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityMedium, domain, message, endStrict))
+			}
+		}
+	}
+
+	// An included record that cannot be fetched or parsed makes receivers
+	// fail the whole evaluation with a permerror. The score does not count
+	// it yet; the issue says so rather than staying silent.
+	for i, r := range *results.SpfRecords {
+		if i == mainSPFIndex || r.Valid || (r.Record != nil && strings.Contains(*r.Record, "redirect=")) {
+			continue
+		}
+		included := ""
+		if r.Domain != nil {
+			included = *r.Domain
+		}
+		reason := ""
+		if r.Error != nil {
+			reason = ": " + *r.Error
+		}
+		c.note(newIssue(model.IssueTypeSpfIncludeInvalid, model.IssueSeverityHigh, included,
+			fmt.Sprintf("The SPF record included from %s cannot be evaluated%s. Receivers that cannot follow an include: treat the whole record as a permanent error.", included, reason),
+			fmt.Sprintf("Fix the record of %s, or remove the include: pointing to it.", included)))
+	}
+
+	return c.score, c.issues
 }

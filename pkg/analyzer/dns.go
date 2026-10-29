@@ -308,7 +308,11 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 	score += 30 * mxScore / 100
 
 	// SPF Records: 30 points
-	score += 30 * d.calculateSPFScore(results) / 100
+	spfScore, spfIssues := d.calculateSPFScore(results)
+	score += 30 * spfScore / 100
+	results.Issues = &model.DNSIssues{
+		Spf: weighIssues(spfIssues, 30, 100),
+	}
 
 	// DMARC Record: 40 points
 	score += 40 * d.calculateDMARCScore(results) / 100
@@ -352,15 +356,25 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	// unavailable for uploaded EMLs): when there's no IP to check, exclude it
 	// from the average instead of counting it as a 0/20 failure for
 	// something that was never actually testable.
+	spfScore, spfIssues := d.calculateSPFScore(results)
+	dkimScore, dkimIssues := d.calculateDKIMScore(results)
+
 	weightedScore := 20 * d.calculateMXScore(results)
-	weightedScore += 20 * d.calculateSPFScore(results)
-	weightedScore += 20 * d.calculateDKIMScore(results)
+	weightedScore += 20 * spfScore
+	weightedScore += 20 * dkimScore
 	weightedScore += 20 * d.calculateDMARCScore(results)
 	totalWeight := 80
 
 	if senderIP != "" {
 		weightedScore += 20 * d.calculatePTRScore(results, senderIP)
 		totalWeight += 20
+	}
+
+	// Penalties are counted out of each check's own 100 points; the section
+	// weighs every check the same.
+	results.Issues = &model.DNSIssues{
+		Spf:  weighIssues(spfIssues, 20, totalWeight),
+		Dkim: weighIssues(dkimIssues, 20, totalWeight),
 	}
 
 	score := weightedScore / totalWeight

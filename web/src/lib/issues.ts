@@ -45,6 +45,18 @@ const issueLabels: Record<Issue["type"], string> = {
     missing_header: "Missing required header",
     invalid_message_id: "Malformed Message-ID",
     reply_without_references: "Reply without a thread",
+    spf_missing: "No SPF record",
+    spf_invalid: "Invalid SPF record",
+    spf_include_invalid: "Broken SPF include",
+    spf_all_pass: "SPF authorizes every server",
+    spf_all_neutral: "SPF says nothing about other servers",
+    spf_all_missing: "SPF says nothing about other servers",
+    spf_all_softfail: "SPF only soft-fails other servers",
+    dkim_missing: "Message is not DKIM-signed",
+    dkim_invalid: "Invalid DKIM key",
+    dkim_sha1: "DKIM signs with SHA-1",
+    dkim_key_short: "DKIM key too short",
+    dkim_key_weak: "Weak DKIM key",
 };
 
 export function issueLabel(type: Issue["type"]): string {

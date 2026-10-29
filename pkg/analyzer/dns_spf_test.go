@@ -451,7 +451,7 @@ func TestCheckHeloSPFRecordDoesNotAffectScore(t *testing.T) {
 		},
 	}
 
-	want := analyzer.calculateSPFScore(results)
+	want, _ := analyzer.calculateSPFScore(results)
 
 	for _, heloRecord := range []*model.SPFRecord{
 		{Domain: utils.PtrTo("mail.example.com"), Error: utils.PtrTo("No SPF record found")},
@@ -459,7 +459,7 @@ func TestCheckHeloSPFRecordDoesNotAffectScore(t *testing.T) {
 	} {
 		results.HeloSpfRecord = heloRecord
 
-		if got := analyzer.calculateSPFScore(results); got != want {
+		if got, _ := analyzer.calculateSPFScore(results); got != want {
 			t.Errorf("calculateSPFScore() = %d with a HELO record, want %d", got, want)
 		}
 	}
@@ -578,9 +578,9 @@ func TestSPFScoreTakesNoIncludeForTheRedirectTarget(t *testing.T) {
 	}, nil)
 
 	results := &model.DNSResults{FromDomain: "example.com", SpfRecords: analyzer.checkSPFRecords("example.com")}
-	score := analyzer.calculateSPFScore(results)
+	score, issues := analyzer.calculateSPFScore(results)
 
-	if score == 100 {
-		t.Errorf("score = %d, want the record itself scored, not its include's -all", score)
+	if score == 100 || len(issues) == 0 {
+		t.Errorf("score = %d with issues %v, want the record itself scored, not its include's -all", score, issueTypes(issues))
 	}
 }

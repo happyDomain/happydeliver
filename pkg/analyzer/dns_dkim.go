@@ -189,9 +189,14 @@ func notADKIMRecordError(tags map[string]string) string {
 	return "No DKIM record found (the record at the DKIM location is not a DKIM key record)"
 }
 
-func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (score int) {
+func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (int, []model.Issue) {
+	c := checkScore{score: 100}
+
 	if results.DkimRecords == nil || len(*results.DkimRecords) == 0 {
-		return 0
+		c.cap(0, newIssue(model.IssueTypeDkimMissing, model.IssueSeverityHigh, results.FromDomain,
+			"Without a DKIM signature, DMARC can only rely on SPF, which does not survive forwarding.",
+			"Enable DKIM signing on your mail server or email provider, and publish the public key it gives you in DNS."))
+		return c.score, c.issues
 	}
 
 	hasValid := false
@@ -202,23 +207,41 @@ func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (score int) 
 		}
 	}
 
-	if !hasValid {
-		return 25
+	// A key that cannot be used fails its signature. Only when no other key
+	// works does it cost points: the first one is charged for all of them.
+	for _, dkim := range *results.DkimRecords {
+		if dkim.Valid {
+			continue
+		}
+		where := fmt.Sprintf("%s._domainkey.%s", dkim.Selector, dkim.Domain)
+		reason := "the published key cannot be used"
+		if dkim.Error != nil {
+			reason = *dkim.Error
+		}
+		issue := newIssue(model.IssueTypeDkimInvalid, model.IssueSeverityHigh, where,
+			fmt.Sprintf("The DKIM key at %s is invalid: %s.", where, reason),
+			"Publish the public key your mail server or provider gives you, exactly as given, at that name.")
+		if hasValid {
+			issue.Severity = model.IssueSeverityMedium
+			c.note(issue)
+		} else {
+			c.cap(25, issue)
+		}
 	}
 
-	score = 100
-
 	// Apply security penalties on the best valid record
+	newKey := "Generate a 2048-bit key under a new selector, publish it, switch your signer to it, then remove the old one."
 	for _, dkim := range *results.DkimRecords {
 		if !dkim.Valid {
 			continue
 		}
+		where := fmt.Sprintf("%s._domainkey.%s", dkim.Selector, dkim.Domain)
 
 		// SHA-1 signing is deprecated (RFC 8301)
 		if dkim.SigningAlgorithm != nil && strings.HasSuffix(*dkim.SigningAlgorithm, "-sha1") {
-			if score > 60 {
-				score = 60
-			}
+			c.cap(60, newIssue(model.IssueTypeDkimSha1, model.IssueSeverityMedium, where,
+				fmt.Sprintf("The signature for %s uses %s, which signers must no longer use.", where, *dkim.SigningAlgorithm),
+				"Switch your signer to rsa-sha256 (or ed25519-sha256)."))
 		}
 
 		// Key size penalties apply only to RSA
@@ -226,22 +249,20 @@ func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (score int) 
 		if dkim.KeyType != nil {
 			keyType = strings.ToLower(*dkim.KeyType)
 		}
-		if keyType == "rsa" || keyType == "" {
-			if dkim.KeySize != nil {
-				switch {
-				case *dkim.KeySize < 1024:
-					if score > 25 {
-						score = 25
-					}
-				case *dkim.KeySize < 2048:
-					if score > 75 {
-						score = 75
-					}
-				}
+		if (keyType == "rsa" || keyType == "") && dkim.KeySize != nil {
+			switch {
+			case *dkim.KeySize < 1024:
+				c.cap(25, newIssue(model.IssueTypeDkimKeyShort, model.IssueSeverityHigh, where,
+					fmt.Sprintf("%s publishes a %d-bit RSA key. Receivers must ignore signatures made with keys under 1024 bits.", where, *dkim.KeySize),
+					newKey))
+			case *dkim.KeySize < 2048:
+				c.cap(75, newIssue(model.IssueTypeDkimKeyWeak, model.IssueSeverityMedium, where,
+					fmt.Sprintf("%s publishes a %d-bit RSA key. Signers should use at least 2048 bits.", where, *dkim.KeySize),
+					newKey))
 			}
 		}
 		// Ed25519 keys (256-bit curve, ~3000-bit RSA equivalent) need no penalty.
 	}
 
-	return
+	return c.score, c.issues
 }

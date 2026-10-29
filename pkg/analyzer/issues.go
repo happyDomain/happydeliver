@@ -25,6 +25,47 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 )
 
+// checkScore is the score of one check, out of 100, along with the issues
+// that cost it points. Each issue is charged what it actually took from the
+// score when it was found, so a cap another issue already reached costs
+// nothing more, and the penalties always add up to what the check lost.
+type checkScore struct {
+	score  int
+	issues []model.Issue
+}
+
+// cap lowers the score to max, charging the difference to the issue.
+func (c *checkScore) cap(max int, issue model.Issue) {
+	penalty := 0
+	if c.score > max {
+		penalty = c.score - max
+		c.score = max
+	}
+	issue.Penalty = &penalty
+	c.issues = append(c.issues, issue)
+}
+
+// note records an issue that costs the check nothing.
+func (c *checkScore) note(issue model.Issue) {
+	penalty := 0
+	issue.Penalty = &penalty
+	c.issues = append(c.issues, issue)
+}
+
+// weighIssues turns penalties counted out of a check's own 100 points into
+// points of the section score, of which the check makes weight out of total.
+// The list, empty when the check found nothing, is always there: it is what
+// tells a reader the check was scored.
+func weighIssues(issues []model.Issue, weight, total int) *[]model.Issue {
+	weighed := make([]model.Issue, len(issues))
+	for i, issue := range issues {
+		penalty := (*issue.Penalty*weight + total/2) / total
+		issue.Penalty = &penalty
+		weighed[i] = issue
+	}
+	return &weighed
+}
+
 // newIssue builds an issue the analyser found reading the message or the
 // records of its sender, filed under deliverability.
 func newIssue(issueType model.IssueType, severity model.IssueSeverity, location, message, advice string) model.Issue {

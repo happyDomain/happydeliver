@@ -318,15 +318,17 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references]
+          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
             message, those from malware_detected to scan_skipped off what it
-            carries alongside, and those from missing_header on off its
-            headers. attachment_risk predates the attachment reading
-            and is kept for the reports that already carry it; a finding about
-            an attachment now names what is wrong with it.
+            carries alongside, those from missing_header to
+            reply_without_references off its headers, and those from
+            spf_missing on off the DNS records of its sender. attachment_risk
+            predates the attachment reading and is kept for the reports that
+            already carry it; a finding about an attachment now names what is
+            wrong with it.
           example: "missing_alt"
         category:
           type: string
@@ -1132,6 +1134,26 @@ components:
           items:
             type: string
           description: DNS lookup errors
+        issues:
+          $ref: '#/components/schemas/DNSIssues'
+
+    DNSIssues:
+      type: object
+      description: >-
+        What each check found to change, by check, each reported by the
+        scoring that charged it, so an issue and the points it costs cannot
+        drift apart.
+      properties:
+        spf:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the SPF policy of the envelope sender domain.
+        dkim:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the DKIM keys the message's signatures point to.
 
     SenderDomainInfo:
       type: object

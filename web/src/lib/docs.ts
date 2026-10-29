@@ -160,6 +160,18 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     homograph_url: [docs.confusables],
     invalid_message_id: [docs.messageId],
     reply_without_references: [docs.messageId],
+    spf_missing: [docs.spf, docs.googleSenders],
+    spf_invalid: [docs.spf],
+    spf_include_invalid: [docs.spf, docs.spfLookupLimit],
+    spf_all_pass: [docs.spfAll],
+    spf_all_neutral: [docs.spfAll],
+    spf_all_missing: [docs.spfAll],
+    spf_all_softfail: [docs.spfAll],
+    dkim_missing: [docs.dkim, docs.googleSenders],
+    dkim_invalid: [docs.dkim],
+    dkim_sha1: [docs.dkimKeySize],
+    dkim_key_short: [docs.dkimKeySize],
+    dkim_key_weak: [docs.dkimKeySize],
 };
 
 export function issueDocLinks(type: string): DocLink[] {
