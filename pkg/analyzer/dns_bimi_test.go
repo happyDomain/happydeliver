@@ -368,3 +368,82 @@ func TestAnalyzeBIMIOnly(t *testing.T) {
 		}
 	})
 }
+
+func TestBIMIRecordIssues(t *testing.T) {
+	record := &model.BIMIRecord{
+		Selector:    "default",
+		Domain:      "example.com",
+		Record:      utils.PtrTo("v=BIMI1; l=https://example.com/logo.svg"),
+		RecordValid: utils.PtrTo(true),
+		Checks: &[]model.BIMICheck{
+			{Name: "dmarc_enforcement", Description: "DMARC enforcement", Status: model.BIMICheckStatusFail,
+				Messages: &[]model.BIMICheckMessage{{Severity: model.BIMICheckMessageSeverityError, Text: "p=none is not enforcement"}}},
+			{Name: "logo_svg_tiny_ps", Description: "Logo SVG Tiny Portable/Secure profile", Status: model.BIMICheckStatusFail,
+				Messages: &[]model.BIMICheckMessage{{Severity: model.BIMICheckMessageSeverityError, Text: "script element found"}}},
+			{Name: "vmc", Description: "Mark certificate", Status: model.BIMICheckStatusWarning},
+		},
+	}
+
+	issues := bimiIssues(record, nil, "example.com")
+
+	want := []model.IssueType{model.IssueTypeBimiDmarcNotEnforced, model.IssueTypeBimiUnverified, model.IssueTypeBimiVmcMissing}
+	if got := issueTypes(issues); len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("types = %v, want %v", got, want)
+	}
+	if *issues[1].Advice != "Convert the logo to the SVG Tiny Portable/Secure profile." {
+		t.Errorf("advice = %q", *issues[1].Advice)
+	}
+	if penalties(issues) != 0 {
+		t.Errorf("BIMI issues cost %d DNS points, want none", penalties(issues))
+	}
+
+	// No record: offered once DMARC is enforced, and only then
+	empty := &model.BIMIRecord{Selector: "default", Domain: "example.com"}
+	if got := issueTypes(bimiIssues(empty, &model.DMARCRecord{Valid: true, Policy: utils.PtrTo(model.DMARCRecordPolicy("reject"))}, "example.com")); len(got) != 1 || got[0] != model.IssueTypeBimiMissing {
+		t.Errorf("types = %v, want bimi_missing", got)
+	}
+	if got := bimiIssues(empty, nil, "example.com"); len(got) != 0 {
+		t.Errorf("issues = %v, want none before DMARC is enforced", got)
+	}
+}
+
+// A record that does not parse is told as such, and nothing of its checks.
+func TestBIMIRecordIssuesOfAnUnparsableRecord(t *testing.T) {
+	record := &model.BIMIRecord{
+		Selector: "default", Domain: "example.com",
+		Record: utils.PtrTo("v=BIMI1; l"), RecordValid: utils.PtrTo(false),
+		Checks: &[]model.BIMICheck{{Name: "logo_fetch", Status: model.BIMICheckStatusFail}},
+	}
+	if got := issueTypes(bimiIssues(record, nil, "example.com")); len(got) != 1 || got[0] != model.IssueTypeBimiInvalid {
+		t.Errorf("types = %v, want bimi_invalid alone", got)
+	}
+}
+
+// A warning of a check is told as a suggestion quoting the check.
+func TestBIMIRecordIssuesOfACheckWarning(t *testing.T) {
+	record := &model.BIMIRecord{
+		Selector: "default", Domain: "example.com",
+		Record: utils.PtrTo("v=BIMI1; l=https://example.com/logo.svg"), RecordValid: utils.PtrTo(true), Valid: true,
+		Checks: &[]model.BIMICheck{{Name: "logo_fetch", Description: "Logo fetch", Status: model.BIMICheckStatusWarning,
+			Messages: &[]model.BIMICheckMessage{{Severity: model.BIMICheckMessageSeverityWarning, Text: "served as text/xml"}}}},
+	}
+	issues := bimiIssues(record, nil, "example.com")
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeBimiCheckWarning || issues[0].Message != "Logo fetch: served as text/xml" {
+		t.Errorf("issues = %v, want one bimi_check_warning quoting the check", issues)
+	}
+}
+
+// A published certificate with a reservation is not reported as missing.
+func TestBIMIRecordIssuesOfAPublishedCertificateWarning(t *testing.T) {
+	record := &model.BIMIRecord{
+		Selector: "default", Domain: "example.com",
+		Record: utils.PtrTo("v=BIMI1; l=https://example.com/logo.svg; a=https://example.com/vmc.pem"), RecordValid: utils.PtrTo(true), Valid: true,
+		VmcUrl: utils.PtrTo("https://example.com/vmc.pem"), Vmc: &model.VMCInfo{Valid: true},
+		Checks: &[]model.BIMICheck{{Name: "vmc", Description: "Verified Mark Certificate", Status: model.BIMICheckStatusWarning,
+			Messages: &[]model.BIMICheckMessage{{Severity: model.BIMICheckMessageSeverityWarning, Text: "VMC served with Content-Type \"application/x-x509-ca-cert\""}}}},
+	}
+	issues := bimiIssues(record, nil, "example.com")
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeBimiCheckWarning {
+		t.Errorf("issues = %v, want one bimi_check_warning", issues)
+	}
+}

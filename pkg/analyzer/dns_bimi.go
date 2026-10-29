@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -212,4 +213,171 @@ func bimiVMCToModel(v *bimi.VMCInfo) *model.VMCInfo {
 		m.SanDomains = utils.PtrTo(v.SanDomains)
 	}
 	return m
+}
+
+// bimiCheckFixes is what to change for each BIMI check that fails, by the
+// check's name.
+var bimiCheckFixes = map[string]string{
+	"record_tags":      "fix the tags of the record",
+	"logo_fetch":       "serve the logo over HTTPS at the l= URL, as image/svg+xml",
+	"logo_xml":         "make the logo a well-formed SVG file",
+	"logo_svg_tiny_ps": "convert the logo to the SVG Tiny Portable/Secure profile",
+	"vmc":              "check the mark certificate published at the a= URL",
+}
+
+// dmarcEnforced tells whether a DMARC record is at enforcement, which BIMI
+// requires before anything else.
+func dmarcEnforced(dmarc *model.DMARCRecord) bool {
+	return dmarc != nil && dmarc.Valid && dmarc.Policy != nil &&
+		(*dmarc.Policy == "quarantine" || *dmarc.Policy == "reject")
+}
+
+// bimiLocation is the name a BIMI record is published under.
+func bimiLocation(record *model.BIMIRecord, domain string) string {
+	selector := "default"
+	if record != nil {
+		if record.Selector != "" {
+			selector = record.Selector
+		}
+		if record.Domain != "" {
+			domain = record.Domain
+		}
+	}
+	return fmt.Sprintf("%s._bimi.%s", selector, domain)
+}
+
+// bimiCheckMessages is what a check of the record says at the given severity.
+func bimiCheckMessages(check model.BIMICheck, severity model.BIMICheckMessageSeverity) (texts []string) {
+	if check.Messages != nil {
+		for _, m := range *check.Messages {
+			if m.Severity == severity {
+				texts = append(texts, m.Text)
+			}
+		}
+	}
+	return
+}
+
+// bimiIssues is what the BIMI record of the From domain calls for, read off
+// the checks run on it. BIMI is optional, so all of it costs nothing here: a
+// published record says what keeps it from being displayed, and a domain
+// without one is offered it once its DMARC policy is enforced, which BIMI
+// requires.
+func bimiIssues(record *model.BIMIRecord, dmarc *model.DMARCRecord, domain string) []model.Issue {
+	if record == nil {
+		return nil
+	}
+	c := checkScore{score: 100}
+	if record.Record != nil {
+		for _, issue := range bimiRecordIssues(record, domain) {
+			c.note(issue)
+		}
+	} else if dmarcEnforced(dmarc) {
+		c.note(bimiMissingIssue(record, domain))
+	}
+	if c.issues == nil {
+		return []model.Issue{}
+	}
+	return c.issues
+}
+
+// bimiMissingIssue offers BIMI to a domain whose DMARC policy is enforced.
+func bimiMissingIssue(record *model.BIMIRecord, domain string) model.Issue {
+	if record != nil && record.Domain != "" {
+		domain = record.Domain
+	}
+	return newIssue(model.IssueTypeBimiMissing, model.IssueSeverityLow, bimiLocation(record, domain),
+		"Your DMARC policy is enforced, which is what BIMI requires: supporting mailboxes could display your brand logo next to your messages. The authentication score counts BIMI.",
+		fmt.Sprintf(`Publish a BIMI record at %s pointing to your logo in SVG Tiny PS format. If you do not want a logo, publish "v=BIMI1; l=; a=" instead to decline explicitly: it also keeps mail clients from falling back to a parent domain's record, and earns most of the points.`, bimiLocation(record, domain)))
+}
+
+// bimiRecordIssues is what a published BIMI record calls for, each issue
+// uncharged: what keeps it from being displayed, the record that cannot be
+// read, the checks that fail, and those that pass with a reservation.
+func bimiRecordIssues(record *model.BIMIRecord, domain string) (issues []model.Issue) {
+	if record == nil || record.Record == nil {
+		return nil
+	}
+	location := bimiLocation(record, domain)
+	var checks []model.BIMICheck
+	if record.Checks != nil {
+		checks = *record.Checks
+	}
+
+	for _, check := range checks {
+		if check.Name == "dmarc_enforcement" && check.Status == model.BIMICheckStatusFail {
+			message := strings.TrimSpace("Receivers only consider BIMI once the DMARC policy is at enforcement, however compliant the record and the logo are. " + strings.Join(bimiCheckMessages(check, model.BIMICheckMessageSeverityError), " "))
+			issues = append(issues, newIssue(model.IssueTypeBimiDmarcNotEnforced, model.IssueSeverityLow, location, message,
+				"Move the DMARC policy to p=quarantine or p=reject, with no pct= below 100 and no t=y."))
+		}
+	}
+
+	if record.RecordValid != nil && !*record.RecordValid {
+		message := "Receivers cannot parse the BIMI record and ignore it."
+		if record.Error != nil {
+			message = *record.Error
+		}
+		return append(issues, newIssue(model.IssueTypeBimiInvalid, model.IssueSeverityLow, location, message,
+			`Fix the syntax of the record: "v=BIMI1; l=<logo URL>; a=<certificate URL>".`))
+	}
+
+	var failed, fixes []string
+	for _, check := range checks {
+		if check.Status != model.BIMICheckStatusFail || check.Name == "dmarc_enforcement" {
+			continue
+		}
+		what := check.Description
+		if what == "" {
+			what = check.Name
+		}
+		failed = append(failed, strings.Join(append([]string{what}, bimiCheckMessages(check, model.BIMICheckMessageSeverityError)...), ": "))
+		if fix, ok := bimiCheckFixes[check.Name]; ok {
+			fixes = append(fixes, fix)
+		}
+	}
+	if len(failed) > 0 || !record.Valid {
+		message := strings.Join(failed, " ")
+		if message == "" && record.Error != nil {
+			message = *record.Error
+		}
+		if message == "" {
+			message = "The BIMI record or its assets did not validate."
+		}
+		advice := "Check the detailed BIMI checks below."
+		if len(fixes) > 0 {
+			advice = strings.Join(fixes, "; ") + "."
+			advice = strings.ToUpper(advice[:1]) + advice[1:]
+		}
+		issues = append(issues, newIssue(model.IssueTypeBimiUnverified, model.IssueSeverityLow, location, message, advice))
+	}
+
+	for _, check := range checks {
+		if check.Status != model.BIMICheckStatusWarning {
+			continue
+		}
+		message := strings.Join(bimiCheckMessages(check, model.BIMICheckMessageSeverityWarning), " ")
+		// A certificate that was fetched and parsed is not a missing one:
+		// whatever the warning says (a Content-Type, an expiry close by),
+		// it is a reservation about that certificate, reported as such.
+		if check.Name == "vmc" && record.Vmc == nil && record.VmcUrl == nil {
+			if message == "" {
+				message = "No mark certificate vouches for the logo, and most mailbox providers only display one that has it."
+			}
+			issues = append(issues, newIssue(model.IssueTypeBimiVmcMissing, model.IssueSeverityLow, location, message,
+				"Obtain a Verified or Common Mark Certificate for the logo and publish its URL in a=."))
+			continue
+		}
+		what := check.Description
+		if what == "" {
+			what = check.Name
+		}
+		if message == "" {
+			message = fmt.Sprintf("%s has a reservation.", what)
+		} else {
+			message = fmt.Sprintf("%s: %s", what, message)
+		}
+		issues = append(issues, newIssue(model.IssueTypeBimiCheckWarning, model.IssueSeverityLow, check.Name, message, ""))
+	}
+
+	return issues
 }

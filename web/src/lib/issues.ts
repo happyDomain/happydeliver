@@ -81,6 +81,12 @@ const issueLabels: Record<Issue["type"], string> = {
     domain_lapsing: "Domain is being deleted",
     domain_expiring: "Domain expires soon",
     domain_young: "Domain was registered recently",
+    bimi_missing: "No BIMI record",
+    bimi_dmarc_not_enforced: "BIMI logo will not be displayed: DMARC is not enforced",
+    bimi_invalid: "BIMI record is invalid",
+    bimi_unverified: "BIMI is published but does not validate",
+    bimi_vmc_missing: "No mark certificate vouches for the BIMI logo",
+    bimi_check_warning: "A BIMI check has a reservation",
 };
 
 export function issueLabel(type: Issue["type"]): string {

@@ -261,12 +261,15 @@ func (d *DNSAnalyzer) AnalyzeBIMIOnly(domain, selector, localPart string) (*mode
 	return d.checkBIMIRecord(domain, selector, localPart, dmarc), dmarc
 }
 
-// DMARCIssues is what the DMARC record of domain calls for changing, outside
-// of any test: nothing is scored, so each issue costs points of the DMARC
-// check itself.
-func (d *DNSAnalyzer) DMARCIssues(domain string, dmarc *model.DMARCRecord) *model.DNSIssues {
+// BIMIOnlyIssues is what the BIMI and DMARC records of domain call for
+// changing, outside of any test: nothing is scored, so each issue costs points
+// of its check itself.
+func (d *DNSAnalyzer) BIMIOnlyIssues(domain string, bimiRecord *model.BIMIRecord, dmarc *model.DMARCRecord) *model.DNSIssues {
 	_, issues := d.calculateDMARCScore(&model.DNSResults{FromDomain: domain, DmarcRecord: dmarc})
-	return &model.DNSIssues{Dmarc: issueList(issues)}
+	return &model.DNSIssues{
+		Dmarc: issueList(issues),
+		Bimi:  optionalIssueList(bimiIssues(bimiRecord, dmarc, domain)),
+	}
 }
 
 // AnalyzeDomainOnly performs DNS validation for a domain without email context
@@ -328,6 +331,7 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 		Dmarc:  weighIssues(dmarcIssues, 40, 100),
 	}
 	d.addSectionIssues(results, mxRP, 30, 100)
+	results.Issues.Bimi = optionalIssueList(bimiIssues(results.BimiRecord, results.DmarcRecord, results.FromDomain))
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
@@ -405,6 +409,7 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		results.Issues.HeloPtr = issueList(issuesOfType(*ptr, model.IssueTypeHeloPtrMismatch))
 	}
 	d.addSectionIssues(results, mxRP, 20, totalWeight)
+	results.Issues.Bimi = optionalIssueList(bimiIssues(results.BimiRecord, results.DmarcRecord, results.FromDomain))
 
 	score := weightedScore / totalWeight
 
@@ -469,6 +474,15 @@ func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.I
 func issueList(issues []model.Issue) *[]model.Issue {
 	if issues == nil {
 		return &[]model.Issue{}
+	}
+	return &issues
+}
+
+// optionalIssueList is the list of a check that may not have run: nil when
+// it did not.
+func optionalIssueList(issues []model.Issue) *[]model.Issue {
+	if issues == nil {
+		return nil
 	}
 	return &issues
 }

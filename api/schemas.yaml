@@ -318,15 +318,16 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young]
+          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young, bimi_missing, bimi_dmarc_not_enforced, bimi_invalid, bimi_unverified, bimi_vmc_missing, bimi_check_warning]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
             message, those from malware_detected to scan_skipped off what it
             carries alongside, those from missing_header to
-            reply_without_references off its headers, and those from
-            spf_missing on off the DNS records of its sender and what is known
-            of its domains. attachment_risk
+            reply_without_references off its headers, those from spf_missing
+            to domain_young off the DNS records of its sender and what is
+            known of its domains, and those from bimi_missing on off its BIMI
+            record. attachment_risk
             predates the attachment reading and is kept for the reports that
             already carry it; a finding about an attachment now names what is
             wrong with it.
@@ -1155,6 +1156,11 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
           description: About where bounces to a Return-Path domain other than the From domain go.
+        bimi:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the BIMI record of the From domain. Never charged, the DNS score does not count BIMI.
         spf:
           type: array
           items:
@@ -1900,7 +1906,7 @@ components:
           description: The DMARC record of the same domain. BIMI section 7.1 makes an enforcing policy a precondition of Indicator display, so the record is reported alongside rather than left for a separate lookup.
         issues:
           $ref: '#/components/schemas/DNSIssues'
-          description: What the DMARC record calls for changing, under dmarc. Nothing is scored here, so each issue costs points of the DMARC check itself, out of 100.
+          description: What the DMARC record calls for changing, under dmarc, and the BIMI record under bimi. Nothing is scored here, so each issue costs points of the DMARC check itself, out of 100.
 
     BlacklistCheckRequest:
       type: object

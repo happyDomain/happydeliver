@@ -191,6 +191,12 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     ptr_multiple: [docs.reverseDns],
     fcrdns_mismatch: [docs.reverseDns, docs.googleSenders],
     helo_ptr_mismatch: [docs.ehlo],
+    bimi_missing: [docs.bimi, docs.bimiGroup],
+    bimi_dmarc_not_enforced: [docs.bimi, docs.dmarcPolicy],
+    bimi_invalid: [docs.bimi, docs.bimiGroup],
+    bimi_unverified: [docs.bimi, docs.bimiGroup],
+    bimi_vmc_missing: [docs.bimi, docs.bimiGroup],
+    bimi_check_warning: [docs.bimi, docs.bimiGroup],
 };
 
 export function issueDocLinks(type: string): DocLink[] {
