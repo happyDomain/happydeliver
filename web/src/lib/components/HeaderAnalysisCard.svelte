@@ -109,6 +109,7 @@
                         message={issue.message}
                         advice={issue.advice}
                         docs={headerDocLinks(issue.location ?? "")}
+                        penalty={issue.penalty}
                     />
                 {/each}
             </div>
@@ -146,6 +147,7 @@
                             location={issue.location}
                             advice={issue.advice}
                             docs={issueDocLinks(issue.type)}
+                            penalty={issue.penalty}
                         />
                     {/each}
                 </div>

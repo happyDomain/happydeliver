@@ -113,6 +113,7 @@
                             symbol={placed.issue.symbol}
                             corroboratedBy={placed.issue.corroborated_by}
                             docs={issueDocLinks(placed.issue.type)}
+                            penalty={placed.issue.penalty}
                         />
                     {/each}
                 {/each}

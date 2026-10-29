@@ -26,6 +26,8 @@
         corroboratedBy?: string[];
         /** Where the standard the finding refers to is written down. */
         docs?: DocLink[];
+        /** Points it cost the score it was weighed in, when it was weighed on its own. */
+        penalty?: number;
     }
 
     let {
@@ -39,6 +41,7 @@
         symbol,
         corroboratedBy,
         docs,
+        penalty,
     }: Props = $props();
 
     // The colour is the whole of what severity says here: critical and high both mean the
@@ -55,6 +58,11 @@
 
 <div {id} class="alert alert-{alertClass} py-2 px-3 mb-2">
     <div>
+        {#if penalty}
+            <span class="float-end small text-body-secondary ms-2" title="Points of the score"
+                >−{penalty} pts</span
+            >
+        {/if}
         <strong>{title}</strong>
         {#if observer}
             <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1 fw-normal">

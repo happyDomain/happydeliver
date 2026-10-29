@@ -7,6 +7,7 @@
     }
 
     let { issue }: Props = $props();
+    const penalty = $derived(issue.penalty);
 
     const observer = $derived(issueObserver(issue));
 
@@ -26,7 +27,15 @@
     class="issue-note border-start border-3 border-{tone} rounded-end py-2 px-3 mb-3"
     style:--note-rgb="var(--bs-{tone}-rgb)"
 >
-    <div class="fw-semibold text-{tone}-emphasis">{issueLabel(issue.type)}</div>
+    <div class="d-flex flex-wrap align-items-baseline column-gap-2">
+        <span class="fw-semibold text-{tone}-emphasis">{issueLabel(issue.type)}</span>
+        {#if penalty}
+            <!-- What fixing it alone brings back, in points of the section score -->
+            <span class="small text-body-secondary text-nowrap" title="Points of the section score"
+                >−{penalty} pts</span
+            >
+        {/if}
+    </div>
     <div class="small">{issue.message}{observer ? ` (reported by ${observer})` : ""}</div>
     {#if issue.advice}
         <div class="small mt-1">
