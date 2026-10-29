@@ -81,3 +81,25 @@ func TestParseXGoogleDKIMResult(t *testing.T) {
 		})
 	}
 }
+
+// Only a signature that fails or cannot be evaluated costs points: Google
+// reporting nothing about its own signature says nothing of the message.
+func TestCalculateXGoogleDKIMScore(t *testing.T) {
+	a := NewAuthenticationAnalyzer("")
+	for result, want := range map[model.AuthResultResult]int{
+		model.AuthResultResultPass:      0,
+		model.AuthResultResultFail:      -100,
+		model.AuthResultResultPermerror: -100,
+		model.AuthResultResultNone:      0,
+		model.AuthResultResultNeutral:   0,
+		model.AuthResultResultTemperror: 0,
+	} {
+		results := &model.AuthenticationResults{
+			Spf:         &model.AuthResult{Result: model.AuthResultResultPass},
+			XGoogleDkim: &model.AuthResult{Result: result},
+		}
+		if got := a.calculateXGoogleDKIMScore(results); got != want {
+			t.Errorf("calculateXGoogleDKIMScore(%s) = %d, want %d", result, got, want)
+		}
+	}
+}

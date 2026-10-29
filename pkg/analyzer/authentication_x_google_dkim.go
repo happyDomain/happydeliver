@@ -48,12 +48,13 @@ func (a *AuthenticationAnalyzer) parseXGoogleDKIMResult(method authresults.Metho
 	return result
 }
 
+// calculateXGoogleDKIMScore only takes points off: for a signature Google
+// made that no longer verifies, or cannot be evaluated at all. Any other
+// verdict (none, neutral, a temporary error) says nothing of the message.
 func (a *AuthenticationAnalyzer) calculateXGoogleDKIMScore(results *model.AuthenticationResults) (score int) {
 	if results.XGoogleDkim != nil {
 		switch results.XGoogleDkim.Result {
-		case model.AuthResultResultPass:
-			// pass: don't alter the score
-		default: // fail
+		case model.AuthResultResultFail, model.AuthResultResultPermerror:
 			return -100
 		}
 	}
