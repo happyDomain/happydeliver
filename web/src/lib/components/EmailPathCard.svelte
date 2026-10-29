@@ -1,11 +1,14 @@
 <script lang="ts">
     import type { ReceivedHop } from "#lib/api/types.gen.js";
+    import ReportSection from "./ReportSection.svelte";
 
     interface Props {
         receivedChain: ReceivedHop[];
+        /** The path is context, not a grade: folded unless asked otherwise. */
+        open?: boolean;
     }
 
-    let { receivedChain }: Props = $props();
+    let { receivedChain, open = false }: Props = $props();
 
     // Hops above the inbound one are the recipient's own. -1 when the backend
     // flagged none, which marks nothing.
@@ -25,16 +28,22 @@
         if (!withProto) return false;
         return withProto.trim().toUpperCase().endsWith("A");
     }
+
+    // What the folded header says: how many relays the message crossed, and how many of the
+    // connections are known to have been encrypted.
+    const encrypted = $derived(
+        receivedChain.filter((hop) => hop.tls || protocolIndicatesTLS(hop.with)).length,
+    );
+
+    const pathStatus = $derived({
+        label: `${receivedChain.length} hop${receivedChain.length > 1 ? "s" : ""}, ${encrypted} with TLS`,
+        tone: "muted" as const,
+        needsAttention: false,
+    });
 </script>
 
 {#if receivedChain && receivedChain.length > 0}
-    <div class="card shadow-sm" id="email-path">
-        <div class="card-header">
-            <h4 class="mb-0">
-                <i class="bi bi-pin-map me-2"></i>
-                Email Path
-            </h4>
-        </div>
+    <ReportSection id="email-path" title="Email Path" icon="pin-map" status={pathStatus} {open}>
         <div class="list-group list-group-flush">
             {#each receivedChain as hop, i (i)}
                 <div class="list-group-item" class:bg-light={i < entryIndex}>
@@ -137,5 +146,5 @@
                 </div>
             {/each}
         </div>
-    </div>
+    </ReportSection>
 {/if}

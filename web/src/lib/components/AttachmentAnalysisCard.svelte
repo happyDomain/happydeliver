@@ -6,17 +6,26 @@
         issueLabel,
         issueObserver,
     } from "#lib/issues.js";
-    import { getScoreColorClass } from "#lib/score.js";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import { issueDocLinks } from "#lib/docs.js";
+    import type { SectionStatus } from "#lib/sections.js";
     import IssueAlert from "./IssueAlert.svelte";
+    import ReportSection from "./ReportSection.svelte";
 
     interface Props {
         attachmentAnalysis: AttachmentAnalysis;
         attachmentsGrade?: string;
         attachmentsScore?: number;
+        status?: SectionStatus;
+        open?: boolean;
     }
 
-    let { attachmentAnalysis, attachmentsGrade, attachmentsScore }: Props = $props();
+    let {
+        attachmentAnalysis,
+        attachmentsGrade,
+        attachmentsScore,
+        status,
+        open = true,
+    }: Props = $props();
 
     function formatSize(size: number): string {
         if (size < 1024) return `${size} B`;
@@ -74,25 +83,18 @@
     }
 </script>
 
-<div class="card shadow-sm" id="attachment-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-paperclip me-2"></i>
-                Attachment Analysis
-            </span>
-            {#if attachmentsGrade}
-                <span>
-                    {#if attachmentsScore !== undefined}
-                        <span class="badge bg-{getScoreColorClass(attachmentsScore)}">
-                            {attachmentsScore}%
-                        </span>
-                    {/if}
-                    <GradeDisplay grade={attachmentsGrade} size="small" />
-                </span>
-            {/if}
-        </h4>
-    </div>
+<ReportSection
+    id="attachment-details"
+    title="Attachment Analysis"
+    icon="paperclip"
+    grade={attachmentsGrade || undefined}
+    score={attachmentsGrade ? attachmentsScore : undefined}
+    status={status ??
+        (attachmentAnalysis.has_attachments
+            ? undefined
+            : { label: "No attachments", tone: "muted", needsAttention: false })}
+    {open}
+>
     {#if !attachmentAnalysis.has_attachments}
         <div class="card-body">
             <p class="text-muted mb-0">
@@ -194,6 +196,7 @@
                                         advice={placed.issue.advice}
                                         observer={issueObserver(placed.issue)}
                                         corroboratedBy={placed.issue.corroborated_by}
+                                        docs={issueDocLinks(placed.issue.type)}
                                     />
                                 {/each}
                             {/each}
@@ -203,4 +206,4 @@
             {/each}
         </div>
     {/if}
-</div>
+</ReportSection>

@@ -1,66 +1,112 @@
 <script lang="ts">
     import { dmarcAlignment } from "#lib/alignment.js";
-    import type { DmarcRecord, HeaderAnalysis } from "#lib/api/types.gen.js";
-    import { headerDocLinks, issueDocLinks } from "#lib/docs.js";
+    import type { DmarcRecord, HeaderAnalysis, HeaderCheck } from "#lib/api/types.gen.js";
+    import { docs, headerDocLinks, issueDocLinks } from "#lib/docs.js";
     import { compareBySeverity, issueLabel } from "#lib/issues.js";
-    import { getScoreColorClass } from "#lib/score.js";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import type { SectionStatus } from "#lib/sections.js";
+    import CheckCard from "./CheckCard.svelte";
+    import DocLinks from "./DocLinks.svelte";
     import IssueAlert from "./IssueAlert.svelte";
+    import ReportSection from "./ReportSection.svelte";
 
     interface Props {
         dmarcRecord?: DmarcRecord;
         headerAnalysis: HeaderAnalysis;
         headerGrade?: string;
         headerScore?: number;
+        status?: SectionStatus;
+        open?: boolean;
     }
 
-    let { dmarcRecord, headerAnalysis, headerGrade, headerScore }: Props = $props();
+    let {
+        dmarcRecord,
+        headerAnalysis,
+        headerGrade,
+        headerScore,
+        status,
+        open = true,
+    }: Props = $props();
+
+    /** Anchor of a header issue, by its position in header_analysis.issues.headers. */
+    const headerIssueAnchor = (index: number) => `header-issue-${index}`;
 
     // Gravest first, as in the content card. The alert's colour no longer competes with a
-    // badge naming the level, so the order is what tells a reader where to start.
-    const issues = $derived((headerAnalysis.issues?.headers ?? []).slice().sort(compareBySeverity));
-    // Each header's issues, by its name: its row names them, the list above words them.
+    // badge naming the level, so the order is what tells a reader where to start. Each keeps
+    // its position in the API's list, which is what its anchor is made of.
+    const issues = $derived(
+        (headerAnalysis.issues?.headers ?? [])
+            .map((issue, index) => ({ issue, index }))
+            .sort((a, b) => compareBySeverity(a.issue, b.issue)),
+    );
+
+    // Each header's issues, by the name its row shows: the row points at them in the list.
     const issuesAt = $derived(
-        issues.reduce((byName, issue) => {
-            const name = issue.location?.toLowerCase() ?? "";
-            byName.set(name, [...(byName.get(name) ?? []), issue]);
+        issues.reduce((byName, entry) => {
+            const name = entry.issue.location?.toLowerCase() ?? "";
+            byName.set(name, [...(byName.get(name) ?? []), entry]);
             return byName;
         }, new Map<string, typeof issues>()),
     );
+
     const alignmentIssues = $derived(
         (headerAnalysis.issues?.domain_alignment ?? []).slice().sort(compareBySeverity),
     );
+
+    const importanceOrder = { required: 0, recommended: 1, optional: 2, newsletter: 3 };
+
+    // A header row has something to say when an expected header is missing, or a present one
+    // is malformed. Everything else is the expected state and is folded away.
+    function isProblem(name: string, check: HeaderCheck): boolean {
+        if (issuesAt.has(name)) return true;
+        if (check.present) return check.valid === false;
+        return check.importance === "required" || check.importance === "recommended";
+    }
+
+    const headerRows = $derived(
+        Object.entries(headerAnalysis.headers ?? {}).sort(
+            ([, a], [, b]) =>
+                importanceOrder[a.importance || "optional"] -
+                importanceOrder[b.importance || "optional"],
+        ),
+    );
+    const problemRows = $derived(headerRows.filter(([name, check]) => isProblem(name, check)));
+    const fineRows = $derived(headerRows.filter(([name, check]) => !isProblem(name, check)));
+
+    const alignment = $derived(headerAnalysis.domain_alignment);
+    const alignmentSummary = $derived(
+        alignment
+            ? [
+                  alignment.from_domain ? `From ${alignment.from_domain}` : undefined,
+                  alignment.return_path_domain
+                      ? `Return-Path ${alignment.return_path_domain}`
+                      : undefined,
+                  ...(alignment.dkim_domains ?? []).map((d) => `DKIM ${d.domain}`),
+              ]
+                  .filter(Boolean)
+                  .join(", ")
+            : undefined,
+    );
 </script>
 
-<div class="card shadow-sm" id="header-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-list-ul me-2"></i>
-                Header Analysis
-            </span>
-            <span>
-                {#if headerScore !== undefined}
-                    <span class="badge bg-{getScoreColorClass(headerScore)}">
-                        {headerScore}%
-                    </span>
-                {/if}
-                {#if headerGrade !== undefined}
-                    <GradeDisplay grade={headerGrade} size="small" />
-                {/if}
-            </span>
-        </h4>
-    </div>
+<ReportSection
+    id="header-details"
+    title="Header Analysis"
+    icon="list-ul"
+    grade={headerGrade}
+    score={headerScore}
+    {status}
+    {open}
+>
     <div class="card-body">
         {#if issues.length > 0}
             <div class="mb-3">
                 <h5>Issues</h5>
-                {#each issues as issue, i (i)}
+                {#each issues as { issue, index } (index)}
                     <IssueAlert
+                        id={headerIssueAnchor(index)}
                         title={issueLabel(issue.type)}
                         severity={issue.severity}
                         message={issue.message}
-                        location={issue.location}
                         advice={issue.advice}
                         docs={headerDocLinks(issue.location ?? "")}
                     />
@@ -69,26 +115,21 @@
         {/if}
 
         {#if headerAnalysis.domain_alignment}
-            {@const alignment = dmarcAlignment(headerAnalysis.domain_alignment, dmarcRecord)}
+            {@const alignmentLevel = dmarcAlignment(headerAnalysis.domain_alignment, dmarcRecord)}
             {@const spfStrictAligned =
                 headerAnalysis.domain_alignment.from_domain ===
                 headerAnalysis.domain_alignment.return_path_domain}
             {@const spfRelaxedAligned =
                 headerAnalysis.domain_alignment.from_org_domain ===
                 headerAnalysis.domain_alignment.return_path_org_domain}
-            <div class="card mb-3" id="domain-alignment">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i
-                            class="bi {alignment === 'exact'
-                                ? 'bi-check-circle-fill text-success'
-                                : alignment === 'organizational'
-                                  ? 'bi-check-circle text-info'
-                                  : 'bi-x-circle-fill text-danger'}"
-                        ></i>
-                        Domain Alignment
-                    </h5>
-                </div>
+            <CheckCard
+                id="domain-alignment"
+                title="Domain Alignment"
+                tag="DMARC"
+                status={alignmentLevel !== "none" ? "pass" : "fail"}
+                summary={alignmentSummary}
+                docs={[docs.dmarcAlignment]}
+            >
                 <div class="card-body">
                     <p class="card-text small text-muted">
                         Domain alignment ensures that the visible "From" domain matches the domain
@@ -97,20 +138,16 @@
                         email spoofing by verifying that the sender domain is consistent across all
                         authentication layers. Only one of the following lines needs to pass.
                     </p>
-                    {#if alignmentIssues.length > 0}
-                        <div class="mt-3">
-                            {#each alignmentIssues as issue, i (i)}
-                                <IssueAlert
-                                    title={issueLabel(issue.type)}
-                                    severity={issue.severity}
-                                    message={issue.message}
-                                    location={issue.location}
-                                    advice={issue.advice}
-                                    docs={issueDocLinks(issue.type)}
-                                />
-                            {/each}
-                        </div>
-                    {/if}
+                    {#each alignmentIssues as issue, i (i)}
+                        <IssueAlert
+                            title={issueLabel(issue.type)}
+                            severity={issue.severity}
+                            message={issue.message}
+                            location={issue.location}
+                            advice={issue.advice}
+                            docs={issueDocLinks(issue.type)}
+                        />
+                    {/each}
                 </div>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item d-flex ps-0">
@@ -341,82 +378,114 @@
                         </div>
                     {/each}
                 </div>
-            </div>
+            </CheckCard>
         {/if}
 
-        {#if headerAnalysis.headers && Object.keys(headerAnalysis.headers).length > 0}
+        {#if headerRows.length > 0}
             <div class="mt-3">
-                <h5 style="margin-bottom: -1.3em">Headers</h5>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th>When?</th>
-                                <th>Present</th>
-                                <th>Valid</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {#each Object.entries(headerAnalysis.headers).sort((a, b) => {
-                                const importanceOrder = { required: 0, recommended: 1, optional: 2, newsletter: 3 };
-                                const aImportance = importanceOrder[a[1].importance || "optional"];
-                                const bImportance = importanceOrder[b[1].importance || "optional"];
-                                return aImportance - bImportance;
-                            }) as [name, check] (name)}
-                                <tr>
-                                    <td>
-                                        <code>{name}</code>
-                                    </td>
-                                    <td>
-                                        {#if check.importance}
-                                            <small
-                                                class="text-{check.importance === 'required'
-                                                    ? 'danger'
-                                                    : check.importance === 'recommended'
-                                                      ? 'warning'
-                                                      : 'secondary'}"
-                                            >
-                                                {check.importance}
-                                            </small>
-                                        {/if}
-                                    </td>
-                                    <td>
-                                        <i
-                                            class="bi {check.present
-                                                ? 'bi-check-circle text-success'
-                                                : 'bi-x-circle text-danger'}"
-                                        ></i>
-                                    </td>
-                                    <td>
-                                        {#if check.present && check.valid !== undefined}
-                                            <i
-                                                class="bi {check.valid
-                                                    ? 'bi-check-circle text-success'
-                                                    : 'bi-x-circle text-warning'}"
-                                            ></i>
-                                        {:else}
-                                            -
-                                        {/if}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted text-truncate" title={check.value}
-                                            >{check.value || "-"}</small
-                                        >
-                                        {#each issuesAt.get(name.toLowerCase()) ?? [] as issue, j (j)}
-                                            <div class="text-warning small">
-                                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                                {issueLabel(issue.type)}
-                                            </div>
-                                        {/each}
-                                    </td>
-                                </tr>
-                            {/each}
-                        </tbody>
-                    </table>
-                </div>
+                <h5>Headers</h5>
+                {#if problemRows.length > 0}
+                    {@render headerTable(problemRows, true)}
+                {:else}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Every required and recommended header is present and well-formed.
+                    </p>
+                {/if}
+                {#if fineRows.length > 0}
+                    <details class="passed-items">
+                        <summary>
+                            {fineRows.length} other header{fineRows.length > 1 ? "s" : ""} checked
+                        </summary>
+                        <div class="mt-2">
+                            {@render headerTable(fineRows, false)}
+                        </div>
+                    </details>
+                {/if}
             </div>
         {/if}
     </div>
-</div>
+    <div class="card-footer">
+        <DocLinks
+            label="Standards:"
+            docs={[
+                docs.messageFormat,
+                docs.mimeVersion,
+                docs.listUnsubscribe,
+                docs.oneClickUnsubscribe,
+            ]}
+        />
+    </div>
+</ReportSection>
+
+{#snippet headerTable(rows: [string, HeaderCheck][], withDocs: boolean)}
+    <div class="table-responsive">
+        <table class="table table-sm mb-2">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>When?</th>
+                    <th>Present</th>
+                    <th>Valid</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {#each rows as [name, check] (name)}
+                    <tr>
+                        <td>
+                            <code>{name}</code>
+                        </td>
+                        <td>
+                            {#if check.importance}
+                                <small
+                                    class="text-{check.importance === 'required'
+                                        ? 'danger'
+                                        : check.importance === 'recommended'
+                                          ? 'warning'
+                                          : 'secondary'}"
+                                >
+                                    {check.importance}
+                                </small>
+                            {/if}
+                        </td>
+                        <td>
+                            <i
+                                class="bi {check.present
+                                    ? 'bi-check-circle text-success'
+                                    : 'bi-x-circle text-danger'}"
+                            ></i>
+                        </td>
+                        <td>
+                            {#if check.present && check.valid !== undefined}
+                                <i
+                                    class="bi {check.valid
+                                        ? 'bi-check-circle text-success'
+                                        : 'bi-x-circle text-warning'}"
+                                ></i>
+                            {:else}
+                                -
+                            {/if}
+                        </td>
+                        <td>
+                            <small class="text-muted text-truncate" title={check.value}
+                                >{check.value || "-"}</small
+                            >
+                            {#each issuesAt.get(name) ?? [] as { issue, index } (index)}
+                                <div class="small">
+                                    <a class="link-warning" href="#{headerIssueAnchor(index)}">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        {issueLabel(issue.type)}
+                                    </a>
+                                </div>
+                            {/each}
+                            {#if withDocs}
+                                <DocLinks docs={headerDocLinks(name)} label="" class="mt-1" />
+                            {/if}
+                        </td>
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+    </div>
+{/snippet}

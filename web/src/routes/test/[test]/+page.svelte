@@ -5,8 +5,9 @@
     import TileLoader from "#lib/components/TileLoader.svelte";
 
     import { getReport, getTest, reanalyzeReport } from "#lib/api/index.js";
-    import type { BlacklistCheck, Report, Test } from "#lib/api/types.gen.js";
+    import type { Report, Test } from "#lib/api/types.gen.js";
     import { adviceAnchorsBySymbol } from "#lib/issues.js";
+    import { sectionStatuses, type SectionKey } from "#lib/sections.js";
     import {
         AuthenticationCard,
         BlacklistCard,
@@ -18,6 +19,7 @@
         ErrorDisplay,
         HeaderAnalysisCard,
         PendingState,
+        ReportSection,
         RspamdCard,
         ScoreCard,
         SpamAssassinCard,
@@ -26,8 +28,6 @@
         WhitelistCard,
     } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
-
-    type BlacklistRecords = Record<string, BlacklistCheck[]>;
 
     let testId = $derived(page.params.test);
     let test = $state<Test | null>(null);
@@ -43,6 +43,16 @@
     let menuOpen = $state(false);
     let fetching = $state(false);
     let reportRateLimited = $state(false);
+
+    // How each section reads once folded: a section with something to fix opens, one that
+    // only passed stays a single line.
+    const statuses = $derived(report ? sectionStatuses(report) : {});
+
+    // A section with no status was not graded (attachments, when there are none): nothing
+    // in it calls for attention.
+    function opens(section: SectionKey): boolean {
+        return statuses[section]?.needsAttention ?? false;
+    }
 
     function showError(status: number | undefined, apiError: unknown, defaultMessage: string) {
         errorStatus = status ?? 500;
@@ -347,6 +357,8 @@
                             dnsResults={report.dns_results}
                             dnsGrade={report.summary?.dns_grade}
                             dnsScore={report.summary?.dns_score}
+                            status={statuses.dns}
+                            open={opens("dns")}
                         />
                     </div>
                 </div>
@@ -363,51 +375,26 @@
                             dnsResults={report.dns_results}
                             source={report.source}
                             authservId={report.authserv_id}
+                            status={statuses.authentication}
+                            open={opens("authentication")}
                         />
                     </div>
                 </div>
             {/if}
 
             <!-- Blacklist Checks -->
-            {#snippet blacklistChecks(blacklists: BlacklistRecords, report: Report)}
-                <BlacklistCard
-                    {blacklists}
-                    blacklistGrade={report.summary?.blacklist_grade}
-                    blacklistScore={report.summary?.blacklist_score}
-                />
-            {/snippet}
-
-            <!-- Whitelist Checks -->
-            {#snippet whitelistChecks(whitelists: BlacklistRecords)}
-                <WhitelistCard {whitelists} />
-            {/snippet}
-
-            <!-- Blacklist & Whitelist Checks -->
-            {#if report.blacklists && report.whitelists && Object.keys(report.blacklists).length == 1 && Object.keys(report.whitelists).length == 1}
-                <div class="row mb-4">
-                    <div class="col-6" id="blacklist">
-                        {@render blacklistChecks(report.blacklists, report)}
-                    </div>
-                    <div class="col-6" id="whitelist">
-                        {@render whitelistChecks(report.whitelists)}
+            {#if report.blacklists && Object.keys(report.blacklists).length > 0}
+                <div class="row mb-4" id="blacklist">
+                    <div class="col-12">
+                        <BlacklistCard
+                            blacklists={report.blacklists}
+                            blacklistGrade={report.summary?.blacklist_grade}
+                            blacklistScore={report.summary?.blacklist_score}
+                            status={statuses.blacklist}
+                            open={opens("blacklist")}
+                        />
                     </div>
                 </div>
-            {:else}
-                {#if report.blacklists && Object.keys(report.blacklists).length > 0}
-                    <div class="row mb-4" id="blacklist">
-                        <div class="col-12">
-                            {@render blacklistChecks(report.blacklists, report)}
-                        </div>
-                    </div>
-                {/if}
-
-                {#if report.whitelists && Object.keys(report.whitelists).length > 0}
-                    <div class="row mb-4" id="whitelist">
-                        <div class="col-12">
-                            {@render whitelistChecks(report.whitelists)}
-                        </div>
-                    </div>
-                {/if}
             {/if}
 
             <!-- Domain Reputation -->
@@ -417,6 +404,7 @@
                         <DomainReputationCard
                             blacklist={report.domain_reputation}
                             domain={report.dns_results?.from_domain ?? ""}
+                            class=""
                         />
                     </div>
                 </div>
@@ -431,6 +419,8 @@
                             headerAnalysis={report.header_analysis}
                             headerGrade={report.summary?.header_grade}
                             headerScore={report.summary?.header_score}
+                            status={statuses.headers}
+                            open={opens("headers")}
                         />
                     </div>
                 </div>
@@ -439,21 +429,37 @@
             <!-- Spam filter analysis -->
             {#if report.spamassassin || report.rspamd}
                 <div class="row mb-4" id="spam">
-                    {#if report.spamassassin}
-                        <div class={report.rspamd ? "col col-lg-6 mb-4 mb-lg-0" : "col-12"}>
-                            <SpamAssassinCard spamassassin={report.spamassassin} />
-                        </div>
-                    {/if}
-                    {#if report.rspamd}
-                        <div class={report.spamassassin ? "col col-lg-6" : "col-12"}>
-                            <RspamdCard
-                                rspamd={report.rspamd}
-                                adviceAnchors={adviceAnchorsBySymbol(
-                                    report.content_analysis?.html_issues,
-                                )}
-                            />
-                        </div>
-                    {/if}
+                    <div class="col-12">
+                        <ReportSection
+                            id="spam-details"
+                            title="Spam Filters"
+                            icon="bug"
+                            grade={report.summary?.spam_grade}
+                            score={report.summary?.spam_score}
+                            status={statuses.spam}
+                            open={opens("spam")}
+                        >
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    {#if report.spamassassin}
+                                        <div class={report.rspamd ? "col-lg-6" : "col-12"}>
+                                            <SpamAssassinCard spamassassin={report.spamassassin} />
+                                        </div>
+                                    {/if}
+                                    {#if report.rspamd}
+                                        <div class={report.spamassassin ? "col-lg-6" : "col-12"}>
+                                            <RspamdCard
+                                                rspamd={report.rspamd}
+                                                adviceAnchors={adviceAnchorsBySymbol(
+                                                    report.content_analysis?.html_issues,
+                                                )}
+                                            />
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        </ReportSection>
+                    </div>
                 </div>
             {/if}
 
@@ -465,6 +471,8 @@
                             contentAnalysis={report.content_analysis}
                             contentGrade={report.summary?.content_grade}
                             contentScore={report.summary?.content_score}
+                            status={statuses.content}
+                            open={opens("content")}
                         />
                     </div>
                 </div>
@@ -478,7 +486,18 @@
                             attachmentAnalysis={report.attachment_analysis}
                             attachmentsGrade={report.summary?.attachments_grade}
                             attachmentsScore={report.summary?.attachments_score}
+                            status={statuses.attachments}
+                            open={opens("attachments")}
                         />
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Whitelists: informational, they never weigh on the score -->
+            {#if report.whitelists && Object.keys(report.whitelists).length > 0}
+                <div class="row mb-4" id="whitelist">
+                    <div class="col-12">
+                        <WhitelistCard whitelists={report.whitelists} open={false} />
                     </div>
                 </div>
             {/if}

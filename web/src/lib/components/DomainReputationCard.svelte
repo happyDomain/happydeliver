@@ -2,17 +2,20 @@
     import { SvelteSet } from "svelte/reactivity";
 
     import type { DomainBlacklistResult, DomainBlacklistSourceResult } from "#lib/api/types.gen.js";
-    import { getScoreColorClass } from "#lib/score.js";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import type { SectionStatus } from "#lib/sections.js";
+    import ReportSection from "./ReportSection.svelte";
 
     interface Props {
         blacklist: DomainBlacklistResult;
         // The domain the check was asked about, to tell whether the sources
         // were queried for another, registered, one.
         domain: string;
+        /** Defaults to unfolded only when a source lists the domain. */
+        open?: boolean;
+        class?: string;
     }
 
-    let { blacklist, domain }: Props = $props();
+    let { blacklist, domain, open, class: className = "mt-4" }: Props = $props();
 
     // The backend decides the verdict; the counts shown here are derived
     // from the same results array it renders below, so they cannot diverge.
@@ -152,27 +155,51 @@
     function plural(n: number, word: string): string {
         return `${n} ${word}${n === 1 ? "" : "s"}`;
     }
+
+    const listed = $derived(
+        blacklist.verdict === "listed" || blacklist.verdict === "listed_critical",
+    );
+
+    const status: SectionStatus = $derived(
+        blacklist.verdict === "listed_critical"
+            ? {
+                  label: `Listed on ${plural(summary.critical, "critical source")}`,
+                  tone: "danger",
+                  needsAttention: true,
+              }
+            : blacklist.verdict === "listed"
+              ? {
+                    label: `Listed on ${plural(summary.listed, "source")}`,
+                    tone: "warning",
+                    needsAttention: true,
+                }
+              : blacklist.verdict === "inconclusive"
+                ? { label: "Inconclusive", tone: "muted", needsAttention: false }
+                : { label: "Not listed", tone: "success", needsAttention: false },
+    );
+
+    // What a source has to say comes first; the sources that saw nothing are folded into a
+    // count, as their verdict is the expected one.
+    const notable = $derived(
+        sorted.filter(
+            (r) => r.status === "listed" || r.status === "errored" || r.status === "pending",
+        ),
+    );
+    const quiet = $derived(
+        sorted.filter((r) => r.status === "clean" || r.status === "informational"),
+    );
 </script>
 
-<div class="card shadow-sm mt-4" id="reputation-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-shield-shaded me-2"></i>
-                Domain Reputation
-            </span>
-            <span>
-                {#if blacklist.score !== undefined}
-                    <span class="badge bg-{getScoreColorClass(blacklist.score)}">
-                        {blacklist.score}%
-                    </span>
-                {/if}
-                {#if blacklist.grade !== undefined}
-                    <GradeDisplay grade={blacklist.grade} size="small" />
-                {/if}
-            </span>
-        </h4>
-    </div>
+<ReportSection
+    id="reputation-details"
+    class={className}
+    title="Domain Reputation"
+    icon="shield-shaded"
+    grade={blacklist.grade}
+    score={blacklist.score}
+    {status}
+    open={open ?? listed}
+>
     {#if blacklist.registered_domain && blacklist.registered_domain !== domain}
         <div class="card-body border-bottom py-2">
             <p class="mb-0 small text-muted">
@@ -228,112 +255,129 @@
             </div>
         {/if}
     </div>
-    <div class="list-group list-group-flush">
-        {#each sorted as r (rowKey(r))}
-            {@const key = rowKey(r)}
-            {@const open = openRows.has(key)}
-            {@const expandable = hasDetails(r)}
-            <div class="list-group-item">
-                <div class="d-flex align-items-start">
-                    <i class="bi {statusIcon(r)} {statusClass(r)} me-2 fs-5"></i>
-                    <div class="flex-grow-1">
-                        <strong>{r.source_name}</strong>
-                        <span class="text-uppercase ms-2 {statusClass(r)}">
-                            {statusLabel(r)}
-                        </span>
-                        {#if r.lookup_url}
-                            <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
-                            <a
-                                href={r.lookup_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="btn btn-sm btn-outline-secondary float-end"
-                                title="Open lookup page"
-                                aria-label="Open lookup page"
-                            >
-                                <i class="bi bi-box-arrow-up-right"></i>
-                            </a>
-                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+    {#if notable.length > 0}
+        <div class="list-group list-group-flush">
+            {#each notable as r (rowKey(r))}
+                {@render sourceRow(r)}
+            {/each}
+        </div>
+    {/if}
+    {#if quiet.length > 0}
+        <div class="card-body py-2" class:border-top={notable.length > 0}>
+            <details class="passed-items">
+                <summary>
+                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                    {plural(quiet.length, "source")} report nothing against this domain
+                </summary>
+                <div class="list-group list-group-flush mt-2">
+                    {#each quiet as r (rowKey(r))}
+                        {@render sourceRow(r)}
+                    {/each}
+                </div>
+            </details>
+        </div>
+    {/if}
+</ReportSection>
+
+{#snippet sourceRow(r: DomainBlacklistSourceResult)}
+    {@const key = rowKey(r)}
+    {@const expanded = openRows.has(key)}
+    {@const expandable = hasDetails(r)}
+    <div class="list-group-item">
+        <div class="d-flex align-items-start">
+            <i class="bi {statusIcon(r)} {statusClass(r)} me-2 fs-5"></i>
+            <div class="flex-grow-1">
+                <strong>{r.source_name}</strong>
+                <span class="text-uppercase ms-2 {statusClass(r)}">
+                    {statusLabel(r)}
+                </span>
+                {#if r.lookup_url}
+                    <a
+                        href={r.lookup_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="btn btn-sm btn-outline-secondary float-end"
+                        title="Open lookup page"
+                        aria-label="Open lookup page"
+                    >
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                {/if}
+                <div class="small text-muted">
+                    <code>{r.source_id}</code>
+                    {#if r.subject}
+                        &middot; <code>{r.subject}</code>
+                    {/if}
+                </div>
+                <div class="small">
+                    {firstReason(r)}
+                    {#if expandable}
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm p-0 ms-1 align-baseline"
+                            onclick={() => toggle(key)}
+                            aria-expanded={expanded}
+                        >
+                            {expanded ? "Hide details" : "Show details"}
+                        </button>
+                    {/if}
+                </div>
+                {#if r.status === "informational"}
+                    <div class="small text-muted">
+                        Web ad and tracker blocklist, not used by mail filters: not counted in the
+                        score.
+                    </div>
+                {/if}
+                {#if expandable && expanded}
+                    <div class="mt-2">
+                        {#if r.reasons && r.reasons.length > 0}
+                            <ul class="small mb-2">
+                                {#each r.reasons as reason}
+                                    <li>{reason}</li>
+                                {/each}
+                            </ul>
                         {/if}
-                        <div class="small text-muted">
-                            <code>{r.source_id}</code>
-                            {#if r.subject}
-                                &middot; <code>{r.subject}</code>
-                            {/if}
-                        </div>
-                        <div class="small">
-                            {firstReason(r)}
-                            {#if expandable}
-                                <button
-                                    type="button"
-                                    class="btn btn-link btn-sm p-0 ms-1 align-baseline"
-                                    onclick={() => toggle(key)}
-                                    aria-expanded={open}
-                                >
-                                    {open ? "Hide details" : "Show details"}
-                                </button>
-                            {/if}
-                        </div>
-                        {#if r.status === "informational"}
-                            <div class="small text-muted">
-                                Web ad and tracker blocklist, not used by mail filters: not counted
-                                in the score.
-                            </div>
+                        {#if r.evidence && r.evidence.length > 0}
+                            <table class="table table-sm table-bordered mb-0 evidence-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Label</th>
+                                        <th scope="col">Value</th>
+                                        <th scope="col">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each r.evidence as ev}
+                                        <tr>
+                                            <td class="text-nowrap">{ev.label}</td>
+                                            <td>
+                                                <code class="small">{ev.value}</code>
+                                            </td>
+                                            <td class="text-nowrap">
+                                                {#if ev.status}
+                                                    <span class="badge bg-light">
+                                                        {ev.status}
+                                                    </span>
+                                                {:else}
+                                                    <span class="text-muted">—</span>
+                                                {/if}
+                                            </td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
                         {/if}
-                        {#if expandable && open}
-                            <div class="mt-2">
-                                {#if r.reasons && r.reasons.length > 0}
-                                    <ul class="small mb-2">
-                                        {#each r.reasons as reason, i (i)}
-                                            <li>{reason}</li>
-                                        {/each}
-                                    </ul>
-                                {/if}
-                                {#if r.evidence && r.evidence.length > 0}
-                                    <table
-                                        class="table table-sm table-bordered mb-0 evidence-table"
-                                    >
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">Label</th>
-                                                <th scope="col">Value</th>
-                                                <th scope="col">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {#each r.evidence as ev, i (i)}
-                                                <tr>
-                                                    <td class="text-nowrap">{ev.label}</td>
-                                                    <td>
-                                                        <code class="small">{ev.value}</code>
-                                                    </td>
-                                                    <td class="text-nowrap">
-                                                        {#if ev.status}
-                                                            <span class="badge bg-light">
-                                                                {ev.status}
-                                                            </span>
-                                                        {:else}
-                                                            <span class="text-muted">—</span>
-                                                        {/if}
-                                                    </td>
-                                                </tr>
-                                            {/each}
-                                        </tbody>
-                                    </table>
-                                {/if}
-                                {#if r.reference}
-                                    <p class="small text-muted mt-2 mb-0">
-                                        Reference: {r.reference}
-                                    </p>
-                                {/if}
-                            </div>
+                        {#if r.reference}
+                            <p class="small text-muted mt-2 mb-0">
+                                Reference: {r.reference}
+                            </p>
                         {/if}
                     </div>
-                </div>
+                {/if}
             </div>
-        {/each}
+        </div>
     </div>
-</div>
+{/snippet}
 
 <style>
     .evidence-table code {

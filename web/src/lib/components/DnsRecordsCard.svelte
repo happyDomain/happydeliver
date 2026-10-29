@@ -1,16 +1,16 @@
 <script lang="ts">
     import type { DnsResults, DomainAlignment, Issue } from "#lib/api/types.gen.js";
-    import { getScoreColorClass } from "#lib/score.js";
+    import type { SectionStatus } from "#lib/sections.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import DomainInfoDisplay from "./DomainInfoDisplay.svelte";
-    import GradeDisplay from "./GradeDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
+    import ReportSection from "./ReportSection.svelte";
     import ReturnOkDisplay from "./ReturnOkDisplay.svelte";
     import SenderOriginDisplay from "./SenderOriginDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
@@ -26,6 +26,8 @@
         dnsGrade?: string;
         dnsScore?: number;
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
+        status?: SectionStatus;
+        open?: boolean;
     }
 
     let {
@@ -35,6 +37,8 @@
         dnsGrade,
         dnsScore,
         domainOnly = false,
+        status,
+        open = true,
     }: Props = $props();
 
     // Both come from the hop the backend marked as inbound.
@@ -54,25 +58,15 @@
     );
 </script>
 
-<div class="card shadow-sm" id="dns-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-diagram-3 me-2"></i>
-                DNS Records
-            </span>
-            <span>
-                {#if dnsScore !== undefined}
-                    <span class="badge bg-{getScoreColorClass(dnsScore)}">
-                        {dnsScore}%
-                    </span>
-                {/if}
-                {#if dnsGrade !== undefined}
-                    <GradeDisplay grade={dnsGrade} size="small" />
-                {/if}
-            </span>
-        </h4>
-    </div>
+<ReportSection
+    id="dns-details"
+    title="DNS Records"
+    icon="diagram-3"
+    grade={dnsGrade}
+    score={dnsScore}
+    {status}
+    {open}
+>
     <div class="card-body">
         {#if !dnsResults}
             <p class="text-muted mb-0">No DNS results available</p>
@@ -91,12 +85,12 @@
             {#if !domainOnly}
                 <!-- Reverse IP Section -->
                 {#if senderIp}
-                    <div class="mb-3 d-flex align-items-center gap-2">
-                        <h4 class="mb-0 text-truncate">
-                            Received from: <code
+                    <div class="mb-3 pb-2 border-bottom">
+                        <h5 class="mb-0 text-truncate">
+                            Sending server: <code
                                 >{heloHostname} ({dnsResults.ptr_records?.[0] || "Unknown"} [{senderIp}])</code
                             >
-                        </h4>
+                        </h5>
                     </div>
                 {/if}
 
@@ -131,15 +125,13 @@
                 <!-- Return Address Reachability (ReturnOK) -->
                 <ReturnOkDisplay returnOk={dnsResults.return_ok} />
 
-                <hr class="my-4" />
-
                 <!-- Return-Path Domain Section -->
-                <div class="mb-3">
+                <div class="mb-3 pb-2 border-bottom mt-4">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h4 class="mb-0 text-truncate">
-                            Return-Path Domain:
+                        <h5 class="mb-0 text-truncate">
+                            Return-Path domain:
                             <code>{dnsResults.rp_domain || dnsResults.from_domain}</code>
-                        </h4>
+                        </h5>
                         {#if rpMisaligned}
                             <span class="badge bg-danger ms-2">
                                 <i class="bi bi-exclamation-triangle-fill"></i> Differs from From domain
@@ -160,7 +152,8 @@
                 <!-- MX Records for Return-Path Domain -->
                 {#if dnsResults.rp_mx_records && dnsResults.rp_mx_records.length > 0}
                     <MxRecordsDisplay
-                        class="mb-4"
+                        id="dns-mx-return-path"
+                        class="mb-3"
                         mxRecords={dnsResults.rp_mx_records}
                         title="Mail Exchange Records for Return-Path Domain"
                         description="These MX records handle bounce messages and non-delivery reports."
@@ -175,13 +168,11 @@
             />
 
             {#if !domainOnly}
-                <hr class="my-4" />
-
                 <!-- From Domain Section -->
-                <div class="mb-3 d-flex align-items-center gap-2">
-                    <h4 class="mb-0 text-truncate">
-                        From Domain: <code>{dnsResults.from_domain}</code>
-                    </h4>
+                <div class="mb-3 pb-2 border-bottom mt-4 d-flex align-items-center gap-2">
+                    <h5 class="mb-0 text-truncate">
+                        From domain: <code>{dnsResults.from_domain}</code>
+                    </h5>
                     {#if dnsResults.rp_domain && dnsResults.rp_domain !== dnsResults.from_domain}
                         <span class="badge bg-danger ms-2">
                             <i class="bi bi-exclamation-triangle-fill"></i> Differs from Return-Path domain
@@ -196,7 +187,8 @@
             <!-- MX Records for From Domain -->
             {#if dnsResults.from_mx_records && dnsResults.from_mx_records.length > 0}
                 <MxRecordsDisplay
-                    class="mb-4"
+                    id="dns-mx-from"
+                    class="mb-3"
                     mxRecords={dnsResults.from_mx_records}
                     title="Mail Exchange Records for From Domain"
                     description="These MX records handle replies to emails sent from this domain."
@@ -221,4 +213,4 @@
             />
         {/if}
     </div>
-</div>
+</ReportSection>

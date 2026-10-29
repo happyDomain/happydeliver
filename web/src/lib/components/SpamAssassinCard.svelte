@@ -36,7 +36,7 @@
 </script>
 
 <CheckCard
-    id="spam-details"
+    id="spamassassin-details"
     class="mb-0 h-100"
     title="SpamAssassin"
     status={checkStatus}

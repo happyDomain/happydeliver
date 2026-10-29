@@ -6,8 +6,10 @@
         isUploadedMessage,
         type MessageSource,
     } from "#lib/authentication.js";
-    import { getScoreColorClass } from "#lib/score.js";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import { docs } from "#lib/docs.js";
+    import type { SectionStatus } from "#lib/sections.js";
+    import DocLinks from "./DocLinks.svelte";
+    import ReportSection from "./ReportSection.svelte";
 
     interface Props {
         authentication: AuthenticationResults;
@@ -16,6 +18,8 @@
         dnsResults?: DnsResults;
         source?: MessageSource;
         authservId?: string;
+        status?: SectionStatus;
+        open?: boolean;
     }
 
     let {
@@ -25,6 +29,8 @@
         dnsResults,
         source,
         authservId,
+        status,
+        open = true,
     }: Props = $props();
 
     let allRequiredMissing = $derived(hasNoAuthenticationResults(authentication));
@@ -96,30 +102,25 @@
     }
 </script>
 
-<div class="card shadow-sm" id="authentication-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-shield-check me-2"></i>
-                Authentication
-            </span>
-            <span>
-                {#if allRequiredMissing}
-                    <!-- No Authentication-Results header: the score below is not the sender's. -->
-                    <GradeDisplay grade="N/A" size="small" />
-                {:else}
-                    {#if authenticationScore !== undefined}
-                        <span class="badge bg-{getScoreColorClass(authenticationScore)}">
-                            {authenticationScore}%
-                        </span>
-                    {/if}
-                    {#if authenticationGrade !== undefined}
-                        <GradeDisplay grade={authenticationGrade} size="small" />
-                    {/if}
-                {/if}
-            </span>
-        </h4>
-    </div>
+<!-- The receiver's raw verdict: needed to debug a failure, noise on a pass. -->
+{#snippet rawResult(details: string)}
+    <details class="passed-items mt-1">
+        <summary>Raw result</summary>
+        <pre class="p-2 mb-0 mt-1 text-muted small" style="white-space: pre-wrap">{details}</pre>
+    </details>
+{/snippet}
+
+<!-- No Authentication-Results header: the score is not the sender's, so it shows as N/A. -->
+<ReportSection
+    id="authentication-details"
+    title="Authentication"
+    icon="shield-check"
+    grade={authenticationGrade}
+    score={authenticationScore}
+    unavailable={allRequiredMissing}
+    {status}
+    {open}
+>
     {#if allRequiredMissing}
         <div class="card-body border-bottom">
             <div class="alert alert-warning mb-0">
@@ -220,9 +221,7 @@
                             </div>
                         {/if}
                         {#if authentication.iprev.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.iprev.details}</pre>
+                            {@render rawResult(authentication.iprev.details)}
                         {/if}
                     </div>
                 </div>
@@ -266,9 +265,7 @@
                             </div>
                         {/if}
                         {#if authentication.x_ptr.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.x_ptr.details}</pre>
+                            {@render rawResult(authentication.x_ptr.details)}
                         {/if}
                     </div>
                 </div>
@@ -336,9 +333,7 @@
                             </div>
                         {/if}
                         {#if authentication.spf.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.spf.details}</pre>
+                            {@render rawResult(authentication.spf.details)}
                         {/if}
                     </div>
                 {:else if authentication.spf_helo}
@@ -409,10 +404,7 @@
                             </div>
                         {/if}
                         {#if authentication.spf_helo.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.spf_helo
-                                    .details}</pre>
+                            {@render rawResult(authentication.spf_helo.details)}
                         {/if}
                     </div>
                 </div>
@@ -451,9 +443,7 @@
                                 </div>
                             {/if}
                             {#if dkim.details}
-                                <pre
-                                    class="p-2 mb-0 text-muted small"
-                                    style="white-space: pre-wrap">{dkim.details}</pre>
+                                {@render rawResult(dkim.details)}
                             {/if}
                         </div>
                     </div>
@@ -522,10 +512,7 @@
                             </div>
                         {/if}
                         {#if authentication.x_google_dkim.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.x_google_dkim
-                                    .details}</pre>
+                            {@render rawResult(authentication.x_google_dkim.details)}
                         {/if}
                     </div>
                 </div>
@@ -568,10 +555,7 @@
                             </div>
                         {/if}
                         {#if authentication.x_aligned_from.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.x_aligned_from
-                                    .details}</pre>
+                            {@render rawResult(authentication.x_aligned_from.details)}
                         {/if}
                     </div>
                 </div>
@@ -632,9 +616,7 @@
                             {/if}
                         {/if}
                         {#if authentication.dmarc.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.dmarc.details}</pre>
+                            {@render rawResult(authentication.dmarc.details)}
                         {/if}
                     </div>
                 {:else}
@@ -678,9 +660,7 @@
                             {authentication.bimi.result}
                         </span>
                         {#if authentication.bimi.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.bimi.details}</pre>
+                            {@render rawResult(authentication.bimi.details)}
                         {/if}
                     </div>
                 {:else if authentication.bimi && authentication.bimi.result == "none"}
@@ -692,9 +672,7 @@
                             Brand Indicators for Message Identification
                         </div>
                         {#if authentication.bimi.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.bimi.details}</pre>
+                            {@render rawResult(authentication.bimi.details)}
                         {/if}
                     </div>
                 {:else}
@@ -736,13 +714,17 @@
                             </div>
                         {/if}
                         {#if authentication.arc.details}
-                            <pre
-                                class="p-2 mb-0 text-muted small"
-                                style="white-space: pre-wrap">{authentication.arc.details}</pre>
+                            {@render rawResult(authentication.arc.details)}
                         {/if}
                     </div>
                 </div>
             </div>
         {/if}
     </div>
-</div>
+    <div class="card-footer">
+        <DocLinks
+            label="Standards:"
+            docs={[docs.spf, docs.dkim, docs.dmarc, docs.arc, docs.bimi, docs.authResults]}
+        />
+    </div>
+</ReportSection>
