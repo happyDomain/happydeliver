@@ -441,9 +441,10 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 }
 
 // addSectionIssues completes the issues of results with those of a
-// Return-Path on another domain, weighed as the MX check, and with those
+// Return-Path on another domain, weighed as the MX check, with those
 // charged to the section itself: what the sender domains are, and whether
-// they can receive mail, told along with their MX records.
+// they can receive mail, told along with their MX records; and with the
+// lookups that failed, which cost nothing.
 func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.Issue, weight, total int) {
 	issues := results.Issues
 
@@ -458,6 +459,17 @@ func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.I
 			// One domain for both: losing its replies and its bounces alike
 			chargeUnreachable(issues.MxFrom, results.ReturnOk.From, results.ReturnOk.ReturnPath)
 		}
+	}
+
+	// Lookups that failed are not the sender's doing, but they are what the
+	// checks could not see.
+	if results.Errors != nil {
+		var lookups []model.Issue
+		for _, failure := range *results.Errors {
+			lookups = append(lookups, newIssue(model.IssueTypeDnsLookupFailed, model.IssueSeverityInfo, "", failure,
+				"Checks relying on this lookup may be incomplete; test again later if the failure looks temporary."))
+		}
+		issues.Lookups = optionalIssueList(lookups)
 	}
 
 	from, rp := domainInfoIssues(results)

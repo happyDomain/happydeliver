@@ -121,6 +121,7 @@ const issueLabels: Record<Issue["type"], string> = {
     rbl_listed: "Sending address is blacklisted",
     rbl_network_listed: "Network of the sending address is listed",
     domain_listed: "Domain is on a blocklist",
+    dns_lookup_failed: "A DNS lookup failed",
 };
 
 export function issueLabel(type: Issue["type"]): string {

@@ -484,3 +484,25 @@ func TestHeloSPFIssueVariants(t *testing.T) {
 		t.Errorf("issues = %v, want an empty list for a valid policy", issues)
 	}
 }
+
+// A lookup that did not answer is told, for free, under lookups.
+func TestDNSLookupFailuresAreReportedForFree(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+
+	results := &model.DNSResults{FromDomain: "example.com", Errors: &[]string{"Failed to lookup MX records: timeout"}}
+	analyzer.CalculateDomainOnlyScore(results)
+
+	lookups := results.Issues.Lookups
+	if lookups == nil || len(*lookups) != 1 {
+		t.Fatalf("lookups = %v, want the one failure", lookups)
+	}
+	if issue := (*lookups)[0]; issue.Type != model.IssueTypeDnsLookupFailed || issue.Severity != model.IssueSeverityInfo || (issue.Penalty != nil && *issue.Penalty != 0) {
+		t.Errorf("issue = %+v, want a free dns_lookup_failed of severity info", issue)
+	}
+
+	results = &model.DNSResults{FromDomain: "example.com"}
+	analyzer.CalculateDomainOnlyScore(results)
+	if results.Issues.Lookups != nil {
+		t.Errorf("lookups = %v without any failure, want none", *results.Issues.Lookups)
+	}
+}
