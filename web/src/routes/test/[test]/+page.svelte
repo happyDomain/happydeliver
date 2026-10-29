@@ -1,12 +1,13 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { resolve } from "$app/paths";
-    import { onDestroy } from "svelte";
+    import { onDestroy, onMount, tick } from "svelte";
     import TileLoader from "#lib/components/TileLoader.svelte";
 
     import { getReport, getTest, reanalyzeReport } from "#lib/api/index.js";
     import type { Report, Test } from "#lib/api/types.gen.js";
     import { adviceAnchorsBySymbol } from "#lib/issues.js";
+    import { revealHash, revealOnNavigation } from "#lib/reveal.js";
     import { sectionStatuses, type SectionKey } from "#lib/sections.js";
     import {
         AuthenticationCard,
@@ -53,6 +54,19 @@
     function opens(section: SectionKey): boolean {
         return statuses[section]?.needsAttention ?? false;
     }
+
+    // Links into folded sections unfold them; so does a link someone shared, once the
+    // report it points into has rendered.
+    onMount(() => revealOnNavigation());
+
+    // The report is fetched before the page stops loading, so it is only in the DOM once
+    // both are settled.
+    let revealedFor: string | null = null;
+    $effect(() => {
+        if (!report || loading || revealedFor === report.id || !window.location.hash) return;
+        revealedFor = report.id;
+        tick().then(() => revealHash(window.location.hash)?.scrollIntoView());
+    });
 
     function showError(status: number | undefined, apiError: unknown, defaultMessage: string) {
         errorStatus = status ?? 500;
