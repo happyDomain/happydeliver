@@ -37,6 +37,7 @@ var contentDefects = []*reading.Defect{
 	defectUnreplacedTemplate,
 	defectSuspiciousURL,
 	defectDeadLink,
+	defectExcessiveLinks,
 	defectDeadImage,
 	defectDeadUnsubscribe,
 	defectRedirectChain,
@@ -113,6 +114,11 @@ var (
 	// defectDeadLink: a body link that does not answer, or whose redirections
 	// never end.
 	defectDeadLink = &reading.Defect{Name: "dead_link"}
+
+	// defectExcessiveLinks: a message carrying so many links that it reads
+	// as a list of destinations. No criterion grades how many there are, so it
+	// answers under a cap of its own.
+	defectExcessiveLinks = &reading.Defect{Name: "excessive_links", Family: familyLinkCount}
 
 	// defectDeadImage: an image source that does not answer, which leaves a
 	// hole the recipient sees the moment the message opens.

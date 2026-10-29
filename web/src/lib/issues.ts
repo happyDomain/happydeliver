@@ -11,6 +11,7 @@ const issueLabels: Record<Issue["type"], string> = {
     broken_html: "Broken HTML",
     missing_alt: "Missing alt text",
     excessive_images: "Too many images",
+    excessive_links: "Too many links",
     obfuscated_url: "Obfuscated URL",
     suspicious_link: "Suspicious link",
     dangerous_html: "Dangerous HTML",

@@ -114,6 +114,48 @@ func TestAMessageMostlyMadeOfLinksEarnsLess(t *testing.T) {
 	}
 }
 
+// TestOneDeadLinkAmongManyStillCosts pins the rounding of the links
+// criterion: its share of 25 points is less than one for a link among more
+// than 25, and must not round down to nothing.
+func TestOneDeadLinkAmongManyStillCosts(t *testing.T) {
+	analyzer := NewAnalyzer(time.Second)
+
+	results := func(dead bool) *Results {
+		links := make([]LinkCheck, 0, 30)
+		for i := range 30 {
+			links = append(links, LinkCheck{URL: fmt.Sprintf("https://example.com/%d", i), Valid: true, IsSafe: true, probedURL: probedURL{Status: 200}})
+		}
+		if dead {
+			links[0].Status = 404
+		}
+		return &Results{HTMLValid: true, TextContent: "Newsletter", TextAlternative: textAltOK, Links: links}
+	}
+
+	working, _ := analyzer.scoreOf(results(false))
+	dead, _ := analyzer.scoreOf(results(true))
+
+	if dead >= working {
+		t.Errorf("one dead link among 30 scored %d, as much as none (%d)", dead, working)
+	}
+}
+
+// TestAMessageWithoutHTMLIsNotJudgedOnIt covers a plain text message, or a
+// text part sent along with an attachment: it carries no HTML to be broken.
+func TestAMessageWithoutHTMLIsNotJudgedOnIt(t *testing.T) {
+	analyzer := NewAnalyzer(time.Second)
+
+	plain := func(valid bool) *Results {
+		return &Results{HTMLValid: valid, TextContent: "Hello", TextAlternative: textAltOK}
+	}
+
+	valid, _ := analyzer.scoreOf(plain(true))
+	invalid, _ := analyzer.scoreOf(plain(false))
+
+	if invalid != valid {
+		t.Errorf("a message without HTML scored %d when marked invalid, %d when valid", invalid, valid)
+	}
+}
+
 // TestImagesDrowningTheTextCostTheRatioCriterion pins the three steps of the
 // image-to-text ratio: fine, heavy, and mostly pictures.
 func TestImagesDrowningTheTextCostTheRatioCriterion(t *testing.T) {

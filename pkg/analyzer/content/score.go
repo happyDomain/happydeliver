@@ -48,12 +48,17 @@ var contentCriteria = []contentCriterion{
 		Points: func(*contentInput) (int, bool) { return 10, true },
 	},
 	{
-		// HTML that parses, or a message that is plain text and says so.
+		// HTML that parses. A message without HTML has none to judge, and
+		// leaves the scale rather than failing here: a plain text message, or
+		// a text part sent along with an attachment, is not broken HTML.
 		Name:    "html_validity",
 		Weight:  10,
 		Answers: []*reading.Defect{defectBrokenHTML},
 		Points: func(in *contentInput) (int, bool) {
-			if in.Results.HTMLValid || (!in.Results.IsMultipart && in.Results.HasPlaintext()) {
+			if in.Results.HTMLContent == "" {
+				return 0, false
+			}
+			if in.Results.HTMLValid {
 				return 10, true
 			}
 			return 0, true
@@ -72,9 +77,9 @@ var contentCriteria = []contentCriterion{
 		},
 	},
 	{
-		// Links that lead somewhere (a destination that answers, and a URL
-		// that designates one at all) and not so many of them that the
-		// message is mostly destinations.
+		// Links that lead somewhere: a destination that answers, and a URL
+		// that designates one at all. How many there are is charged apart,
+		// by excessiveLinksCheck.
 		Name:    "links",
 		Weight:  25,
 		Answers: []*reading.Defect{defectDeadLink, defectUnreplacedTemplate},
@@ -87,7 +92,7 @@ var contentCriteria = []contentCriterion{
 				if in.Results.BodyTruncated {
 					return 0, false
 				}
-				// No link at all is the safest a message can be.
+				// No link at all: none of them can be broken.
 				return 25, true
 			}
 
@@ -105,12 +110,11 @@ var contentCriteria = []contentCriterion{
 				}
 			}
 
-			points := 20 * (len(in.Results.Links) - broken) / len(in.Results.Links)
-			if len(in.Results.Links) > 30 {
-				points -= 10
-			}
-
-			return points, true
+			// Each broken link costs its share, rounded up, so that what the
+			// criterion withholds is told apart link by link: a message whose
+			// links all answer earns the whole of it, as one carrying none
+			// does, and a single dead link among many still costs a point.
+			return 25 * (len(in.Results.Links) - broken) / len(in.Results.Links), true
 		},
 	},
 	{

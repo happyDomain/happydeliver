@@ -164,3 +164,28 @@ func suspicionConcern(kind URLSuspicionKind, rawURL string) string {
 		return ""
 	}
 }
+
+// maxLinks is how many links a message carries before it reads as a list of
+// destinations rather than a message.
+const maxLinks = 30
+
+// excessiveLinksCheck reports a message carrying more than maxLinks links.
+var excessiveLinksCheck = contentCheck{
+	Name:     "excessive_links",
+	Category: reading.CategoryDeliverability,
+	Reports:  []*reading.Defect{defectExcessiveLinks},
+	Run: func(_ context.Context, in *contentInput) ([]reading.Finding, error) {
+		if len(in.Results.Links) <= maxLinks {
+			return nil, nil
+		}
+
+		return []reading.Finding{reading.NewFinding(
+			defectExcessiveLinks,
+			model.IssueTypeExcessiveLinks,
+			model.IssueSeverityMedium,
+			"",
+			fmt.Sprintf("The message carries %d links, more than the %d a mailing needs.", len(in.Results.Links), maxLinks),
+			"Link to fewer destinations, or to a page gathering them; filters weigh a message made mostly of links as one",
+		)}, nil
+	},
+}

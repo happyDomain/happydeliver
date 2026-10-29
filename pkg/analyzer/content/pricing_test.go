@@ -22,6 +22,7 @@
 package content
 
 import (
+	"fmt"
 	"net/http"
 	"net/mail"
 	"testing"
@@ -84,7 +85,7 @@ func speakingResults() *Results {
 		Advice:   "Serve it over https:",
 	}
 
-	return &Results{
+	results := &Results{
 		// A message sent from a domain none of its links leads back to, which
 		// is what the off-domain check looks for. Every destination below is
 		// under example.com, so the sender's own domain is another one.
@@ -128,4 +129,11 @@ func speakingResults() *Results {
 			"R_SUSPICIOUS_IMAGES": {Name: "R_SUSPICIOUS_IMAGES"},
 		}},
 	}
+
+	// More links than a mailing needs, which is what the link count looks for.
+	for i := len(results.Links); i <= maxLinks; i++ {
+		results.Links = append(results.Links, LinkCheck{URL: fmt.Sprintf("https://example.com/%d", i), Valid: true})
+	}
+
+	return results
 }

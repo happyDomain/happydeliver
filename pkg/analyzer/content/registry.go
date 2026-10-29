@@ -58,6 +58,7 @@ var contentChecks = []contentCheck{
 	// reads the destinations the probe above established, and the count of
 	// what went unfetched, which qualifies that reading, follows it.
 	offDomainLinksCheck,
+	excessiveLinksCheck,
 
 	unprobedURLsCheck,
 

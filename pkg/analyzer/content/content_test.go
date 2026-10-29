@@ -1201,7 +1201,7 @@ func TestScoreImageShareFloor(t *testing.T) {
 	// A message answering every criterion, so that the points lost are read
 	// on the scale they are written on.
 	score := func(images []ImageCheck) int {
-		got, _ := analyzer.scoreOf(&Results{HTMLValid: true, TextContent: "hello", TextAlternative: textAltOK, Images: images})
+		got, _ := analyzer.scoreOf(&Results{HTMLValid: true, HTMLContent: "<p>hello</p>", TextContent: "hello", TextAlternative: textAltOK, Images: images})
 		return got
 	}
 

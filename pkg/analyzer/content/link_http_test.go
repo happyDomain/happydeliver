@@ -775,11 +775,11 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 	clean, _ := analyzer.scoreOf(base(nil, 200))
 	dead, _ := analyzer.scoreOf(base([]LinkHTTPFinding{notFound}, 404))
 
-	// Ten points for the link that no longer counts among the working ones,
-	// and nothing else: the links criterion is the one that grades a dead body
-	// link, so the finding that names it deducts nothing on top. One defect,
-	// one payer.
-	if want := clean - 10; dead != want {
+	// Half the links criterion, rounded up, for the one link of two that no
+	// longer counts among the working ones, and nothing else: the links criterion is
+	// the one that grades a dead body link, so the finding that names it
+	// deducts nothing on top. One defect, one payer.
+	if want := clean - 13; dead != want {
 		t.Errorf("score with a dead link = %d, want %d (clean score is %d)", dead, want, clean)
 	}
 
@@ -788,7 +788,7 @@ func TestCalculateContentScorePenalizesHTTPFindings(t *testing.T) {
 
 	// A link that never arrives carries no status code, and must still count as
 	// broken rather than as one of the working links.
-	if want := clean - 10; looping != want {
+	if want := clean - 13; looping != want {
 		t.Errorf("score with a looping link = %d, want %d (clean score is %d)", looping, want, clean)
 	}
 

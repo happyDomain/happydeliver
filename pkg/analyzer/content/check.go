@@ -69,6 +69,10 @@ var (
 	// deceptive link and an unreachable one are charged apart.
 	familyHTTPProbe = &reading.Family{Name: "http_probe", Cap: 10}
 
+	// familyLinkCount answers for a message carrying more links than a
+	// mailing needs, which costs ten points however far past the bar it goes.
+	familyLinkCount = &reading.Family{Name: "link_count", Cap: 10, PerItem: 10}
+
 	// familyHarmfulHTML answers for markup an email client blocks outright.
 	// Each tag costs a flat twenty points: they are all equally fatal to the
 	// rendering, so weighing them by severity would say nothing.

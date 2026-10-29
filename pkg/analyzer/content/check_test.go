@@ -24,6 +24,7 @@ package content
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -522,4 +523,22 @@ func TestHTMLRemarkCheckReportsWithoutCharging(t *testing.T) {
 			t.Errorf("a remark was charged %d point(s)", penalty)
 		}
 	})
+}
+
+// More than maxLinks links read as a list of destinations, told once.
+func TestExcessiveLinksCheck(t *testing.T) {
+	carrying := func(n int) *Results {
+		results := &Results{}
+		for i := range n {
+			results.Links = append(results.Links, LinkCheck{URL: fmt.Sprintf("https://example.com/%d", i), Valid: true})
+		}
+		return results
+	}
+
+	if issues := runCheck(t, excessiveLinksCheck, carrying(maxLinks)); len(issues) != 0 {
+		t.Errorf("%d links: issues = %v, want none", maxLinks, issues)
+	}
+	if issues := runCheck(t, excessiveLinksCheck, carrying(maxLinks+1)); len(issues) != 1 || issues[0].Type != model.IssueTypeExcessiveLinks {
+		t.Errorf("%d links: issues = %v, want one excessive_links", maxLinks+1, issues)
+	}
 }
