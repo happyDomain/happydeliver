@@ -281,14 +281,19 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *mailmsg.Message, authResu
 	// Check for proper MIME structure
 	analysis.HasMimeStructure = utils.PtrTo(len(email.Parts) > 0)
 
-	// Initialize headers map
+	// Initialize headers map, along with what is wrong with them
 	headers := make(map[string]model.HeaderCheck)
+	var issues []model.Issue
+	addCheck := func(headerName, importance string) {
+		check, headerIssues := h.checkHeader(email, headerName, importance)
+		headers[strings.ToLower(headerName)] = *check
+		issues = append(issues, headerIssues...)
+	}
 
 	// Check required headers
 	requiredHeaders := []string{"From", "To", "Date", "Message-ID", "Subject"}
 	for _, headerName := range requiredHeaders {
-		check := h.checkHeader(email, headerName, "required")
-		headers[strings.ToLower(headerName)] = *check
+		addCheck(headerName, "required")
 	}
 
 	// Check recommended headers
@@ -297,19 +302,16 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *mailmsg.Message, authResu
 		recommendedHeaders = append(recommendedHeaders, "reply-to")
 	}
 	for _, headerName := range recommendedHeaders {
-		check := h.checkHeader(email, headerName, "recommended")
-		headers[strings.ToLower(headerName)] = *check
+		addCheck(headerName, "recommended")
 	}
 
 	// Check MIME-Version header (recommended but absence is not penalized)
-	mimeVersionCheck := h.checkHeader(email, "MIME-Version", "recommended")
-	headers[strings.ToLower("MIME-Version")] = *mimeVersionCheck
+	addCheck("MIME-Version", "recommended")
 
 	// Check optional headers
 	optionalHeaders := []string{"List-Unsubscribe", "List-Unsubscribe-Post"}
 	for _, headerName := range optionalHeaders {
-		check := h.checkHeader(email, headerName, "newsletter")
-		headers[strings.ToLower(headerName)] = *check
+		addCheck(headerName, "newsletter")
 	}
 
 	analysis.Headers = &headers
@@ -328,14 +330,19 @@ func (h *HeaderAnalyzer) GenerateHeaderAnalysis(email *mailmsg.Message, authResu
 
 	// Header issues
 	analysis.Issues = &model.HeaderIssues{
-		Headers: issueList(h.findHeaderIssues(email)),
+		Headers: issueList(append(issues, h.findHeaderIssues(email)...)),
 	}
 
 	return analysis
 }
 
-// checkHeader checks if a header is present and valid
-func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, importance string) *model.HeaderCheck {
+// rfc5322Required are the headers RFC 5322 makes mandatory, whose absence
+// receivers hold against the message most.
+var rfc5322Required = map[string]bool{"From": true, "Date": true, "Message-ID": true}
+
+// checkHeader checks if a header is present and valid, and says what is
+// wrong with it, located at the header.
+func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, importance string) (*model.HeaderCheck, []model.Issue) {
 	value := email.GetHeaderValue(headerName)
 	present := email.HasHeader(headerName) && value != ""
 
@@ -345,65 +352,73 @@ func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, 
 		Importance: &importanceEnum,
 	}
 
-	if present {
-		check.Value = &value
+	var issues []model.Issue
+	report := func(issueType model.IssueType, severity model.IssueSeverity, message, advice string) {
+		issues = append(issues, newIssue(issueType, severity, headerName, message, advice))
+	}
 
-		// Validate specific headers
-		valid := true
-		var headerIssues []string
-
-		switch headerName {
-		case "Message-ID":
-			if !h.isValidMessageID(value) {
-				valid = false
-				headerIssues = append(headerIssues, "Invalid Message-ID format (should be <id@domain>)")
-			}
-			if len(email.Header["Message-Id"]) > 1 {
-				valid = false
-				headerIssues = append(headerIssues, fmt.Sprintf("Multiple Message-ID headers found (%d); only one is allowed", len(email.Header["Message-Id"])))
-			}
-		case "Date":
-			// Validate date format
-			if _, err := h.parseEmailDate(value); err != nil {
-				valid = false
-				headerIssues = append(headerIssues, fmt.Sprintf("Invalid date format: %v", err))
-			}
-		case "Subject":
-			// Report the text a mail client would show rather than the raw
-			// "=?UTF-8?B?...?=" encoded words.
-			if email.Subject != "" {
-				check.Value = &email.Subject
-			}
-		case "MIME-Version":
-			if stripCFWS(value) != "1.0" {
-				valid = false
-				headerIssues = append(headerIssues, fmt.Sprintf("MIME-Version should be '1.0', got '%s'", value))
-			}
-		case "From", "To", "Cc", "Bcc", "Reply-To", "Sender", "Resent-From", "Resent-To", "Return-Path":
-			// Parse address header using net/mail and get normalized address
-			if normalizedAddr, err := h.validateAddressHeader(value); err != nil {
-				valid = false
-				headerIssues = append(headerIssues, fmt.Sprintf("Invalid email address format: %v", err))
-			} else {
-				// Use the normalized address as the value
-				check.Value = &normalizedAddr
-			}
-		}
-
-		check.Valid = &valid
-		if len(headerIssues) > 0 {
-			check.Issues = &headerIssues
-		}
-	} else {
-		valid := false
-		check.Valid = &valid
+	if !present {
+		check.Valid = utils.PtrTo(false)
 		if importance == "required" {
-			issues := []string{"Required header is missing"}
-			check.Issues = &issues
+			if rfc5322Required[headerName] {
+				report(model.IssueTypeMissingHeader, model.IssueSeverityCritical,
+					fmt.Sprintf("Required header '%s' is missing", headerName),
+					fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", headerName))
+			} else {
+				report(model.IssueTypeMissingHeader, model.IssueSeverityMedium,
+					fmt.Sprintf("The %s header is missing; filters distrust messages without one.", headerName),
+					fmt.Sprintf("Add a %s header.", headerName))
+			}
+		}
+		return check, issues
+	}
+
+	check.Value = &value
+
+	switch headerName {
+	case "Message-ID":
+		if !h.isValidMessageID(value) {
+			report(model.IssueTypeInvalidMessageId, model.IssueSeverityMedium,
+				"Message-ID format is invalid",
+				"Use proper Message-ID format: <unique-id@domain.com>")
+		}
+		if n := len(email.Header["Message-Id"]); n > 1 {
+			report(model.IssueTypeDuplicateHeader, model.IssueSeverityMedium,
+				fmt.Sprintf("The message carries %d Message-ID headers; only one is allowed.", n),
+				"Have only one Message-ID header written, by the program that composes the message.")
+		}
+	case "Date":
+		if _, err := h.parseEmailDate(value); err != nil {
+			report(model.IssueTypeInvalidDate, model.IssueSeverityMedium,
+				fmt.Sprintf("The Date header cannot be read: %v", err),
+				`Write the date in the RFC 5322 format, for instance "Mon, 2 Jan 2006 15:04:05 +0000".`)
+		}
+	case "Subject":
+		// Report the text a mail client would show rather than the raw
+		// "=?UTF-8?B?...?=" encoded words.
+		if email.Subject != "" {
+			check.Value = &email.Subject
+		}
+	case "MIME-Version":
+		if stripCFWS(value) != "1.0" {
+			report(model.IssueTypeInvalidMimeVersion, model.IssueSeverityLow,
+				fmt.Sprintf("MIME-Version should be '1.0', got '%s'", value),
+				"Set MIME-Version: 1.0, the only version there is.")
+		}
+	case "From", "To", "Cc", "Bcc", "Reply-To", "Sender", "Resent-From", "Resent-To", "Return-Path":
+		// Parse address header using net/mail and get normalized address
+		if normalizedAddr, err := h.validateAddressHeader(value); err != nil {
+			report(model.IssueTypeInvalidAddress, model.IssueSeverityMedium,
+				fmt.Sprintf("The %s header is not a valid address: %v", headerName, err),
+				`Write each address as "Name <user@example.com>" or user@example.com, quoting a name that holds special characters.`)
+		} else {
+			// Use the normalized address as the value
+			check.Value = &normalizedAddr
 		}
 	}
 
-	return check
+	check.Valid = utils.PtrTo(len(issues) == 0)
+	return check, issues
 }
 
 // analyzeDomainAlignment checks domain alignment between headers and DKIM signatures
@@ -591,29 +606,11 @@ func calculateAlignmentScore(alignment *model.DomainAlignment) (int, []model.Iss
 	return c.score, c.issues
 }
 
-// findHeaderIssues identifies issues with headers, each located at the
-// header it is about. They are not charged one by one: the header score
-// weighs what is present rather than what is wrong.
+// findHeaderIssues identifies what is wrong with the headers taken together,
+// beyond what checkHeader finds in each. Header issues are not charged one by
+// one: the header score weighs what is present rather than what is wrong.
 func (h *HeaderAnalyzer) findHeaderIssues(email *mailmsg.Message) []model.Issue {
 	var issues []model.Issue
-
-	// Check for missing required headers
-	requiredHeaders := []string{"From", "Date", "Message-ID"}
-	for _, header := range requiredHeaders {
-		if !email.HasHeader(header) || email.GetHeaderValue(header) == "" {
-			issues = append(issues, newIssue(model.IssueTypeMissingHeader, model.IssueSeverityCritical, header,
-				fmt.Sprintf("Required header '%s' is missing", header),
-				fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)))
-		}
-	}
-
-	// Check Message-ID format
-	messageID := email.GetHeaderValue("Message-ID")
-	if messageID != "" && !h.isValidMessageID(messageID) {
-		issues = append(issues, newIssue(model.IssueTypeInvalidMessageId, model.IssueSeverityMedium, "Message-ID",
-			"Message-ID format is invalid",
-			"Use proper Message-ID format: <unique-id@domain.com>"))
-	}
 
 	// Check for fake reply/forward: Subject has Re:/Fwd: prefix but no thread headers
 	// email.Subject is the RFC 2047 decoded form: a "Re:" written inside an

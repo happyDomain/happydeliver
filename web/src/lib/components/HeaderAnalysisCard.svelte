@@ -19,6 +19,14 @@
     // Gravest first, as in the content card. The alert's colour no longer competes with a
     // badge naming the level, so the order is what tells a reader where to start.
     const issues = $derived((headerAnalysis.issues?.headers ?? []).slice().sort(compareBySeverity));
+    // Each header's issues, by its name: its row names them, the list above words them.
+    const issuesAt = $derived(
+        issues.reduce((byName, issue) => {
+            const name = issue.location?.toLowerCase() ?? "";
+            byName.set(name, [...(byName.get(name) ?? []), issue]);
+            return byName;
+        }, new Map<string, typeof issues>()),
+    );
     const alignmentIssues = $derived(
         (headerAnalysis.issues?.domain_alignment ?? []).slice().sort(compareBySeverity),
     );
@@ -396,14 +404,12 @@
                                         <small class="text-muted text-truncate" title={check.value}
                                             >{check.value || "-"}</small
                                         >
-                                        {#if check.issues && check.issues.length > 0}
-                                            {#each check.issues as issue, j (j)}
-                                                <div class="text-warning small">
-                                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                                    {issue}
-                                                </div>
-                                            {/each}
-                                        {/if}
+                                        {#each issuesAt.get(name.toLowerCase()) ?? [] as issue, j (j)}
+                                            <div class="text-warning small">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                {issueLabel(issue.type)}
+                                            </div>
+                                        {/each}
                                     </td>
                                 </tr>
                             {/each}

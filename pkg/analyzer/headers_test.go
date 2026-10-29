@@ -218,7 +218,7 @@ func TestCheckHeader(t *testing.T) {
 				}),
 			}
 
-			check := analyzer.checkHeader(email, tt.headerName, tt.importance)
+			check, issues := analyzer.checkHeader(email, tt.headerName, tt.importance)
 
 			if check.Present != tt.expectedPresent {
 				t.Errorf("Present = %v, want %v", check.Present, tt.expectedPresent)
@@ -234,10 +234,7 @@ func TestCheckHeader(t *testing.T) {
 				t.Errorf("Importance = %v, want %v", *check.Importance, tt.importance)
 			}
 
-			issuesLen := 0
-			if check.Issues != nil {
-				issuesLen = len(*check.Issues)
-			}
+			issuesLen := len(issues)
 			if issuesLen != tt.expectedIssuesLen {
 				t.Errorf("Issues length = %d, want %d", issuesLen, tt.expectedIssuesLen)
 			}
@@ -1032,18 +1029,15 @@ func TestCheckHeader_DateValidation(t *testing.T) {
 				}),
 			}
 
-			check := analyzer.checkHeader(email, "Date", "required")
+			check, issues := analyzer.checkHeader(email, "Date", "required")
 
 			if check.Valid != nil && *check.Valid != tt.expectedValid {
 				t.Errorf("Valid = %v, want %v", *check.Valid, tt.expectedValid)
 			}
 
-			issuesLen := 0
-			if check.Issues != nil {
-				issuesLen = len(*check.Issues)
-			}
+			issuesLen := len(issues)
 			if issuesLen != tt.expectedIssuesLen {
-				t.Errorf("Issues length = %d, want %d (issues: %v)", issuesLen, tt.expectedIssuesLen, check.Issues)
+				t.Errorf("Issues length = %d, want %d (issues: %v)", issuesLen, tt.expectedIssuesLen, issues)
 			}
 		})
 	}
@@ -1197,6 +1191,57 @@ func TestFindHeaderIssues_FakeReply(t *testing.T) {
 	}
 }
 
+func TestCheckHeaderReportsIssues(t *testing.T) {
+	analyzer := NewHeaderAnalyzer()
+	tests := []struct {
+		name, header, value, importance string
+		wantType                        model.IssueType
+		wantSeverity                    model.IssueSeverity
+	}{
+		{"missing From", "From", "", "required", model.IssueTypeMissingHeader, model.IssueSeverityCritical},
+		{"missing To", "To", "", "required", model.IssueTypeMissingHeader, model.IssueSeverityMedium},
+		{"unreadable Date", "Date", "yesterday", "required", model.IssueTypeInvalidDate, model.IssueSeverityMedium},
+		{"MIME-Version 2.0", "MIME-Version", "2.0", "recommended", model.IssueTypeInvalidMimeVersion, model.IssueSeverityLow},
+		{"malformed From", "From", "not an address", "required", model.IssueTypeInvalidAddress, model.IssueSeverityMedium},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := &mailmsg.Message{Header: createHeaderWithFields(map[string]string{tt.header: tt.value})}
+			check, issues := analyzer.checkHeader(email, tt.header, tt.importance)
+			if len(issues) != 1 || issues[0].Type != tt.wantType || issues[0].Severity != tt.wantSeverity || utils.Deref(issues[0].Location) != tt.header {
+				t.Fatalf("issues = %+v, want one %s (%s) at %s", issues, tt.wantType, tt.wantSeverity, tt.header)
+			}
+			if check.Valid == nil || *check.Valid {
+				t.Errorf("Valid = %v, want false", check.Valid)
+			}
+		})
+	}
+
+	// Two Message-ID headers
+	email := &mailmsg.Message{Header: mail.Header{"Message-Id": {"<a@example.com>", "<b@example.com>"}}}
+	if _, issues := analyzer.checkHeader(email, "Message-ID", "required"); fmt.Sprint(issueTypes(issues)) != fmt.Sprint([]model.IssueType{model.IssueTypeDuplicateHeader}) {
+		t.Errorf("duplicate Message-ID: issues = %v", issueTypes(issues))
+	}
+}
+
+// A malformed Message-ID used to be reported by checkHeader and findHeaderIssues both.
+func TestGenerateHeaderAnalysisReportsMessageIDOnce(t *testing.T) {
+	email := &mailmsg.Message{Header: createHeaderWithFields(map[string]string{
+		"From": "sender@example.com", "To": "rcpt@example.com", "Subject": "Hi",
+		"Date": "Mon, 01 Jan 2024 12:00:00 +0000", "Message-ID": "not-a-message-id",
+	})}
+	analysis := NewHeaderAnalyzer().GenerateHeaderAnalysis(email, nil)
+	n := 0
+	for _, issue := range *analysis.Issues.Headers {
+		if issue.Type == model.IssueTypeInvalidMessageId {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("invalid_message_id reported %d times, want once", n)
+	}
+}
+
 // Header issues are Issues located at their header, filed under
 // deliverability, and not charged one by one.
 func TestFindHeaderIssuesLocatesEachAtItsHeader(t *testing.T) {
@@ -1208,10 +1253,9 @@ func TestFindHeaderIssuesLocatesEachAtItsHeader(t *testing.T) {
 
 	issues := NewHeaderAnalyzer().findHeaderIssues(email)
 
+	// The missing Date and the malformed Message-ID are checkHeader's to report
 	want := map[string]model.IssueType{
-		"Date":       model.IssueTypeMissingHeader,
-		"Message-ID": model.IssueTypeInvalidMessageId,
-		"Subject":    model.IssueTypeReplyWithoutReferences,
+		"Subject": model.IssueTypeReplyWithoutReferences,
 	}
 	if len(issues) != len(want) {
 		t.Fatalf("%d issues, want %d", len(issues), len(want))

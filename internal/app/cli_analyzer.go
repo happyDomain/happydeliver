@@ -510,11 +510,6 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 						fmt.Fprintf(writer, "MISSING")
 					}
 					fmt.Fprintln(writer)
-					if hdr.Issues != nil && len(*hdr.Issues) > 0 {
-						for _, issue := range *hdr.Issues {
-							fmt.Fprintf(writer, "      - %s\n", issue)
-						}
-					}
 				}
 			}
 		}
