@@ -371,6 +371,16 @@ components:
             named here, so the defect is not listed twice while the agreement
             stays visible.
           example: ["R_SUSPICIOUS_IMAGES"]
+        penalty:
+          type: integer
+          minimum: 0
+          description: >-
+            Points the issue cost the score it was weighed in: its section's,
+            or its file's for an attachment. Issues are charged in the order
+            they are listed, so one whose cap another already reached costs
+            nothing more, and the penalties add up to what the score lost.
+            Absent where issues are not weighed one by one.
+          example: 5
 
     IssueSource:
       type: string

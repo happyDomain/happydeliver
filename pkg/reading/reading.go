@@ -342,35 +342,39 @@ func Run[In any](ctx context.Context, checks []Check[In], in In) (issues []model
 		kept = append(kept, o)
 	}
 
-	// Each family is totalled before being capped: the cap belongs to the
-	// family, not to the defect, so that two defects sharing one may not
-	// deduct twice its bound between them.
-	perFamily := make(map[*Family]int, len(checks))
+	// Each family is capped as a whole, not per defect, so that two defects
+	// sharing one may not deduct twice its bound between them. Every issue is
+	// charged its share in the order they are kept: what it costs, until its
+	// family reaches the cap, and nothing past it. The shares add up to the
+	// penalty, so a reader can tell what fixing each one brings back.
+	charged := make(map[*Family]int, len(checks))
 
 	issues = make([]model.Issue, 0, len(kept))
 	for _, o := range kept {
-		issues = append(issues, o.finding.Issue)
+		issue := o.finding.Issue
+		charge := 0
 
 		// What a finding costs is its defect's business: a check reporting a
 		// dead link and a dead unsubscribe address answers for them
 		// differently, the first being already paid for by a criterion.
-		if o.finding.Defect == nil || o.finding.Defect.Family == nil {
-			continue
+		if o.finding.Defect != nil && o.finding.Defect.Family != nil {
+			family := o.finding.Defect.Family
+			cost := 0
+			switch {
+			case family.PerSeverity != nil:
+				cost = family.PerSeverity[o.finding.Severity]
+			case family.PerItem > 0:
+				cost = family.PerItem
+			default:
+				cost = SeverityPenalty(o.finding.Severity)
+			}
+			charge = max(min(cost, family.Cap-charged[family]), 0)
+			charged[family] += charge
 		}
 
-		family := o.finding.Defect.Family
-		switch {
-		case family.PerSeverity != nil:
-			perFamily[family] += family.PerSeverity[o.finding.Severity]
-		case family.PerItem > 0:
-			perFamily[family] += family.PerItem
-		default:
-			perFamily[family] += SeverityPenalty(o.finding.Severity)
-		}
-	}
-
-	for family, total := range perFamily {
-		penalty += min(total, family.Cap)
+		issue.Penalty = &charge
+		penalty += charge
+		issues = append(issues, issue)
 	}
 
 	return issues, penalty

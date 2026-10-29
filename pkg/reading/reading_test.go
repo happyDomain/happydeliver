@@ -152,7 +152,38 @@ func TestRunCharges(t *testing.T) {
 			if penalty != test.penalty {
 				t.Errorf("charged %d point(s), want %d", penalty, test.penalty)
 			}
+
+			shares := 0
+			for _, issue := range issues {
+				shares += *issue.Penalty
+			}
+			if shares != penalty {
+				t.Errorf("the issues are charged %d point(s) between them, the reading %d", shares, penalty)
+			}
 		})
+	}
+}
+
+// TestRunChargesEachIssueItsShare pins how the penalty is split between the
+// issues: in the order they are kept, each costs what it weighs until its
+// family reaches the cap, and nothing past it.
+func TestRunChargesEachIssueItsShare(t *testing.T) {
+	family := &Family{Name: "test", Cap: 5}
+	critical := model.IssueSeverityCritical
+
+	issues, _ := Run(context.Background(), []Check[message]{
+		reports("noisy", family, critical, critical, critical),
+		reports("reporter", nil, critical),
+	}, message{})
+
+	want := []int{3, 2, 0, 0}
+	if len(issues) != len(want) {
+		t.Fatalf("reported %d issue(s), want %d", len(issues), len(want))
+	}
+	for i, issue := range issues {
+		if *issue.Penalty != want[i] {
+			t.Errorf("issue %d is charged %d point(s), want %d", i, *issue.Penalty, want[i])
+		}
 	}
 }
 
