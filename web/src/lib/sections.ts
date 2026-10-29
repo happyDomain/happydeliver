@@ -209,13 +209,30 @@ export function spamStatus(
     return undefined;
 }
 
-/** How each section of a report reads once folded. */
+/**
+ * How each section of a report reads once folded.
+ *
+ * A suggestion that costs points opens its section too, but only when no section has
+ * anything to fix: next to a real problem it would only distract, while on a report that
+ * otherwise passes, it is all that stands between the grade and an A+.
+ */
 export function sectionStatuses(report: Report): Partial<Record<SectionKey, SectionStatus>> {
     const statuses: Partial<Record<SectionKey, SectionStatus>> = {};
+    const costly = new Set<SectionKey>();
     for (const section of sectionSummaries(report)) {
+        const issues = sectionIssues(report, section.key);
         statuses[section.key] =
             (section.key === "spam" && !section.unavailable ? spamStatus(report) : undefined) ??
-            sectionStatus(sectionIssues(report, section.key), section.unavailable, section.score);
+            sectionStatus(issues, section.unavailable, section.score);
+        if (!section.unavailable && issues.some((issue) => (issue.penalty ?? 0) > 0)) {
+            costly.add(section.key);
+        }
+    }
+
+    if (!Object.values(statuses).some((status) => status?.needsAttention)) {
+        for (const key of costly) {
+            statuses[key] = { ...statuses[key]!, needsAttention: true };
+        }
     }
     return statuses;
 }

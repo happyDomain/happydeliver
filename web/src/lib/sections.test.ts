@@ -206,4 +206,33 @@ describe("sectionStatuses", () => {
             sectionStatuses(report({ rspamd: rspamd({ deliverability_score: 100 }) })).spam?.label,
         ).toBe("All checks passed");
     });
+
+    it("opens the sections whose suggestions cost points, when nothing is to be fixed", () => {
+        const bimi = analyserIssue("bimi_missing", { severity: "low", penalty: 10 });
+        const helo = analyserIssue("helo_spf_missing", { severity: "info", penalty: 0 });
+        const r = report({
+            authentication: { ...report().authentication, issues: { bimi: [bimi] } },
+            dns_results: { ...report().dns_results!, issues: { helo_spf: [helo] } },
+        });
+        const statuses = sectionStatuses(r);
+        expect(statuses.authentication).toEqual({
+            label: "1 suggestion",
+            tone: "info",
+            needsAttention: true,
+        });
+        expect(statuses.dns?.needsAttention).toBe(false);
+    });
+
+    it("leaves them folded next to a section with something to fix", () => {
+        const bimi = analyserIssue("bimi_missing", { severity: "low", penalty: 10 });
+        const weak = analyserIssue("dkim_key_weak", { severity: "medium", penalty: 5 });
+        const statuses = sectionStatuses(
+            report({
+                authentication: { ...report().authentication, issues: { bimi: [bimi] } },
+                dns_results: { ...report().dns_results!, issues: { dkim: [weak] } },
+            }),
+        );
+        expect(statuses.authentication?.needsAttention).toBe(false);
+        expect(statuses.dns?.needsAttention).toBe(true);
+    });
 });
