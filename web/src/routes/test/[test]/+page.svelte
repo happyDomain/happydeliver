@@ -20,10 +20,8 @@
         ErrorDisplay,
         HeaderAnalysisCard,
         PendingState,
-        ReportSection,
-        RspamdCard,
         ScoreCard,
-        SpamAssassinCard,
+        SpamFiltersCard,
         SummaryCard,
         TinySurvey,
     } from "#lib/components/index.js";
@@ -445,35 +443,17 @@
             {#if report.spamassassin || report.rspamd}
                 <div class="row mb-4" id="spam">
                     <div class="col-12">
-                        <ReportSection
-                            id="spam-details"
-                            title="Spam Filters"
-                            icon="bug"
-                            grade={report.summary?.spam_grade}
-                            score={report.summary?.spam_score}
+                        <SpamFiltersCard
+                            spamassassin={report.spamassassin}
+                            rspamd={report.rspamd}
+                            spamGrade={report.summary?.spam_grade}
+                            spamScore={report.summary?.spam_score}
+                            adviceAnchors={adviceAnchorsBySymbol(
+                                report.content_analysis?.html_issues,
+                            )}
                             status={statuses.spam}
                             open={opens("spam")}
-                        >
-                            <div class="card-body">
-                                <div class="row g-3">
-                                    {#if report.spamassassin}
-                                        <div class={report.rspamd ? "col-lg-6" : "col-12"}>
-                                            <SpamAssassinCard spamassassin={report.spamassassin} />
-                                        </div>
-                                    {/if}
-                                    {#if report.rspamd}
-                                        <div class={report.spamassassin ? "col-lg-6" : "col-12"}>
-                                            <RspamdCard
-                                                rspamd={report.rspamd}
-                                                adviceAnchors={adviceAnchorsBySymbol(
-                                                    report.content_analysis?.html_issues,
-                                                )}
-                                            />
-                                        </div>
-                                    {/if}
-                                </div>
-                            </div>
-                        </ReportSection>
+                        />
                     </div>
                 </div>
             {/if}

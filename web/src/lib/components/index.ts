@@ -30,6 +30,7 @@ export { default as ScoreLink } from "./ScoreLink.svelte";
 export { default as SenderOriginDisplay } from "./SenderOriginDisplay.svelte";
 export { default as RspamdCard } from "./RspamdCard.svelte";
 export { default as SpamAssassinCard } from "./SpamAssassinCard.svelte";
+export { default as SpamFiltersCard } from "./SpamFiltersCard.svelte";
 export { default as SpfRecordsDisplay } from "./SpfRecordsDisplay.svelte";
 export { default as SummaryCard } from "./SummaryCard.svelte";
 export { default as HistoryTable } from "./HistoryTable.svelte";

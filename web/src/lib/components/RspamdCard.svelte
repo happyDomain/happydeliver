@@ -1,22 +1,22 @@
 <script lang="ts">
-    import type { RspamdResult } from "#lib/api/types.gen.js";
-    import { getScoreColorClass } from "#lib/score.js";
+    import type { RspamdResult, SpamTestDetail } from "#lib/api/types.gen.js";
+    import { spamFilterSites } from "#lib/docs.js";
+    import { formatRuleScore } from "#lib/spam.js";
     import CheckCard from "./CheckCard.svelte";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import SpamRuleList from "./SpamRuleList.svelte";
+    import SpamEngine from "./SpamEngine.svelte";
+    import type { GaugeStep } from "./SpamScoreGauge.svelte";
 
     interface Props {
         rspamd: RspamdResult;
         /**
          * Symbol to the anchor of the content finding that carries its advice, for the symbols
-         * that produced one. Without it the table is a list of names and numbers: a reader
-         * seeing ZERO_FONT at +1.00 has no way of knowing that what to do about it is written
-         * out further down the page.
+         * that produced one.
          */
         adviceAnchors?: Record<string, string>;
-        open?: boolean;
     }
 
-    let { rspamd, adviceAnchors = {}, open }: Props = $props();
+    let { rspamd, adviceAnchors = {} }: Props = $props();
 
     // rspamd's built-in action ladder, used to derive the action the message
     // would have triggered: the action header is unreliable in milter setups
@@ -30,31 +30,34 @@
     // rejects elsewhere.
     const rejectThreshold = $derived(rspamd.threshold ?? RSPAMD_DEFAULT_REJECT_THRESHOLD);
 
-    const effectiveAction = $derived.by(() => {
-        if (rspamd.score >= rejectThreshold) return { label: "Reject", cls: "bg-danger" };
-        if (rspamd.score >= RSPAMD_ADD_HEADER_THRESHOLD)
-            return { label: "Add header", cls: "bg-warning" };
-        if (rspamd.score >= RSPAMD_GREYLIST_THRESHOLD)
-            return { label: "Greylist", cls: "bg-warning" };
-        return { label: "No action", cls: "bg-success" };
-    });
+    // The steps below the reject threshold only: an instance rejecting from 5 never
+    // gets to add a header at 6.
+    const steps = $derived<GaugeStep[]>([
+        ...[
+            { at: RSPAMD_GREYLIST_THRESHOLD, label: "Greylist", zone: "Greylisted" },
+            { at: RSPAMD_ADD_HEADER_THRESHOLD, label: "Add header", zone: "Spam folder" },
+        ].filter((s) => s.at < rejectThreshold),
+        { at: rejectThreshold, label: "Reject", zone: "Rejected" },
+    ]);
+
+    // What becomes of the message, in the words the gauge uses for the stretch it is in.
+    const DELIVERED = "Delivered";
+    const outcome = $derived(
+        [...steps].reverse().find((s) => rspamd.score >= s.at)?.zone ?? DELIVERED,
+    );
 
     const symbols = $derived(Object.entries(rspamd.symbols ?? {}));
 
-    // What pushed the message towards spam, worst first: the symbols to act on.
+    // What pushed the message towards spam, worst first: the symbols to act on. Each one
+    // is something to improve even when the total costs nothing, since they are listed apart
+    // from what lowered the score: FORGED_SENDER at +0.30 is still a forged sender.
     const scoring = $derived(
-        symbols.filter(([, symbol]) => symbol.score > 0).sort(([, a], [, b]) => b.score - a.score),
+        symbols.filter(([, s]) => s.score > 0).sort(([, a], [, b]) => b.score - a.score),
     );
-
-    // What lowered the score: in the sender's favour, so folded with the neutral ones below.
+    // What lowered the score: in the sender's favour, so folded.
     const helping = $derived(
-        symbols.filter(([, symbol]) => symbol.score < 0).sort(([, a], [, b]) => a.score - b.score),
+        symbols.filter(([, s]) => s.score < 0).sort(([, a], [, b]) => a.score - b.score),
     );
-
-    const checkStatus = $derived(
-        rspamd.is_spam ? "fail" : (rspamd.deliverability_score ?? 100) < 100 ? "improve" : "pass",
-    );
-
     // A symbol scoring zero neither helped nor hurt: rspamd raises a great many of
     // them to record that a check ran and had nothing to say (ARC_NA, R_SPF_NA,
     // DMARC_NA) or simply to trace what it saw (MIME_TRACE, DKIM_TRACE, ASN). On an
@@ -64,183 +67,77 @@
     // worth being able to look up, and a reader chasing one symbol in particular
     // needs to find it here. Sorted by name, since they have no score to rank them by.
     const quiet = $derived(
-        symbols.filter(([, symbol]) => symbol.score === 0).sort(([a], [b]) => a.localeCompare(b)),
+        symbols.filter(([, s]) => s.score === 0).sort(([a], [b]) => a.localeCompare(b)),
     );
+
+    /** The first symbols of a list, as a folded row says them. */
+    function names(rules: [string, SpamTestDetail][], limit = 3): string {
+        const shown = rules
+            .slice(0, limit)
+            .map(([name, s]) => `${name} ${formatRuleScore(s.score, 2)}`)
+            .join(", ");
+        return rules.length > limit ? `${shown} and ${rules.length - limit} more` : shown;
+    }
+
+    const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
 </script>
 
-{#snippet symbolRows(rows: typeof symbols)}
-    {#each rows as [symbolName, symbol] (symbolName)}
-        <tr class={symbol.score > 0 ? "table-warning" : symbol.score < 0 ? "table-success" : ""}>
-            <td>
-                <span class="font-monospace">{symbolName}</span>
-                {#if adviceAnchors[symbolName]}
-                    <!-- The symbol itself stays plain text: it is a name to read, not
-                         somewhere to go. Only the lightbulb leads to the advice. -->
-                    <a
-                        class="ms-1"
-                        href="#{adviceAnchors[symbolName]}"
-                        title="This symbol produced a finding with advice, further down in Content Analysis"
-                        aria-label="Read the advice for {symbolName}"
-                    >
-                        <i class="bi bi-lightbulb" aria-hidden="true"></i>
-                    </a>
-                {/if}
-                {#if symbol.params}
-                    <small class="d-block text-muted">
-                        {symbol.params}
-                    </small>
-                {/if}
-            </td>
-            <td class="text-end">
-                <span
-                    class={symbol.score > 0
-                        ? "text-danger fw-bold"
-                        : symbol.score < 0
-                          ? "text-success fw-bold"
-                          : "text-muted"}
-                >
-                    {symbol.score > 0 ? "+" : ""}{symbol.score.toFixed(2)}
-                </span>
-            </td>
-            <td class="small text-muted">{symbol.description ?? ""}</td>
-        </tr>
-    {/each}
-{/snippet}
-
-<CheckCard
+<SpamEngine
     id="rspamd-details"
-    class="mb-0 h-100"
-    title="rspamd"
-    status={checkStatus}
-    summary="{rspamd.score.toFixed(1)}{rspamd.threshold !== undefined
-        ? ` / ${rspamd.threshold.toFixed(1)}`
-        : ''}, {rspamd.is_spam ? 'spam' : 'not spam'}"
-    open={open ?? checkStatus !== "pass"}
+    name="rspamd"
+    subject={rspamd.server}
+    score={rspamd.score}
+    {steps}
+    base={DELIVERED}
+    verdict={outcome}
+    isSpam={rspamd.is_spam}
+    deliverabilityScore={rspamd.deliverability_score}
+    deliverabilityGrade={rspamd.deliverability_grade}
+    site={spamFilterSites.rspamd}
+    about="rspamd adds up the weight of every symbol it raises, then acts by steps: greylisting delays the message, an added header has it filed as spam, and from the last step on it is refused.{rspamd.threshold ===
+    undefined
+        ? " This instance did not say where it rejects: the threshold shown is rspamd's default."
+        : ''}"
 >
-    {#snippet aside()}
-        {#if rspamd.deliverability_score !== undefined}
-            <span class="badge bg-{getScoreColorClass(rspamd.deliverability_score)}">
-                {rspamd.deliverability_score}%
-            </span>
-        {/if}
-        {#if rspamd.deliverability_grade !== undefined}
-            <GradeDisplay grade={rspamd.deliverability_grade} size="inline" />
-        {/if}
-    {/snippet}
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <strong>Score:</strong>
-                <!-- Absent when rspamd reported no threshold: show the score alone
-                     rather than a boundary this instance may not apply. -->
-                <span class={rspamd.is_spam ? "text-danger" : "text-success"}>
-                    {rspamd.score.toFixed(2)}{#if rspamd.threshold !== undefined}
-                        / {rspamd.threshold.toFixed(1)}{/if}
-                </span>
-            </div>
-            <div class="col-md-4">
-                <strong>Classified as:</strong>
-                <span class="badge {rspamd.is_spam ? 'bg-danger' : 'bg-success'} ms-2">
-                    {rspamd.is_spam ? "SPAM" : "HAM"}
-                </span>
-            </div>
-            <div class="col-md-4">
-                <strong>Action:</strong>
-                <span class="badge {effectiveAction.cls} ms-2">
-                    {effectiveAction.label}
-                </span>
-            </div>
-        </div>
+    {#if symbols.length > 0}
+        <CheckCard
+            title="Against the message"
+            status={scoring.length === 0 ? "pass" : rspamd.is_spam ? "fail" : "improve"}
+            summary={scoring.length > 0 ? names(scoring) : "No symbol counted against it"}
+            tag={scoring.length > 0 ? plural(scoring.length, "symbol") : undefined}
+            open={scoring.length > 0}
+        >
+            {#if scoring.length > 0}
+                <div class="card-body">
+                    <SpamRuleList rules={scoring} digits={2} {adviceAnchors} />
+                </div>
+            {/if}
+        </CheckCard>
 
-        {#if symbols.length > 0}
-            <div class="mb-3">
-                {#if scoring.length > 0}
-                    <div class="table-responsive mt-2">
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th class="text-end">Score</th>
-                                    <th>Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {@render symbolRows(scoring)}
-                            </tbody>
-                        </table>
-                    </div>
-                {:else}
-                    <p class="text-muted small mb-0 mt-2">
-                        <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        No symbol counted against the message.
-                    </p>
-                {/if}
-
-                {#if helping.length > 0}
-                    <details class="passed-items mt-2">
-                        <summary>
-                            {helping.length} symbol{helping.length > 1 ? "s" : ""} in your favour
-                        </summary>
-                        <div class="table-responsive mt-2">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Symbol</th>
-                                        <th class="text-end">Score</th>
-                                        <th>Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {@render symbolRows(helping)}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                {/if}
-
-                {#if quiet.length > 0}
-                    <details class="passed-items mt-2">
-                        <summary>
-                            {quiet.length} symbol{quiet.length > 1 ? "s" : ""} that scored nothing
-                        </summary>
-                        <div class="table-responsive mt-2">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Symbol</th>
-                                        <th class="text-end">Score</th>
-                                        <th>Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {@render symbolRows(quiet)}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                {/if}
-            </div>
+        {#if helping.length > 0}
+            <CheckCard
+                title="In your favour"
+                status="pass"
+                summary={names(helping)}
+                tag={plural(helping.length, "symbol")}
+            >
+                <div class="card-body">
+                    <SpamRuleList rules={helping} digits={2} {adviceAnchors} />
+                </div>
+            </CheckCard>
         {/if}
 
-        {#if rspamd.report}
-            <details class="mt-3">
-                <summary class="cursor-pointer fw-bold">Raw Report</summary>
-                <pre class="mt-2 small p-3 rounded">{rspamd.report}</pre>
-            </details>
+        {#if quiet.length > 0}
+            <CheckCard
+                title="Scored nothing"
+                status="neutral"
+                summary={quiet.map(([name]) => name).join(", ")}
+                tag={plural(quiet.length, "symbol")}
+            >
+                <div class="card-body">
+                    <SpamRuleList rules={quiet} digits={2} {adviceAnchors} />
+                </div>
+            </CheckCard>
         {/if}
-    </div>
-</CheckCard>
-
-<style>
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    details summary {
-        user-select: none;
-    }
-
-    details summary:hover {
-        color: var(--bs-primary);
-    }
-</style>
+    {/if}
+</SpamEngine>

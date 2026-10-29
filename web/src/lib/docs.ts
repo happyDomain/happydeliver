@@ -268,3 +268,12 @@ export function rblLookupLink(rbl: string): DocLink | undefined {
     const link = rblLookups[rbl.toLowerCase()];
     return link ? { ...link, title: `Look up and request removal from ${rbl}` } : undefined;
 }
+
+/**
+ * The spam filters' own sites. Not standards, but there is no other reference for what a
+ * filter does: each documents its rules and how it adds them up.
+ */
+export const spamFilterSites = {
+    spamassassin: { label: "spamassassin.apache.org", url: "https://spamassassin.apache.org/" },
+    rspamd: { label: "rspamd.com", url: "https://rspamd.com/" },
+} satisfies Record<string, DocLink>;

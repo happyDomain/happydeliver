@@ -1,165 +1,100 @@
 <script lang="ts">
     import type { SpamAssassinResult, SpamTestDetail } from "#lib/api/types.gen.js";
-    import { getScoreColorClass } from "#lib/score.js";
+    import { spamFilterSites } from "#lib/docs.js";
+    import { formatRuleScore, inReportOrder } from "#lib/spam.js";
     import CheckCard from "./CheckCard.svelte";
-    import GradeDisplay from "./GradeDisplay.svelte";
+    import SpamRuleList from "./SpamRuleList.svelte";
+    import SpamEngine from "./SpamEngine.svelte";
 
     interface Props {
         spamassassin: SpamAssassinResult;
-        open?: boolean;
     }
 
-    let { spamassassin, open }: Props = $props();
+    let { spamassassin }: Props = $props();
 
-    const tests = $derived(Object.entries(spamassassin.test_details ?? {}));
+    // One list, in the order SpamAssassin reports them: it keeps the rules about the same
+    // thing together, so a +0.1 for DKIM_SIGNED reads beside the -0.1 for DKIM_VALID that
+    // cancels it, rather than as a fault on its own.
+    const tests = $derived(
+        inReportOrder(spamassassin.test_details ?? {}, spamassassin.report, spamassassin.tests),
+    );
 
     // DKIM_SIGNED is there whenever the message carries a signature: it only tells something
     // when no DKIM_VALID comes to vouch for that signature.
     const dkimVouched = $derived(tests.some(([name]) => name === "DKIM_VALID"));
-    const harmless = ([name, t]: [string, SpamTestDetail]) =>
-        t.score <= 0 || (name === "DKIM_SIGNED" && dkimVouched);
 
-    // What pushed the message towards spam, worst first: the rules to act on. Those that
-    // lowered the score or did nothing are the expected case and are folded away.
+    // What pushed the message towards spam, worst first: what the folded row names.
     const raising = $derived(
-        tests.filter((r) => !harmless(r)).sort(([, a], [, b]) => b.score - a.score),
+        tests
+            .filter(([name, t]) => t.score > 0 && !(name === "DKIM_SIGNED" && dkimVouched))
+            .sort(([, a], [, b]) => b.score - a.score),
     );
-    const others = $derived(tests.filter(harmless).sort(([, a], [, b]) => a.score - b.score));
 
-    const checkStatus = $derived(
+    // The rules are what the verdict is made of, so they take its status: a rule adding a
+    // tenth of a point does not call for a change when the score, all told, costs nothing.
+    const rulesStatus = $derived(
         spamassassin.is_spam
             ? "fail"
-            : (spamassassin.deliverability_score ?? 100) < 100
+            : (spamassassin.deliverability_score ?? (spamassassin.score > 0 ? 0 : 100)) < 100
               ? "improve"
               : "pass",
     );
+
+    /** The first rules of a list, as a folded row says them. */
+    function names(rules: [string, SpamTestDetail][], limit = 3): string {
+        const shown = rules
+            .slice(0, limit)
+            .map(([name, t]) => `${name} ${formatRuleScore(t.score)}`)
+            .join(", ");
+        return rules.length > limit ? `${shown} and ${rules.length - limit} more` : shown;
+    }
+
+    const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
 </script>
 
-<CheckCard
+<SpamEngine
     id="spamassassin-details"
-    class="mb-0 h-100"
-    title="SpamAssassin"
-    status={checkStatus}
-    summary="{spamassassin.score.toFixed(1)} / {spamassassin.required_score.toFixed(
-        1,
-    )}, {spamassassin.is_spam ? 'spam' : 'not spam'}"
-    open={open ?? checkStatus !== "pass"}
+    name="SpamAssassin"
+    subject={spamassassin.version}
+    score={spamassassin.score}
+    steps={[{ at: spamassassin.required_score, label: "Spam", zone: "Spam" }]}
+    base="Not spam"
+    verdict={spamassassin.is_spam ? "Spam" : "Not spam"}
+    isSpam={spamassassin.is_spam}
+    deliverabilityScore={spamassassin.deliverability_score}
+    deliverabilityGrade={spamassassin.deliverability_grade}
+    site={spamFilterSites.spamassassin}
+    about="SpamAssassin adds up the weight of every rule the message triggers. From the threshold on, the receiver files it as spam; below it, every point still makes the next filter less forgiving."
 >
-    {#snippet aside()}
-        {#if spamassassin.deliverability_score !== undefined}
-            <span class="badge bg-{getScoreColorClass(spamassassin.deliverability_score)}">
-                {spamassassin.deliverability_score}%
-            </span>
-        {/if}
-        {#if spamassassin.deliverability_grade !== undefined}
-            <GradeDisplay grade={spamassassin.deliverability_grade} size="inline" />
-        {/if}
-    {/snippet}
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <strong>Score:</strong>
-                <span class={spamassassin.is_spam ? "text-danger" : "text-success"}>
-                    {spamassassin.score.toFixed(2)} / {spamassassin.required_score.toFixed(1)}
-                </span>
+    {#if tests.length > 0}
+        <CheckCard
+            title="Rules"
+            status={rulesStatus}
+            summary={rulesStatus !== "pass"
+                ? `Against the message: ${names(raising)}`
+                : spamassassin.score < 0
+                  ? `In the message's favour overall, ${formatRuleScore(spamassassin.score)}`
+                  : "Nothing counted against the message"}
+            tag={plural(tests.length, "rule")}
+            open={rulesStatus !== "pass"}
+        >
+            <div class="card-body">
+                <SpamRuleList rules={tests} />
             </div>
-            <div class="col-md-6">
-                <strong>Classified as:</strong>
-                <span class="badge {spamassassin.is_spam ? 'bg-danger' : 'bg-success'} ms-2">
-                    {spamassassin.is_spam ? "SPAM" : "HAM"}
-                </span>
-            </div>
-        </div>
-
-        {#if tests.length > 0}
-            {#if raising.length > 0}
-                <p class="small text-muted mb-1">
-                    Rules that raised the score, the ones weighing the most first:
-                </p>
-                {@render testTable(raising)}
-            {:else}
-                <p class="small text-muted mb-2">
-                    <i class="bi bi-check-circle-fill text-success me-1"></i>
-                    No rule counted against the message.
-                </p>
-            {/if}
-            {#if others.length > 0}
-                <details class="passed-items mb-2">
-                    <summary>
-                        {others.length} rule{others.length > 1 ? "s" : ""} in your favour or neutral
-                    </summary>
-                    <div class="mt-2">{@render testTable(others)}</div>
-                </details>
-            {/if}
-        {:else if spamassassin.tests && spamassassin.tests.length > 0}
-            <div class="mb-2">
-                <strong>Tests Triggered:</strong>
-                <div class="mt-2">
-                    {#each spamassassin.tests as test (test)}
-                        <span class="badge text-bg-light me-1 mb-1">{test}</span>
-                    {/each}
-                </div>
-            </div>
-        {/if}
-
-        {#if spamassassin.report}
-            <details class="mt-3">
-                <summary class="cursor-pointer fw-bold">Raw Report</summary>
-                <pre class="mt-2 small p-3 rounded">{spamassassin.report}</pre>
-            </details>
-        {/if}
-    </div>
-</CheckCard>
-
-{#snippet testTable(rows: [string, SpamTestDetail][])}
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-2">
-            <thead>
-                <tr>
-                    <th>Test Name</th>
-                    <th class="text-end">Score</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                {#each rows as [testName, detail] (testName)}
-                    <tr
-                        class={detail.score > 0
-                            ? "table-warning"
-                            : detail.score < 0
-                              ? "table-success"
-                              : ""}
-                    >
-                        <td class="font-monospace">{testName}</td>
-                        <td class="text-end">
-                            <span
-                                class={detail.score > 0
-                                    ? "text-danger fw-bold"
-                                    : detail.score < 0
-                                      ? "text-success fw-bold"
-                                      : "text-muted"}
-                            >
-                                {detail.score > 0 ? "+" : ""}{detail.score.toFixed(1)}
-                            </span>
-                        </td>
-                        <td class="small">{detail.description || ""}</td>
-                    </tr>
+        </CheckCard>
+    {:else if spamassassin.tests && spamassassin.tests.length > 0}
+        <!-- Reports from before test_details was recorded carry only the rule names -->
+        <CheckCard
+            title="Rules triggered"
+            status="neutral"
+            summary={spamassassin.tests.join(", ")}
+            tag={plural(spamassassin.tests.length, "rule")}
+        >
+            <div class="card-body">
+                {#each spamassassin.tests as test (test)}
+                    <span class="badge text-bg-light font-monospace me-1 mb-1">{test}</span>
                 {/each}
-            </tbody>
-        </table>
-    </div>
-{/snippet}
-
-<style>
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    details summary {
-        user-select: none;
-    }
-
-    details summary:hover {
-        color: var(--bs-primary);
-    }
-</style>
+            </div>
+        </CheckCard>
+    {/if}
+</SpamEngine>
