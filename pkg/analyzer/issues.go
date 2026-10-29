@@ -29,27 +29,35 @@ import (
 // that cost it points. Each issue is charged what it actually took from the
 // score when it was found, so a cap another issue already reached costs
 // nothing more, and the penalties always add up to what the check lost.
+//
+// A check that adds bonuses may start above 100: what it loses above 100 is
+// charged to no one, as it costs nothing out of the check's 100 points.
 type checkScore struct {
 	score  int
 	issues []model.Issue
 }
 
-// cap lowers the score to max, charging the difference to the issue.
-func (c *checkScore) cap(max int, issue model.Issue) {
-	penalty := 0
-	if c.score > max {
-		penalty = c.score - max
-		c.score = max
-	}
+// charge sets the score, charging what it lost within 0 to 100 to the issue.
+func (c *checkScore) charge(score int, issue model.Issue) {
+	penalty := max(min(c.score, 100)-min(max(score, 0), 100), 0)
+	c.score = score
 	issue.Penalty = &penalty
 	c.issues = append(c.issues, issue)
 }
 
+// cap lowers the score to max, charging the difference to the issue.
+func (c *checkScore) cap(max int, issue model.Issue) {
+	c.charge(min(c.score, max), issue)
+}
+
+// deduct takes points off the score, charging them to the issue.
+func (c *checkScore) deduct(points int, issue model.Issue) {
+	c.charge(c.score-points, issue)
+}
+
 // note records an issue that costs the check nothing.
 func (c *checkScore) note(issue model.Issue) {
-	penalty := 0
-	issue.Penalty = &penalty
-	c.issues = append(c.issues, issue)
+	c.charge(c.score, issue)
 }
 
 // weighIssues turns penalties counted out of a check's own 100 points into
