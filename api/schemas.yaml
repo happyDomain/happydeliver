@@ -318,12 +318,13 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped]
+          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
             message, those from malware_detected to scan_skipped off what it
-            carries alongside. attachment_risk predates the attachment reading
+            carries alongside, and those from missing_header on off its
+            headers. attachment_risk predates the attachment reading
             and is kept for the reports that already carry it; a finding about
             an attachment now names what is wrong with it.
           example: "missing_alt"
@@ -348,7 +349,9 @@ components:
           example: "3 images carry no alt attribute"
         location:
           type: string
-          description: Where the issue was found
+          description: >-
+            Where the issue was found: a line of the body, a header, a DNS
+            record name.
           example: "HTML body line 42"
         advice:
           type: string
@@ -615,8 +618,8 @@ components:
         issues:
           type: array
           items:
-            $ref: '#/components/schemas/HeaderIssue'
-          description: Issues found in headers
+            $ref: '#/components/schemas/Issue'
+          description: Issues found in headers, the header concerned as their location
 
     HeaderCheck:
       type: object
@@ -762,31 +765,6 @@ components:
             type: string
           description: Alignment issues
           example: ["Return-Path domain does not match From domain"]
-
-    HeaderIssue:
-      type: object
-      required:
-        - header
-        - severity
-        - message
-      properties:
-        header:
-          type: string
-          description: Header name
-          example: "Date"
-        severity:
-          type: string
-          enum: [critical, high, medium, low, info]
-          description: Issue severity
-          example: "medium"
-        message:
-          type: string
-          description: Human-readable description
-          example: "Date header is in the future"
-        advice:
-          type: string
-          description: How to fix this issue
-          example: "Ensure your mail server clock is synchronized with NTP"
 
     AuthenticationResults:
       type: object

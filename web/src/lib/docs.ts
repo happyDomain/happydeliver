@@ -158,6 +158,8 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     client_compat: [docs.canIEmail],
     broken_html: [docs.canIEmail],
     homograph_url: [docs.confusables],
+    invalid_message_id: [docs.messageId],
+    reply_without_references: [docs.messageId],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

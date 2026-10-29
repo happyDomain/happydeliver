@@ -42,6 +42,9 @@ const issueLabels: Record<Issue["type"], string> = {
     archive_bomb: "Archive bomb",
     scan_error: "Scanner could not answer",
     scan_skipped: "Not fully scanned",
+    missing_header: "Missing required header",
+    invalid_message_id: "Malformed Message-ID",
+    reply_without_references: "Reply without a thread",
 };
 
 export function issueLabel(type: Issue["type"]): string {

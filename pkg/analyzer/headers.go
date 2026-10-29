@@ -623,32 +623,28 @@ func dmarcAlignment(alignment *model.DomainAlignment, dmarc *model.DMARCRecord) 
 	return level
 }
 
-// findHeaderIssues identifies issues with headers
-func (h *HeaderAnalyzer) findHeaderIssues(email *mailmsg.Message) []model.HeaderIssue {
-	var issues []model.HeaderIssue
+// findHeaderIssues identifies issues with headers, each located at the
+// header it is about. They are not charged one by one: the header score
+// weighs what is present rather than what is wrong.
+func (h *HeaderAnalyzer) findHeaderIssues(email *mailmsg.Message) []model.Issue {
+	var issues []model.Issue
 
 	// Check for missing required headers
 	requiredHeaders := []string{"From", "Date", "Message-ID"}
 	for _, header := range requiredHeaders {
 		if !email.HasHeader(header) || email.GetHeaderValue(header) == "" {
-			issues = append(issues, model.HeaderIssue{
-				Header:   header,
-				Severity: model.HeaderIssueSeverityCritical,
-				Message:  fmt.Sprintf("Required header '%s' is missing", header),
-				Advice:   utils.PtrTo(fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)),
-			})
+			issues = append(issues, newIssue(model.IssueTypeMissingHeader, model.IssueSeverityCritical, header,
+				fmt.Sprintf("Required header '%s' is missing", header),
+				fmt.Sprintf("Add the %s header to ensure RFC 5322 compliance", header)))
 		}
 	}
 
 	// Check Message-ID format
 	messageID := email.GetHeaderValue("Message-ID")
 	if messageID != "" && !h.isValidMessageID(messageID) {
-		issues = append(issues, model.HeaderIssue{
-			Header:   "Message-ID",
-			Severity: model.HeaderIssueSeverityMedium,
-			Message:  "Message-ID format is invalid",
-			Advice:   utils.PtrTo("Use proper Message-ID format: <unique-id@domain.com>"),
-		})
+		issues = append(issues, newIssue(model.IssueTypeInvalidMessageId, model.IssueSeverityMedium, "Message-ID",
+			"Message-ID format is invalid",
+			"Use proper Message-ID format: <unique-id@domain.com>"))
 	}
 
 	// Check for fake reply/forward: Subject has Re:/Fwd: prefix but no thread headers
@@ -659,12 +655,9 @@ func (h *HeaderAnalyzer) findHeaderIssues(email *mailmsg.Message) []model.Header
 		subject = email.GetHeaderValue("Subject")
 	}
 	if h.hasReplyPrefix(subject) && !email.HasHeader("References") && !email.HasHeader("In-Reply-To") {
-		issues = append(issues, model.HeaderIssue{
-			Header:   "Subject",
-			Severity: model.HeaderIssueSeverityHigh,
-			Message:  "Subject indicates a reply or forward but no References or In-Reply-To header is present",
-			Advice:   utils.PtrTo("Remove the Re:/Fwd: prefix from the subject, or add References/In-Reply-To headers if this is a genuine reply"),
-		})
+		issues = append(issues, newIssue(model.IssueTypeReplyWithoutReferences, model.IssueSeverityHigh, "Subject",
+			"Subject indicates a reply or forward but no References or In-Reply-To header is present",
+			"Remove the Re:/Fwd: prefix from the subject, or add References/In-Reply-To headers if this is a genuine reply"))
 	}
 
 	return issues

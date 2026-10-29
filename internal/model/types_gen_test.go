@@ -114,10 +114,6 @@ func TestEnumValidKnownMembers(t *testing.T) {
 			HeaderCheckImportanceNewsletter.Valid, HeaderCheckImportanceOptional.Valid,
 			HeaderCheckImportanceRecommended.Valid, HeaderCheckImportanceRequired.Valid,
 		}},
-		{"HeaderIssueSeverity", []func() bool{
-			HeaderIssueSeverityCritical.Valid, HeaderIssueSeverityHigh.Valid, HeaderIssueSeverityInfo.Valid,
-			HeaderIssueSeverityLow.Valid, HeaderIssueSeverityMedium.Valid,
-		}},
 		{"IPRevResultResult", []func() bool{
 			IPRevResultResultFail.Valid, IPRevResultResultPass.Valid, IPRevResultResultPermerror.Valid,
 			IPRevResultResultTemperror.Valid,
@@ -230,7 +226,6 @@ func TestEnumValidRejectsUnknown(t *testing.T) {
 		DMARCRecordSubdomainPolicy(bogus).Valid,
 		DomainTestResponseGrade(bogus).Valid,
 		HeaderCheckImportance(bogus).Valid,
-		HeaderIssueSeverity(bogus).Valid,
 		IPRevResultResult(bogus).Valid,
 		LinkCheckStatus(bogus).Valid,
 		ReportGrade(bogus).Valid,

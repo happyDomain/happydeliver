@@ -523,8 +523,12 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 		if header.Issues != nil && len(*header.Issues) > 0 {
 			fmt.Fprintln(writer, "\n  Header Issues:")
 			for _, issue := range *header.Issues {
+				header := ""
+				if issue.Location != nil {
+					header = *issue.Location
+				}
 				fmt.Fprintf(writer, "    [%s] %s: %s\n",
-					strings.ToUpper(string(issue.Severity)), issue.Header, issue.Message)
+					strings.ToUpper(string(issue.Severity)), header, issue.Message)
 				if issue.Advice != nil {
 					fmt.Fprintf(writer, "      Advice: %s\n", *issue.Advice)
 				}

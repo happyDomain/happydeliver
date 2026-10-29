@@ -1184,6 +1184,38 @@ func TestFindHeaderIssues_FakeReply(t *testing.T) {
 	}
 }
 
+// Header issues are Issues located at their header, filed under
+// deliverability, and not charged one by one.
+func TestFindHeaderIssuesLocatesEachAtItsHeader(t *testing.T) {
+	email := &mailmsg.Message{Header: createHeaderWithFields(map[string]string{
+		"From":       "sender@example.com",
+		"Message-ID": "not-an-id",
+		"Subject":    "Re: hello",
+	})}
+
+	issues := NewHeaderAnalyzer().findHeaderIssues(email)
+
+	want := map[string]model.IssueType{
+		"Date":       model.IssueTypeMissingHeader,
+		"Message-ID": model.IssueTypeInvalidMessageId,
+		"Subject":    model.IssueTypeReplyWithoutReferences,
+	}
+	if len(issues) != len(want) {
+		t.Fatalf("%d issues, want %d", len(issues), len(want))
+	}
+	for _, issue := range issues {
+		if issue.Location == nil || want[*issue.Location] != issue.Type {
+			t.Errorf("%s located at %v", issue.Type, issue.Location)
+		}
+		if issue.Category != model.IssueCategoryDeliverability {
+			t.Errorf("%s filed under %s", issue.Type, issue.Category)
+		}
+		if issue.Penalty != nil {
+			t.Errorf("%s charged %d, header issues are not charged", issue.Type, *issue.Penalty)
+		}
+	}
+}
+
 // Helper functions for testing
 func ptrToStr(p *string) string {
 	if p == nil {

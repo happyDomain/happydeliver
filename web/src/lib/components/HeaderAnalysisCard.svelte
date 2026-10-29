@@ -1,7 +1,8 @@
 <script lang="ts">
     import { dmarcAlignment } from "#lib/alignment.js";
     import type { DmarcRecord, HeaderAnalysis } from "#lib/api/types.gen.js";
-    import { compareBySeverity } from "#lib/issues.js";
+    import { headerDocLinks } from "#lib/docs.js";
+    import { compareBySeverity, issueLabel } from "#lib/issues.js";
     import { getScoreColorClass } from "#lib/score.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import IssueAlert from "./IssueAlert.svelte";
@@ -45,10 +46,12 @@
                 <h5>Issues</h5>
                 {#each issues as issue, i (i)}
                     <IssueAlert
-                        title={issue.header}
+                        title={issueLabel(issue.type)}
                         severity={issue.severity}
                         message={issue.message}
+                        location={issue.location}
                         advice={issue.advice}
+                        docs={headerDocLinks(issue.location ?? "")}
                     />
                 {/each}
             </div>

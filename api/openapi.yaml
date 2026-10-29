@@ -406,8 +406,6 @@ components:
       $ref: './schemas.yaml#/components/schemas/DKIMDomainInfo'
     DomainAlignment:
       $ref: './schemas.yaml#/components/schemas/DomainAlignment'
-    HeaderIssue:
-      $ref: './schemas.yaml#/components/schemas/HeaderIssue'
     AuthenticationResults:
       $ref: './schemas.yaml#/components/schemas/AuthenticationResults'
     AuthResult:
