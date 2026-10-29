@@ -57,6 +57,16 @@ const issueLabels: Record<Issue["type"], string> = {
     dkim_sha1: "DKIM signs with SHA-1",
     dkim_key_short: "DKIM key too short",
     dkim_key_weak: "Weak DKIM key",
+    dmarc_missing: "No DMARC record",
+    dmarc_invalid: "DMARC record is invalid",
+    dmarc_policy_none: "DMARC policy only monitors (p=none)",
+    dmarc_policy_quarantine: "DMARC policy could be stricter",
+    dmarc_test_mode: "DMARC test mode is on (t=y)",
+    dmarc_pct: "DMARC policy applies to part of the mail",
+    dmarc_pct_deprecated: "DMARC record uses the deprecated pct= tag",
+    dmarc_sp_weaker: "Subdomains are less protected than the domain",
+    dmarc_np_weaker: "Non-existent subdomains are less protected",
+    dmarc_deprecated_tags: "DMARC record uses deprecated tags",
 };
 
 export function issueLabel(type: Issue["type"]): string {

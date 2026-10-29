@@ -49,7 +49,7 @@ type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
 	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, listedCount int, score int, grade string, err error)
-	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord)
+	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord, issues *model.DNSIssues)
 }
 
 // APIHandler implements the ServerInterface for handling API requests
@@ -506,7 +506,7 @@ func (h *APIHandler) CheckBimi(c *gin.Context) {
 
 	localPart := utils.Deref(request.LocalPart)
 
-	bimiRecord, dmarcRecord := h.analyzer.CheckBIMI(domain, selector, localPart)
+	bimiRecord, dmarcRecord, issues := h.analyzer.CheckBIMI(domain, selector, localPart)
 
 	// Build response
 	response := model.BIMICheckResponse{
@@ -514,6 +514,7 @@ func (h *APIHandler) CheckBimi(c *gin.Context) {
 		Selector:    selector,
 		BimiRecord:  *bimiRecord,
 		DmarcRecord: dmarcRecord,
+		Issues:      issues,
 	}
 	response.LocalPart = utils.PtrToNonZero(localPart)
 

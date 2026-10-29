@@ -172,6 +172,16 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dkim_sha1: [docs.dkimKeySize],
     dkim_key_short: [docs.dkimKeySize],
     dkim_key_weak: [docs.dkimKeySize],
+    dmarc_missing: [docs.dmarc, docs.googleSenders, docs.yahooSenders],
+    dmarc_invalid: [docs.dmarcPolicy],
+    dmarc_policy_none: [docs.dmarcPolicy, docs.yahooSenders],
+    dmarc_policy_quarantine: [docs.dmarcPolicy],
+    dmarc_test_mode: [docs.dmarcbis],
+    dmarc_pct: [docs.dmarcbis],
+    dmarc_pct_deprecated: [docs.dmarcbis],
+    dmarc_sp_weaker: [docs.dmarcPolicy],
+    dmarc_np_weaker: [docs.dmarcbis],
+    dmarc_deprecated_tags: [docs.dmarcbis],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

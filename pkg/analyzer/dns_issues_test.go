@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"fmt"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -217,5 +218,52 @@ func TestDNSScoreReportsScoredChecks(t *testing.T) {
 	}
 	if results.Issues.Dkim != nil {
 		t.Errorf("DKIM issues = %v, want none: a domain test does not score DKIM", *results.Issues.Dkim)
+	}
+}
+
+func TestDMARCScoreIssues(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	policy := func(p string) *model.DMARCRecordPolicy { return utils.PtrTo(model.DMARCRecordPolicy(p)) }
+
+	tests := []struct {
+		name   string
+		record *model.DMARCRecord
+		score  int
+		types  []model.IssueType
+	}{
+		{"reject", &model.DMARCRecord{Valid: true, Policy: policy("reject")}, 105, nil},
+		{"missing", nil, 0, []model.IssueType{model.IssueTypeDmarcMissing}},
+		{"invalid", &model.DMARCRecord{Record: utils.PtrTo("v=DMARC1; p=bogus")}, 20, []model.IssueType{model.IssueTypeDmarcInvalid}},
+		{"none", &model.DMARCRecord{Valid: true, Policy: policy("none")}, 55, []model.IssueType{model.IssueTypeDmarcPolicyNone}},
+		// The bonus above 100 absorbs part of what a quarantine costs
+		{"quarantine", &model.DMARCRecord{Valid: true, Policy: policy("quarantine")}, 80, []model.IssueType{model.IssueTypeDmarcPolicyQuarantine}},
+		{"reject in test mode", &model.DMARCRecord{Valid: true, Policy: policy("reject"), TestMode: utils.PtrTo(true)}, 80, []model.IssueType{model.IssueTypeDmarcTestMode}},
+		{"weaker subdomains", &model.DMARCRecord{Valid: true, Policy: policy("reject"), SubdomainPolicy: utils.PtrTo(model.DMARCRecordSubdomainPolicy("none"))}, 75, []model.IssueType{model.IssueTypeDmarcSpWeaker}},
+		{"half applied", &model.DMARCRecord{Valid: true, Policy: policy("reject"), Percentage: utils.PtrTo(50)}, 52, []model.IssueType{model.IssueTypeDmarcPct}},
+		{"quarantine in test mode", &model.DMARCRecord{Valid: true, Policy: policy("quarantine"), TestMode: utils.PtrTo(true)}, 55, []model.IssueType{model.IssueTypeDmarcPolicyQuarantine, model.IssueTypeDmarcTestMode}},
+		// t=y has no level below none to soften it to
+		{"none in test mode", &model.DMARCRecord{Valid: true, Policy: policy("none"), TestMode: utils.PtrTo(true)}, 55, []model.IssueType{model.IssueTypeDmarcPolicyNone}},
+		{"weaker non-existent subdomains", &model.DMARCRecord{Valid: true, Policy: policy("reject"), NonexistentSubdomainPolicy: utils.PtrTo(model.DMARCRecordNonexistentSubdomainPolicy("none"))}, 75, []model.IssueType{model.IssueTypeDmarcNpWeaker}},
+		// Strict alignment earns 10 above 100, which absorb as much of a quarantine
+		{"strict alignment absorbs a quarantine", &model.DMARCRecord{Valid: true, Policy: policy("quarantine"), SpfAlignment: utils.PtrTo(model.DMARCRecordSpfAlignmentStrict), DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict)}, 90, []model.IssueType{model.IssueTypeDmarcPolicyQuarantine}},
+		{"pct=0", &model.DMARCRecord{Valid: true, Policy: policy("reject"), Percentage: utils.PtrTo(0)}, 0, []model.IssueType{model.IssueTypeDmarcPct}},
+		// sp=quarantine matches the policy in effect once t=y applies
+		{"sp judged against the policy in effect", &model.DMARCRecord{Valid: true, Policy: policy("reject"), TestMode: utils.PtrTo(true), SubdomainPolicy: utils.PtrTo(model.DMARCRecordSubdomainPolicy("quarantine"))}, 80, []model.IssueType{model.IssueTypeDmarcTestMode}},
+		{"deprecated tags", &model.DMARCRecord{Valid: true, Policy: policy("reject"), DeprecatedRf: utils.PtrTo(true), DeprecatedPct: utils.PtrTo(true), Percentage: utils.PtrTo(100)}, 105, []model.IssueType{model.IssueTypeDmarcPctDeprecated, model.IssueTypeDmarcDeprecatedTags}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			score, issues := analyzer.calculateDMARCScore(&model.DNSResults{FromDomain: "example.com", DmarcRecord: tt.record})
+			if score != tt.score {
+				t.Errorf("score = %d, want %d", score, tt.score)
+			}
+			if got := issueTypes(issues); fmt.Sprint(got) != fmt.Sprint(tt.types) {
+				t.Errorf("types = %v, want %v", got, tt.types)
+			}
+			if got := penalties(issues); got != 100-min(score, 100) {
+				t.Errorf("penalties add up to %d, the check lost %d", got, 100-min(score, 100))
+			}
+		})
 	}
 }

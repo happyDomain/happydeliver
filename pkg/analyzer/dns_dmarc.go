@@ -233,83 +233,125 @@ func (d *DNSAnalyzer) validateDMARC(record string) bool {
 	return true
 }
 
-func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (score int) {
-	if results.DmarcRecord == nil {
-		return
+// calculateDMARCScore scores the DMARC policy of the From domain. A sound
+// policy earns bonuses taking it above 100, which the issues are not charged
+// for: each costs what it takes from the check's 100 points.
+func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []model.Issue) {
+	dmarc := results.DmarcRecord
+	domain := results.FromDomain
+	if dmarc != nil && dmarc.Domain != nil && *dmarc.Domain != "" {
+		domain = *dmarc.Domain
 	}
 
-	if !results.DmarcRecord.Valid {
-		if results.DmarcRecord.Record != nil {
-			// Partial credit if a DMARC record exists but has issues
-			score += 20
-		}
-		return
-	}
-
-	score += 50
-
-	// Determine effective policy: DMARCbis t=y downgrades policy one level.
-	effectivePolicy := "none"
-	if results.DmarcRecord.Policy != nil {
-		effectivePolicy = string(*results.DmarcRecord.Policy)
-	}
-	testMode := results.DmarcRecord.TestMode != nil && *results.DmarcRecord.TestMode
-	if testMode {
-		switch effectivePolicy {
-		case "reject":
-			effectivePolicy = "quarantine"
-		case "quarantine":
-			effectivePolicy = "none"
-		}
-	}
-
-	// Bonus/penalty for policy strength
-	switch effectivePolicy {
-	case "reject":
-		score += 25
-	case "none":
-		score -= 25
-	}
-
-	// Bonus points for strict alignment modes
-	if results.DmarcRecord.SpfAlignment != nil && *results.DmarcRecord.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
-		score += 5
-	}
-	if results.DmarcRecord.DkimAlignment != nil && *results.DmarcRecord.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
-		score += 5
-	}
-
-	// Subdomain policy scoring (sp tag): +15 for equal-or-stricter, -15 for weaker
-	if results.DmarcRecord.SubdomainPolicy != nil {
-		subPolicy := string(*results.DmarcRecord.SubdomainPolicy)
-		if dmarcPolicyStrength[subPolicy] >= dmarcPolicyStrength[effectivePolicy] {
-			score += 15
+	if dmarc == nil || !dmarc.Valid {
+		c := checkScore{score: 100}
+		if dmarc == nil || dmarc.Record == nil {
+			c.cap(0, newIssue(model.IssueTypeDmarcMissing, model.IssueSeverityHigh, domain,
+				fmt.Sprintf("%s publishes no DMARC policy. Gmail and Yahoo require one from bulk senders.", domain),
+				fmt.Sprintf(`Publish a TXT record at _dmarc.%s, starting with "v=DMARC1; p=none; rua=mailto:<address>" to collect reports, then move to p=quarantine and p=reject once all your mail passes.`, domain)))
 		} else {
-			score -= 15
+			// Partial credit if a DMARC record exists but has issues
+			message := "Receivers cannot parse the DMARC record and ignore it."
+			if dmarc.Error != nil {
+				message = *dmarc.Error
+			}
+			c.cap(20, newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityHigh, domain, message,
+				"Fix the syntax of the record: it must start with v=DMARC1 and use only known tags."))
 		}
-	} else {
-		score += 15 // inherits main policy — good default
+		return c.score, c.issues
 	}
 
-	// Non-existent subdomain policy scoring (np tag, DMARCbis): +15 for equal-or-stricter, -15 for weaker
-	effectiveSubPolicy := effectivePolicy
-	if results.DmarcRecord.SubdomainPolicy != nil {
-		effectiveSubPolicy = string(*results.DmarcRecord.SubdomainPolicy)
+	// The best policy is worth 105, then strict alignment modes add 5 each.
+	c := checkScore{score: 105}
+	if dmarc.SpfAlignment != nil && *dmarc.SpfAlignment == model.DMARCRecordSpfAlignmentStrict {
+		c.score += 5
 	}
-	if results.DmarcRecord.NonexistentSubdomainPolicy == nil {
-		score += 15 // inherits subdomain/main policy — good default
-	} else if dmarcPolicyStrength[string(*results.DmarcRecord.NonexistentSubdomainPolicy)] >= dmarcPolicyStrength[effectiveSubPolicy] {
-		score += 15
-	} else {
-		score -= 15
+	if dmarc.DkimAlignment != nil && *dmarc.DkimAlignment == model.DMARCRecordDkimAlignmentStrict {
+		c.score += 5
+	}
+
+	// What the policy costs, as published: reject earns 25, none loses 25.
+	policy := "none"
+	if dmarc.Policy != nil {
+		policy = string(*dmarc.Policy)
+	}
+	switch policy {
+	case "quarantine":
+		c.deduct(25, newIssue(model.IssueTypeDmarcPolicyQuarantine, model.IssueSeverityLow, domain,
+			"p=quarantine sends failing mail to spam; p=reject is the strongest protection.",
+			"Move to p=reject once you are confident all your legitimate mail passes."))
+	case "none":
+		c.deduct(50, newIssue(model.IssueTypeDmarcPolicyNone, model.IssueSeverityMedium, domain,
+			"Mail failing DMARC is delivered as usual, so your domain is not protected from spoofing.",
+			"Once the aggregate reports show all your legitimate mail passing, move to p=quarantine, then p=reject."))
+	}
+
+	// DMARCbis t=y downgrades the policy one level, which costs what that
+	// level is worth on top. p=none has no level below: t=y changes nothing
+	// there, and removing it would bring nothing back.
+	effectivePolicy := policy
+	if dmarc.TestMode != nil && *dmarc.TestMode {
+		points := 0
+		switch policy {
+		case "reject":
+			effectivePolicy, points = "quarantine", 25
+		case "quarantine":
+			effectivePolicy, points = "none", 25
+		}
+		if points > 0 {
+			c.deduct(points, newIssue(model.IssueTypeDmarcTestMode, model.IssueSeverityMedium, domain,
+				"Receivers apply your policy one level softer than published.",
+				"Remove t=y once you are confident all your legitimate mail passes."))
+		}
+	}
+
+	// Subdomain policy (sp tag): one weaker than the policy in effect costs 30
+	effectiveSubPolicy := effectivePolicy
+	if dmarc.SubdomainPolicy != nil {
+		effectiveSubPolicy = string(*dmarc.SubdomainPolicy)
+		if dmarcPolicyStrength[effectiveSubPolicy] < dmarcPolicyStrength[effectivePolicy] {
+			c.deduct(30, newIssue(model.IssueTypeDmarcSpWeaker, model.IssueSeverityLow, domain,
+				fmt.Sprintf("sp=%s is weaker than the %s policy applied to the domain.", effectiveSubPolicy, effectivePolicy),
+				fmt.Sprintf("Set sp=%s, or remove sp= so subdomains inherit the main policy.", policy)))
+		}
+	}
+
+	// Non-existent subdomain policy (np tag, DMARCbis): same, against the subdomain policy
+	if dmarc.NonexistentSubdomainPolicy != nil {
+		np := string(*dmarc.NonexistentSubdomainPolicy)
+		if dmarcPolicyStrength[np] < dmarcPolicyStrength[effectiveSubPolicy] {
+			c.deduct(30, newIssue(model.IssueTypeDmarcNpWeaker, model.IssueSeverityLow, domain,
+				fmt.Sprintf("np=%s is weaker than the %s policy applied to existing subdomains, though spoofing a subdomain that does not exist is the easier attack.", np, effectiveSubPolicy),
+				fmt.Sprintf("Set np=%s, or remove np= so they inherit it.", effectiveSubPolicy)))
+		}
 	}
 
 	// pct= scaling (deprecated in DMARCbis, kept for backward compatibility).
 	// pct=0 is an anti-pattern: score it as zero enforcement.
-	if results.DmarcRecord.Percentage != nil {
-		pct := *results.DmarcRecord.Percentage
-		score = score * pct / 100
+	if dmarc.Percentage != nil && *dmarc.Percentage < 100 {
+		pct := *dmarc.Percentage
+		c.cap(c.score*pct/100, newIssue(model.IssueTypeDmarcPct, model.IssueSeverityMedium, domain,
+			fmt.Sprintf("The policy applies to %d%% of failing mail; the rest is treated as if the policy were one level softer. The pct= tag is also removed in DMARCbis.", pct),
+			"Remove pct= to apply the policy to all mail; use t=y instead if you need a test phase."))
+	} else if dmarc.DeprecatedPct != nil && *dmarc.DeprecatedPct {
+		c.note(newIssue(model.IssueTypeDmarcPctDeprecated, model.IssueSeverityInfo, domain,
+			"pct=100 is the default and DMARCbis removes the tag.",
+			"Remove pct= from the record."))
 	}
 
-	return
+	var deprecated []string
+	if dmarc.DeprecatedRf != nil && *dmarc.DeprecatedRf {
+		deprecated = append(deprecated, "rf=")
+	}
+	if dmarc.DeprecatedRi != nil && *dmarc.DeprecatedRi {
+		deprecated = append(deprecated, "ri=")
+	}
+	if len(deprecated) > 0 {
+		tags := strings.Join(deprecated, " and ")
+		c.note(newIssue(model.IssueTypeDmarcDeprecatedTags, model.IssueSeverityInfo, domain,
+			fmt.Sprintf("The record uses %s, which DMARCbis removes and receivers ignore.", tags),
+			fmt.Sprintf("Remove %s from the record.", tags)))
+	}
+
+	return c.score, c.issues
 }

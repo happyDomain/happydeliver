@@ -260,6 +260,14 @@ func (d *DNSAnalyzer) AnalyzeBIMIOnly(domain, selector, localPart string) (*mode
 	return d.checkBIMIRecord(domain, selector, localPart, dmarc), dmarc
 }
 
+// DMARCIssues is what the DMARC record of domain calls for changing, outside
+// of any test: nothing is scored, so each issue costs points of the DMARC
+// check itself.
+func (d *DNSAnalyzer) DMARCIssues(domain string, dmarc *model.DMARCRecord) *model.DNSIssues {
+	_, issues := d.calculateDMARCScore(&model.DNSResults{FromDomain: domain, DmarcRecord: dmarc})
+	return &model.DNSIssues{Dmarc: issueList(issues)}
+}
+
 // AnalyzeDomainOnly performs DNS validation for a domain without email context
 // This is useful for checking domain configuration without sending an actual email
 func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
@@ -310,12 +318,15 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 	// SPF Records: 30 points
 	spfScore, spfIssues := d.calculateSPFScore(results)
 	score += 30 * spfScore / 100
-	results.Issues = &model.DNSIssues{
-		Spf: weighIssues(spfIssues, 30, 100),
-	}
 
 	// DMARC Record: 40 points
-	score += 40 * d.calculateDMARCScore(results) / 100
+	dmarcScore, dmarcIssues := d.calculateDMARCScore(results)
+	score += 40 * dmarcScore / 100
+
+	results.Issues = &model.DNSIssues{
+		Spf:   weighIssues(spfIssues, 30, 100),
+		Dmarc: weighIssues(dmarcIssues, 40, 100),
+	}
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
@@ -358,11 +369,12 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	// something that was never actually testable.
 	spfScore, spfIssues := d.calculateSPFScore(results)
 	dkimScore, dkimIssues := d.calculateDKIMScore(results)
+	dmarcScore, dmarcIssues := d.calculateDMARCScore(results)
 
 	weightedScore := 20 * d.calculateMXScore(results)
 	weightedScore += 20 * spfScore
 	weightedScore += 20 * dkimScore
-	weightedScore += 20 * d.calculateDMARCScore(results)
+	weightedScore += 20 * dmarcScore
 	totalWeight := 80
 
 	if senderIP != "" {
@@ -373,8 +385,9 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	// Penalties are counted out of each check's own 100 points; the section
 	// weighs every check the same.
 	results.Issues = &model.DNSIssues{
-		Spf:  weighIssues(spfIssues, 20, totalWeight),
-		Dkim: weighIssues(dkimIssues, 20, totalWeight),
+		Spf:   weighIssues(spfIssues, 20, totalWeight),
+		Dkim:  weighIssues(dkimIssues, 20, totalWeight),
+		Dmarc: weighIssues(dmarcIssues, 20, totalWeight),
 	}
 
 	score := weightedScore / totalWeight
@@ -404,4 +417,13 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	}
 
 	return score, grade.Of(score)
+}
+
+// issueList is the list of a check that ran, empty rather than nil when it
+// found nothing.
+func issueList(issues []model.Issue) *[]model.Issue {
+	if issues == nil {
+		return &[]model.Issue{}
+	}
+	return &issues
 }

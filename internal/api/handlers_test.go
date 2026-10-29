@@ -142,9 +142,9 @@ func (f *fakeAnalyzer) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []mo
 	return nil, nil, 0, 0, "F", nil
 }
 
-func (f *fakeAnalyzer) CheckBIMI(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord) {
+func (f *fakeAnalyzer) CheckBIMI(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord, *model.DNSIssues) {
 	f.lastBIMIDomain, f.lastBIMISelector, f.lastBIMILocalPart = domain, selector, localPart
-	return &model.BIMIRecord{Domain: domain, Selector: selector}, nil
+	return &model.BIMIRecord{Domain: domain, Selector: selector}, nil, nil
 }
 
 func newTestHandler(t *testing.T, cfg *config.Config) (*APIHandler, *fakeStorage, *fakeAnalyzer) {
