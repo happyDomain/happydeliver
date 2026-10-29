@@ -164,7 +164,7 @@
             <!-- SPF Records (for Return-Path Domain) -->
             <SpfRecordsDisplay
                 spfRecords={dnsResults.spf_records}
-                dmarcRecord={dnsResults.dmarc_record}
+                issues={dnsResults.issues?.spf}
             />
 
             {#if !domainOnly}
