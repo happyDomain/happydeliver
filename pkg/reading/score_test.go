@@ -22,7 +22,10 @@
 package reading
 
 import (
+	"slices"
 	"testing"
+
+	"git.happydns.org/happyDeliver/internal/model"
 )
 
 // criterion builds a criterion answering a fixed number of points, or none
@@ -106,5 +109,61 @@ func TestWeigh(t *testing.T) {
 				t.Errorf("graded %d %q, want %d %q", score, grade, test.score, test.grade)
 			}
 		})
+	}
+}
+
+func TestApportion(t *testing.T) {
+	tests := []struct {
+		name    string
+		total   int
+		weights []int
+		want    []int
+	}{
+		{"in proportion", 10, []int{3, 2}, []int{6, 4}},
+		{"the largest remainders take what is left", 10, []int{1, 1, 1}, []int{4, 3, 3}},
+		{"a weight below zero takes nothing", 6, []int{-5, 2, 1}, []int{0, 4, 2}},
+		{"weights adding up to nothing take nothing", 5, []int{0, 0}, []int{0, 0}},
+		{"nothing to share", 0, []int{1, 2}, []int{0, 0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := apportion(tt.total, tt.weights); !slices.Equal(got, tt.want) {
+				t.Errorf("apportion(%d, %v) = %v, want %v", tt.total, tt.weights, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestChargeCriteria pins that what the criteria withheld is charged to the
+// findings of the defects they answer, evenly, on the full scale, on top of
+// what the checks already charged them.
+func TestChargeCriteria(t *testing.T) {
+	answered := &Defect{Name: "answered"}
+	unanswered := &Defect{Name: "unanswered"}
+	charged := 2
+	finding := func(defect *Defect, penalty *int) Finding {
+		return Finding{Issue: model.Issue{Penalty: penalty}, Defect: defect}
+	}
+
+	evaluation := Evaluation{Findings: []Finding{
+		finding(answered, nil),
+		finding(unanswered, &charged),
+		finding(answered, nil),
+	}}
+	criteria := []Criterion[message]{
+		// Withholds 10 of its 20, on a scale of 50 once the third leaves it:
+		// 20 points of the hundred, shared by the two findings answering it.
+		{Name: "a", Weight: 20, Answers: []*Defect{answered}, Points: func(message) (int, bool) { return 10, true }},
+		{Name: "b", Weight: 30, Points: func(message) (int, bool) { return 30, true }},
+		{Name: "c", Weight: 50, Answers: []*Defect{answered}, Points: func(message) (int, bool) { return 0, false }},
+	}
+
+	ChargeCriteria(criteria, message{}, &evaluation)
+
+	want := []int{10, 2, 10}
+	for i, issue := range evaluation.Issues {
+		if issue.Penalty == nil || *issue.Penalty != want[i] {
+			t.Errorf("issue %d is charged %v, want %d", i, issue.Penalty, want[i])
+		}
 	}
 }

@@ -118,7 +118,11 @@ func (c *Analyzer) Read(observed *Results) Reading {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 	defer cancel()
 
-	return reading.Evaluate(ctx, contentChecks, observed.checkInput())
+	in := observed.checkInput()
+	evaluation := reading.Evaluate(ctx, contentChecks, in)
+	reading.ChargeCriteria(contentCriteria, in, &evaluation)
+
+	return evaluation
 }
 
 // concernForURL keys a defect that is about one URL. Both the check that reads

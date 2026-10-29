@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/mail"
 	"testing"
+	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
@@ -136,4 +137,28 @@ func speakingResults() *Results {
 	}
 
 	return results
+}
+
+// What the content score lost is what its issues say fixing them brings back.
+func TestContentPenaltiesAddUpToTheScore(t *testing.T) {
+	analyzer := NewAnalyzer(time.Second)
+	for name, results := range map[string]*Results{
+		"a message carrying one of everything": speakingResults(),
+		"HTML without text, an image without alt": {HTMLValid: true, HTMLContent: "<p>hello</p>",
+			Images: []ImageCheck{{Src: "https://example.com/a.png"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			read := analyzer.Read(results)
+			score, _ := analyzer.Score(results, read)
+			sum := 0
+			for _, issue := range read.Issues {
+				if issue.Penalty != nil {
+					sum += *issue.Penalty
+				}
+			}
+			if sum != 100-score {
+				t.Errorf("penalties add up to %d, the content score lost %d", sum, 100-score)
+			}
+		})
+	}
 }
