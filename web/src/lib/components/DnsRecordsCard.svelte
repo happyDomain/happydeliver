@@ -184,10 +184,7 @@
                         fromDomain={dnsResults.from_domain}
                         issues={issues.dmarc}
                     />
-                    <BimiRecordDisplay
-                        bimiRecord={dnsResults.bimi_record}
-                        dmarcRecord={dnsResults.dmarc_record}
-                    />
+                    <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} issues={issues.bimi} />
                 </CheckList>
             {/if}
         {/if}

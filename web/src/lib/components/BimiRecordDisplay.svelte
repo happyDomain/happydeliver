@@ -1,52 +1,26 @@
 <script lang="ts">
     import type {
         BimiCheck,
-        BimiRecord,
-        DmarcRecord,
         BimiCheckMessage,
+        BimiRecord,
+        Issue,
+        VmcInfo,
     } from "#lib/api/types.gen.js";
+    import { displayName, inReadingOrder, parseDistinguishedName } from "#lib/certificate.js";
     import { docs } from "#lib/docs.js";
     import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         bimiRecord?: BimiRecord;
-        dmarcRecord?: DmarcRecord;
+        /** What the analyser found to change about BIMI. */
+        issues?: Issue[];
         /** Forces the card open or folded; by default it opens when something is wrong. */
         open?: boolean;
     }
 
-    let { bimiRecord, dmarcRecord, open }: Props = $props();
-
-    /* Only consulted when no BIMI record exists at all, to offer the
-       declination advice below. The authoritative dmarc_enforcement check is
-       not available there: the analyser only runs the checks on a record it
-       found, so this is the raw policy rather than a second opinion on it. */
-    const dmarcEnforced = $derived(
-        dmarcRecord?.policy === "quarantine" || dmarcRecord?.policy === "reject",
-    );
-
-    let checksOpen = $state(false);
-    let vmcOpen = $state(false);
+    let { bimiRecord, issues, open }: Props = $props();
 
     type Status = BimiCheck["status"];
-
-    /* The card headline grades the configuration on the same three tiers as
-       the verdict of the BIMI page, so the two cannot contradict each other.
-       Assets that fail are graded as harshly as a record that does not parse:
-       an Indicator receivers cannot validate is one they do not display, so
-       either way nothing is shown. The intermediate tier is the configuration
-       that works with a reservation (an Indicator no certificate vouches for,
-       a logo above the recommended size), which is exactly what a warning is,
-       so the tier is read off the checks rather than enumerated here. */
-    const headline: Status = $derived(
-        !bimiRecord?.record_valid || !bimiRecord?.valid
-            ? "fail"
-            : (bimiRecord.checks?.some((c) => c.status === "warning") ?? false)
-              ? "warning"
-              : "pass",
-    );
-
-    type Dot = { status: Status; label: string };
 
     /* Set when the record was found at the organizational domain because the
        queried domain publishes none of its own: it applies here, but it is not
@@ -73,148 +47,282 @@
         return `the addresses starting with ${prefixes.map((p) => `“${p}”`).join(", ")}`;
     });
 
-    /* Why section 7.1 forbids BIMI processing here, as the analyser decided
-       it: a record and assets that are fully compliant still display nothing
-       when the DMARC policy is not at enforcement. The reasons are read off
-       the check rather than recomputed from dmarcRecord, so this banner cannot
-       drift from the verdict the rest of the report shows. */
-    const dmarcBlockers: string[] = $derived.by(() => {
-        const check = bimiRecord?.checks?.find((c) => c.name === "dmarc_enforcement");
-        if (check?.status !== "fail") return [];
-        return (check.messages ?? []).filter((m) => m.severity === "error").map((m) => m.text);
-    });
+    /* How each status is painted, in one place: the checks and the criteria of
+       the certificate both read it, so a status cannot end up a different
+       colour depending on which of them renders it. */
+    const STATUS: Record<Status, { icon: string; label: string; text: string; bg: string }> = {
+        pass: {
+            icon: "bi-check-circle-fill text-success",
+            label: "Passed",
+            text: "text-body-secondary",
+            bg: "bg-success",
+        },
+        fail: {
+            icon: "bi-x-circle-fill text-danger",
+            label: "Failed",
+            text: "text-danger-emphasis",
+            bg: "bg-danger",
+        },
+        warning: {
+            icon: "bi-exclamation-triangle-fill text-warning",
+            label: "Warning",
+            text: "text-warning-emphasis",
+            bg: "bg-warning",
+        },
+        skipped: {
+            icon: "bi-dash-circle text-body-tertiary",
+            label: "Skipped",
+            text: "text-body-secondary",
+            bg: "bg-secondary",
+        },
+    };
 
-    /* Dots in the same order as the entries of the expanded view. */
-    const checksDots: Dot[] = $derived(
-        (bimiRecord?.checks ?? []).map((c) => ({
-            status: c.status,
-            label: c.description ?? c.name,
-        })),
-    );
+    const checks = $derived(bimiRecord?.checks ?? []);
+    const passed = $derived(checks.filter((c) => c.status === "pass").length);
 
     /* Optional booleans are left unset when the criterion could not be
-       evaluated (e.g. the certificate could not be downloaded or parsed);
-       that is not the same as the criterion being absent. */
+       evaluated (e.g. the certificate could not be parsed); that is not the
+       same as the criterion being absent, so it never reads as a failure. */
     function triState(value: boolean | undefined): Status {
         if (value === undefined) return "skipped";
         return value ? "pass" : "fail";
     }
 
-    const vmcDots: Dot[] = $derived.by(() => {
-        const vmc = bimiRecord?.vmc;
-        if (!vmc) return [];
+    type Criterion = { status: Status; label: string; detail?: string };
+    type CriteriaGroup = { title: string; icon: string; criteria: Criterion[] };
 
-        const dots: Dot[] = [
-            { status: triState(vmc.has_bimi_eku), label: "BIMI Extended Key Usage" },
-            { status: triState(vmc.issuer_has_bimi_eku), label: "Issuer allowed to issue VMCs" },
-            { status: triState(vmc.has_logotype), label: "Embedded logo" },
+    const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+
+    /* What the certificate vouches for, by what it is about: who issued it, the
+       mark it carries, and whether its issuance can be audited. */
+    function criteriaGroups(vmc: VmcInfo): CriteriaGroup[] {
+        const issuance: Criterion[] = [
+            {
+                status: triState(vmc.has_bimi_eku),
+                label: "Issued for BIMI",
+                detail: "BIMI Extended Key Usage",
+            },
+            {
+                status: triState(vmc.issuer_has_bimi_eku),
+                label: "Issuer allowed to issue mark certificates",
+                detail:
+                    vmc.issuer_has_bimi_eku === undefined
+                        ? "the issuer certificate is not published"
+                        : undefined,
+            },
+        ];
+        /* Only an analysis that had a set of trusted roots could reach it: without
+           them, a permanently unevaluated criterion would read as one left
+           unchecked rather than one never asked. */
+        if (vmc.chain_trusted !== undefined) {
+            issuance.push({
+                status: triState(vmc.chain_trusted),
+                label: "Chains to a trusted BIMI root",
+            });
+        }
+
+        const mark: Criterion[] = [
+            {
+                status: triState(vmc.has_logotype),
+                label: "Logo embedded",
+                detail: vmc.logo_media_type,
+            },
             {
                 status: triState(vmc.logo_hash_verified),
-                label: "Embedded logo matches its certified hash",
+                label: "Logo matches its certified hash",
+                detail: vmc.logo_hash_algorithm,
             },
-            { status: triState(vmc.has_crl_distribution_points), label: "Revocation checkable" },
+        ];
+        // Same: it needs the published logo to compare with.
+        if (vmc.logo_matches !== undefined) {
+            mark.push({
+                status: triState(vmc.logo_matches),
+                label: "Same logo as the published one",
+                detail: "at the l= URL",
+            });
+        }
+
+        const audit: Criterion[] = [
+            {
+                status: triState(vmc.has_crl_distribution_points),
+                label: "Revocation can be checked",
+                detail: "CRL distribution point",
+            },
             {
                 status: triState(vmc.sct_count === undefined ? undefined : vmc.sct_count > 0),
                 label: "Logged to Certificate Transparency",
+                detail:
+                    vmc.sct_count === undefined
+                        ? undefined
+                        : plural(vmc.sct_count, "signed timestamp", "signed timestamps"),
             },
         ];
 
-        /* Two criteria only an analysis that had both sides to compare could
-           reach: without the published logo, or without a set of trusted
-           roots, a permanently grey dot would read as a failing criterion
-           rather than as one that was never asked. */
-        if (vmc.logo_matches !== undefined) {
-            dots.push({
-                status: triState(vmc.logo_matches),
-                label: "Embedded logo matches published logo",
-            });
-        }
-        if (vmc.chain_trusted !== undefined) {
-            dots.push({
-                status: triState(vmc.chain_trusted),
-                label: "Chain leads to a trusted BIMI root",
-            });
-        }
-
-        return dots;
-    });
-
-    /* How each status is painted, in one place: the dots, the icons and the
-       badges all read it, so a status cannot end up a different colour
-       depending on which of the three renders it. */
-    const STATUS: Record<Status, { badge: string; icon: string; text: string }> = {
-        pass: { badge: "bg-success", icon: "bi-check-circle-fill", text: "text-success" },
-        fail: { badge: "bg-danger", icon: "bi-x-circle-fill", text: "text-danger" },
-        warning: {
-            badge: "bg-warning",
-            icon: "bi-exclamation-triangle-fill",
-            text: "text-warning",
-        },
-        skipped: { badge: "bg-secondary", icon: "bi-dash-circle", text: "text-muted" },
-    };
-
-    function messageColor(message: BimiCheckMessage): string {
-        if (message.severity === "info") return "text-muted";
-        return message.severity === "warning" ? "text-warning" : "text-danger";
+        return [
+            { title: "Issuance", icon: "bi-bank", criteria: issuance },
+            { title: "Mark", icon: "bi-image", criteria: mark },
+            { title: "Audit", icon: "bi-journal-check", criteria: audit },
+        ];
     }
 
-    function formatDate(date?: string): string {
-        if (!date) return "";
+    type Validity = { tone: Status; text: string; elapsed: number };
+
+    const DAY = 24 * 60 * 60 * 1000;
+
+    /* Where today falls in the validity period, and how soon it ends: the
+       analyser warns 30 days ahead, so the period reads the same. */
+    function validity(vmc: VmcInfo): Validity | undefined {
+        if (!vmc.not_before || !vmc.not_after) return undefined;
+        const from = new Date(vmc.not_before).getTime();
+        const to = new Date(vmc.not_after).getTime();
+        const now = Date.now();
+        const elapsed = Math.min(1, Math.max(0, (now - from) / (to - from || 1)));
+
+        if (now < from) {
+            return { tone: "fail", text: "not yet valid", elapsed };
+        }
+        if (now > to) {
+            const days = Math.floor((now - to) / DAY);
+            return {
+                tone: "fail",
+                text: days > 0 ? `expired ${plural(days, "day", "days")} ago` : "expired today",
+                elapsed,
+            };
+        }
+        const days = Math.floor((to - now) / DAY);
+        return {
+            tone: days < 30 ? "warning" : "pass",
+            text: days > 0 ? `expires in ${plural(days, "day", "days")}` : "expires today",
+            elapsed,
+        };
+    }
+
+    function messageColor(message: BimiCheckMessage): string {
+        if (message.severity === "info") return "text-body-secondary";
+        return message.severity === "warning" ? "text-warning-emphasis" : "text-danger-emphasis";
+    }
+
+    function formatDate(date: string): string {
         return new Date(date).toLocaleDateString();
     }
 </script>
 
-{#snippet statusDots(dots: Dot[])}
-    <span
-        class="badge bg-light border rounded-pill d-inline-flex align-items-center gap-1 py-1 px-2"
-    >
-        {#each dots as dot, i (i)}
-            <span
-                class="status-dot d-inline-block rounded-circle {STATUS[dot.status].badge}"
-                title="{dot.label}: {dot.status}"
-            ></span>
-        {/each}
-    </span>
-{/snippet}
+<!-- The certificate the a= tag points to, read as a card would be: who it is
+     issued to and by, for how long, for which domains, then what it vouches for. -->
+{#snippet certificate(vmc: VmcInfo)}
+    {@const subject = parseDistinguishedName(vmc.subject ?? "")}
+    {@const issuer = parseDistinguishedName(vmc.issuer ?? "")}
+    {@const period = validity(vmc)}
+    <div class="d-flex flex-column gap-3 mt-2 p-3 bg-body-tertiary border rounded">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-patch-check fs-3 text-body-tertiary" aria-hidden="true"></i>
+            <div class="text-break">
+                <div class="fw-semibold" title={vmc.subject}>
+                    {displayName(subject) ?? vmc.subject}
+                </div>
+                {#if vmc.issuer}
+                    <div class="small text-body-secondary" title={vmc.issuer}>
+                        issued by {displayName(issuer) ?? vmc.issuer}
+                    </div>
+                {/if}
+            </div>
+        </div>
 
-<!-- The three states an optional criterion has: unevaluated is not failed, so
-     it must never render as a failure. -->
-{#snippet presenceBadge(
-    value: boolean | undefined,
-    passLabel: string = "present",
-    failLabel: string = "missing",
-)}
-    {#if value === undefined}
-        <span class="badge bg-secondary">not evaluated</span>
-    {:else if value}
-        <span class="badge bg-success">{passLabel}</span>
-    {:else}
-        <span class="badge bg-danger">{failLabel}</span>
-    {/if}
-{/snippet}
-
-<!-- The disclosure header both collapsible sections share: a chevron, a
-     heading, and the collapsed section's verdicts folded into dots. -->
-{#snippet collapseHeader(
-    open: boolean,
-    controls: string,
-    title: string,
-    dots: Dot[],
-    toggle: () => void,
-)}
-    <button
-        type="button"
-        class="btn btn-link p-0 text-decoration-none text-muted d-flex align-items-center w-100"
-        aria-expanded={open}
-        aria-controls={controls}
-        onclick={toggle}
-    >
-        <i class="bi me-1" class:bi-chevron-right={!open} class:bi-chevron-down={open}></i>
-        <h6 class="mb-0 me-2">{title}</h6>
-        {#if !open}
-            {@render statusDots(dots)}
+        {#if period && vmc.not_before && vmc.not_after}
+            <div>
+                <div class="d-flex flex-wrap justify-content-between column-gap-3 small">
+                    <span>
+                        {formatDate(vmc.not_before)} &rarr; {formatDate(vmc.not_after)}
+                    </span>
+                    <span class={STATUS[period.tone].text}>{period.text}</span>
+                </div>
+                <div
+                    class="progress mt-1"
+                    style:--bs-progress-height="0.25rem"
+                    style:--bs-progress-bg="var(--bs-border-color)"
+                    role="progressbar"
+                    aria-label="Validity period elapsed"
+                    aria-valuenow={Math.round(period.elapsed * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                >
+                    <div
+                        class="progress-bar {STATUS[period.tone].bg}"
+                        style:width="{period.elapsed * 100}%"
+                    ></div>
+                </div>
+            </div>
         {/if}
-    </button>
+
+        {#if vmc.san_domains && vmc.san_domains.length > 0}
+            <div class="small">
+                <span class="text-body-secondary me-1">Covers</span>
+                {#each vmc.san_domains as san (san)}
+                    <span
+                        class="d-inline-block me-1 mb-1 px-1 font-monospace bg-body border rounded-1"
+                        >{san}</span
+                    >
+                {/each}
+            </div>
+        {/if}
+
+        <!-- The three groups side by side where there is room, one under another where not. -->
+        <div class="row row-cols-1 row-cols-md-3 g-3">
+            {#each criteriaGroups(vmc) as group (group.title)}
+                <section class="col">
+                    <h6 class="small text-uppercase text-body-secondary mb-1">
+                        <i class="bi {group.icon} me-1" aria-hidden="true"></i>{group.title}
+                    </h6>
+                    <ul class="list-unstyled vstack gap-1 mb-0">
+                        {#each group.criteria as criterion (criterion.label)}
+                            <li class="d-flex gap-2">
+                                <i
+                                    class="bi {STATUS[criterion.status].icon}"
+                                    role="img"
+                                    aria-label={criterion.status === "skipped"
+                                        ? "Not evaluated"
+                                        : STATUS[criterion.status].label}
+                                    title={criterion.status === "skipped"
+                                        ? "Not evaluated"
+                                        : STATUS[criterion.status].label}
+                                ></i>
+                                <span>
+                                    {criterion.label}
+                                    {#if criterion.detail}
+                                        <span class="d-block small text-body-secondary"
+                                            >{criterion.detail}</span
+                                        >
+                                    {/if}
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                </section>
+            {/each}
+        </div>
+
+        <details class="passed-items">
+            <summary>Certificate details</summary>
+            <dl class="check-facts bg-body mt-2 mb-0">
+                {#each inReadingOrder(subject) as attribute, i (i)}
+                    <dt>{attribute.label}</dt>
+                    <dd>{attribute.value}</dd>
+                {/each}
+                {#if issuer.length > 0}
+                    <dt>Issuer</dt>
+                    <dd title={vmc.issuer}>{issuer.map((a) => a.value).join(", ")}</dd>
+                {/if}
+                {#if vmc.serial_number}
+                    <dt>Serial number</dt>
+                    <dd class="font-monospace small">{vmc.serial_number}</dd>
+                {/if}
+                {#if vmc.chain_length !== undefined}
+                    <dt>Chain</dt>
+                    <dd>{plural(vmc.chain_length, "certificate", "certificates")} published</dd>
+                {/if}
+            </dl>
+        </details>
+    </div>
 {/snippet}
 
 {#if bimiRecord}
@@ -225,324 +333,153 @@
         title="Brand Indicators for Message Identification"
         tag="BIMI"
         status={!bimiRecord.record
-            ? "info"
-            : headline === "pass"
-              ? "pass"
-              : headline === "warning"
-                ? "improve"
-                : "fail"}
+            ? "neutral"
+            : bimiRecord.record_valid === false || !bimiRecord.valid
+              ? "fail"
+              : "pass"}
         summary={bimiRecord.record ?? bimiRecord.error ?? "No BIMI record (optional)"}
         summaryFoldedOnly={!!bimiRecord.record}
         docs={[docs.bimi, docs.bimiGroup]}
+        {issues}
         {open}
     >
         <div class="card-body">
-            <p class="card-text small text-muted mb-2">
-                BIMI allows your brand logo to be displayed next to your emails in supported mail
-                clients. Requires strong DMARC enforcement (quarantine or reject policy) and
-                optionally a Verified Mark Certificate (VMC).
-            </p>
-
-            <hr />
-
-            <div class="mb-2">
-                <strong>Selector:</strong> <code>{bimiRecord.selector}</code>
-                <strong class="ms-3">Domain:</strong> <code>{bimiRecord.domain}</code>
-            </div>
-            {#if dmarcBlockers.length > 0}
-                <div class="alert alert-danger">
-                    <h6 class="alert-heading">
-                        <i class="bi bi-exclamation-octagon-fill me-1"></i>
-                        This logo will not be displayed
-                    </h6>
-                    <p class="mb-2 small">
-                        A message is only considered for BIMI once the sending domain's DMARC policy
-                        is at enforcement. Receivers must not perform BIMI processing here, so no
-                        indicator is shown however compliant the record and the logo below are.
-                    </p>
-                    <ul class="mb-2 small">
-                        {#each dmarcBlockers as reason, i (i)}
-                            <li>{reason}</li>
-                        {/each}
-                    </ul>
-                    <p class="mb-0 small text-muted">
-                        Requirement from §&thinsp;7.1 of
-                        <em>draft-brand-indicators-for-message-identification</em>. See the
-                        <a href="#dns-dmarc" class="alert-link">DMARC section</a> of this report.
-                    </p>
-                </div>
-            {/if}
-            {#if inheritedFrom}
-                <div class="alert alert-info py-2">
-                    <i class="bi bi-diagram-2 me-1"></i>
-                    <code>{bimiRecord.domain}</code> publishes no BIMI record of its own: the one
-                    shown below is inherited from its organizational domain
-                    <code>{inheritedFrom}</code>. Publish a record at
-                    <code>{bimiRecord.selector}._bimi.{bimiRecord.domain}</code> to give this domain its
-                    own indicator, or a declination record to opt it out.
-                </div>
-            {/if}
-            {#if derivedFromLocalPart}
-                <div class="alert alert-info py-2">
-                    <i class="bi bi-person-badge me-1"></i>
-                    The record published at
-                    <code
-                        >{bimiRecord.requested_selector}._bimi.{bimiRecord.record_domain ??
-                            bimiRecord.domain}</code
-                    >
-                    sends this sender to a selector named after its address, so the indicator shown below
-                    is the one published at
-                    <code
-                        >{bimiRecord.selector}._bimi.{bimiRecord.record_domain ??
-                            bimiRecord.domain}</code
-                    >.
-                </div>
-            {:else if localPartScope}
-                <div class="alert alert-info py-2">
-                    <i class="bi bi-person-badge me-1"></i>
-                    This record's <code>lps=</code> tag sends {localPartScope} to a selector named after
-                    the address, so those senders can be served another indicator than the one shown below.
-                </div>
-            {/if}
-            {#if bimiRecord.avatar_preference}
-                <div class="mb-2">
-                    <strong>Avatar preference:</strong>
-                    <code>{bimiRecord.avatar_preference}</code>
-                    <span class="small text-muted ms-1">
-                        {#if bimiRecord.avatar_preference === "personal"}
-                            providers that display personal avatars are asked to prefer the sender's
-                            avatar over the brand indicator.
-                        {:else if bimiRecord.avatar_preference === "brand"}
-                            providers that display personal avatars are asked to prefer the brand
-                            indicator. This is also the default.
-                        {:else}
-                            unknown value: receivers must ignore it and fall back to
-                            <code>brand</code>, and some may treat the whole record as failing.
-                        {/if}
-                    </span>
-                </div>
-            {/if}
-            <div class="mb-2">
-                <strong>DNS record:</strong>
-                {#if bimiRecord.record_valid}
-                    <span class="badge bg-success">Valid</span>
-                {:else}
-                    <span class="badge bg-danger">Invalid</span>
+            <dl class="check-facts">
+                <dt>Queried</dt>
+                <dd><code>{bimiRecord.selector}._bimi.{bimiRecord.domain}</code></dd>
+                {#if inheritedFrom}
+                    <dt>Found at</dt>
+                    <dd>
+                        <code>{bimiRecord.selector}._bimi.{inheritedFrom}</code>
+                        <div class="small text-body-secondary">
+                            {bimiRecord.domain} has no record of its own: this one is inherited from its
+                            organizational domain. Publish one, or a declination record, to give it its
+                            own.
+                        </div>
+                    </dd>
                 {/if}
-            </div>
-            {#if bimiRecord.record}
-                <div class="mb-2">
-                    <strong>Record:</strong><br />
-                    <code class="d-block mt-1 text-break">{bimiRecord.record}</code>
-                </div>
-            {/if}
-            {#if bimiRecord.error}
-                <div class="text-danger">
-                    <strong>Error:</strong>
-                    {bimiRecord.error}
-                </div>
-            {/if}
-            {#if bimiRecord.logo_url}
-                <div class="mb-2">
-                    <strong>Logo URL:</strong>
-                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
-                    <a href={bimiRecord.logo_url} target="_blank" rel="noopener noreferrer"
-                        >{bimiRecord.logo_url}</a
-                    >
-                </div>
-            {/if}
-            {#if bimiRecord.vmc_url}
-                <div class="mb-2">
-                    <strong>VMC URL:</strong>
-                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
-                    <a href={bimiRecord.vmc_url} target="_blank" rel="noopener noreferrer"
-                        >{bimiRecord.vmc_url}</a
-                    >
-                </div>
-            {/if}
-            {#if bimiRecord.record_valid}
-                <div class="mb-2">
-                    <strong>Assets (logo, VMC):</strong>
-                    {#if bimiRecord.valid}
-                        <span class="badge bg-success">Compliant</span>
-                    {:else}
-                        <span class="badge bg-danger">Failed validation</span>
-                    {/if}
-                </div>
-            {/if}
-            {#if bimiRecord.checks && bimiRecord.checks.length > 0}
-                <hr />
-                {@render collapseHeader(
-                    checksOpen,
-                    "bimi-detailed-checks",
-                    "Detailed checks",
-                    checksDots,
-                    () => (checksOpen = !checksOpen),
-                )}
-                <ul
-                    id="bimi-detailed-checks"
-                    class="list-group list-group-flush mt-2"
-                    class:d-none={!checksOpen}
-                >
-                    {#each bimiRecord.checks as check (check.name)}
-                        <li class="list-group-item px-0">
-                            <i
-                                class="bi {STATUS[check.status].icon} {STATUS[check.status]
-                                    .text} me-1"
-                            ></i>
-                            <strong>{check.description}</strong>
-                            <span class="badge ms-2 {STATUS[check.status].badge}">
-                                {check.status}
-                            </span>
-                            {#if check.messages && check.messages.length > 0}
-                                <ul class="small mb-0 mt-1">
-                                    {#each check.messages as message, i (i)}
-                                        <li class={messageColor(message)}>
-                                            {#if message.severity === "warning" && check.status === "fail"}
-                                                <i
-                                                    class="bi bi-exclamation-triangle-fill me-1"
-                                                    title="Warning (does not cause the failure)"
-                                                ></i>
-                                            {/if}
-                                            {message.text}
-                                        </li>
-                                    {/each}
-                                </ul>
+                {#if derivedFromLocalPart}
+                    <dt>Selector</dt>
+                    <dd>
+                        <code>{bimiRecord.selector}</code>
+                        <div class="small text-body-secondary">
+                            The record at <code>{bimiRecord.requested_selector}</code> sends this sender
+                            to a selector named after its address (lps=).
+                        </div>
+                    </dd>
+                {:else if localPartScope}
+                    <dt>Senders</dt>
+                    <dd class="small text-body-secondary">
+                        lps= sends {localPartScope} to a selector named after the address, which can serve
+                        them another indicator.
+                    </dd>
+                {/if}
+                {#if bimiRecord.record}
+                    <dt>Record</dt>
+                    <dd>
+                        <code>{bimiRecord.record}</code>
+                        {#if bimiRecord.record_valid === false && bimiRecord.error}
+                            <div class="small text-danger">{bimiRecord.error}</div>
+                        {/if}
+                    </dd>
+                {:else if bimiRecord.error}
+                    <dt>Record</dt>
+                    <dd>{bimiRecord.error}</dd>
+                {/if}
+                {#if bimiRecord.avatar_preference}
+                    <dt>Avatar preference</dt>
+                    <dd>
+                        <code>{bimiRecord.avatar_preference}</code>
+                        <span class="small text-body-secondary">
+                            {#if bimiRecord.avatar_preference === "personal"}
+                                , the sender's own avatar is preferred over the brand indicator
+                            {:else if bimiRecord.avatar_preference === "brand"}
+                                , the brand indicator is preferred (the default)
+                            {:else}
+                                , unknown value: receivers fall back to <code>brand</code>
                             {/if}
+                        </span>
+                    </dd>
+                {/if}
+                {#if bimiRecord.logo_url}
+                    <dt>Logo</dt>
+                    <dd>
+                        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
+                        <a href={bimiRecord.logo_url} target="_blank" rel="noopener noreferrer"
+                            >{bimiRecord.logo_url}</a
+                        >
+                    </dd>
+                {/if}
+                {#if bimiRecord.vmc_url}
+                    <dt>Certificate</dt>
+                    <dd>
+                        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
+                        <a href={bimiRecord.vmc_url} target="_blank" rel="noopener noreferrer"
+                            >{bimiRecord.vmc_url}</a
+                        >
+                    </dd>
+                {/if}
+            </dl>
+
+            {#if checks.length > 0}
+                <!-- Every check in sight, each with its verdict: what BIMI asks of the
+                     record, the logo and the certificate is the substance of the card. -->
+                <h6 class="small text-uppercase text-body-secondary mb-1">
+                    Checks
+                    <span class="text-lowercase">({passed} of {checks.length} passed)</span>
+                </h6>
+                <ul class="list-group list-group-flush">
+                    {#each checks as check (check.name)}
+                        <li class="list-group-item d-flex gap-2 px-0 bg-transparent">
+                            <i
+                                class="bi {STATUS[check.status].icon}"
+                                role="img"
+                                aria-label={STATUS[check.status].label}
+                                title={STATUS[check.status].label}
+                            ></i>
+                            <div class="flex-grow-1 text-break">
+                                <div class="d-flex flex-wrap column-gap-2 align-items-baseline">
+                                    <span
+                                        class={check.status === "skipped"
+                                            ? "text-body-secondary"
+                                            : "fw-semibold"}>{check.description}</span
+                                    >
+                                    <span class="small {STATUS[check.status].text}">
+                                        {STATUS[check.status].label}
+                                    </span>
+                                </div>
+                                {#if check.messages && check.messages.length > 0}
+                                    <ul class="small mb-0 ps-3">
+                                        {#each check.messages as message, i (i)}
+                                            <li class={messageColor(message)}>
+                                                {#if message.severity === "warning" && check.status === "fail"}
+                                                    <i
+                                                        class="bi bi-exclamation-triangle-fill me-1"
+                                                        title="Warning (does not cause the failure)"
+                                                    ></i>
+                                                {/if}
+                                                {message.text}
+                                            </li>
+                                        {/each}
+                                    </ul>
+                                {/if}
+                                <!-- The certificate is what this check examined: it is shown
+                                     where its verdict is, unless it could not even be read,
+                                     which the messages above say. -->
+                                {#if check.name === "vmc" && bimiRecord.vmc?.subject}
+                                    {@render certificate(bimiRecord.vmc)}
+                                {/if}
+                            </div>
                         </li>
                     {/each}
                 </ul>
             {/if}
-            {#if bimiRecord.vmc}
-                <hr />
-                {@render collapseHeader(
-                    vmcOpen,
-                    "bimi-vmc-details",
-                    "Verified Mark Certificate",
-                    vmcDots,
-                    () => (vmcOpen = !vmcOpen),
-                )}
-                <div id="bimi-vmc-details" class="small mt-2" class:d-none={!vmcOpen}>
-                    {#if bimiRecord.vmc.error}
-                        <div class="alert alert-danger py-1 px-2 mb-2 small">
-                            {bimiRecord.vmc.error}
-                        </div>
-                    {/if}
-                    {#if bimiRecord.vmc.subject}
-                        <div class="mb-1 text-truncate">
-                            <strong>Subject:</strong>
-                            <code class="text-break" title={bimiRecord.vmc.subject}>
-                                {bimiRecord.vmc.subject}
-                            </code>
-                        </div>
-                    {/if}
-                    {#if bimiRecord.vmc.issuer}
-                        <div class="mb-1 text-truncate">
-                            <strong>Issuer:</strong>
-                            <code class="text-break" title={bimiRecord.vmc.issuer}>
-                                {bimiRecord.vmc.issuer}
-                            </code>
-                        </div>
-                    {/if}
-                    {#if bimiRecord.vmc.not_before && bimiRecord.vmc.not_after}
-                        <div class="mb-1">
-                            <strong>Validity:</strong>
-                            {formatDate(bimiRecord.vmc.not_before)} &rarr; {formatDate(
-                                bimiRecord.vmc.not_after,
-                            )}
-                        </div>
-                    {/if}
-                    {#if bimiRecord.vmc.san_domains && bimiRecord.vmc.san_domains.length > 0}
-                        <div class="mb-1">
-                            <strong>Covered domains:</strong>
-                            {#each bimiRecord.vmc.san_domains as san (san)}
-                                <code class="me-1">{san}</code>
-                            {/each}
-                        </div>
-                    {/if}
-                    <div class="mb-1">
-                        <strong>BIMI Extended Key Usage:</strong>
-                        {@render presenceBadge(bimiRecord.vmc.has_bimi_eku)}
-                        <strong class="ms-3">Embedded logo:</strong>
-                        {@render presenceBadge(bimiRecord.vmc.has_logotype)}
-                        {#if bimiRecord.vmc.logo_media_type}
-                            <span class="badge bg-secondary ms-1"
-                                >{bimiRecord.vmc.logo_media_type}</span
-                            >
-                        {/if}
-                        {#if bimiRecord.vmc.logo_matches === true}
-                            <span class="badge bg-success ms-1">matches published logo</span>
-                        {:else if bimiRecord.vmc.logo_matches === false}
-                            <span class="badge bg-danger ms-1">differs from published logo</span>
-                        {/if}
-                    </div>
-                    <div class="mb-1">
-                        <strong>Certified logo hash:</strong>
-                        {@render presenceBadge(
-                            bimiRecord.vmc.logo_hash_verified,
-                            `verified${
-                                bimiRecord.vmc.logo_hash_algorithm
-                                    ? ` (${bimiRecord.vmc.logo_hash_algorithm})`
-                                    : ""
-                            }`,
-                            "does not cover the embedded logo",
-                        )}
-                    </div>
-                    <div class="mb-1">
-                        <strong>Issuer Extended Key Usage:</strong>
-                        {@render presenceBadge(bimiRecord.vmc.issuer_has_bimi_eku)}
-                        <strong class="ms-3">CRL distribution point:</strong>
-                        {@render presenceBadge(bimiRecord.vmc.has_crl_distribution_points)}
-                    </div>
-                    <div class="mb-1">
-                        <strong>Certificate Transparency:</strong>
-                        {@render presenceBadge(
-                            bimiRecord.vmc.sct_count === undefined
-                                ? undefined
-                                : bimiRecord.vmc.sct_count > 0,
-                            `${bimiRecord.vmc.sct_count} signed timestamp${
-                                (bimiRecord.vmc.sct_count ?? 0) > 1 ? "s" : ""
-                            }`,
-                            "no signed timestamp",
-                        )}
-                        {#if bimiRecord.vmc.chain_trusted !== undefined}
-                            <strong class="ms-3">Issuance chain:</strong>
-                            {@render presenceBadge(
-                                bimiRecord.vmc.chain_trusted,
-                                "leads to a trusted BIMI root",
-                                "does not lead to a trusted BIMI root",
-                            )}
-                        {/if}
-                    </div>
-                </div>
-            {/if}
-            {#if !bimiRecord.record && dmarcEnforced}
-                <div class="alert alert-info mt-3 mb-0">
-                    <h6 class="alert-heading">
-                        <i class="bi bi-lightbulb me-1"></i>
-                        Explicitly decline BIMI participation
-                    </h6>
-                    <p class="mb-2 small">
-                        If you do not intend to publish a brand logo, you can add a declination
-                        record to signal that this domain deliberately opts out of BIMI. This
-                        prevents mail clients from falling back to a parent-domain record:
-                    </p>
-                    <code class="d-block bg-white rounded p-2 text-break border"
-                        >{bimiRecord.selector}._bimi.{bimiRecord.domain}. IN TXT "v=BIMI1; l=; a="</code
-                    >
-                    <p class="mt-1 mb-0 small text-muted">
-                        Declination record format as defined in §&thinsp;4.3.1 of
-                        <em>draft-brand-indicators-for-message-identification</em>.
-                    </p>
-                </div>
-            {/if}
+
+            <p class="check-about">
+                BIMI lets supporting mailboxes display your brand logo next to your messages. It
+                requires an enforced DMARC policy, and most providers also a mark certificate (VMC
+                or CMC) vouching for the logo.
+            </p>
         </div>
     </CheckCard>
 {/if}
-
-<style>
-    .status-dot {
-        width: 0.5rem;
-        height: 0.5rem;
-    }
-</style>

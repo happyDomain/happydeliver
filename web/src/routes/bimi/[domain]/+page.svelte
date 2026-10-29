@@ -255,7 +255,7 @@
                     <!-- The record is what this page is about: never folded. -->
                     <BimiRecordDisplay
                         bimiRecord={record}
-                        dmarcRecord={result.dmarc_record}
+                        issues={result.issues?.bimi}
                         open={true}
                     />
 
