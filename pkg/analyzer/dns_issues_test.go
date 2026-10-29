@@ -410,3 +410,37 @@ func TestMXIssuesOfAnotherReturnPath(t *testing.T) {
 		t.Errorf("Return-Path issues = %v, want mx_missing costing 50", rp)
 	}
 }
+
+func TestHeloSPFIssueKnowsWhoseHostnameItIs(t *testing.T) {
+	for _, tt := range []struct {
+		helo, prefix string
+	}{
+		{"mail.example.com", "Publish mail.example.com."},
+		{"relay.example.net", "Ask your email provider"},
+	} {
+		issues := heloSPFIssues(&model.DNSResults{FromDomain: "example.com", HeloSpfRecord: &model.SPFRecord{Domain: utils.PtrTo(tt.helo)}})
+		if len(issues) != 1 || issues[0].Type != model.IssueTypeHeloSpfMissing || *issues[0].Penalty != 0 {
+			t.Fatalf("%s: issues = %v, want one free helo_spf_missing", tt.helo, issues)
+		}
+		if !strings.HasPrefix(*issues[0].Advice, tt.prefix) {
+			t.Errorf("%s: advice = %q, want it to start with %q", tt.helo, *issues[0].Advice, tt.prefix)
+		}
+	}
+}
+
+func TestHeloSPFIssueVariants(t *testing.T) {
+	invalid := &model.SPFRecord{Domain: utils.PtrTo("relay.example.net"), Record: utils.PtrTo("v=spf1 bogus"), Error: utils.PtrTo("unknown mechanism")}
+	issues := heloSPFIssues(&model.DNSResults{FromDomain: "example.com", HeloSpfRecord: invalid})
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeHeloSpfInvalid || !strings.HasPrefix(*issues[0].Advice, "Report it to your email provider") {
+		t.Errorf("issues = %v, want helo_spf_invalid for the provider to fix", issues)
+	}
+	// The Return-Path domain, and its organizational domain, tell whose hostname it is
+	rp := &model.DNSResults{FromDomain: "example.org", RpDomain: utils.PtrTo("bounces.example.com"), HeloSpfRecord: &model.SPFRecord{Domain: utils.PtrTo("mail.example.com")}}
+	if issues := heloSPFIssues(rp); len(issues) != 1 || !strings.HasPrefix(*issues[0].Advice, "Publish mail.example.com.") {
+		t.Errorf("issues = %v, want the sender to publish it", issues)
+	}
+	valid := &model.DNSResults{FromDomain: "example.com", HeloSpfRecord: &model.SPFRecord{Domain: utils.PtrTo("mail.example.com"), Valid: true}}
+	if issues := heloSPFIssues(valid); issues == nil || len(issues) != 0 {
+		t.Errorf("issues = %v, want an empty list for a valid policy", issues)
+	}
+}

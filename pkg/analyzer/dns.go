@@ -395,6 +395,9 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 		Dkim:   weighIssues(dkimIssues, 20, totalWeight),
 		Dmarc:  weighIssues(dmarcIssues, 20, totalWeight),
 	}
+	if results.HeloSpfRecord != nil {
+		results.Issues.HeloSpf = issueList(heloSPFIssues(results))
+	}
 	if senderIP != "" {
 		ptr := weighIssues(ptrIssues, 20, totalWeight)
 		results.Issues.Ptr = issueList(issuesOfType(*ptr, model.IssueTypePtrMissing, model.IssueTypePtrMultiple))

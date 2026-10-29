@@ -60,6 +60,8 @@ const issueLabels: Record<Issue["type"], string> = {
     mx_missing: "No MX record",
     mx_invalid: "Invalid MX records",
     domain_unreachable: "Domain cannot receive mail",
+    helo_spf_missing: "HELO hostname publishes no SPF policy",
+    helo_spf_invalid: "SPF policy of the HELO hostname does not validate",
     dmarc_missing: "No DMARC record",
     dmarc_invalid: "DMARC record is invalid",
     dmarc_policy_none: "DMARC policy only monitors (p=none)",

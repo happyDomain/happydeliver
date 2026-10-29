@@ -318,7 +318,7 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch]
+          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
@@ -1159,6 +1159,11 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
           description: About the SPF policy of the envelope sender domain.
+        helo_spf:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the SPF policy of the hostname the sending server announced. Never charged.
         dkim:
           type: array
           items:

@@ -30,6 +30,7 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
+	"git.happydns.org/happyDeliver/pkg/domainname"
 )
 
 // checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
@@ -572,4 +573,53 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 	}
 
 	return c.score, c.issues
+}
+
+// heloSPFIssues is what the policy of the HELO hostname calls for, which
+// costs nothing: it is never scored. Who can publish it depends on whose
+// hostname it is.
+func heloSPFIssues(results *model.DNSResults) (issues []model.Issue) {
+	helo := results.HeloSpfRecord
+	if helo == nil || helo.Domain == nil || *helo.Domain == "" {
+		return nil
+	}
+	if helo.Valid {
+		return []model.Issue{}
+	}
+	host := domainname.Normalize(*helo.Domain)
+
+	sender := results.FromDomain
+	if results.RpDomain != nil && *results.RpDomain != "" {
+		sender = *results.RpDomain
+	}
+	own := false
+	for _, domain := range []string{domainname.Normalize(sender), domainname.Organizational(domainname.Normalize(sender))} {
+		if domain != "" && (host == domain || strings.HasSuffix(host, "."+domain)) {
+			own = true
+		}
+	}
+
+	c := checkScore{score: 100}
+	if helo.Record != nil {
+		reason := ""
+		if helo.Error != nil {
+			reason = ": " + *helo.Error
+		}
+		advice := fmt.Sprintf("Fix the policy published for %s.", host)
+		if !own {
+			advice = fmt.Sprintf("Report it to your email provider: %s belongs to the infrastructure that relayed your message, so only its operator can fix it.", host)
+		}
+		c.note(newIssue(model.IssueTypeHeloSpfInvalid, model.IssueSeverityInfo, host,
+			fmt.Sprintf("%s publishes a policy that cannot be evaluated%s.", host, reason), advice))
+	} else {
+		suggested := fmt.Sprintf(`%s. IN TXT "v=spf1 a -all"`, host)
+		advice := fmt.Sprintf("Publish %s. The a mechanism authorizes the address the hostname resolves to, so the record survives a change of IP.", suggested)
+		if !own {
+			advice = fmt.Sprintf("Ask your email provider to publish %s: the hostname belongs to their infrastructure, not to your domain.", suggested)
+		}
+		c.note(newIssue(model.IssueTypeHeloSpfMissing, model.IssueSeverityInfo, host,
+			fmt.Sprintf("Receivers could authenticate %s on top of the envelope sender, and it is the only identity SPF can check on a bounce. Optional: it does not affect the score.", host),
+			advice))
+	}
+	return c.issues
 }
