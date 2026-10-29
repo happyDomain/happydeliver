@@ -177,10 +177,9 @@ func TestGenerateReportFoldsDomainReputationIntoBlacklistScore(t *testing.T) {
 	// Half of the non-informational RBLs report a listing: a deterministic,
 	// middling score/grade to combine the domain reputation against.
 	rblResults := &DNSListResults{
-		Checks:              map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "zen.spamhaus.org", Listed: true}}},
-		IPsChecked:          []string{"192.0.2.1"},
-		ListedCount:         6,
-		RelevantListedCount: 6,
+		Checks:      map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "zen.spamhaus.org", Listed: true}}},
+		IPsChecked:  []string{"192.0.2.1"},
+		ListedCount: 6,
 	}
 	baseScore, baseGrade := gen.rblChecker.CalculateScore(rblResults, false)
 	if baseGrade == "" {

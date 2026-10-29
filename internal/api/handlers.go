@@ -48,7 +48,7 @@ import (
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) (reportJSON []byte, err error)
 	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
-	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, listedCount int, score int, grade string, err error)
+	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, issues []model.Issue, listedCount int, score int, grade string, err error)
 	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord, issues *model.DNSIssues)
 }
 
@@ -537,7 +537,7 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 	}
 
 	// Perform blacklist check using analyzer
-	checks, whitelists, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
+	checks, whitelists, issues, listedCount, score, grade, err := h.analyzer.CheckBlacklistIP(request.Ip)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Error{
 			Error:   "invalid_ip",
@@ -552,6 +552,7 @@ func (h *APIHandler) CheckBlacklist(c *gin.Context) {
 		Ip:          request.Ip,
 		Blacklists:  checks,
 		Whitelists:  &whitelists,
+		Issues:      &issues,
 		ListedCount: listedCount,
 		Score:       score,
 		Grade:       model.BlacklistCheckResponseGrade(grade),

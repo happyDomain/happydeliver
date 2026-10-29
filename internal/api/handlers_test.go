@@ -138,8 +138,8 @@ func (f *fakeAnalyzer) AnalyzeDomain(domain string) (*model.DNSResults, int, str
 	return &model.DNSResults{}, 0, "F"
 }
 
-func (f *fakeAnalyzer) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, int, int, string, error) {
-	return nil, nil, 0, 0, "F", nil
+func (f *fakeAnalyzer) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, []model.Issue, int, int, string, error) {
+	return nil, nil, nil, 0, 0, "F", nil
 }
 
 func (f *fakeAnalyzer) CheckBIMI(domain, selector, localPart string) (*model.BIMIRecord, *model.DMARCRecord, *model.DNSIssues) {

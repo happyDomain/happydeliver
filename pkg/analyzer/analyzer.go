@@ -143,16 +143,21 @@ func (a *APIAdapter) CheckBIMI(domain, selector, localPart string) (*model.BIMIR
 }
 
 // CheckBlacklistIP checks a single IP address against DNS blacklists and whitelists
-func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, int, int, string, error) {
+func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, []model.Issue, int, int, string, error) {
 	// Check the IP against all configured RBLs
 	checks, listedCount, err := a.analyzer.generator.rblChecker.CheckIP(ip)
 	if err != nil {
-		return nil, nil, 0, 0, "", err
+		return nil, nil, nil, 0, 0, "", err
 	}
 
-	// Score it the way a report does, informational lists apart
-	results := a.analyzer.generator.rblChecker.ResultsForIP(ip, checks)
+	// Score it the way a report does, from the checks themselves
+	results := &DNSListResults{
+		Checks:      map[string][]model.BlacklistCheck{ip: checks},
+		IPsChecked:  []string{ip},
+		ListedCount: listedCount,
+	}
 	score, grade := a.analyzer.generator.rblChecker.CalculateScore(results, false)
+	issues := a.analyzer.generator.rblChecker.ListingIssues(results)[ip]
 
 	// Check the IP against all configured DNSWLs (informational only)
 	whitelists, _, err := a.analyzer.generator.dnswlChecker.CheckIP(ip)
@@ -160,5 +165,5 @@ func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []mode
 		whitelists = nil
 	}
 
-	return checks, whitelists, listedCount, score, grade, nil
+	return checks, whitelists, issues, listedCount, score, grade, nil
 }

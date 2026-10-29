@@ -29,6 +29,7 @@ import (
 	blacklist "git.happydns.org/checker-blacklist/checker"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestFromObservationNilOrWrongType(t *testing.T) {
@@ -444,5 +445,66 @@ func TestFromObservationURLFeedsOnlyCountTheDomain(t *testing.T) {
 				t.Errorf("%s %q: the observation evidence was modified", source, tt.url)
 			}
 		}
+	}
+}
+
+// Each source listing the domain is an issue charged its share of the
+// penalty, and the shares add up to what the score loses.
+func TestListingIssuesShareThePenalty(t *testing.T) {
+	listed := func(name, severity string) model.DomainBlacklistSourceResult {
+		return model.DomainBlacklistSourceResult{SourceName: name, Listed: true, Status: model.DomainBlacklistSourceResultStatusListed, Severity: &severity}
+	}
+	clean := model.DomainBlacklistSourceResult{SourceName: "Clean", Status: model.DomainBlacklistSourceResultStatusClean}
+
+	for _, tc := range []struct {
+		name      string
+		results   []model.DomainBlacklistSourceResult
+		penalties []int
+	}{
+		{"clean", []model.DomainBlacklistSourceResult{clean}, nil},
+		{"one critical out of five", []model.DomainBlacklistSourceResult{listed("A", "crit"), clean, clean, clean, clean}, []int{20}},
+		{"mixed", []model.DomainBlacklistSourceResult{listed("A", "crit"), listed("B", "warn"), listed("C", "info"), clean}, []int{25, 13, 6}},
+		{"beyond the score", []model.DomainBlacklistSourceResult{listed("A", "crit"), listed("B", "crit")}, []int{50, 50}},
+		{"one info out of thirty rounds up", append([]model.DomainBlacklistSourceResult{listed("A", "info")}, slices.Repeat([]model.DomainBlacklistSourceResult{clean}, 29)...), []int{1}},
+	} {
+		summary := tally(tc.results)
+		issues := listingIssues(tc.results, summary.answered, "example.com")
+
+		var got []int
+		sum := 0
+		for _, issue := range issues {
+			got = append(got, *issue.Penalty)
+			sum += *issue.Penalty
+		}
+		if !slices.Equal(got, tc.penalties) {
+			t.Errorf("%s: penalties = %v, want %v", tc.name, got, tc.penalties)
+		}
+		if want := min(summary.penalty(), 100); sum != want {
+			t.Errorf("%s: penalties add up to %d, the score loses %d", tc.name, sum, want)
+		}
+	}
+}
+
+func TestFromObservationReportsListingsAsIssues(t *testing.T) {
+	data := &blacklist.BlacklistData{
+		Domain:           "example.com",
+		RegisteredDomain: "example.com",
+		Results: []blacklist.SourceResult{{
+			SourceID:   "dnsbl",
+			SourceName: "DNS blocklists",
+			Subject:    "zen.spamhaus.org",
+			Enabled:    true,
+			Reasons:    []string{"listed on zen.spamhaus.org"},
+			Evidence:   []blacklist.Evidence{{Label: "Return code", Value: "127.0.0.2"}},
+		}},
+	}
+
+	got := FromObservation(data)
+	if got.Issues == nil || got.Issues.Sources == nil || len(*got.Issues.Sources) != 1 {
+		t.Fatalf("issues = %v, want one under sources", got.Issues)
+	}
+	issue := (*got.Issues.Sources)[0]
+	if issue.Type != model.IssueTypeDomainListed || utils.Deref(issue.Location) != "DNS blocklists" || *issue.Penalty != 100-*got.Score {
+		t.Errorf("issue = %+v, score %d", issue, *got.Score)
 	}
 }

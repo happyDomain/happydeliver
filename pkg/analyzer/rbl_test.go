@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"fmt"
 	"net/mail"
 	"slices"
 	"testing"
@@ -342,6 +343,15 @@ func TestExtractIPs(t *testing.T) {
 	}
 }
 
+// listedOn has the address listed on the first n lists of DefaultRBLs.
+func listedOn(ip string, n int) map[string][]model.BlacklistCheck {
+	checks := []model.BlacklistCheck{}
+	for i, rbl := range DefaultRBLs {
+		checks = append(checks, model.BlacklistCheck{Rbl: rbl, Listed: i < n})
+	}
+	return map[string][]model.BlacklistCheck{ip: checks}
+}
+
 func TestGetBlacklistScore(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -371,36 +381,36 @@ func TestGetBlacklistScore(t *testing.T) {
 		{
 			name: "Listed on 1 RBL",
 			results: &DNSListResults{
-				IPsChecked:          []string{"198.51.100.1"},
-				ListedCount:         1,
-				RelevantListedCount: 1,
+				IPsChecked:  []string{"198.51.100.1"},
+				Checks:      listedOn("198.51.100.1", 1),
+				ListedCount: 1,
 			},
 			expectedScore: 92, // 100 - 1*100/12 = 92 (12 scoring lists = 14 default - 2 informational)
 		},
 		{
 			name: "Listed on 2 RBLs",
 			results: &DNSListResults{
-				IPsChecked:          []string{"198.51.100.1"},
-				ListedCount:         2,
-				RelevantListedCount: 2,
+				IPsChecked:  []string{"198.51.100.1"},
+				Checks:      listedOn("198.51.100.1", 2),
+				ListedCount: 2,
 			},
 			expectedScore: 84, // 100 - 2*100/12 = 84
 		},
 		{
 			name: "Listed on 3 RBLs",
 			results: &DNSListResults{
-				IPsChecked:          []string{"198.51.100.1"},
-				ListedCount:         3,
-				RelevantListedCount: 3,
+				IPsChecked:  []string{"198.51.100.1"},
+				Checks:      listedOn("198.51.100.1", 3),
+				ListedCount: 3,
 			},
 			expectedScore: 75, // 100 - 3*100/12 = 75
 		},
 		{
 			name: "Listed on 4+ RBLs",
 			results: &DNSListResults{
-				IPsChecked:          []string{"198.51.100.1"},
-				ListedCount:         4,
-				RelevantListedCount: 4,
+				IPsChecked:  []string{"198.51.100.1"},
+				Checks:      listedOn("198.51.100.1", 4),
+				ListedCount: 4,
 			},
 			expectedScore: 67, // 100 - 4*100/12 = 67
 		},
@@ -524,7 +534,92 @@ func TestDefaultRBLs(t *testing.T) {
 	}
 }
 
-func TestResultsForIP(t *testing.T) {
+// Each listing is an issue of the address listed, charged its share of the
+// score; network-wide lists cost their flat penalty once between them.
+func TestListingIssues(t *testing.T) {
+	checker := NewRBLChecker(0, []string{"zen.spamhaus.org", "dnsbl.sorbs.net", "cbl.abuseat.org", "dnsbl-2.uceprotect.net", "dnsbl-3.uceprotect.net"}, true)
+	results := &DNSListResults{
+		IPsChecked: []string{"192.0.2.1", "198.51.100.2"},
+		Checks: map[string][]model.BlacklistCheck{
+			"192.0.2.1": {
+				{Rbl: "zen.spamhaus.org", Listed: true},
+				{Rbl: "dnsbl.sorbs.net", Listed: true},
+				{Rbl: "dnsbl-2.uceprotect.net", Listed: true},
+			},
+			"198.51.100.2": {
+				{Rbl: "cbl.abuseat.org"},
+				{Rbl: "dnsbl-3.uceprotect.net", Listed: true},
+			},
+		},
+	}
+
+	score, _ := checker.CalculateScore(results, false)
+	issues := checker.ListingIssues(results)
+
+	type charged struct {
+		Type     model.IssueType
+		Severity model.IssueSeverity
+		Penalty  int
+	}
+	want := map[string][]charged{
+		"192.0.2.1": {
+			{model.IssueTypeRblListed, model.IssueSeverityCritical, 33},
+			{model.IssueTypeRblListed, model.IssueSeverityHigh, 33},
+			{model.IssueTypeRblNetworkListed, model.IssueSeverityLow, 10},
+		},
+		"198.51.100.2": {
+			{model.IssueTypeRblNetworkListed, model.IssueSeverityLow, 0},
+		},
+	}
+	sum := 0
+	for ip, wanted := range want {
+		var got []charged
+		for _, issue := range issues[ip] {
+			got = append(got, charged{issue.Type, issue.Severity, *issue.Penalty})
+			sum += *issue.Penalty
+		}
+		if fmt.Sprint(got) != fmt.Sprint(wanted) {
+			t.Errorf("%s: issues = %v, want %v", ip, got, wanted)
+		}
+	}
+	if score != 100-sum {
+		t.Errorf("score = %d, the issues cost %d", score, sum)
+	}
+}
+
+// A single address looked up on its own is scored as a report scores it,
+// from its checks: the counts of a lookup do not tell its lists apart.
+func TestCalculateScoreReadsTheChecks(t *testing.T) {
+	checker := NewRBLChecker(0, []string{"zen.spamhaus.org", "dnsbl.sorbs.net", "dnsbl-2.uceprotect.net", "dnsbl-3.uceprotect.net"}, false)
+	results := &DNSListResults{
+		IPsChecked:  []string{"192.0.2.1"},
+		Checks:      map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "zen.spamhaus.org", Listed: true}}},
+		ListedCount: 1,
+	}
+
+	if score, _ := checker.CalculateScore(results, false); score != 50 {
+		t.Errorf("score = %d, want 50: one of two scoring lists", score)
+	}
+}
+
+// With only network-wide lists configured, nothing is scored: the listings
+// are told, and cost nothing.
+func TestListingIssuesWithoutScoringLists(t *testing.T) {
+	checker := NewRBLChecker(0, []string{"dnsbl-2.uceprotect.net", "dnsbl-3.uceprotect.net"}, false)
+	results := &DNSListResults{
+		IPsChecked: []string{"192.0.2.1"},
+		Checks:     map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "dnsbl-3.uceprotect.net", Listed: true}}},
+	}
+	score, _ := checker.CalculateScore(results, false)
+	issues := checker.ListingIssues(results)["192.0.2.1"]
+	if score != 100 || len(issues) != 1 || issues[0].Type != model.IssueTypeRblNetworkListed || *issues[0].Penalty != 0 {
+		t.Errorf("score = %d, issues = %v, want 100 and one free rbl_network_listed", score, issues)
+	}
+}
+
+// A single address is scored from its checks, informational lists apart, as
+// the address checker scores it.
+func TestCalculateScoreForASingleAddress(t *testing.T) {
 	checker := NewRBLChecker(5*time.Second, nil, false)
 	ip := "198.51.100.1"
 
@@ -547,9 +642,10 @@ func TestResultsForIP(t *testing.T) {
 				checks = append(checks, model.BlacklistCheck{Rbl: list, Listed: slices.Contains(tt.listed, list)})
 			}
 
-			results := checker.ResultsForIP(ip, checks)
-			if results.ListedCount != len(tt.listed) {
-				t.Errorf("ListedCount = %d, want %d", results.ListedCount, len(tt.listed))
+			results := &DNSListResults{
+				Checks:      map[string][]model.BlacklistCheck{ip: checks},
+				IPsChecked:  []string{ip},
+				ListedCount: len(tt.listed),
 			}
 			if score, _ := checker.CalculateScore(results, false); score != tt.expectedScore {
 				t.Errorf("CalculateScore() = %d, want %d", score, tt.expectedScore)

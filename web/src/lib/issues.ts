@@ -109,6 +109,9 @@ const issueLabels: Record<Issue["type"], string> = {
     bimi_unverified: "BIMI is published but does not validate",
     bimi_vmc_missing: "No mark certificate vouches for the BIMI logo",
     bimi_check_warning: "A BIMI check has a reservation",
+    rbl_listed: "Sending address is blacklisted",
+    rbl_network_listed: "Network of the sending address is listed",
+    domain_listed: "Domain is on a blocklist",
 };
 
 export function issueLabel(type: Issue["type"]): string {

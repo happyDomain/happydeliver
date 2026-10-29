@@ -26,6 +26,7 @@ package reputation
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/url"
 	"slices"
@@ -86,6 +87,8 @@ func buildResult(data *blacklist.BlacklistData) *model.DomainBlacklistResult {
 		g := model.DomainBlacklistResultGrade(grade.Of(score))
 		out.Score = &score
 		out.Grade = &g
+		issues := listingIssues(results, summary.answered, data.RegisteredDomain)
+		out.Issues = &model.DomainBlacklistIssues{Sources: &issues}
 	}
 
 	return out
@@ -121,6 +124,55 @@ func (s blacklistTally) penalty() int {
 	return (weight + s.answered - 1) / s.answered
 }
 
+// weightOf is what a listing weighs on the score, by its severity.
+func weightOf(severity string) (int, model.IssueSeverity) {
+	switch severity {
+	case "crit":
+		return criticalWeight, model.IssueSeverityCritical
+	case "info":
+		return infoWeight, model.IssueSeverityMedium
+	default: // "warn" or unspecified severity
+		return warningWeight, model.IssueSeverityHigh
+	}
+}
+
+// listingIssues says what each source listing the domain calls for, each
+// charged its share of the penalty: the shares round up the way the
+// penalty does, and stop where the score does, so they add up to it.
+func listingIssues(results []model.DomainBlacklistSourceResult, answered int, domain string) []model.Issue {
+	issues := []model.Issue{}
+	shared := func(weight int) int {
+		return min((weight+answered-1)/answered, 100)
+	}
+
+	weight := 0
+	for _, r := range results {
+		if r.Status != model.DomainBlacklistSourceResultStatusListed {
+			continue
+		}
+		w, severity := weightOf(utils.Deref(r.Severity))
+		penalty := shared(weight+w) - shared(weight)
+		weight += w
+
+		message := fmt.Sprintf("%s lists %s.", r.SourceName, domain)
+		if r.Reasons != nil && len(*r.Reasons) > 0 {
+			message = fmt.Sprintf("%s lists %s: %s.", r.SourceName, domain, strings.Join(*r.Reasons, "; "))
+		}
+		location := r.SourceName
+		advice := "Check what each list reports (malware, phishing, spam), clean up the domain or the site it points to, then follow each list's removal procedure."
+		issues = append(issues, model.Issue{
+			Type:     model.IssueTypeDomainListed,
+			Category: model.IssueCategoryDeliverability,
+			Severity: severity,
+			Message:  message,
+			Location: &location,
+			Advice:   &advice,
+			Penalty:  &penalty,
+		})
+	}
+	return issues
+}
+
 // tally counts the per-source statuses.
 func tally(results []model.DomainBlacklistSourceResult) (summary blacklistTally) {
 	for _, r := range results {
@@ -134,12 +186,12 @@ func tally(results []model.DomainBlacklistSourceResult) (summary blacklistTally)
 		case model.DomainBlacklistSourceResultStatusListed:
 			summary.answered++
 			summary.listed++
-			switch utils.Deref(r.Severity) {
-			case "crit":
+			switch weight, _ := weightOf(utils.Deref(r.Severity)); weight {
+			case criticalWeight:
 				summary.critical++
-			case "info":
+			case infoWeight:
 				summary.info++
-			default: // "warn" or unspecified severity
+			default:
 				summary.warning++
 			}
 		}

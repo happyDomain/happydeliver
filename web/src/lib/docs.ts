@@ -219,6 +219,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     bimi_unverified: [docs.bimi, docs.bimiGroup],
     bimi_vmc_missing: [docs.bimi, docs.bimiGroup],
     bimi_check_warning: [docs.bimi, docs.bimiGroup],
+    rbl_listed: [docs.dnsbl],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

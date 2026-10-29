@@ -90,6 +90,18 @@ var DefaultInformationalRBLs = []string{
 	"dnsbl-3.uceprotect.net", // UCEPROTECT Level 3: entire ASes, too broad for scoring
 }
 
+// majorRBLs are the lists most receivers consult: a listing there is
+// enough to be refused, which the issue it raises says by its severity.
+var majorRBLs = map[string]bool{
+	"zen.spamhaus.org":       true,
+	"b.barracudacentral.org": true,
+	"bl.spamcop.net":         true,
+}
+
+// informationalPenalty is what a listing on any informational list costs,
+// once, however many of them list the address.
+const informationalPenalty = 10
+
 // DefaultDNSWLs is a list of commonly used DNSWL providers
 var DefaultDNSWLs = []string{
 	"list.dnswl.org",   // DNSWL.org — the main DNS whitelist
@@ -140,10 +152,9 @@ func NewDNSWLChecker(timeout time.Duration, dnswls []string, checkAllIPs bool) *
 
 // DNSListResults represents the results of DNS list checks
 type DNSListResults struct {
-	Checks              map[string][]model.BlacklistCheck // Map of IP -> list of checks for that IP
-	IPsChecked          []string
-	ListedCount         int // Total listings including informational entries
-	RelevantListedCount int // Listings on scoring (non-informational) lists only
+	Checks      map[string][]model.BlacklistCheck // Map of IP -> list of checks for that IP
+	IPsChecked  []string
+	ListedCount int // Total listings including informational entries
 }
 
 // CheckEmail checks all IPs found in the email headers against the configured lists
@@ -165,9 +176,6 @@ func (r *DNSListChecker) CheckEmail(email *mailmsg.Message) *DNSListResults {
 			results.Checks[ip] = append(results.Checks[ip], check)
 			if check.Listed {
 				results.ListedCount++
-				if !r.informationalSet[list] {
-					results.RelevantListedCount++
-				}
 			}
 		}
 
@@ -205,25 +213,6 @@ func (r *DNSListChecker) CheckIP(ip string) ([]model.BlacklistCheck, int, error)
 	}
 
 	return checks, listedCount, nil
-}
-
-// ResultsForIP gathers the checks of a single IP address as CheckEmail does,
-// telling the listings on scoring lists from those on informational lists, so
-// that CalculateScore weighs them the same way.
-func (r *DNSListChecker) ResultsForIP(ip string, checks []model.BlacklistCheck) *DNSListResults {
-	results := &DNSListResults{
-		Checks:     map[string][]model.BlacklistCheck{ip: checks},
-		IPsChecked: []string{ip},
-	}
-	for _, check := range checks {
-		if check.Listed {
-			results.ListedCount++
-			if !r.informationalSet[check.Rbl] {
-				results.RelevantListedCount++
-			}
-		}
-	}
-	return results
 }
 
 // extractIPs extracts IP addresses from Received headers
@@ -287,6 +276,9 @@ func (r *DNSListChecker) extractIPs(email *mailmsg.Message) []string {
 func (r *DNSListChecker) checkIP(ip, list string) model.BlacklistCheck {
 	check := model.BlacklistCheck{
 		Rbl: list,
+	}
+	if r.informationalSet[list] {
+		check.Informational = utils.PtrTo(true)
 	}
 
 	reversedIP := r.reverseIP(ip)
@@ -362,18 +354,73 @@ func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bo
 		return 100, ""
 	}
 
-	if results.ListedCount <= 0 || scoringListCount <= 0 {
+	score, _ := r.chargeListings(results)
+	if score == 100 {
 		return 100, "A+"
 	}
+	return score, grade.Of(score)
+}
 
-	// A listing on any informational list applies a flat 10% penalty.
-	informationalPenalty := 0
-	if results.ListedCount > results.RelevantListedCount {
-		informationalPenalty = 10
+// ListingIssues is what the listings of each address checked call for, by
+// address, each charged its share of what CalculateScore takes off.
+func (r *DNSListChecker) ListingIssues(results *DNSListResults) map[string][]model.Issue {
+	_, issues := r.chargeListings(results)
+	return issues
+}
+
+// chargeListings scores the listings and charges each its share, read off
+// the checks themselves. A listing on a scoring list costs its share of the
+// 100 points; the first on an informational list costs the flat penalty,
+// those after it nothing more.
+func (r *DNSListChecker) chargeListings(results *DNSListResults) (int, map[string][]model.Issue) {
+	scoringListCount := len(r.Lists) - len(r.informationalSet)
+	c := checkScore{score: 100}
+	issues := map[string][]model.Issue{}
+	if results == nil {
+		return c.score, issues
 	}
 
-	percentage := max(0, 100-results.RelevantListedCount*100/scoringListCount-informationalPenalty)
-	return percentage, grade.Of(percentage)
+	relevant := 0
+	informational := false
+	for _, ip := range results.IPsChecked {
+		c.issues = nil
+		for _, check := range results.Checks[ip] {
+			if !check.Listed {
+				continue
+			}
+
+			if r.informationalSet[check.Rbl] {
+				issue := newIssue(model.IssueTypeRblNetworkListed, model.IssueSeverityLow, check.Rbl,
+					fmt.Sprintf("%s lists the whole address range or provider of %s, not this address for what it sent. Few receivers use it, but the blacklist score takes a flat penalty for any such listing.", check.Rbl, ip),
+					"Nothing to clean up on your side: ask your hosting provider about the listing of its network, or send through a provider with a better-kept network.")
+				if informational || scoringListCount <= 0 {
+					c.note(issue)
+				} else {
+					c.deduct(informationalPenalty, issue)
+				}
+				informational = true
+				continue
+			}
+
+			severity := model.IssueSeverityHigh
+			if majorRBLs[check.Rbl] {
+				severity = model.IssueSeverityCritical
+			}
+			issue := newIssue(model.IssueTypeRblListed, severity, check.Rbl,
+				fmt.Sprintf("%s lists %s: receivers that consult it refuse or filter its mail.", check.Rbl, ip),
+				"Find out what got the address listed (a compromised account, an open relay, purchased or stale recipient lists), fix it, then request removal from each list. Most lists delist automatically once the cause stops.")
+			if scoringListCount <= 0 {
+				c.note(issue)
+				continue
+			}
+			// The shares round the way the total does, so they add up to it.
+			relevant++
+			c.deduct(relevant*100/scoringListCount-(relevant-1)*100/scoringListCount, issue)
+		}
+		issues[ip] = append([]model.Issue{}, c.issues...)
+	}
+
+	return max(c.score, 0), issues
 }
 
 // GetUniqueListedIPs returns a list of unique IPs that are listed on at least one entry

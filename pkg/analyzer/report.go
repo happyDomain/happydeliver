@@ -420,6 +420,8 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	// Add blacklist checks as a map of IP -> array of BlacklistCheck
 	if results.RBL != nil && len(results.RBL.Checks) > 0 {
 		report.Blacklists = &results.RBL.Checks
+		issues := r.rblChecker.ListingIssues(results.RBL)
+		report.BlacklistIssues = &issues
 	}
 
 	// Add whitelist checks as a map of IP -> array of BlacklistCheck (informational only)
