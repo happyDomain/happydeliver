@@ -2004,6 +2004,10 @@ details.check-row {
         padding-right: 0;
         background: transparent;
     }
+
+    > .check-findings {
+        padding-top: 0.5rem;
+    }
 }
 
 // What a check found, as label and value pairs: a framed panel, so the data reads

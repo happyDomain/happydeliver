@@ -28,13 +28,20 @@
     import { getContext, type Snippet } from "svelte";
     import type { ClassValue } from "svelte/elements";
 
-    import type { DocLink } from "#lib/docs.js";
+    import type { Issue } from "#lib/api/types.gen.js";
+    import { issueDocLinks, type DocLink } from "#lib/docs.js";
+    import { compareBySeverity, type Severity } from "#lib/issues.js";
     import { checkListKey } from "./CheckList.svelte";
     import DocLinks from "./DocLinks.svelte";
+    import IssueNote from "./IssueNote.svelte";
 
     interface Props {
         id?: string;
         title: string;
+        /**
+         * How the check came out. When issues are given, they decide instead: this only
+         * says whether a check with nothing to report is graded at all.
+         */
         status: CheckStatus;
         /** Overrides the status icon, for a check that is about something rather than graded. */
         icon?: string;
@@ -48,6 +55,12 @@
         aside?: Snippet;
         /** Where the standard describes what this check verifies. */
         docs?: DocLink[];
+        /**
+         * What the analyser found to change about this check, shown first when unfolded.
+         * Given, they are the only source of the status, so an icon that warns always comes
+         * with what it warns about.
+         */
+        issues?: Issue[];
         /** Defaults to unfolded when there is something to act on. */
         open?: boolean;
         class?: ClassValue;
@@ -64,6 +77,7 @@
         tag,
         aside,
         docs,
+        issues,
         open,
         class: className = "mb-3",
         children,
@@ -72,7 +86,30 @@
     // In a CheckList, a row among others; on its own, a card.
     const row = getContext<boolean>(checkListKey) ?? false;
 
-    const startOpen = $derived(open ?? (status === "fail" || status === "warn"));
+    const severityStatus: Record<Severity, CheckStatus> = {
+        critical: "fail",
+        high: "fail",
+        medium: "warn",
+        low: "improve",
+        info: "info",
+    };
+
+    const sorted = $derived(issues ? [...issues].sort(compareBySeverity) : []);
+
+    const shownStatus = $derived.by<CheckStatus>(() => {
+        if (issues === undefined) return status;
+        if (sorted.length > 0) return severityStatus[sorted[0].severity];
+        return status === "neutral" || status === "info" ? status : "pass";
+    });
+
+    // The check's own references, then those of its issues, each once.
+    const allDocs = $derived(
+        [...(docs ?? []), ...sorted.flatMap((issue) => issueDocLinks(issue.type))].filter(
+            (d, i, all) => all.findIndex((other) => other.url === d.url) === i,
+        ),
+    );
+
+    const startOpen = $derived(open ?? (shownStatus === "fail" || shownStatus === "warn"));
 </script>
 
 <details
@@ -87,10 +124,10 @@
         ]}
     >
         <i
-            class="bi {icon ?? icons[status]} fs-5 flex-shrink-0"
+            class="bi {icon ?? icons[shownStatus]} fs-5 flex-shrink-0"
             role="img"
-            aria-label={labels[status]}
-            title={labels[status]}
+            aria-label={labels[shownStatus]}
+            title={labels[shownStatus]}
         ></i>
         <span
             class="flex-grow-1 overflow-hidden d-flex flex-wrap align-items-baseline column-gap-3"
@@ -112,10 +149,17 @@
         {/if}
         <i class="bi bi-chevron-down disclosure" aria-hidden="true"></i>
     </summary>
+    {#if sorted.length > 0}
+        <div class={row ? "check-findings" : "check-findings card-body pb-0"}>
+            {#each sorted as issue, i (i)}
+                <IssueNote {issue} />
+            {/each}
+        </div>
+    {/if}
     {@render children?.()}
-    {#if docs && docs.length > 0}
+    {#if allDocs.length > 0}
         <div class={row ? "check-docs" : "card-footer"}>
-            <DocLinks {docs} />
+            <DocLinks docs={allDocs} />
         </div>
     {/if}
 </details>
