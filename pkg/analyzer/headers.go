@@ -140,6 +140,29 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (i
 	return score, rune(grade)
 }
 
+// stripCFWS removes the comments and the whitespace RFC 2045 section 4 allows
+// between the tokens of a structured field such as MIME-Version, where mailers
+// commonly name themselves: "1.0 (Mac OS X Mail 16.0 \(3864.700.51.1.1\))".
+// Comments nest, and a backslash quotes the character that follows it.
+func stripCFWS(value string) string {
+	var b strings.Builder
+	depth := 0
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case depth > 0 && c == '\\':
+			i++
+		case c == '(':
+			depth++
+		case depth > 0 && c == ')':
+			depth--
+		case depth == 0 && c != ' ' && c != '\t' && c != '\r' && c != '\n':
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
 // isValidMessageID checks if a Message-ID has proper format
 func (h *HeaderAnalyzer) isValidMessageID(messageID string) bool {
 	// Basic check: should be in format <...@...>
@@ -351,7 +374,7 @@ func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, 
 				check.Value = &email.Subject
 			}
 		case "MIME-Version":
-			if value != "1.0" {
+			if stripCFWS(value) != "1.0" {
 				valid = false
 				headerIssues = append(headerIssues, fmt.Sprintf("MIME-Version should be '1.0', got '%s'", value))
 			}
