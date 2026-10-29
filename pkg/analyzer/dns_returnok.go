@@ -89,17 +89,40 @@ func (d *DNSAnalyzer) checkReturnOKDomain(domain, orgDomain string) *model.Retur
 	return result
 }
 
-// calculateReturnOKPenalty returns a non-positive value: each sender domain that
-// can receive neither replies nor bounces (status=fail) costs points, since
-// those messages would be silently lost.
+// returnOKPenalty is what a sender domain that can receive neither replies
+// nor bounces (status=fail) costs the section, since those messages would be
+// silently lost.
+const returnOKPenalty = 10
+
+// calculateReturnOKPenalty returns a non-positive value: what the sender
+// domains that cannot receive mail cost.
 func calculateReturnOKPenalty(results *model.DNSResults) (penalty int) {
 	if results.ReturnOk == nil {
 		return 0
 	}
 	for _, dom := range []*model.ReturnOKDomain{results.ReturnOk.From, results.ReturnOk.ReturnPath} {
 		if dom != nil && dom.Status == returnOKStatusFail {
-			penalty -= 10
+			penalty -= returnOKPenalty
 		}
 	}
 	return
+}
+
+// chargeUnreachable adds what calculateReturnOKPenalty charges for the domains
+// of reach that cannot receive mail to the issue the MX check raised about
+// it, which tells the same story.
+func chargeUnreachable(issues *[]model.Issue, reach ...*model.ReturnOKDomain) {
+	points := 0
+	for _, dom := range reach {
+		if dom != nil && dom.Status == returnOKStatusFail {
+			points += returnOKPenalty
+		}
+	}
+	for i := range *issues {
+		if (*issues)[i].Type == model.IssueTypeDomainUnreachable {
+			penalty := *(*issues)[i].Penalty + points
+			(*issues)[i].Penalty = &penalty
+			return
+		}
+	}
 }

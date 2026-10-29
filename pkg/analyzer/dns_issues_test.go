@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -265,5 +266,100 @@ func TestDMARCScoreIssues(t *testing.T) {
 				t.Errorf("penalties add up to %d, the check lost %d", got, 100-min(score, 100))
 			}
 		})
+	}
+}
+
+func TestMXIssuesWithoutAValidRecord(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain:    "example.com",
+		FromMxRecords: &[]model.MXRecord{{Host: "old.example.com", Error: utils.PtrTo("no address")}},
+	}
+	score, from, rp := analyzer.calculateMXScore(results)
+	if score != 0 || len(from) != 1 || from[0].Type != model.IssueTypeMxInvalid || from[0].Severity != model.IssueSeverityHigh || *from[0].Penalty != 100 {
+		t.Errorf("score = %d, From issues = %v, want one high mx_invalid costing 100", score, from)
+	}
+	if rp != nil {
+		t.Errorf("Return-Path issues = %v, want none", rp)
+	}
+}
+
+func TestMXIssueOfAnImplicitMX(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain: "example.com",
+		ReturnOk:   &model.ReturnOK{From: &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusWarn}},
+	}
+	_, from, _ := analyzer.calculateMXScore(results)
+	if len(from) != 1 || from[0].Type != model.IssueTypeMxMissing || !strings.Contains(from[0].Message, "implicit MX") {
+		t.Errorf("From issues = %v, want mx_missing about the implicit MX", from)
+	}
+}
+
+func TestUnreachableDomainsChargedApart(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain: "example.com",
+		RpDomain:   utils.PtrTo("bounces.example.net"),
+		ReturnOk: &model.ReturnOK{
+			From:       &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusFail},
+			ReturnPath: &model.ReturnOKDomain{Domain: "bounces.example.net", Status: returnOKStatusFail},
+		},
+	}
+	analyzer.CalculateDNSScore(results, "")
+	for name, issues := range map[string]*[]model.Issue{"From": results.Issues.MxFrom, "Return-Path": results.Issues.MxReturnPath} {
+		// Half the MX check (13 section points, rounded) and 10 for the domain
+		if issues == nil || len(*issues) != 1 || (*issues)[0].Type != model.IssueTypeDomainUnreachable || *(*issues)[0].Penalty != 23 {
+			t.Errorf("%s issues = %v, want one domain_unreachable costing 23", name, issues)
+		}
+	}
+}
+
+// A domain that cannot receive mail is told once, with its MX records, and
+// charged both what the MX check loses and what the section takes off.
+func TestUnreachableDomainIssues(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain: "example.com",
+		RpDomain:   utils.PtrTo("example.com"),
+		ReturnOk: &model.ReturnOK{
+			From:       &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusFail},
+			ReturnPath: &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusFail},
+		},
+	}
+
+	analyzer.CalculateDNSScore(results, "")
+
+	if results.Issues.MxReturnPath != nil {
+		t.Errorf("Return-Path issues = %v, want none: it is the From domain", *results.Issues.MxReturnPath)
+	}
+	got := *results.Issues.MxFrom
+	if len(got) != 1 || got[0].Type != model.IssueTypeDomainUnreachable {
+		t.Fatalf("From issues = %v, want one domain_unreachable", got)
+	}
+	// The whole MX check (25 section points out of 4 checks) and 10 per role
+	if *got[0].Penalty != 45 {
+		t.Errorf("penalty = %d, want 45", *got[0].Penalty)
+	}
+}
+
+func TestMXIssuesOfAnotherReturnPath(t *testing.T) {
+	analyzer := newMockAnalyzer(nil, nil)
+	results := &model.DNSResults{
+		FromDomain:    "example.com",
+		FromMxRecords: &[]model.MXRecord{{Host: "mx.example.com", Valid: true}, {Host: "old.example.com", Error: utils.PtrTo("no address")}},
+		RpDomain:      utils.PtrTo("bounces.example.net"),
+	}
+
+	score, from, rp := analyzer.calculateMXScore(results)
+
+	if score != 50 {
+		t.Errorf("score = %d, want 50", score)
+	}
+	if fmt.Sprint(issueTypes(from)) != fmt.Sprint([]model.IssueType{model.IssueTypeMxInvalid}) || *from[0].Penalty != 0 {
+		t.Errorf("From issues = %v, want one free mx_invalid", from)
+	}
+	if fmt.Sprint(issueTypes(rp)) != fmt.Sprint([]model.IssueType{model.IssueTypeMxMissing}) || *rp[0].Penalty != 50 {
+		t.Errorf("Return-Path issues = %v, want mx_missing costing 50", rp)
 	}
 }

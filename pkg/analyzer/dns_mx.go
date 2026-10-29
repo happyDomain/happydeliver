@@ -24,6 +24,7 @@ package analyzer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
@@ -65,52 +66,82 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) *[]model.MXRecord {
 	return &results
 }
 
-func (d *DNSAnalyzer) calculateMXScore(results *model.DNSResults) (score int) {
-	// Having valid MX records is critical for email deliverability
-	// From domain MX records (half points) - needed for replies
-	if results.FromMxRecords != nil && len(*results.FromMxRecords) > 0 {
-		hasValidFromMX := false
-		for _, mx := range *results.FromMxRecords {
-			if mx.Valid {
-				hasValidFromMX = true
-				break
-			}
-		}
-		if hasValidFromMX {
-			score += 50
-		}
+// calculateMXScore scores where replies and bounces to the sender domains go,
+// half for each. The issues of the From domain and of a Return-Path on
+// another domain come apart, as the report shows them on each; a Return-Path
+// on the From domain is that domain's to answer for, both halves of it.
+func (d *DNSAnalyzer) calculateMXScore(results *model.DNSResults) (int, []model.Issue, []model.Issue) {
+	c := checkScore{score: 100}
+
+	var reachFrom, reachRP *model.ReturnOKDomain
+	if results.ReturnOk != nil {
+		reachFrom, reachRP = results.ReturnOk.From, results.ReturnOk.ReturnPath
 	}
 
-	// Return-Path domain MX records (10 points) - needed for bounces
-	if results.RpMxRecords != nil && len(*results.RpMxRecords) > 0 {
-		hasValidRpMX := false
-		for _, mx := range *results.RpMxRecords {
-			if mx.Valid {
-				hasValidRpMX = true
-				break
-			}
-		}
-		if hasValidRpMX {
-			score += 50
-		}
-	} else if results.RpDomain != nil && *results.RpDomain != results.FromDomain {
-		// If Return-Path domain is different but has no MX records, it's a problem
-		// Don't deduct points if RP domain is same as From domain (already checked)
-	} else {
-		// If Return-Path is same as From domain, give full 10 points for RP MX
-		if results.FromMxRecords != nil && len(*results.FromMxRecords) > 0 {
-			hasValidFromMX := false
-			for _, mx := range *results.FromMxRecords {
-				if mx.Valid {
-					hasValidFromMX = true
-					break
-				}
-			}
-			if hasValidFromMX {
-				score += 50
-			}
+	// The Return-Path domain only has records of its own when it is another
+	// domain; otherwise it stands or falls with the From domain.
+	rpChecked := results.RpMxRecords != nil && len(*results.RpMxRecords) > 0
+	rpElsewhere := results.RpDomain != nil && *results.RpDomain != "" && *results.RpDomain != results.FromDomain
+
+	fromPoints, lost := 50, "replies"
+	if !rpChecked && !rpElsewhere {
+		fromPoints = 100
+		if results.RpDomain != nil && *results.RpDomain != "" {
+			lost = "replies and bounces"
 		}
 	}
+	mxIssues(&c, results.FromDomain, results.FromMxRecords, reachFrom, fromPoints, lost)
+	fromIssues := c.issues
 
-	return
+	c.issues = nil
+	if rpChecked || rpElsewhere {
+		mxIssues(&c, utils.Deref(results.RpDomain), results.RpMxRecords, reachRP, 50, "bounces")
+	}
+
+	return c.score, fromIssues, c.issues
+}
+
+// mxIssues charges points to what keeps a domain from receiving mail, if
+// anything does; lost names what goes there.
+func mxIssues(c *checkScore, domain string, records *[]model.MXRecord, reach *model.ReturnOKDomain, points int, lost string) {
+	var valid bool
+	var invalid []string
+	if records != nil {
+		for _, mx := range *records {
+			if mx.Valid {
+				valid = true
+				continue
+			}
+			bad := mx.Host
+			if mx.Error != nil {
+				bad += ": " + *mx.Error
+			}
+			invalid = append(invalid, bad)
+		}
+	}
+	if valid {
+		points = 0
+	}
+	publish := fmt.Sprintf("Publish an MX record for %s pointing to a server that accepts mail.", domain)
+
+	switch {
+	case reach != nil && reach.Status == returnOKStatusFail:
+		c.deduct(points, newIssue(model.IssueTypeDomainUnreachable, model.IssueSeverityHigh, domain,
+			fmt.Sprintf("%s has neither MX nor A/AAAA record: %s to it are lost, and receivers treat such senders as suspicious.", domain, lost),
+			publish))
+	case len(invalid) == 0 && !valid:
+		message := fmt.Sprintf("%s publishes no MX record, so %s to it have nowhere to go.", domain, lost)
+		if reach != nil && reach.Status == returnOKStatusWarn {
+			message = fmt.Sprintf("%s publishes no MX record and relies on its A/AAAA record as an implicit MX for %s.", domain, lost)
+		}
+		c.deduct(points, newIssue(model.IssueTypeMxMissing, model.IssueSeverityLow, domain, message, publish))
+	case !valid:
+		c.deduct(points, newIssue(model.IssueTypeMxInvalid, model.IssueSeverityHigh, domain,
+			fmt.Sprintf("No MX record of %s leads to a server: %s.", domain, strings.Join(invalid, "; ")),
+			"Make every MX record point to a hostname that resolves to a server accepting mail."))
+	case len(invalid) > 0:
+		c.note(newIssue(model.IssueTypeMxInvalid, model.IssueSeverityMedium, domain,
+			fmt.Sprintf("Some MX records of %s are invalid: %s.", domain, strings.Join(invalid, "; ")),
+			"Make every MX record point to a hostname that resolves to a server accepting mail."))
+	}
 }

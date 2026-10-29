@@ -310,9 +310,7 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 	score := 0
 
 	// MX Records: 30 points (only one domain to check)
-	mxScore := d.calculateMXScore(results)
-	// Since calculateMXScore checks both From and RP domains,
-	// and we only have From domain, we use the full score
+	mxScore, mxFrom, mxRP := d.calculateMXScore(results)
 	score += 30 * mxScore / 100
 
 	// SPF Records: 30 points
@@ -324,9 +322,11 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 	score += 40 * dmarcScore / 100
 
 	results.Issues = &model.DNSIssues{
-		Spf:   weighIssues(spfIssues, 30, 100),
-		Dmarc: weighIssues(dmarcIssues, 40, 100),
+		MxFrom: weighIssues(mxFrom, 30, 100),
+		Spf:    weighIssues(spfIssues, 30, 100),
+		Dmarc:  weighIssues(dmarcIssues, 40, 100),
 	}
+	d.addSectionIssues(results, mxRP, 30, 100)
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)
@@ -367,11 +367,12 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	// unavailable for uploaded EMLs): when there's no IP to check, exclude it
 	// from the average instead of counting it as a 0/20 failure for
 	// something that was never actually testable.
+	mxScore, mxFrom, mxRP := d.calculateMXScore(results)
 	spfScore, spfIssues := d.calculateSPFScore(results)
 	dkimScore, dkimIssues := d.calculateDKIMScore(results)
 	dmarcScore, dmarcIssues := d.calculateDMARCScore(results)
 
-	weightedScore := 20 * d.calculateMXScore(results)
+	weightedScore := 20 * mxScore
 	weightedScore += 20 * spfScore
 	weightedScore += 20 * dkimScore
 	weightedScore += 20 * dmarcScore
@@ -385,10 +386,12 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	// Penalties are counted out of each check's own 100 points; the section
 	// weighs every check the same.
 	results.Issues = &model.DNSIssues{
-		Spf:   weighIssues(spfIssues, 20, totalWeight),
-		Dkim:  weighIssues(dkimIssues, 20, totalWeight),
-		Dmarc: weighIssues(dmarcIssues, 20, totalWeight),
+		MxFrom: weighIssues(mxFrom, 20, totalWeight),
+		Spf:    weighIssues(spfIssues, 20, totalWeight),
+		Dkim:   weighIssues(dkimIssues, 20, totalWeight),
+		Dmarc:  weighIssues(dmarcIssues, 20, totalWeight),
 	}
+	d.addSectionIssues(results, mxRP, 20, totalWeight)
 
 	score := weightedScore / totalWeight
 
@@ -417,6 +420,28 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	}
 
 	return score, grade.Of(score)
+}
+
+// addSectionIssues completes the issues of results with those of a
+// Return-Path on another domain, weighed as the MX check, and with what the
+// section itself charges for sender domains that cannot receive mail, told
+// along with their MX records.
+func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.Issue, weight, total int) {
+	issues := results.Issues
+
+	if mxRP != nil || (results.RpDomain != nil && *results.RpDomain != "" && *results.RpDomain != results.FromDomain) {
+		issues.MxReturnPath = weighIssues(mxRP, weight, total)
+	}
+	if results.ReturnOk != nil {
+		if issues.MxReturnPath != nil {
+			chargeUnreachable(issues.MxFrom, results.ReturnOk.From)
+			chargeUnreachable(issues.MxReturnPath, results.ReturnOk.ReturnPath)
+		} else {
+			// One domain for both: losing its replies and its bounces alike
+			chargeUnreachable(issues.MxFrom, results.ReturnOk.From, results.ReturnOk.ReturnPath)
+		}
+	}
+
 }
 
 // issueList is the list of a check that ran, empty rather than nil when it
