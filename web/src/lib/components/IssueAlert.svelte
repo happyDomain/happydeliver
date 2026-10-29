@@ -1,4 +1,7 @@
 <script lang="ts">
+    import type { DocLink } from "#lib/docs.js";
+    import DocLinks from "./DocLinks.svelte";
+
     interface Props {
         /** Anchor, so that anything pointing at this finding's advice has a target. */
         id?: string;
@@ -21,6 +24,8 @@
          * agreement is a reinforcement, not a second alert, so it goes in the same block.
          */
         corroboratedBy?: string[];
+        /** Where the standard the finding refers to is written down. */
+        docs?: DocLink[];
     }
 
     let {
@@ -33,6 +38,7 @@
         observer,
         symbol,
         corroboratedBy,
+        docs,
     }: Props = $props();
 
     // The colour is the whole of what severity says here: critical and high both mean the
@@ -77,5 +83,6 @@
                 {/each}
             </div>
         {/if}
+        <DocLinks {docs} class="mt-1" />
     </div>
 </div>
