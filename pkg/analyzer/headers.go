@@ -45,10 +45,8 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 	return &HeaderAnalyzer{}
 }
 
-// CalculateHeaderScore evaluates email structural quality from header analysis.
-// dmarc is the DMARC record of the From domain, whose alignment modes decide
-// which authenticating domains count as aligned; nil when it publishes none.
-func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis, dmarc *model.DMARCRecord) (int, rune) {
+// CalculateHeaderScore evaluates email structural quality from header analysis
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (int, rune) {
 	if analysis == nil || analysis.Headers == nil {
 		return 0, ' '
 	}
@@ -58,15 +56,16 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis, dm
 	headers := *analysis.Headers
 
 	// RP and From alignment (25 points)
-	switch dmarcAlignment(analysis.DomainAlignment, dmarc) {
-	case alignmentExact:
-		score += 25
-	case alignmentOrganizational:
-		score += 20
-	default:
+	alignmentScore, alignmentIssues := calculateAlignmentScore(analysis.DomainAlignment)
+	score += alignmentScore
+	if alignmentScore == 0 {
 		// Bad domain alignment, cap grade to C
 		maxGrade -= 2
 	}
+	if analysis.Issues == nil {
+		analysis.Issues = &model.HeaderIssues{}
+	}
+	analysis.Issues.DomainAlignment = issueList(alignmentIssues)
 
 	// Check required headers (RFC 5322) - 30 points
 	requiredHeaders := []string{"from", "date", "message-id"}
@@ -457,8 +456,6 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	}
 
 	// Check alignment (strict and relaxed)
-	issues := []string{}
-
 	// hasReturnPath and hasDKIM track whether we have these fields to check
 	hasReturnPath := alignment.FromDomain != nil && alignment.ReturnPathDomain != nil
 	hasDKIM := alignment.FromDomain != nil && len(dkimDomains) > 0
@@ -488,14 +485,6 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 		}
 		rpRelaxedAligned = strings.EqualFold(fromOrgDomain, rpOrgDomain)
 
-		if !rpStrictAligned {
-			if rpRelaxedAligned {
-				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not exactly match From domain (%s), but satisfies relaxed alignment (organizational domain: %s)", rpDomain, fromDomain, fromOrgDomain))
-			} else {
-				issues = append(issues, fmt.Sprintf("Return-Path domain (%s) does not match From domain (%s) - neither strict nor relaxed alignment", rpDomain, fromDomain))
-			}
-		}
-
 		strictAligned = rpStrictAligned
 		relaxedAligned = rpRelaxedAligned
 	}
@@ -522,18 +511,6 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 			}
 		}
 
-		if !dkimStrictAligned && !dkimRelaxedAligned {
-			// List all DKIM domains that failed alignment
-			dkimDomainsList := []string{}
-			for _, dkimDomain := range dkimDomains {
-				dkimDomainsList = append(dkimDomainsList, dkimDomain.Domain)
-			}
-			issues = append(issues, fmt.Sprintf("DKIM signature domains (%s) do not align with From domain (%s) - neither strict nor relaxed alignment", strings.Join(dkimDomainsList, ", "), fromDomain))
-		} else if !dkimStrictAligned && dkimRelaxedAligned {
-			// DKIM has relaxed alignment but not strict
-			issues = append(issues, fmt.Sprintf("DKIM signature domains satisfy relaxed alignment with From domain (%s) but not strict alignment (organizational domain: %s)", fromDomain, fromOrgDomain))
-		}
-
 		// Overall alignment requires at least one method (Return-Path OR DKIM) to be aligned
 		// For DMARC compliance, at least one of SPF or DKIM must be aligned
 		if dkimStrictAligned {
@@ -547,79 +524,71 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	*alignment.Aligned = strictAligned
 	*alignment.RelaxedAligned = relaxedAligned
 
-	if len(issues) > 0 {
-		alignment.Issues = &issues
-	}
-
 	return alignment
 }
 
-// alignmentLevel is how closely the domains authenticating a message align
-// with its From domain.
-type alignmentLevel int
+// calculateAlignmentScore scores, out of 25 points of the header score,
+// whether the domains authenticating the message align with the From domain,
+// which DMARC needs of one of them at least. The issues say what each costs,
+// along with a method that does not align while the other does, which costs
+// nothing but leaves DMARC resting on one leg.
+func calculateAlignmentScore(alignment *model.DomainAlignment) (int, []model.Issue) {
+	c := checkScore{score: 25}
 
-const (
-	alignmentNone alignmentLevel = iota
-	// alignmentOrganizational is a domain sharing only the organizational
-	// domain of the From domain, which DMARC counts in relaxed mode.
-	alignmentOrganizational
-	// alignmentExact is the From domain itself.
-	alignmentExact
-)
-
-// dmarcAlignment tells how closely the domains authenticating the message
-// align with the From domain, counting only what DMARC would: a domain that
-// shares only the organizational domain does not align in strict mode, which
-// the policy sets apart for the Return-Path (aspf=s) and the DKIM signatures
-// (adkim=s). Without a usable record, DMARC aligns in relaxed mode.
-func dmarcAlignment(alignment *model.DomainAlignment, dmarc *model.DMARCRecord) alignmentLevel {
 	if alignment == nil || alignment.Aligned == nil || alignment.RelaxedAligned == nil {
-		return alignmentNone
-	}
-
-	spfStrict, dkimStrict := false, false
-	if dmarc != nil && dmarc.Valid {
-		spfStrict = dmarc.SpfAlignment != nil && *dmarc.SpfAlignment == model.DMARCRecordSpfAlignmentStrict
-		dkimStrict = dmarc.DkimAlignment != nil && *dmarc.DkimAlignment == model.DMARCRecordDkimAlignmentStrict
+		c.cap(0, newIssue(model.IssueTypeDomainMisaligned, model.IssueSeverityHigh, "",
+			"The domains authenticating the message could not be compared with the From domain, so DMARC alignment is unknown.",
+			""))
+		return c.score, c.issues
 	}
 
 	from := utils.Deref(alignment.FromDomain)
 	fromOrg := utils.Deref(alignment.FromOrgDomain)
-	levelOf := func(domain, orgDomain string, strict bool) alignmentLevel {
-		switch {
-		case strings.EqualFold(domain, from):
-			return alignmentExact
-		case !strict && orgDomain != "" && strings.EqualFold(orgDomain, fromOrg):
-			return alignmentOrganizational
-		}
-		return alignmentNone
-	}
-
-	compared := false
-	level := alignmentNone
-	if from != "" && alignment.ReturnPathDomain != nil {
-		compared = true
-		level = max(level, levelOf(*alignment.ReturnPathDomain, utils.Deref(alignment.ReturnPathOrgDomain), spfStrict))
-	}
-	if from != "" && alignment.DkimDomains != nil {
+	rp := utils.Deref(alignment.ReturnPathDomain)
+	var dkimDomains, dkimAligned []string
+	if alignment.DkimDomains != nil {
 		for _, d := range *alignment.DkimDomains {
-			compared = true
-			level = max(level, levelOf(d.Domain, d.OrgDomain, dkimStrict))
+			dkimDomains = append(dkimDomains, d.Domain)
+			if strings.EqualFold(d.OrgDomain, fromOrg) {
+				dkimAligned = append(dkimAligned, d.Domain)
+			}
 		}
 	}
+	rpAligned := rp != "" && strings.EqualFold(utils.Deref(alignment.ReturnPathOrgDomain), fromOrg)
 
-	// Nothing to compare: no Return-Path nor DKIM signature to hold against the From domain
-	if !compared {
-		switch {
-		case *alignment.Aligned:
-			return alignmentExact
-		case *alignment.RelaxedAligned:
-			return alignmentOrganizational
+	switch {
+	case !*alignment.RelaxedAligned:
+		var neither []string
+		if rp != "" {
+			neither = append(neither, fmt.Sprintf("the Return-Path domain (%s)", rp))
 		}
-		return alignmentNone
+		if len(dkimDomains) > 0 {
+			neither = append(neither, fmt.Sprintf("the DKIM signing domains (%s)", strings.Join(dkimDomains, ", ")))
+		}
+		c.cap(0, newIssue(model.IssueTypeDomainMisaligned, model.IssueSeverityHigh, from,
+			fmt.Sprintf("Neither %s shares the organizational domain of the From address (%s), so DMARC cannot pass.", strings.Join(neither, " nor "), from),
+			"Have your email provider sign with DKIM for your own domain (a CNAME or TXT record they give you), or use a Return-Path on a subdomain of yours."))
+		return c.score, c.issues
+
+	case !*alignment.Aligned:
+		c.cap(20, newIssue(model.IssueTypeDomainRelaxedAligned, model.IssueSeverityLow, from,
+			fmt.Sprintf("No authenticating domain is exactly %s, only within its organizational domain (%s): a DMARC policy requiring strict alignment (aspf=s, adkim=s) would fail.", from, fromOrg),
+			fmt.Sprintf("Sign with DKIM for %s itself, or use it as the Return-Path domain.", from)))
 	}
 
-	return level
+	// One method aligns: the other does not have to, but DMARC then rests on it alone.
+	if rp != "" && !rpAligned {
+		c.note(newIssue(model.IssueTypeReturnPathMisaligned, model.IssueSeverityInfo, rp,
+			fmt.Sprintf("The Return-Path domain (%s) does not share the organizational domain of %s: SPF does not count toward DMARC, which rests on DKIM alone.", rp, from),
+			fmt.Sprintf("Use a Return-Path on a subdomain of %s; providers call it a custom bounce or MAIL FROM domain.", fromOrg)))
+	}
+	if len(dkimDomains) > 0 && len(dkimAligned) == 0 {
+		c.note(newIssue(model.IssueTypeDkimMisaligned, model.IssueSeverityInfo, strings.Join(dkimDomains, ", "),
+			fmt.Sprintf("No DKIM signature is made for %s or a domain sharing its organizational domain: DMARC rests on SPF alone, which breaks when the message is forwarded.", from),
+			"Have your email provider sign with DKIM for your own domain (a CNAME or TXT record they give you)."))
+	}
+
+	return c.score, c.issues
 }
 
 // findHeaderIssues identifies issues with headers, each located at the

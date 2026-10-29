@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"fmt"
 	"net/mail"
 	"net/textproto"
 	"strings"
@@ -30,7 +31,6 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 
-	"git.happydns.org/happyDeliver/pkg/domainname"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -116,7 +116,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate header analysis first
 			analysis := analyzer.GenerateHeaderAnalysis(tt.email, nil)
-			score, _ := analyzer.CalculateHeaderScore(analysis, nil)
+			score, _ := analyzer.CalculateHeaderScore(analysis)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
@@ -361,32 +361,32 @@ func TestAddressDomain(t *testing.T) {
 
 func TestAnalyzeDomainAlignment(t *testing.T) {
 	tests := []struct {
-		name            string
-		fromHeader      string
-		returnPath      string
-		expectAligned   bool
-		expectIssuesLen int
+		name          string
+		fromHeader    string
+		returnPath    string
+		expectAligned bool
+		expectIssues  []model.IssueType
 	}{
 		{
-			name:            "Aligned domains",
-			fromHeader:      "sender@example.com",
-			returnPath:      "bounce@example.com",
-			expectAligned:   true,
-			expectIssuesLen: 0,
+			name:          "Aligned domains",
+			fromHeader:    "sender@example.com",
+			returnPath:    "bounce@example.com",
+			expectAligned: true,
+			expectIssues:  nil,
 		},
 		{
-			name:            "Misaligned domains",
-			fromHeader:      "sender@example.com",
-			returnPath:      "bounce@different.com",
-			expectAligned:   false,
-			expectIssuesLen: 1,
+			name:          "Misaligned domains",
+			fromHeader:    "sender@example.com",
+			returnPath:    "bounce@different.com",
+			expectAligned: false,
+			expectIssues:  []model.IssueType{model.IssueTypeDomainMisaligned},
 		},
 		{
-			name:            "Only From header",
-			fromHeader:      "sender@example.com",
-			returnPath:      "",
-			expectAligned:   true,
-			expectIssuesLen: 0,
+			name:          "Only From header",
+			fromHeader:    "sender@example.com",
+			returnPath:    "",
+			expectAligned: true,
+			expectIssues:  nil,
 		},
 	}
 
@@ -415,14 +415,27 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 				t.Errorf("Aligned = %v, want %v", *alignment.Aligned, tt.expectAligned)
 			}
 
-			issuesLen := 0
-			if alignment.Issues != nil {
-				issuesLen = len(*alignment.Issues)
-			}
-			if issuesLen != tt.expectIssuesLen {
-				t.Errorf("Issues length = %d, want %d", issuesLen, tt.expectIssuesLen)
+			if _, issues := calculateAlignmentScore(alignment); fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.expectIssues) {
+				t.Errorf("issues = %v, want %v", issueTypes(issues), tt.expectIssues)
 			}
 		})
+	}
+}
+
+// The alignment issues end up in the analysis, and a message without
+// alignment data is told it is misaligned.
+func TestAlignmentIssuesStoredByHeaderScore(t *testing.T) {
+	if score, issues := calculateAlignmentScore(nil); score != 0 || fmt.Sprint(issueTypes(issues)) != fmt.Sprint([]model.IssueType{model.IssueTypeDomainMisaligned}) {
+		t.Errorf("nil alignment: score %d, issues %v", score, issueTypes(issues))
+	}
+	email := &mailmsg.Message{Header: createHeaderWithFields(map[string]string{
+		"From": "sender@example.com", "Return-Path": "<bounce@other.net>",
+	})}
+	a := NewHeaderAnalyzer()
+	analysis := a.GenerateHeaderAnalysis(email, nil)
+	a.CalculateHeaderScore(analysis)
+	if analysis.Issues.DomainAlignment == nil || (*analysis.Issues.DomainAlignment)[0].Type != model.IssueTypeDomainMisaligned {
+		t.Errorf("domain_alignment issues = %v", analysis.Issues.DomainAlignment)
 	}
 }
 
@@ -1242,7 +1255,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 		dkimDomains          []string
 		expectStrictAligned  bool
 		expectRelaxedAligned bool
-		expectIssuesContain  string
+		expectIssues         []model.IssueType
+		expectScore          int
 	}{
 		{
 			name:                 "DKIM strict alignment with From domain",
@@ -1251,7 +1265,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"example.com"},
 			expectStrictAligned:  true,
 			expectRelaxedAligned: true,
-			expectIssuesContain:  "",
+			expectIssues:         nil,
+			expectScore:          25,
 		},
 		{
 			name:                 "DKIM relaxed alignment only",
@@ -1260,7 +1275,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"example.com"},
 			expectStrictAligned:  false,
 			expectRelaxedAligned: true,
-			expectIssuesContain:  "relaxed alignment",
+			expectIssues:         []model.IssueType{model.IssueTypeDomainRelaxedAligned},
+			expectScore:          20,
 		},
 		{
 			name:                 "DKIM no alignment",
@@ -1269,7 +1285,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"different.com"},
 			expectStrictAligned:  false,
 			expectRelaxedAligned: false,
-			expectIssuesContain:  "do not align",
+			expectIssues:         []model.IssueType{model.IssueTypeDomainMisaligned},
+			expectScore:          0,
 		},
 		{
 			name:                 "Multiple DKIM signatures - one aligns",
@@ -1278,7 +1295,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"different.com", "example.com"},
 			expectStrictAligned:  true,
 			expectRelaxedAligned: true,
-			expectIssuesContain:  "",
+			expectIssues:         nil,
+			expectScore:          25,
 		},
 		{
 			name:                 "Return-Path misaligned but DKIM aligned",
@@ -1287,7 +1305,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"example.com"},
 			expectStrictAligned:  true,
 			expectRelaxedAligned: true,
-			expectIssuesContain:  "Return-Path",
+			expectIssues:         []model.IssueType{model.IssueTypeReturnPathMisaligned},
+			expectScore:          25,
 		},
 		{
 			name:                 "Return-Path aligned, no DKIM",
@@ -1296,7 +1315,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{},
 			expectStrictAligned:  true,
 			expectRelaxedAligned: true,
-			expectIssuesContain:  "",
+			expectIssues:         nil,
+			expectScore:          25,
 		},
 		{
 			name:                 "Both Return-Path and DKIM misaligned",
@@ -1305,7 +1325,8 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 			dkimDomains:          []string{"different.com"},
 			expectStrictAligned:  false,
 			expectRelaxedAligned: false,
-			expectIssuesContain:  "do not",
+			expectIssues:         []model.IssueType{model.IssueTypeDomainMisaligned},
+			expectScore:          0,
 		},
 	}
 
@@ -1366,80 +1387,15 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 				}
 			}
 
-			// Check issues contain expected string
-			if tt.expectIssuesContain != "" {
-				if alignment.Issues == nil || len(*alignment.Issues) == 0 {
-					t.Errorf("Expected issues to contain '%s', but no issues found", tt.expectIssuesContain)
-				} else {
-					found := false
-					for _, issue := range *alignment.Issues {
-						if strings.Contains(strings.ToLower(issue), strings.ToLower(tt.expectIssuesContain)) {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Errorf("Expected issues to contain '%s', but found: %v", tt.expectIssuesContain, *alignment.Issues)
-					}
-				}
+			score, issues := calculateAlignmentScore(alignment)
+			if score != tt.expectScore {
+				t.Errorf("score = %d, want %d", score, tt.expectScore)
 			}
-		})
-	}
-}
-
-func TestDmarcAlignment(t *testing.T) {
-	strict := &model.DMARCRecord{
-		Valid:         true,
-		SpfAlignment:  utils.PtrTo(model.DMARCRecordSpfAlignmentStrict),
-		DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict),
-	}
-	strictDkim := &model.DMARCRecord{
-		Valid:         true,
-		DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict),
-	}
-	alignment := func(rp string, dkim ...string) *model.DomainAlignment {
-		a := &model.DomainAlignment{
-			FromDomain:     utils.PtrTo("example.com"),
-			FromOrgDomain:  utils.PtrTo("example.com"),
-			Aligned:        utils.PtrTo(false),
-			RelaxedAligned: utils.PtrTo(false),
-		}
-		if rp != "" {
-			a.ReturnPathDomain = utils.PtrTo(rp)
-			a.ReturnPathOrgDomain = utils.PtrTo(domainname.Organizational(rp))
-		}
-		if len(dkim) > 0 {
-			var domains []model.DKIMDomainInfo
-			for _, d := range dkim {
-				domains = append(domains, model.DKIMDomainInfo{Domain: d, OrgDomain: domainname.Organizational(d)})
+			if fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.expectIssues) {
+				t.Errorf("issues = %v, want %v", issueTypes(issues), tt.expectIssues)
 			}
-			a.DkimDomains = &domains
-		}
-		return a
-	}
-
-	tests := []struct {
-		name      string
-		alignment *model.DomainAlignment
-		dmarc     *model.DMARCRecord
-		want      alignmentLevel
-	}{
-		{"same domain", alignment("example.com", "example.com"), strict, alignmentExact},
-		{"subdomain, no record", alignment("bounce.example.com", "mail.example.com"), nil, alignmentOrganizational},
-		{"subdomain, invalid record", alignment("", "mail.example.com"), &model.DMARCRecord{Valid: false, DkimAlignment: strictDkim.DkimAlignment}, alignmentOrganizational},
-		{"DKIM subdomain under adkim=s", alignment("", "mail.example.com"), strictDkim, alignmentNone},
-		{"Return-Path subdomain under adkim=s only", alignment("bounce.example.com", "mail.example.com"), strictDkim, alignmentOrganizational},
-		{"both subdomains under strict modes", alignment("bounce.example.com", "mail.example.com"), strict, alignmentNone},
-		{"exact DKIM under strict modes", alignment("bounce.example.com", "other.net", "example.com"), strict, alignmentExact},
-		{"unrelated domains", alignment("other.net", "other.net"), nil, alignmentNone},
-		{"nothing to compare", &model.DomainAlignment{FromDomain: utils.PtrTo("example.com"), Aligned: utils.PtrTo(true), RelaxedAligned: utils.PtrTo(true)}, strict, alignmentExact},
-		{"no alignment", nil, nil, alignmentNone},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := dmarcAlignment(tt.alignment, tt.dmarc); got != tt.want {
-				t.Errorf("dmarcAlignment() = %v, want %v", got, tt.want)
+			if got := penalties(issues); got != 25-score {
+				t.Errorf("penalties add up to %d, the alignment lost %d", got, 25-score)
 			}
 		})
 	}

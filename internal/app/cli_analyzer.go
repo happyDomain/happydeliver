@@ -478,10 +478,10 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			if align.RelaxedAligned != nil {
 				fmt.Fprintf(writer, "    Relaxed Alignment: %t\n", *align.RelaxedAligned)
 			}
-			if align.Issues != nil && len(*align.Issues) > 0 {
+			if header.Issues != nil && header.Issues.DomainAlignment != nil && len(*header.Issues.DomainAlignment) > 0 {
 				fmt.Fprintln(writer, "    Issues:")
-				for _, issue := range *align.Issues {
-					fmt.Fprintf(writer, "      - %s\n", issue)
+				for _, issue := range *header.Issues.DomainAlignment {
+					fmt.Fprintf(writer, "      - [%s] %s\n", strings.ToUpper(string(issue.Severity)), issue.Message)
 				}
 			}
 		}

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { dmarcAlignment } from "#lib/alignment.js";
     import type { DmarcRecord, HeaderAnalysis } from "#lib/api/types.gen.js";
-    import { headerDocLinks } from "#lib/docs.js";
+    import { headerDocLinks, issueDocLinks } from "#lib/docs.js";
     import { compareBySeverity, issueLabel } from "#lib/issues.js";
     import { getScoreColorClass } from "#lib/score.js";
     import GradeDisplay from "./GradeDisplay.svelte";
@@ -19,6 +19,9 @@
     // Gravest first, as in the content card. The alert's colour no longer competes with a
     // badge naming the level, so the order is what tells a reader where to start.
     const issues = $derived((headerAnalysis.issues?.headers ?? []).slice().sort(compareBySeverity));
+    const alignmentIssues = $derived(
+        (headerAnalysis.issues?.domain_alignment ?? []).slice().sort(compareBySeverity),
+    );
 </script>
 
 <div class="card shadow-sm" id="header-details">
@@ -86,21 +89,17 @@
                         email spoofing by verifying that the sender domain is consistent across all
                         authentication layers. Only one of the following lines needs to pass.
                     </p>
-                    {#if headerAnalysis.domain_alignment.issues && headerAnalysis.domain_alignment.issues.length > 0}
+                    {#if alignmentIssues.length > 0}
                         <div class="mt-3">
-                            {#each headerAnalysis.domain_alignment.issues as issue, i (i)}
-                                <div
-                                    class="alert alert-{alignment !== 'none'
-                                        ? 'info'
-                                        : 'warning'} py-2 small mb-2"
-                                >
-                                    <i
-                                        class="bi bi-{alignment !== 'none'
-                                            ? 'info-circle'
-                                            : 'exclamation-triangle'} me-1"
-                                    ></i>
-                                    {issue}
-                                </div>
+                            {#each alignmentIssues as issue, i (i)}
+                                <IssueAlert
+                                    title={issueLabel(issue.type)}
+                                    severity={issue.severity}
+                                    message={issue.message}
+                                    location={issue.location}
+                                    advice={issue.advice}
+                                    docs={issueDocLinks(issue.type)}
+                                />
                             {/each}
                         </div>
                     {/if}

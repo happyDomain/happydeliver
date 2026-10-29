@@ -330,13 +330,13 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young, auth_unavailable, auth_unevaluated, spf_fail, spf_softfail, spf_neutral, spf_permerror, spf_temperror, spf_helo_fail, dkim_fail, dkim_temperror, dkim_extra_fail, dmarc_fail, dmarc_permerror, dmarc_temperror, iprev_fail, iprev_error, tls_missing, x_aligned_from_fail, x_google_dkim_fail, arc_fail, bimi_declined, bimi_not_honored, bimi_missing, bimi_dmarc_not_enforced, bimi_invalid, bimi_unverified, bimi_vmc_missing, bimi_check_warning, rbl_listed, rbl_network_listed, domain_listed]
+          enum: [broken_html, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, domain_misaligned, domain_relaxed_aligned, return_path_misaligned, dkim_misaligned, spf_missing, spf_invalid, spf_include_invalid, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young, auth_unavailable, auth_unevaluated, spf_fail, spf_softfail, spf_neutral, spf_permerror, spf_temperror, spf_helo_fail, dkim_fail, dkim_temperror, dkim_extra_fail, dmarc_fail, dmarc_permerror, dmarc_temperror, iprev_fail, iprev_error, tls_missing, x_aligned_from_fail, x_google_dkim_fail, arc_fail, bimi_declined, bimi_not_honored, bimi_missing, bimi_dmarc_not_enforced, bimi_invalid, bimi_unverified, bimi_vmc_missing, bimi_check_warning, rbl_listed, rbl_network_listed, domain_listed]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
             message, those from malware_detected to scan_skipped off what it
             carries alongside, those from missing_header to
-            reply_without_references off its headers, those from spf_missing
+            dkim_misaligned off its headers, those from spf_missing
             to domain_young off the DNS records of its sender and what is
             known of its domains, those from auth_unavailable to
             bimi_not_honored off the verdicts its receiver reported on its
@@ -645,6 +645,11 @@ components:
         What each check of the headers found to change, by the check of the
         report showing it.
       properties:
+        domain_alignment:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About whether the domains authenticating the message align with the From domain, each with the points of the header score it costs.
         headers:
           type: array
           items:
@@ -789,12 +794,6 @@ components:
           type: boolean
           description: Whether domains satisfy relaxed alignment (organizational domain match)
           example: true
-        issues:
-          type: array
-          items:
-            type: string
-          description: Alignment issues
-          example: ["Return-Path domain does not match From domain"]
 
     AuthenticationResults:
       type: object
