@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { DmarcRecord, SpfRecord } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         spfRecords?: SpfRecord[];
@@ -26,22 +28,15 @@
 </script>
 
 {#if spfRecords && spfRecords.length > 0}
-    <div class="card mb-4" id="dns-spf">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-2">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={spfIsValid && !spfCanBeImprove}
-                    class:text-success={spfIsValid && !spfCanBeImprove}
-                    class:bi-arrow-up-circle-fill={spfIsValid && spfCanBeImprove}
-                    class:text-warning={spfIsValid && spfCanBeImprove}
-                    class:bi-x-circle-fill={!spfIsValid}
-                    class:text-danger={!spfIsValid}
-                ></i>
-                Sender Policy Framework
-            </h5>
-            <span class="badge bg-secondary">SPF</span>
-        </div>
+    <CheckCard
+        id="dns-spf"
+        title="Sender Policy Framework"
+        tag="SPF"
+        status={!spfIsValid ? "fail" : spfCanBeImprove ? "improve" : "pass"}
+        summary={spfRecords[0].record ?? spfRecords[0].error}
+        summaryFoldedOnly={!!spfRecords[0].record}
+        docs={[docs.spf, docs.spfAll, docs.spfLookupLimit]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 SPF specifies which mail servers are authorized to send emails on behalf of your
@@ -127,5 +122,5 @@
                 </div>
             {/each}
         </div>
-    </div>
+    </CheckCard>
 {/if}

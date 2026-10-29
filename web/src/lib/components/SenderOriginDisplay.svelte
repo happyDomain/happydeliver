@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { IpOrigin } from "#lib/api/types.gen.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         senderOrigin?: IpOrigin;
@@ -52,14 +53,22 @@
 </script>
 
 {#if senderOrigin}
-    <div class="card mb-4" id="dns-origin">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i class="bi bi-globe-americas text-secondary"></i>
-                Sender Network
-            </h5>
-            <span class="badge bg-secondary">{sourceLabel}</span>
-        </div>
+    <CheckCard
+        id="dns-origin"
+        title="Sender Network"
+        status="neutral"
+        icon="bi-globe-americas text-secondary"
+        summary={[
+            senderOrigin.as_name && senderOrigin.asn
+                ? `${senderOrigin.as_name} (AS${senderOrigin.asn})`
+                : (senderOrigin.as_name ??
+                  (senderOrigin.asn ? `AS${senderOrigin.asn}` : undefined)),
+            senderOrigin.country_name ?? senderOrigin.country,
+        ]
+            .filter(Boolean)
+            .join(", ")}
+        tag={sourceLabel}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 Every address on the Internet is announced by one network, identified by an
@@ -125,5 +134,5 @@
                 </div>
             {/if}
         </div>
-    </div>
+    </CheckCard>
 {/if}

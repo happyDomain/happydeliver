@@ -2,33 +2,31 @@
     import type { ClassValue } from "svelte/elements";
 
     import type { MxRecord } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
+        id?: string;
         class: ClassValue;
         mxRecords: MxRecord[];
         title: string;
         description?: string;
     }
 
-    let { class: className, mxRecords, title, description }: Props = $props();
+    let { id, class: className, mxRecords, title, description }: Props = $props();
 
     let mxsAreValids = $derived(mxRecords.reduce((acc, r) => acc && r.valid, true));
 </script>
 
-<div class="card {className}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="text-muted mb-0">
-            <i
-                class="bi"
-                class:bi-check-circle-fill={mxsAreValids}
-                class:text-success={mxsAreValids}
-                class:bi-x-circle-fill={!mxsAreValids}
-                class:text-danger={!mxsAreValids}
-            ></i>
-            {title}
-        </h5>
-        <span class="badge bg-secondary">MX</span>
-    </div>
+<CheckCard
+    {id}
+    class={className}
+    {title}
+    tag="MX"
+    status={mxsAreValids ? "pass" : "fail"}
+    summary={mxRecords.map((mx) => mx.host).join(", ")}
+    docs={[docs.mxLookup]}
+>
     <div class="card-body">
         {#if description}
             <p class="card-text small text-muted mb-0">{description}</p>
@@ -52,4 +50,4 @@
             </div>
         {/each}
     </div>
-</div>
+</CheckCard>

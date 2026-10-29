@@ -1,12 +1,30 @@
 <script lang="ts">
     import type { DmarcRecord } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         dmarcRecord?: DmarcRecord;
         fromDomain?: string;
+        /** Forces the card open or folded; by default it opens when something is wrong. */
+        open?: boolean;
     }
 
-    let { dmarcRecord, fromDomain }: Props = $props();
+    let { dmarcRecord, fromDomain, open }: Props = $props();
+
+    // Monitoring only, or enforcing on part of the mail: valid, but not protecting the
+    // domain, and scored as such.
+    const dmarcStatus = $derived(
+        !dmarcRecord?.valid
+            ? "fail"
+            : dmarcRecord.policy === "none" ||
+                dmarcRecord.test_mode ||
+                (dmarcRecord.percentage !== undefined && dmarcRecord.percentage < 100)
+              ? "warn"
+              : dmarcRecord.policy === "quarantine" || dmarcRecord.deprecated_pct
+                ? "improve"
+                : "pass",
+    );
 
     const isFallback = $derived(
         !!dmarcRecord?.domain && !!fromDomain && dmarcRecord.domain !== fromDomain,
@@ -22,23 +40,16 @@
 </script>
 
 {#if dmarcRecord}
-    <div class="card mb-4" id="dns-dmarc">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={dmarcRecord.valid && dmarcRecord.policy != "none"}
-                    class:text-success={dmarcRecord.valid && dmarcRecord.policy != "none"}
-                    class:bi-arrow-up-circle-fill={dmarcRecord.valid &&
-                        dmarcRecord.policy == "none"}
-                    class:text-warning={dmarcRecord.valid && dmarcRecord.policy == "none"}
-                    class:bi-x-circle-fill={!dmarcRecord.valid}
-                    class:text-danger={!dmarcRecord.valid}
-                ></i>
-                Domain-based Message Authentication
-            </h5>
-            <span class="badge bg-secondary">DMARC</span>
-        </div>
+    <CheckCard
+        id="dns-dmarc"
+        title="Domain-based Message Authentication"
+        tag="DMARC"
+        status={dmarcStatus}
+        summary={dmarcRecord.record ?? dmarcRecord.error ?? "No DMARC record"}
+        summaryFoldedOnly={!!dmarcRecord.record}
+        docs={[docs.dmarc, docs.dmarcPolicy, docs.dmarcbis, docs.dmarcV1]}
+        {open}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-2">
                 DMARC enforces domain alignment requirements (regardless of the policy). It builds
@@ -417,5 +428,5 @@
                 </div>
             {/if}
         </div>
-    </div>
+    </CheckCard>
 {/if}

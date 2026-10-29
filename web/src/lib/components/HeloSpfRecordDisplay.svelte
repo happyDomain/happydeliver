@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { SpfRecord } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         heloSpfRecord?: SpfRecord;
@@ -39,20 +41,15 @@
 </script>
 
 {#if heloSpfRecord}
-    <div class="card mb-4" id="dns-helo-spf">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={hasPolicy}
-                    class:text-success={hasPolicy}
-                    class:bi-info-circle-fill={!hasPolicy}
-                    class:text-info={!hasPolicy}
-                ></i>
-                SPF for the HELO Hostname
-            </h5>
-            <span class="badge bg-secondary">SPF</span>
-        </div>
+    <CheckCard
+        id="dns-helo-spf"
+        title="SPF for the HELO Hostname"
+        tag="SPF"
+        status={hasPolicy ? "pass" : "info"}
+        summary={heloSpfRecord.record ?? "No policy published (optional)"}
+        summaryFoldedOnly={!!heloSpfRecord.record}
+        docs={[docs.spfHelo]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 SPF can authenticate, in addition to the envelope sender, the hostname the sending
@@ -138,5 +135,5 @@
                 {/if}
             </div>
         </div>
-    </div>
+    </CheckCard>
 {/if}

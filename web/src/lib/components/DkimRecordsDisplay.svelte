@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { DkimRecord } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         dkimRecords?: DkimRecord[];
@@ -9,22 +11,27 @@
 
     // Compute overall validity
     const dkimIsValid = $derived(dkimRecords?.reduce((acc, r) => acc && r.valid, true) ?? false);
+
+    const dkimSummary = $derived(
+        dkimRecords && dkimRecords.length > 0
+            ? dkimRecords
+                  .map(
+                      (r) =>
+                          `${r.selector}._domainkey.${r.domain}${r.key_size ? ` (${r.key_size}-bit ${r.key_type ?? "rsa"})` : ""}`,
+                  )
+                  .join(", ")
+            : "No DKIM signature found",
+    );
 </script>
 
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="text-muted mb-0">
-            <i
-                class="bi"
-                class:bi-check-circle-fill={dkimIsValid}
-                class:text-success={dkimIsValid}
-                class:bi-x-circle-fill={!dkimIsValid}
-                class:text-danger={!dkimIsValid}
-            ></i>
-            DomainKeys Identified Mail
-        </h5>
-        <span class="badge bg-secondary">DKIM</span>
-    </div>
+<CheckCard
+    id="dns-dkim"
+    title="DomainKeys Identified Mail"
+    tag="DKIM"
+    status={dkimIsValid ? "pass" : "fail"}
+    summary={dkimSummary}
+    docs={[docs.dkim, docs.dkimKeySize]}
+>
     <div class="card-body">
         <p class="card-text small text-muted mb-0">
             DKIM cryptographically signs your emails, proving they haven't been tampered with in
@@ -71,4 +78,4 @@
             </div>
         {/if}
     </div>
-</div>
+</CheckCard>

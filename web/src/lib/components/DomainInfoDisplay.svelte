@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { SenderDomainInfo } from "#lib/api/types.gen.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         domainInfo?: SenderDomainInfo;
@@ -92,20 +93,20 @@
             Registration of <code>{domainInfo.domain}</code>: {domainInfo.error}
         </p>
     {:else if hasRegistration}
-        <div class="card mb-4" id="dns-registration-{role}">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="text-muted mb-0">
-                    <i
-                        class="bi"
-                        class:bi-check-circle-fill={!concerning}
-                        class:text-success={!concerning}
-                        class:bi-exclamation-triangle-fill={concerning}
-                        class:text-warning={concerning}
-                    ></i>
-                    Domain Registration
-                </h5>
-                <span class="badge bg-secondary">RDAP / WHOIS</span>
-            </div>
+        <CheckCard
+            id="dns-registration-{role}"
+            title="Domain Registration"
+            tag="RDAP / WHOIS"
+            status={lapsing || expired ? "fail" : concerning ? "warn" : "pass"}
+            summary={[
+                domainInfo.domain,
+                [ageLabel?.toLowerCase(), domainInfo.registrar && `at ${domainInfo.registrar}`]
+                    .filter(Boolean)
+                    .join(" "),
+            ]
+                .filter(Boolean)
+                .join(", ")}
+        >
             <div class="card-body">
                 <p class="card-text small text-muted mb-0">
                     What the registry publishes about <code>{domainInfo.domain}</code>. Receivers
@@ -187,6 +188,6 @@
                     </div>
                 {/if}
             </div>
-        </div>
+        </CheckCard>
     {/if}
 {/if}

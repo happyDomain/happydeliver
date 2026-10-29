@@ -5,13 +5,17 @@
         DmarcRecord,
         BimiCheckMessage,
     } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         bimiRecord?: BimiRecord;
         dmarcRecord?: DmarcRecord;
+        /** Forces the card open or folded; by default it opens when something is wrong. */
+        open?: boolean;
     }
 
-    let { bimiRecord, dmarcRecord }: Props = $props();
+    let { bimiRecord, dmarcRecord, open }: Props = $props();
 
     /* Only consulted when no BIMI record exists at all, to offer the
        declination advice below. The authoritative dmarc_enforcement check is
@@ -214,22 +218,24 @@
 {/snippet}
 
 {#if bimiRecord}
-    <div class="card mb-4" id="dns-bimi">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={headline === "pass"}
-                    class:text-success={headline === "pass"}
-                    class:bi-exclamation-triangle-fill={headline === "warning"}
-                    class:text-warning={headline === "warning"}
-                    class:bi-x-circle-fill={headline === "fail"}
-                    class:text-danger={headline === "fail"}
-                ></i>
-                Brand Indicators for Message Identification
-            </h5>
-            <span class="badge bg-secondary">BIMI</span>
-        </div>
+    <!-- BIMI is optional: a domain without a record has nothing broken, only something
+         it could add, so the card does not open itself for that. -->
+    <CheckCard
+        id="dns-bimi"
+        title="Brand Indicators for Message Identification"
+        tag="BIMI"
+        status={!bimiRecord.record
+            ? "info"
+            : headline === "pass"
+              ? "pass"
+              : headline === "warning"
+                ? "improve"
+                : "fail"}
+        summary={bimiRecord.record ?? bimiRecord.error ?? "No BIMI record (optional)"}
+        summaryFoldedOnly={!!bimiRecord.record}
+        docs={[docs.bimi, docs.bimiGroup]}
+        {open}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-2">
                 BIMI allows your brand logo to be displayed next to your emails in supported mail
@@ -531,7 +537,7 @@
                 </div>
             {/if}
         </div>
-    </div>
+    </CheckCard>
 {/if}
 
 <style>

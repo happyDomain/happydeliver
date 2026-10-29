@@ -1,4 +1,7 @@
 <script lang="ts">
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
+
     interface Props {
         ptrRecords?: string[];
         ptrForwardRecords?: string[];
@@ -29,20 +32,18 @@
 </script>
 
 {#if ptrRecords && ptrRecords.length > 0}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={fcrDnsIsValid}
-                    class:text-success={fcrDnsIsValid}
-                    class:bi-x-circle-fill={!fcrDnsIsValid}
-                    class:text-danger={!fcrDnsIsValid}
-                ></i>
-                Forward-Confirmed Reverse DNS
-            </h5>
-            <span class="badge bg-secondary">FCrDNS</span>
-        </div>
+    <CheckCard
+        id="dns-fcrdns"
+        title="Forward-Confirmed Reverse DNS"
+        tag="FCrDNS"
+        status={fcrDnsIsValid ? "pass" : hasForwardRecords ? "warn" : "fail"}
+        summary={fcrDnsIsValid
+            ? `${ptrRecords[0]} → ${senderIp}`
+            : hasForwardRecords
+              ? `${ptrRecords[0]} does not resolve back to the sender IP`
+              : `${ptrRecords[0]} does not resolve`}
+        docs={[docs.reverseDns]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 Forward-confirmed reverse DNS (FCrDNS) verifies that the PTR hostname resolves back
@@ -122,5 +123,5 @@
                 </div>
             </div>
         {/if}
-    </div>
+    </CheckCard>
 {/if}

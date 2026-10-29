@@ -252,7 +252,12 @@
                     </div>
 
                     <!-- BIMI Record -->
-                    <BimiRecordDisplay bimiRecord={record} dmarcRecord={result.dmarc_record} />
+                    <!-- The record is what this page is about: never folded. -->
+                    <BimiRecordDisplay
+                        bimiRecord={record}
+                        dmarcRecord={result.dmarc_record}
+                        open={true}
+                    />
 
                     <!-- DMARC Record: BIMI display hangs on it, and the card
                          above links here to explain a blocked indicator. -->

@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { RspamdResult } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
+    import CheckCard from "./CheckCard.svelte";
     import GradeDisplay from "./GradeDisplay.svelte";
 
     interface Props {
@@ -12,9 +13,10 @@
          * out further down the page.
          */
         adviceAnchors?: Record<string, string>;
+        open?: boolean;
     }
 
-    let { rspamd, adviceAnchors = {} }: Props = $props();
+    let { rspamd, adviceAnchors = {}, open }: Props = $props();
 
     // rspamd's built-in action ladder, used to derive the action the message
     // would have triggered: the action header is unreliable in milter setups
@@ -39,11 +41,18 @@
 
     const symbols = $derived(Object.entries(rspamd.symbols ?? {}));
 
-    // What actually moved the score, worst first.
+    // What pushed the message towards spam, worst first: the symbols to act on.
     const scoring = $derived(
-        symbols
-            .filter(([, symbol]) => symbol.score !== 0)
-            .sort(([, a], [, b]) => b.score - a.score),
+        symbols.filter(([, symbol]) => symbol.score > 0).sort(([, a], [, b]) => b.score - a.score),
+    );
+
+    // What lowered the score: in the sender's favour, so folded with the neutral ones below.
+    const helping = $derived(
+        symbols.filter(([, symbol]) => symbol.score < 0).sort(([, a], [, b]) => a.score - b.score),
+    );
+
+    const checkStatus = $derived(
+        rspamd.is_spam ? "fail" : (rspamd.deliverability_score ?? 100) < 100 ? "improve" : "pass",
     );
 
     // A symbol scoring zero neither helped nor hurt: rspamd raises a great many of
@@ -98,25 +107,26 @@
     {/each}
 {/snippet}
 
-<div class="card shadow-sm" id="rspamd-details">
-    <div class="card-header">
-        <h4 class="mb-0 d-flex justify-content-between align-items-center">
-            <span>
-                <i class="bi bi-bug me-2"></i>
-                rspamd Analysis
+<CheckCard
+    id="rspamd-details"
+    class="mb-0 h-100"
+    title="rspamd"
+    status={checkStatus}
+    summary="{rspamd.score.toFixed(1)}{rspamd.threshold !== undefined
+        ? ` / ${rspamd.threshold.toFixed(1)}`
+        : ''}, {rspamd.is_spam ? 'spam' : 'not spam'}"
+    open={open ?? checkStatus !== "pass"}
+>
+    {#snippet aside()}
+        {#if rspamd.deliverability_score !== undefined}
+            <span class="badge bg-{getScoreColorClass(rspamd.deliverability_score)}">
+                {rspamd.deliverability_score}%
             </span>
-            <span>
-                {#if rspamd.deliverability_score !== undefined}
-                    <span class="badge bg-{getScoreColorClass(rspamd.deliverability_score)}">
-                        {rspamd.deliverability_score}%
-                    </span>
-                {/if}
-                {#if rspamd.deliverability_grade !== undefined}
-                    <GradeDisplay grade={rspamd.deliverability_grade} size="small" />
-                {/if}
-            </span>
-        </h4>
-    </div>
+        {/if}
+        {#if rspamd.deliverability_grade !== undefined}
+            <GradeDisplay grade={rspamd.deliverability_grade} size="inline" />
+        {/if}
+    {/snippet}
     <div class="card-body">
         <div class="row mb-3">
             <div class="col-md-4">
@@ -161,13 +171,36 @@
                     </div>
                 {:else}
                     <p class="text-muted small mb-0 mt-2">
-                        The filter ran every check and none of them moved the score.
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        No symbol counted against the message.
                     </p>
                 {/if}
 
+                {#if helping.length > 0}
+                    <details class="passed-items mt-2">
+                        <summary>
+                            {helping.length} symbol{helping.length > 1 ? "s" : ""} in your favour
+                        </summary>
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th class="text-end">Score</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {@render symbolRows(helping)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                {/if}
+
                 {#if quiet.length > 0}
-                    <details class="mt-2">
-                        <summary class="cursor-pointer small text-muted">
+                    <details class="passed-items mt-2">
+                        <summary>
                             {quiet.length} symbol{quiet.length > 1 ? "s" : ""} that scored nothing
                         </summary>
                         <div class="table-responsive mt-2">
@@ -196,7 +229,7 @@
             </details>
         {/if}
     </div>
-</div>
+</CheckCard>
 
 <style>
     .cursor-pointer {

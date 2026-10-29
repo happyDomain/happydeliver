@@ -1,4 +1,7 @@
 <script lang="ts">
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
+
     interface Props {
         ptrRecords?: string[];
         senderIp?: string;
@@ -11,25 +14,19 @@
 </script>
 
 {#if ptrRecords && ptrRecords.length > 0}
-    <div class="card mb-4" id="dns-ptr">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={ptrIsValid}
-                    class:text-success={ptrIsValid}
-                    class:bi-x-circle-fill={!ptrIsValid}
-                    class:text-danger={!ptrIsValid}
-                ></i>
-                Reverse DNS
-            </h5>
-            <span class="badge bg-secondary">PTR</span>
-        </div>
+    <CheckCard
+        id="dns-ptr"
+        title="Reverse DNS"
+        tag="PTR"
+        status={!ptrIsValid ? "fail" : ptrRecords.length > 1 ? "warn" : "pass"}
+        summary={ptrRecords.join(", ")}
+        docs={[docs.reverseDns]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
-                PTR (pointer record), also known as reverse DNS maps IP addresses back to hostnames.
-                Having proper PTR records is important as many mail servers verify that the sending
-                IP has a valid reverse DNS entry.
+                PTR (pointer record), also known as reverse DNS, maps IP addresses back to
+                hostnames. Having proper PTR records is important as many mail servers verify that
+                the sending IP has a valid reverse DNS entry.
             </p>
             {#if senderIp}
                 <div class="mt-2">
@@ -57,16 +54,16 @@
                 </div>
             {/if}
         </div>
-    </div>
+    </CheckCard>
 {:else if senderIp}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-2">
-                <i class="bi bi-x-circle-fill text-danger"></i>
-                Reverse DNS (PTR)
-            </h5>
-            <span class="badge bg-secondary">PTR</span>
-        </div>
+    <CheckCard
+        id="dns-ptr"
+        title="Reverse DNS"
+        tag="PTR"
+        status="fail"
+        summary="No PTR record for {senderIp}"
+        docs={[docs.reverseDns]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 PTR records (reverse DNS) map IP addresses back to hostnames. Having proper PTR
@@ -81,5 +78,5 @@
                 provider to configure reverse DNS.
             </div>
         </div>
-    </div>
+    </CheckCard>
 {/if}

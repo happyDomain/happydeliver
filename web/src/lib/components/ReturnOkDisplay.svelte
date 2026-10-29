@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { ReturnOk, ReturnOkDomain } from "#lib/api/types.gen.js";
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
 
     interface Props {
         returnOk?: ReturnOk;
@@ -39,22 +41,14 @@
 </script>
 
 {#if rows.length > 0}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={headerOk}
-                    class:text-success={headerOk}
-                    class:bi-exclamation-triangle-fill={!headerOk && !hasFail}
-                    class:text-warning={!headerOk && !hasFail}
-                    class:bi-x-circle-fill={hasFail}
-                    class:text-danger={hasFail}
-                ></i>
-                Return Address Reachability
-            </h5>
-            <span class="badge bg-secondary">RETURN-OK</span>
-        </div>
+    <CheckCard
+        id="dns-returnok"
+        title="Return Address Reachability"
+        tag="RETURN-OK"
+        status={hasFail ? "fail" : headerOk ? "pass" : "warn"}
+        summary={rows.map((r) => `${r.entry.domain}: ${badgeLabel(r.entry.status)}`).join("; ")}
+        docs={[docs.mxLookup]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 Replies (to the From address) and bounces (to the Return-Path) can only be delivered
@@ -102,5 +96,5 @@
                 </div>
             </div>
         {/if}
-    </div>
+    </CheckCard>
 {/if}

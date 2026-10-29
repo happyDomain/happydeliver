@@ -1,4 +1,7 @@
 <script lang="ts">
+    import { docs } from "#lib/docs.js";
+    import CheckCard from "./CheckCard.svelte";
+
     interface Props {
         heloHostname?: string;
         ptrRecords?: string[];
@@ -23,20 +26,14 @@
 </script>
 
 {#if heloHostname}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="text-muted mb-0">
-                <i
-                    class="bi"
-                    class:bi-check-circle-fill={isMatch}
-                    class:text-success={isMatch}
-                    class:bi-x-circle-fill={!isMatch}
-                    class:text-danger={!isMatch}
-                ></i>
-                HELO / PTR Consistency
-            </h5>
-            <span class="badge bg-secondary">HELO</span>
-        </div>
+    <CheckCard
+        id="dns-helo-ptr"
+        title="HELO / PTR Consistency"
+        tag="HELO"
+        status={isMatch ? "pass" : "warn"}
+        summary={isMatch ? heloHostname : `${heloHostname} differs from the reverse DNS`}
+        docs={[docs.ehlo]}
+    >
         <div class="card-body">
             <p class="card-text small text-muted mb-0">
                 The HELO/EHLO hostname is the name the sending server announces when it connects.
@@ -83,5 +80,5 @@
                 </div>
             </div>
         {/if}
-    </div>
+    </CheckCard>
 {/if}

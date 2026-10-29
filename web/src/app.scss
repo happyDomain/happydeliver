@@ -1914,6 +1914,59 @@ footer {
     border-top: 2px solid rgba($hd-green-500, 0.3);
 }
 
+// ── Report: folding sections and checks ─────────────────────────────────────
+// A report is read for what needs fixing: what passed folds into its header,
+// which still says how it came out, and opens on demand. Layout and spacing
+// come from utility classes in the markup; only what Bootstrap has no class
+// for lives here.
+details.check-card {
+    scroll-margin-top: 1rem;
+
+    > summary {
+        list-style: none;
+        cursor: pointer;
+
+        &::-webkit-details-marker {
+            display: none;
+        }
+
+        &:hover {
+            background-color: var(--hd-bg-hover);
+        }
+    }
+
+    .disclosure {
+        color: var(--hd-fg-3);
+        transition: transform 0.2s ease;
+    }
+
+    &[open] > summary .disclosure {
+        transform: rotate(180deg);
+    }
+
+    &[open] > summary .check-summary-folded {
+        display: none;
+    }
+
+    &:not([open]) > summary {
+        border-bottom: 0;
+        border-radius: var(--bs-card-inner-border-radius);
+    }
+}
+
+// What passed, folded under the problems: a quiet line to open, not a heading.
+details.passed-items {
+    > summary {
+        cursor: pointer;
+        color: var(--hd-fg-3);
+        font-size: $small-font-size;
+
+        &:hover {
+            color: var(--hd-fg-1);
+        }
+    }
+}
+
 // ── Animations ──────────────────────────────────────────────────────────────
 @keyframes fadeIn {
     from {

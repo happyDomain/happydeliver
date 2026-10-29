@@ -4,6 +4,7 @@ export { default as AuthenticationCard } from "./AuthenticationCard.svelte";
 export { default as BimiRecordDisplay } from "./BimiRecordDisplay.svelte";
 export { default as BlacklistCard } from "./BlacklistCard.svelte";
 export { default as ContentAnalysisCard } from "./ContentAnalysisCard.svelte";
+export { default as CheckCard } from "./CheckCard.svelte";
 export { default as DkimRecordsDisplay } from "./DkimRecordsDisplay.svelte";
 export { default as DmarcRecordDisplay } from "./DmarcRecordDisplay.svelte";
 export { default as DomainInfoDisplay } from "./DomainInfoDisplay.svelte";
