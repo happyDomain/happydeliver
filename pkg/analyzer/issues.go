@@ -74,6 +74,13 @@ func weighIssues(issues []model.Issue, weight, total int) *[]model.Issue {
 	return &weighed
 }
 
+// sectionIssue records an issue that costs the section score itself the
+// given points, outside of any check: there is nothing to weigh.
+func sectionIssue(issues *[]model.Issue, points int, issue model.Issue) {
+	issue.Penalty = &points
+	*issues = append(*issues, issue)
+}
+
 // newIssue builds an issue the analyser found reading the message or the
 // records of its sender, filed under deliverability.
 func newIssue(issueType model.IssueType, severity model.IssueSeverity, location, message, advice string) model.Issue {

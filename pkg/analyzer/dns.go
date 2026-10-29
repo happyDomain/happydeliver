@@ -436,9 +436,9 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 }
 
 // addSectionIssues completes the issues of results with those of a
-// Return-Path on another domain, weighed as the MX check, and with what the
-// section itself charges for sender domains that cannot receive mail, told
-// along with their MX records.
+// Return-Path on another domain, weighed as the MX check, and with those
+// charged to the section itself: what the sender domains are, and whether
+// they can receive mail, told along with their MX records.
 func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.Issue, weight, total int) {
 	issues := results.Issues
 
@@ -455,6 +455,13 @@ func (d *DNSAnalyzer) addSectionIssues(results *model.DNSResults, mxRP []model.I
 		}
 	}
 
+	from, rp := domainInfoIssues(results)
+	if results.FromDomainInfo != nil {
+		issues.RegistrationFrom = issueList(from)
+	}
+	if results.RpDomainInfo != nil {
+		issues.RegistrationReturnPath = issueList(rp)
+	}
 }
 
 // issueList is the list of a check that ran, empty rather than nil when it

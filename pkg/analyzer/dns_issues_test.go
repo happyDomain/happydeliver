@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
@@ -408,6 +409,45 @@ func TestMXIssuesOfAnotherReturnPath(t *testing.T) {
 	}
 	if fmt.Sprint(issueTypes(rp)) != fmt.Sprint([]model.IssueType{model.IssueTypeMxMissing}) || *rp[0].Penalty != 50 {
 		t.Errorf("Return-Path issues = %v, want mx_missing costing 50", rp)
+	}
+}
+
+// The registration answers once for lapsing and youth: the issues share
+// what it costs, as the score does.
+func TestRegistrationIssuesShareTheBound(t *testing.T) {
+	results := &model.DNSResults{
+		FromDomainInfo: &model.SenderDomainInfo{Domain: "example.com", Disposable: true, Lapsing: true, AgeDays: utils.PtrTo(3)},
+	}
+
+	from, _ := domainInfoIssues(results)
+
+	want := map[model.IssueType]int{model.IssueTypeDomainDisposable: 25, model.IssueTypeDomainLapsing: 10, model.IssueTypeDomainYoung: 10}
+	if len(from) != len(want) {
+		t.Fatalf("issues = %v, want %v", issueTypes(from), want)
+	}
+	for _, issue := range from {
+		if *issue.Penalty != want[issue.Type] {
+			t.Errorf("%s costs %d, want %d", issue.Type, *issue.Penalty, want[issue.Type])
+		}
+	}
+	if got := calculateDomainInfoPenalty(results); got != -penalties(from) {
+		t.Errorf("calculateDomainInfoPenalty() = %d, the issues cost %d", got, penalties(from))
+	}
+}
+
+// A free provider and an expiry to come are told for free, while a
+// disposable Return-Path costs what it costs.
+func TestSenderDomainIssuesThatCostNothing(t *testing.T) {
+	expiry := time.Now().Add(10 * 24 * time.Hour)
+	from, rp := domainInfoIssues(&model.DNSResults{
+		FromDomainInfo: &model.SenderDomainInfo{Domain: "gmail.com", FreeProvider: true, ExpirationDate: &expiry},
+		RpDomainInfo:   &model.SenderDomainInfo{Domain: "trash.example", Disposable: true},
+	})
+	if got := issueTypes(from); fmt.Sprint(got) != fmt.Sprint([]model.IssueType{model.IssueTypeDomainFreeProvider, model.IssueTypeDomainExpiring}) || penalties(from) != 0 {
+		t.Errorf("From issues = %v, want a free provider and an expiry, both free", from)
+	}
+	if len(rp) != 1 || rp[0].Type != model.IssueTypeDomainDisposable || *rp[0].Penalty != -penaltyDisposableReturnPath {
+		t.Errorf("Return-Path issues = %v, want domain_disposable costing %d", rp, -penaltyDisposableReturnPath)
 	}
 }
 

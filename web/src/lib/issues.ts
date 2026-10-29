@@ -76,6 +76,11 @@ const issueLabels: Record<Issue["type"], string> = {
     ptr_multiple: "Sending IP has several PTR records",
     fcrdns_mismatch: "Reverse DNS is not forward-confirmed",
     helo_ptr_mismatch: "HELO hostname differs from reverse DNS",
+    domain_disposable: "Domain hands out disposable addresses",
+    domain_free_provider: "Domain is a free mailbox provider",
+    domain_lapsing: "Domain is being deleted",
+    domain_expiring: "Domain expires soon",
+    domain_young: "Domain was registered recently",
 };
 
 export function issueLabel(type: Issue["type"]): string {

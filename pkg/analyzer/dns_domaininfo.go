@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -144,18 +145,81 @@ func (d *DNSAnalyzer) checkDomainInfo(domain, orgDomain string) *model.SenderDom
 // calculateDomainInfoPenalty returns a non-positive value: what the sender
 // domains cost for what they are, whatever their records say.
 func calculateDomainInfoPenalty(results *model.DNSResults) (penalty int) {
-	if results.FromDomainInfo != nil && results.FromDomainInfo.Disposable {
-		penalty += penaltyDisposableFrom
-	}
-	if results.RpDomainInfo != nil && results.RpDomainInfo.Disposable {
-		penalty += penaltyDisposableReturnPath
-	}
-	for _, info := range []*model.SenderDomainInfo{results.FromDomainInfo, results.RpDomainInfo} {
-		if info != nil {
-			penalty += registrationPenalty(info)
-		}
+	from, rp := domainInfoIssues(results)
+	for _, issue := range append(from, rp...) {
+		penalty -= *issue.Penalty
 	}
 	return
+}
+
+// domainInfoIssues is what the From and the Return-Path domains are found to
+// be, each issue charged the points of the section score it costs.
+func domainInfoIssues(results *model.DNSResults) (from, rp []model.Issue) {
+	return senderDomainIssues(results.FromDomainInfo, true), senderDomainIssues(results.RpDomainInfo, false)
+}
+
+// senderDomainIssues is what one sender domain is found to be: the visible
+// sender when from, the envelope one otherwise.
+func senderDomainIssues(info *model.SenderDomainInfo, from bool) (issues []model.Issue) {
+	if info == nil {
+		return nil
+	}
+	domain := info.Domain
+
+	if info.Disposable {
+		points, advice := -penaltyDisposableFrom, "Send from a domain you control."
+		if !from {
+			points, advice = -penaltyDisposableReturnPath, "Use a Return-Path at a domain you control, so bounces reach a mailbox someone reads."
+		}
+		sectionIssue(&issues, points, newIssue(model.IssueTypeDomainDisposable, model.IssueSeverityCritical, domain,
+			fmt.Sprintf("%s is a throwaway address provider; receivers refuse or quarantine its mail.", domain),
+			advice))
+	} else if info.FreeProvider {
+		sectionIssue(&issues, 0, newIssue(model.IssueTypeDomainFreeProvider, model.IssueSeverityInfo, domain,
+			fmt.Sprintf("%s is a public mailbox service. That is fine for personal mail sent through the provider itself, but bulk or transactional mail in its name sent from another server fails the provider's own DMARC policy.", domain),
+			"Send such mail from a domain you control."))
+	}
+
+	// The registration answers once for its lapsing and its youth together:
+	// the lapsing, graver, is charged first, the youth what remains.
+	registration := -registrationPenalty(info)
+	if info.Lapsing {
+		points := min(-penaltyDomainLapsing, registration)
+		registration -= points
+		sectionIssue(&issues, points, newIssue(model.IssueTypeDomainLapsing, model.IssueSeverityCritical, domain,
+			fmt.Sprintf("The registration of %s has expired, or the registry is deleting it or holding it out of the DNS.", domain),
+			"Renew the domain with your registrar right away."))
+	} else if info.ExpirationDate != nil {
+		if days := int(time.Until(*info.ExpirationDate).Hours() / 24); days <= 30 {
+			plural := "s"
+			if days == 1 {
+				plural = ""
+			}
+			sectionIssue(&issues, 0, newIssue(model.IssueTypeDomainExpiring, model.IssueSeverityHigh, domain,
+				expiresIn(domain, days, plural),
+				"Renew the registration with your registrar."))
+		}
+	}
+
+	if info.AgeDays != nil && *info.AgeDays < 90 {
+		plural := "s"
+		if *info.AgeDays == 1 {
+			plural = ""
+		}
+		sectionIssue(&issues, registration, newIssue(model.IssueTypeDomainYoung, model.IssueSeverityLow, domain,
+			fmt.Sprintf("%s is %d day%s old; receivers filter young domains more strictly.", domain, *info.AgeDays, plural),
+			"Ramp your sending volume up gradually over the first weeks, starting with recipients who expect your mail."))
+	}
+
+	return issues
+}
+
+// expiresIn says when the registration of domain ends, days from now.
+func expiresIn(domain string, days int, plural string) string {
+	if days < 0 {
+		return fmt.Sprintf("%s has expired.", domain)
+	}
+	return fmt.Sprintf("%s expires in %d day%s.", domain, days, plural)
 }
 
 // isLapsing answers whether the registration is on its way out: past its
