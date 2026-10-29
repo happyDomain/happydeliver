@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SchemasAttachmentAnalysis, SchemasScanResult } from "#lib/api/types.gen.js";
+    import type { AttachmentAnalysis, ScanResult } from "#lib/api/types.gen.js";
     import {
         categoryLabel,
         groupIssuesByCategory,
@@ -12,7 +12,7 @@
     import IssueAlert from "./IssueAlert.svelte";
 
     interface Props {
-        attachmentAnalysis: SchemasAttachmentAnalysis;
+        attachmentAnalysis: AttachmentAnalysis;
         attachmentsGrade?: string;
         attachmentsScore?: number;
     }
@@ -59,7 +59,7 @@
      * What a scanner says beyond its status: the name it gave what it recognised, or how many
      * of the engines it speaks for flagged the file.
      */
-    function scanEvidence(scan: SchemasScanResult): string {
+    function scanEvidence(scan: ScanResult): string {
         if (scan.verdict) return ` — ${scan.verdict}`;
         if (scan.engines_flagged !== undefined && scan.engines_total !== undefined) {
             return ` (${scan.engines_flagged}/${scan.engines_total})`;
@@ -70,7 +70,7 @@
     /**
      * Where an attachment's own report is published, when one of the scanners publishes one.
      */
-    function scanLink(scans?: SchemasScanResult[]): string | undefined {
+    function scanLink(scans?: ScanResult[]): string | undefined {
         return scans?.find((scan) => scan.link)?.link;
     }
 </script>

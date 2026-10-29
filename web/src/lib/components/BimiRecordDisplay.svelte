@@ -3,7 +3,7 @@
         BimiCheck,
         BimiRecord,
         DmarcRecord,
-        SchemasBimiCheckMessage,
+        BimiCheckMessage,
     } from "#lib/api/types.gen.js";
 
     interface Props {
@@ -149,7 +149,7 @@
         skipped: { badge: "bg-secondary", icon: "bi-dash-circle", text: "text-muted" },
     };
 
-    function messageColor(message: SchemasBimiCheckMessage): string {
+    function messageColor(message: BimiCheckMessage): string {
         if (message.severity === "info") return "text-muted";
         return message.severity === "warning" ? "text-warning" : "text-danger";
     }

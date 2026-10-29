@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { SchemasReturnOk, SchemasReturnOkDomain } from "#lib/api/types.gen.js";
+    import type { ReturnOk, ReturnOkDomain } from "#lib/api/types.gen.js";
 
     interface Props {
-        returnOk?: SchemasReturnOk;
+        returnOk?: ReturnOk;
     }
 
     let { returnOk }: Props = $props();
 
-    type Row = { label: string; entry: SchemasReturnOkDomain };
+    type Row = { label: string; entry: ReturnOkDomain };
 
     const rows = $derived<Row[]>(
         [
