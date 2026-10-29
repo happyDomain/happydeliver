@@ -26,7 +26,6 @@
         SpamAssassinCard,
         SummaryCard,
         TinySurvey,
-        WhitelistCard,
     } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
 
@@ -402,8 +401,10 @@
                     <div class="col-12">
                         <BlacklistCard
                             blacklists={report.blacklists}
+                            whitelists={report.whitelists}
                             blacklistGrade={report.summary?.blacklist_grade}
                             blacklistScore={report.summary?.blacklist_score}
+                            issues={report.blacklist_issues}
                             status={statuses.blacklist}
                             open={opens("blacklist")}
                         />
@@ -503,15 +504,6 @@
                             status={statuses.attachments}
                             open={opens("attachments")}
                         />
-                    </div>
-                </div>
-            {/if}
-
-            <!-- Whitelists: informational, they never weigh on the score -->
-            {#if report.whitelists && Object.keys(report.whitelists).length > 0}
-                <div class="row mb-4" id="whitelist">
-                    <div class="col-12">
-                        <WhitelistCard whitelists={report.whitelists} open={false} />
                     </div>
                 </div>
             {/if}

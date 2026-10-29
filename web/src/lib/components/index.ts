@@ -34,5 +34,4 @@ export { default as SpfRecordsDisplay } from "./SpfRecordsDisplay.svelte";
 export { default as SummaryCard } from "./SummaryCard.svelte";
 export { default as HistoryTable } from "./HistoryTable.svelte";
 export { default as TinySurvey } from "./TinySurvey.svelte";
-export { default as WhitelistCard } from "./WhitelistCard.svelte";
 export { default as TileLoader } from "./TileLoader.svelte";

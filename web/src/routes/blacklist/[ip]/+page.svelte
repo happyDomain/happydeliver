@@ -10,7 +10,6 @@
         ErrorDisplay,
         GradeDisplay,
         TinySurvey,
-        WhitelistCard,
     } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
 
@@ -153,21 +152,17 @@
                     </div>
 
                     <div class="row">
-                        <!-- Blacklist Results Card -->
-                        <div class="col col-lg-6">
+                        <div class="col-12">
                             <BlacklistCard
                                 blacklists={{ [result.ip]: result.blacklists }}
+                                whitelists={result.whitelists
+                                    ? { [result.ip]: result.whitelists }
+                                    : undefined}
+                                issues={{ [result.ip]: result.issues ?? [] }}
                                 blacklistScore={result.score}
                                 blacklistGrade={result.grade}
                             />
                         </div>
-
-                        <!-- Whitelist Results Card -->
-                        {#if result.whitelists && result.whitelists.length > 0}
-                            <div class="col col-lg-6">
-                                <WhitelistCard whitelists={{ [result.ip]: result.whitelists }} />
-                            </div>
-                        {/if}
                     </div>
 
                     <!-- Information Card -->
