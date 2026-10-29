@@ -10,7 +10,7 @@
         rspamd?: RspamdResult;
         spamGrade?: string;
         spamScore?: number;
-        /** rspamd symbol to the anchor of the content finding that carries its advice. */
+        /** rspamd symbol to the anchor of the content check showing its advice. */
         adviceAnchors?: Record<string, string>;
         status?: SectionStatus;
         open?: boolean;

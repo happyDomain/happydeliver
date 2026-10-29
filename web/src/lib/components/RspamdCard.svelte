@@ -10,7 +10,7 @@
     interface Props {
         rspamd: RspamdResult;
         /**
-         * Symbol to the anchor of the content finding that carries its advice, for the symbols
+         * Symbol to the anchor of the content check showing its advice, for the symbols
          * that produced one.
          */
         adviceAnchors?: Record<string, string>;

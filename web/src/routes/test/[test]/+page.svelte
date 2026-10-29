@@ -448,9 +448,7 @@
                             rspamd={report.rspamd}
                             spamGrade={report.summary?.spam_grade}
                             spamScore={report.summary?.spam_score}
-                            adviceAnchors={adviceAnchorsBySymbol(
-                                report.content_analysis?.html_issues,
-                            )}
+                            adviceAnchors={adviceAnchorsBySymbol(report.content_analysis)}
                             status={statuses.spam}
                             open={opens("spam")}
                         />

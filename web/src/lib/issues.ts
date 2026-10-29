@@ -246,10 +246,7 @@ export type IssueGroup = {
 /**
  * The issues grouped by the reading they answer, ready to be shown section by section.
  *
- * Each issue keeps the index it had in html_issues. That is not a convenience: the anchor of
- * an issue is made of that index (see contentIssueAnchor), and the rspamd symbol table links
- * to it through adviceAnchorsBySymbol. Grouping by position in the group instead would point
- * every one of those links at the wrong advice.
+ * Each issue keeps the index it had in the list it came from, which keys it in the page.
  *
  * Within a group the gravest findings come first: a reader opening a section is looking for
  * what to fix, and a section that opens on an informational remark buries it. Findings of
@@ -302,6 +299,11 @@ export function issueObserver(issue: Pick<Issue, "source">): string | undefined 
     return !issue.source || issue.source === "self" ? undefined : issue.source;
 }
 
+/** Anchor of a check of the content section, by its key in ContentIssues. */
+export function contentAnchor(check: string): string {
+    return `content-${check.replaceAll("_", "-")}`;
+}
+
 /**
  * Every issue of a content analysis: those of its checks, then those of its links and its
  * images. A report from before the issues were listed by check has them all in html_issues.
@@ -316,30 +318,29 @@ export function contentIssues(content?: ContentAnalysis): Issue[] {
 }
 
 /**
- * Anchor of a content issue, so anything pointing at its advice has a stable target: the
- * rspamd symbol table below, or a link someone sends a colleague.
- */
-export function contentIssueAnchor(index: number): string {
-    return `content-issue-${index}`;
-}
-
-/**
- * Symbol to the anchor of the finding that carries its advice.
+ * Symbol to the anchor of the check of the content section carrying its advice.
  *
  * A symbol reaches the report one of two ways: it raised a finding of its own, or it
- * corroborated one of ours. Either way advice for it sits in the content card, and the symbol
- * table has no way of saying so: a reader seeing ZERO_FONT at +1.00 cannot tell that an
- * explanation of what to do about it is waiting further down the page.
+ * corroborated one of ours. Either way advice for it sits in the content section, and the
+ * symbol table has no way of saying so: a reader seeing ZERO_FONT at +1.00 cannot tell that
+ * an explanation of what to do about it is waiting further down the page.
  */
-export function adviceAnchorsBySymbol(issues?: Issue[]): Record<string, string> {
+export function adviceAnchorsBySymbol(content?: ContentAnalysis): Record<string, string> {
     const anchors: Record<string, string> = {};
+    const note = (issues: Issue[] | undefined, anchor: string) => {
+        for (const issue of issues ?? []) {
+            if (issue.symbol) anchors[issue.symbol] = anchor;
+            for (const other of issue.corroborated_by ?? []) anchors[other] = anchor;
+        }
+    };
 
-    issues?.forEach((issue, index) => {
-        const anchor = contentIssueAnchor(index);
-
-        if (issue.symbol) anchors[issue.symbol] = anchor;
-        for (const other of issue.corroborated_by ?? []) anchors[other] = anchor;
-    });
+    // A report from before the issues were listed by check shows them all on the section.
+    note(content?.html_issues, "content-details");
+    for (const [check, issues] of Object.entries(content?.issues ?? {})) {
+        note(issues, contentAnchor(check));
+    }
+    for (const link of content?.links ?? []) note(link.issues, contentAnchor("links"));
+    for (const image of content?.images ?? []) note(image.issues, contentAnchor("images"));
 
     return anchors;
 }

@@ -7,7 +7,7 @@
         /** Decimals of the scores, as the filter reports them. */
         digits?: number;
         /**
-         * Rule to the anchor of the content finding that carries its advice. Without it the
+         * Rule to the anchor of the content check showing its advice. Without it the
          * list is names and numbers: a reader seeing ZERO_FONT at +1.00 has no way of knowing
          * that what to do about it is written out further down the page.
          */

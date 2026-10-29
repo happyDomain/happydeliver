@@ -4,7 +4,7 @@ import type { ContentAnalysis, Issue } from "#lib/api/types.gen.js";
 import {
     adviceAnchorsBySymbol,
     categoryLabel,
-    contentIssueAnchor,
+    contentAnchor,
     contentIssues,
     groupByChange,
     groupIssuesByCategory,
@@ -26,43 +26,71 @@ function issue(fields: Partial<Issue>): Issue {
 }
 
 describe("adviceAnchorsBySymbol", () => {
-    it("points a symbol at the finding it raised", () => {
-        const anchors = adviceAnchorsBySymbol([
-            issue({ type: "missing_alt" }),
-            issue({ type: "hidden_text", source: "rspamd", symbol: "ZERO_FONT" }),
-        ]);
+    it("points a symbol at the check showing the finding it raised", () => {
+        const anchors = adviceAnchorsBySymbol({
+            issues: {
+                images: [issue({ type: "missing_alt" })],
+                markup: [issue({ type: "hidden_text", source: "rspamd", symbol: "ZERO_FONT" })],
+            },
+        });
 
-        expect(anchors).toEqual({ ZERO_FONT: contentIssueAnchor(1) });
+        expect(anchors).toEqual({ ZERO_FONT: contentAnchor("markup") });
     });
 
     it("points a symbol at our finding when it only corroborated it", () => {
-        const anchors = adviceAnchorsBySymbol([
-            issue({ type: "excessive_images", corroborated_by: ["R_SUSPICIOUS_IMAGES"] }),
-        ]);
+        const anchors = adviceAnchorsBySymbol({
+            issues: {
+                images: [
+                    issue({ type: "excessive_images", corroborated_by: ["R_SUSPICIOUS_IMAGES"] }),
+                ],
+            },
+        });
 
-        expect(anchors).toEqual({ R_SUSPICIOUS_IMAGES: contentIssueAnchor(0) });
+        expect(anchors).toEqual({ R_SUSPICIOUS_IMAGES: contentAnchor("images") });
     });
 
-    it("points every corroborator of one finding at that finding", () => {
-        const anchors = adviceAnchorsBySymbol([
-            issue({ corroborated_by: ["REDIRECTOR_URL", "URL_REDIRECTOR_NESTED"] }),
-        ]);
+    it("points a symbol about one link at the links", () => {
+        const anchors = adviceAnchorsBySymbol({
+            links: [
+                {
+                    url: "https://example.com",
+                    status: "suspicious",
+                    issues: [
+                        issue({ corroborated_by: ["REDIRECTOR_URL", "URL_REDIRECTOR_NESTED"] }),
+                    ],
+                },
+            ],
+        });
 
         expect(anchors).toEqual({
-            REDIRECTOR_URL: contentIssueAnchor(0),
-            URL_REDIRECTOR_NESTED: contentIssueAnchor(0),
+            REDIRECTOR_URL: contentAnchor("links"),
+            URL_REDIRECTOR_NESTED: contentAnchor("links"),
         });
     });
 
-    it("leaves a symbol that produced no finding without an anchor", () => {
-        const anchors = adviceAnchorsBySymbol([issue({ type: "missing_alt" })]);
+    it("points a symbol about one image at the images", () => {
+        const anchors = adviceAnchorsBySymbol({
+            images: [{ has_alt: true, issues: [issue({ symbol: "R_SUSPICIOUS_IMAGES" })] }],
+        });
 
-        expect(anchors["ARC_NA"]).toBeUndefined();
+        expect(anchors).toEqual({ R_SUSPICIOUS_IMAGES: contentAnchor("images") });
+    });
+
+    it("names the anchor of a check after it, dashes for underscores", () => {
+        expect(contentAnchor("text_alternative")).toBe("content-text-alternative");
+    });
+
+    it("points a symbol of a report from before the checks at the section", () => {
+        const anchors = adviceAnchorsBySymbol({
+            html_issues: [issue({ type: "hidden_text", symbol: "ZERO_FONT" })],
+        });
+
+        expect(anchors).toEqual({ ZERO_FONT: "content-details" });
     });
 
     it("survives a report with no content issues at all", () => {
         expect(adviceAnchorsBySymbol(undefined)).toEqual({});
-        expect(adviceAnchorsBySymbol([])).toEqual({});
+        expect(adviceAnchorsBySymbol({})).toEqual({});
     });
 });
 
