@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"net/mail"
+	"slices"
 	"testing"
 	"time"
 
@@ -520,5 +521,39 @@ func TestDefaultRBLs(t *testing.T) {
 		if !found {
 			t.Errorf("DefaultRBLs should contain %s", expected)
 		}
+	}
+}
+
+func TestResultsForIP(t *testing.T) {
+	checker := NewRBLChecker(5*time.Second, nil, false)
+	ip := "198.51.100.1"
+
+	tests := []struct {
+		name          string
+		listed        []string
+		expectedScore int
+	}{
+		{"not listed", nil, 100},
+		// A scoring list costs its share, not the flat penalty of an informational one
+		{"listed on a scoring list", []string{"zen.spamhaus.org"}, 92},
+		{"listed on three scoring lists", []string{"zen.spamhaus.org", "bl.spamcop.net", "b.barracudacentral.org"}, 75},
+		{"listed on an informational list", []string{"dnsbl-3.uceprotect.net"}, 90},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var checks []model.BlacklistCheck
+			for _, list := range checker.Lists {
+				checks = append(checks, model.BlacklistCheck{Rbl: list, Listed: slices.Contains(tt.listed, list)})
+			}
+
+			results := checker.ResultsForIP(ip, checks)
+			if results.ListedCount != len(tt.listed) {
+				t.Errorf("ListedCount = %d, want %d", results.ListedCount, len(tt.listed))
+			}
+			if score, _ := checker.CalculateScore(results, false); score != tt.expectedScore {
+				t.Errorf("CalculateScore() = %d, want %d", score, tt.expectedScore)
+			}
+		})
 	}
 }

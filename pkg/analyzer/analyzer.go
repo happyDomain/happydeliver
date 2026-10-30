@@ -147,13 +147,8 @@ func (a *APIAdapter) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []mode
 		return nil, nil, 0, 0, "", err
 	}
 
-	// Calculate score using the existing function
-	// Create a minimal RBLResults structure for scoring
-	results := &DNSListResults{
-		Checks:      map[string][]model.BlacklistCheck{ip: checks},
-		IPsChecked:  []string{ip},
-		ListedCount: listedCount,
-	}
+	// Score it the way a report does, informational lists apart
+	results := a.analyzer.generator.rblChecker.ResultsForIP(ip, checks)
 	score, grade := a.analyzer.generator.rblChecker.CalculateScore(results, false)
 
 	// Check the IP against all configured DNSWLs (informational only)

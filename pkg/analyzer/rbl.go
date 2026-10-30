@@ -207,6 +207,25 @@ func (r *DNSListChecker) CheckIP(ip string) ([]model.BlacklistCheck, int, error)
 	return checks, listedCount, nil
 }
 
+// ResultsForIP gathers the checks of a single IP address as CheckEmail does,
+// telling the listings on scoring lists from those on informational lists, so
+// that CalculateScore weighs them the same way.
+func (r *DNSListChecker) ResultsForIP(ip string, checks []model.BlacklistCheck) *DNSListResults {
+	results := &DNSListResults{
+		Checks:     map[string][]model.BlacklistCheck{ip: checks},
+		IPsChecked: []string{ip},
+	}
+	for _, check := range checks {
+		if check.Listed {
+			results.ListedCount++
+			if !r.informationalSet[check.Rbl] {
+				results.RelevantListedCount++
+			}
+		}
+	}
+	return results
+}
+
 // extractIPs extracts IP addresses from Received headers
 func (r *DNSListChecker) extractIPs(email *mailmsg.Message) []string {
 	var ips []string
