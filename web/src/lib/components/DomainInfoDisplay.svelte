@@ -157,6 +157,7 @@
                     <div class="list-group-item">
                         <strong>Registrar:</strong>
                         {#if domainInfo.registrar_url}
+                            <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
                             <a
                                 href={domainInfo.registrar_url}
                                 target="_blank"
@@ -164,6 +165,7 @@
                             >
                                 {domainInfo.registrar}
                             </a>
+                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
                         {:else}
                             {domainInfo.registrar}
                         {/if}

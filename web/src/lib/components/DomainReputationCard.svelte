@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { SvelteSet } from "svelte/reactivity";
+
     import type { DomainBlacklistResult, DomainBlacklistSourceResult } from "#lib/api/types.gen.js";
     import { getScoreColorClass } from "#lib/score.js";
     import { theme } from "#lib/stores/theme.js";
@@ -130,20 +132,18 @@
         return "—";
     }
 
-    let openRows = $state(new Set<string>());
+    const openRows = new SvelteSet<string>();
 
     function rowKey(r: DomainBlacklistSourceResult): string {
         return `${r.source_id}::${r.subject ?? ""}`;
     }
 
     function toggle(key: string) {
-        const next = new Set(openRows);
-        if (next.has(key)) {
-            next.delete(key);
+        if (openRows.has(key)) {
+            openRows.delete(key);
         } else {
-            next.add(key);
+            openRows.add(key);
         }
-        openRows = next;
     }
 
     function hasDetails(r: DomainBlacklistSourceResult): boolean {
@@ -243,6 +243,7 @@
                             {statusLabel(r)}
                         </span>
                         {#if r.lookup_url}
+                            <!-- eslint-disable svelte/no-navigation-without-resolve -- external URL, not a SvelteKit route -->
                             <a
                                 href={r.lookup_url}
                                 target="_blank"
@@ -253,6 +254,7 @@
                             >
                                 <i class="bi bi-box-arrow-up-right"></i>
                             </a>
+                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
                         {/if}
                         <div class="small text-muted">
                             <code>{r.source_id}</code>
@@ -283,7 +285,7 @@
                             <div class="mt-2">
                                 {#if r.reasons && r.reasons.length > 0}
                                     <ul class="small mb-2">
-                                        {#each r.reasons as reason}
+                                        {#each r.reasons as reason, i (i)}
                                             <li>{reason}</li>
                                         {/each}
                                     </ul>
@@ -300,7 +302,7 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {#each r.evidence as ev}
+                                            {#each r.evidence as ev, i (i)}
                                                 <tr>
                                                     <td class="text-nowrap">{ev.label}</td>
                                                     <td>

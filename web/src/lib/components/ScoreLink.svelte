@@ -50,6 +50,7 @@
     }
 </script>
 
+<!-- eslint-disable svelte/no-navigation-without-resolve -- the caller passes an already resolved route -->
 <a
     {href}
     class="text-decoration-none"
@@ -71,6 +72,8 @@
         <small class="text-muted d-block">{label}</small>
     </div>
 </a>
+
+<!-- eslint-enable svelte/no-navigation-without-resolve -->
 
 <style>
     .summary-card {

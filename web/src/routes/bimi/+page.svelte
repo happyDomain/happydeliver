@@ -39,6 +39,7 @@
         if (localPart.trim()) query.push(`local_part=${encodeURIComponent(localPart.trim())}`);
 
         const path = resolve("/bimi/[domain]", { domain: target });
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved above, only the query is appended
         goto(query.length > 0 ? `${path}?${query.join("&")}` : path);
     }
 

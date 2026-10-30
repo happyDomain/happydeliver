@@ -5,7 +5,6 @@
 
     import { getReport, getTest, reanalyzeReport } from "#lib/api/index.js";
     import type { BlacklistCheck, Report, Test } from "#lib/api/types.gen.js";
-    import { isUploadedMessage } from "#lib/authentication.js";
     import { adviceAnchorsBySymbol } from "#lib/issues.js";
     import {
         AuthenticationCard,
