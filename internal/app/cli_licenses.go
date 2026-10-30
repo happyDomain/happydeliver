@@ -31,6 +31,7 @@ import (
 	"git.happydns.org/happyDeliver/pkg/emaildata/freemail"
 	"git.happydns.org/happyDeliver/pkg/emaildata/shorteners"
 	"git.happydns.org/happyDeliver/pkg/rspamd"
+	"git.happydns.org/happyDeliver/web"
 )
 
 // notice is one embedded work's credit and the license text it must be
@@ -62,6 +63,9 @@ var embeddedWorks = []notice{
 	{Attribution: caniemail.Attribution, License: caniemail.License},
 	{Attribution: rspamd.Attribution, License: rspamd.License},
 	{Attribution: bimi.RootsAttribution},
+	{Attribution: web.BootstrapAttribution, License: web.BootstrapLicense},
+	{Attribution: web.BootstrapIconsAttribution, License: web.BootstrapIconsLicense},
+	{Attribution: web.PopperAttribution, License: web.PopperLicense},
 }
 
 // RunLicenses prints the notices for the third-party material embedded in the

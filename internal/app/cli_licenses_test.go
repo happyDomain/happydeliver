@@ -75,6 +75,11 @@ func TestLicensesNameEveryEmbeddedWork(t *testing.T) {
 		// are named for where they come from.
 		"Mark Verifying Authority root certificates",
 		"https://bimigroup.org/vmc-issuers/",
+		// Bootstrap, Bootstrap Icons and Popper, MIT, compiled into the web
+		// interface.
+		"https://github.com/twbs/bootstrap",
+		"https://github.com/twbs/icons",
+		"Federico Zivolo",
 	}
 	for _, want := range required {
 		if !strings.Contains(text, want) {
