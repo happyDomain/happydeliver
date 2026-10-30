@@ -33,7 +33,7 @@
     // registry service says where the block was allocated, a geolocation
     // database where the address is believed to be used.
     const countrySource = $derived(senderOrigin?.country_source ?? senderOrigin?.source);
-    const countryIsLocated = $derived(countrySource === "maxmind");
+    const countryIsLocated = $derived((countrySource as string | undefined) === "maxmind");
     const countrySourceLabel = $derived(
         countrySource ? (sourceNames[countrySource] ?? countrySource) : undefined,
     );

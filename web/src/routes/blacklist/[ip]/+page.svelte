@@ -31,7 +31,7 @@
         try {
             const response = await checkBlacklist({ body: { ip } });
 
-            if (response.response.ok) {
+            if (response.response?.ok) {
                 result = response.data ?? null;
             } else if (response.error) {
                 error = response.error.message || "Failed to check IP address";

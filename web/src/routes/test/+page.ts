@@ -14,9 +14,9 @@ export const load: Load = async () => {
         error(errorObj.response?.status || 500, errorObj.message || "Unknown error");
     }
 
-    if (response.response.ok && response.data) {
+    if (response.response?.ok && response.data) {
         redirect(302, `/test/${response.data.id}`);
     } else {
-        error(response.response.status, response.error?.message);
+        error(response.response?.status ?? 500, response.error?.message);
     }
 };
