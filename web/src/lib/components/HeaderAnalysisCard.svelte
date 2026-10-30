@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { dmarcAlignment } from "#lib/alignment.js";
     import type { DmarcRecord, HeaderAnalysis } from "#lib/api/types.gen.js";
     import { compareBySeverity } from "#lib/issues.js";
     import { getScoreColorClass } from "#lib/score.js";
@@ -55,6 +56,7 @@
         {/if}
 
         {#if headerAnalysis.domain_alignment}
+            {@const alignment = dmarcAlignment(headerAnalysis.domain_alignment, dmarcRecord)}
             {@const spfStrictAligned =
                 headerAnalysis.domain_alignment.from_domain ===
                 headerAnalysis.domain_alignment.return_path_domain}
@@ -65,9 +67,9 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i
-                            class="bi {headerAnalysis.domain_alignment.aligned
+                            class="bi {alignment === 'exact'
                                 ? 'bi-check-circle-fill text-success'
-                                : headerAnalysis.domain_alignment.relaxed_aligned
+                                : alignment === 'organizational'
                                   ? 'bi-check-circle text-info'
                                   : 'bi-x-circle-fill text-danger'}"
                         ></i>
@@ -86,14 +88,12 @@
                         <div class="mt-3">
                             {#each headerAnalysis.domain_alignment.issues as issue, i (i)}
                                 <div
-                                    class="alert alert-{headerAnalysis.domain_alignment
-                                        .relaxed_aligned
+                                    class="alert alert-{alignment !== 'none'
                                         ? 'info'
                                         : 'warning'} py-2 small mb-2"
                                 >
                                     <i
-                                        class="bi bi-{headerAnalysis.domain_alignment
-                                            .relaxed_aligned
+                                        class="bi bi-{alignment !== 'none'
                                             ? 'info-circle'
                                             : 'exclamation-triangle'} me-1"
                                     ></i>

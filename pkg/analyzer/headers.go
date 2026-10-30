@@ -45,8 +45,10 @@ func NewHeaderAnalyzer() *HeaderAnalyzer {
 	return &HeaderAnalyzer{}
 }
 
-// CalculateHeaderScore evaluates email structural quality from header analysis
-func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (int, rune) {
+// CalculateHeaderScore evaluates email structural quality from header analysis.
+// dmarc is the DMARC record of the From domain, whose alignment modes decide
+// which authenticating domains count as aligned; nil when it publishes none.
+func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis, dmarc *model.DMARCRecord) (int, rune) {
 	if analysis == nil || analysis.Headers == nil {
 		return 0, ' '
 	}
@@ -56,13 +58,14 @@ func (h *HeaderAnalyzer) CalculateHeaderScore(analysis *model.HeaderAnalysis) (i
 	headers := *analysis.Headers
 
 	// RP and From alignment (25 points)
-	if analysis.DomainAlignment.Aligned == nil || !*analysis.DomainAlignment.RelaxedAligned {
+	switch dmarcAlignment(analysis.DomainAlignment, dmarc) {
+	case alignmentExact:
+		score += 25
+	case alignmentOrganizational:
+		score += 20
+	default:
 		// Bad domain alignment, cap grade to C
 		maxGrade -= 2
-	} else if *analysis.DomainAlignment.Aligned {
-		score += 25
-	} else if *analysis.DomainAlignment.RelaxedAligned {
-		score += 20
 	}
 
 	// Check required headers (RFC 5322) - 30 points
@@ -550,6 +553,74 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	}
 
 	return alignment
+}
+
+// alignmentLevel is how closely the domains authenticating a message align
+// with its From domain.
+type alignmentLevel int
+
+const (
+	alignmentNone alignmentLevel = iota
+	// alignmentOrganizational is a domain sharing only the organizational
+	// domain of the From domain, which DMARC counts in relaxed mode.
+	alignmentOrganizational
+	// alignmentExact is the From domain itself.
+	alignmentExact
+)
+
+// dmarcAlignment tells how closely the domains authenticating the message
+// align with the From domain, counting only what DMARC would: a domain that
+// shares only the organizational domain does not align in strict mode, which
+// the policy sets apart for the Return-Path (aspf=s) and the DKIM signatures
+// (adkim=s). Without a usable record, DMARC aligns in relaxed mode.
+func dmarcAlignment(alignment *model.DomainAlignment, dmarc *model.DMARCRecord) alignmentLevel {
+	if alignment == nil || alignment.Aligned == nil || alignment.RelaxedAligned == nil {
+		return alignmentNone
+	}
+
+	spfStrict, dkimStrict := false, false
+	if dmarc != nil && dmarc.Valid {
+		spfStrict = dmarc.SpfAlignment != nil && *dmarc.SpfAlignment == model.DMARCRecordSpfAlignmentStrict
+		dkimStrict = dmarc.DkimAlignment != nil && *dmarc.DkimAlignment == model.DMARCRecordDkimAlignmentStrict
+	}
+
+	from := utils.Deref(alignment.FromDomain)
+	fromOrg := utils.Deref(alignment.FromOrgDomain)
+	levelOf := func(domain, orgDomain string, strict bool) alignmentLevel {
+		switch {
+		case strings.EqualFold(domain, from):
+			return alignmentExact
+		case !strict && orgDomain != "" && strings.EqualFold(orgDomain, fromOrg):
+			return alignmentOrganizational
+		}
+		return alignmentNone
+	}
+
+	compared := false
+	level := alignmentNone
+	if from != "" && alignment.ReturnPathDomain != nil {
+		compared = true
+		level = max(level, levelOf(*alignment.ReturnPathDomain, utils.Deref(alignment.ReturnPathOrgDomain), spfStrict))
+	}
+	if from != "" && alignment.DkimDomains != nil {
+		for _, d := range *alignment.DkimDomains {
+			compared = true
+			level = max(level, levelOf(d.Domain, d.OrgDomain, dkimStrict))
+		}
+	}
+
+	// Nothing to compare: no Return-Path nor DKIM signature to hold against the From domain
+	if !compared {
+		switch {
+		case *alignment.Aligned:
+			return alignmentExact
+		case *alignment.RelaxedAligned:
+			return alignmentOrganizational
+		}
+		return alignmentNone
+	}
+
+	return level
 }
 
 // findHeaderIssues identifies issues with headers

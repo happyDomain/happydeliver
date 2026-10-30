@@ -30,6 +30,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 
+	"git.happydns.org/happyDeliver/pkg/domainname"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 )
 
@@ -115,7 +116,7 @@ func TestCalculateHeaderScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate header analysis first
 			analysis := analyzer.GenerateHeaderAnalysis(tt.email, nil)
-			score, _ := analyzer.CalculateHeaderScore(analysis)
+			score, _ := analyzer.CalculateHeaderScore(analysis, nil)
 			if score < tt.minScore || score > tt.maxScore {
 				t.Errorf("CalculateHeaderScore() = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
 			}
@@ -1349,6 +1350,64 @@ func TestAnalyzeDomainAlignment_WithDKIM(t *testing.T) {
 						t.Errorf("Expected issues to contain '%s', but found: %v", tt.expectIssuesContain, *alignment.Issues)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestDmarcAlignment(t *testing.T) {
+	strict := &model.DMARCRecord{
+		Valid:         true,
+		SpfAlignment:  utils.PtrTo(model.DMARCRecordSpfAlignmentStrict),
+		DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict),
+	}
+	strictDkim := &model.DMARCRecord{
+		Valid:         true,
+		DkimAlignment: utils.PtrTo(model.DMARCRecordDkimAlignmentStrict),
+	}
+	alignment := func(rp string, dkim ...string) *model.DomainAlignment {
+		a := &model.DomainAlignment{
+			FromDomain:     utils.PtrTo("example.com"),
+			FromOrgDomain:  utils.PtrTo("example.com"),
+			Aligned:        utils.PtrTo(false),
+			RelaxedAligned: utils.PtrTo(false),
+		}
+		if rp != "" {
+			a.ReturnPathDomain = utils.PtrTo(rp)
+			a.ReturnPathOrgDomain = utils.PtrTo(domainname.Organizational(rp))
+		}
+		if len(dkim) > 0 {
+			var domains []model.DKIMDomainInfo
+			for _, d := range dkim {
+				domains = append(domains, model.DKIMDomainInfo{Domain: d, OrgDomain: domainname.Organizational(d)})
+			}
+			a.DkimDomains = &domains
+		}
+		return a
+	}
+
+	tests := []struct {
+		name      string
+		alignment *model.DomainAlignment
+		dmarc     *model.DMARCRecord
+		want      alignmentLevel
+	}{
+		{"same domain", alignment("example.com", "example.com"), strict, alignmentExact},
+		{"subdomain, no record", alignment("bounce.example.com", "mail.example.com"), nil, alignmentOrganizational},
+		{"subdomain, invalid record", alignment("", "mail.example.com"), &model.DMARCRecord{Valid: false, DkimAlignment: strictDkim.DkimAlignment}, alignmentOrganizational},
+		{"DKIM subdomain under adkim=s", alignment("", "mail.example.com"), strictDkim, alignmentNone},
+		{"Return-Path subdomain under adkim=s only", alignment("bounce.example.com", "mail.example.com"), strictDkim, alignmentOrganizational},
+		{"both subdomains under strict modes", alignment("bounce.example.com", "mail.example.com"), strict, alignmentNone},
+		{"exact DKIM under strict modes", alignment("bounce.example.com", "other.net", "example.com"), strict, alignmentExact},
+		{"unrelated domains", alignment("other.net", "other.net"), nil, alignmentNone},
+		{"nothing to compare", &model.DomainAlignment{FromDomain: utils.PtrTo("example.com"), Aligned: utils.PtrTo(true), RelaxedAligned: utils.PtrTo(true)}, strict, alignmentExact},
+		{"no alignment", nil, nil, alignmentNone},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dmarcAlignment(tt.alignment, tt.dmarc); got != tt.want {
+				t.Errorf("dmarcAlignment() = %v, want %v", got, tt.want)
 			}
 		})
 	}
