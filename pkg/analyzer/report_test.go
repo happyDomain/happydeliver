@@ -511,3 +511,30 @@ func TestAnalyzeEmailSourceSelectsAuthservID(t *testing.T) {
 		}
 	})
 }
+
+// Without an x-tls header, the verdict is read off the inbound hop, for a message we
+// received ourselves only: the inbound hop of an uploaded one is a guess.
+func TestAnalyzeEmailSynthesizesXTLS(t *testing.T) {
+	newEmail := func() *mailmsg.Message {
+		email := createTestEmail()
+		email.Header["Received"] = []string{
+			"from mail.example.com (mail.example.com [192.0.2.1]) by mx.example.org with ESMTPS id ABC123; Mon, 01 Jan 2024 12:00:00 +0000",
+		}
+		return email
+	}
+	gen := NewReportGenerator(GeneratorOptions{ReceiverHostname: "mx.example.org", DNSTimeout: time.Second, HTTPTimeout: time.Second})
+
+	t.Run("received message", func(t *testing.T) {
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceReceived})
+		if xtls := results.Authentication.XTls; xtls == nil || xtls.Result != model.AuthResultResultPass || xtls.Details != nil {
+			t.Errorf("XTls = %+v, expected a pass without details", xtls)
+		}
+	})
+
+	t.Run("uploaded message", func(t *testing.T) {
+		results := gen.AnalyzeEmail(newEmail(), AnalysisOptions{Source: model.ReportSourceUploaded})
+		if results.Authentication.XTls != nil {
+			t.Errorf("XTls = %+v, expected none", results.Authentication.XTls)
+		}
+	})
+}

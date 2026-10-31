@@ -899,8 +899,11 @@ components:
         x_tls:
           $ref: '#/components/schemas/AuthResult'
           description: >-
-            Transport TLS encryption of the inbound connection (x-tls).
-            Synthesized from the inbound Received hop when no x-tls header is present.
+            Transport TLS encryption of the inbound connection (x-tls). Its details
+            carry the parameters of the connection the receiver reported (smtp.version,
+            smtp.cipher, smtp.bits). Synthesized from the inbound Received hop when no
+            x-tls header is present, without details: the parameters are then those of
+            that hop, its tls and its with.
 
     AuthResult:
       type: object

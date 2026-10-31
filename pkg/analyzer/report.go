@@ -212,12 +212,11 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 			inboundHop = &chain[i]
 		}
 	}
-	// Fall back to the received chain's inbound TLS when no x-tls header was present. Only valid
-	// for a message we received ourselves: for an uploaded .eml, the topmost Received header
-	// could be an internal hop of the original provider, not the arrival at the recipient's
-	// server.
-	if results.Source == model.ReportSourceReceived && results.Authentication != nil && results.Headers != nil {
-		r.authAnalyzer.ReconcileXTLS(results.Authentication, results.Headers.ReceivedChain)
+	// Fall back to the inbound hop's TLS when no x-tls header was present. Only for a
+	// message we received ourselves: for an uploaded .eml, the inbound hop is a guess, which
+	// is not enough to grade the sender on.
+	if results.Source == model.ReportSourceReceived {
+		r.authAnalyzer.ReconcileXTLS(results.Authentication, inboundHop)
 	}
 	results.DNS = r.dnsAnalyzer.AnalyzeDNS(email, results.Headers, inboundHop)
 	if results.DNS != nil && results.DNS.FromDomain != "" {

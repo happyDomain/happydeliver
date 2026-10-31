@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"strings"
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -37,13 +36,9 @@ func TestParseXTLSResult(t *testing.T) {
 	if result.Result != model.AuthResultResultPass {
 		t.Errorf("Result = %v, want pass", result.Result)
 	}
-	if result.Details == nil {
-		t.Fatal("Details should not be nil")
-	}
-	for _, want := range []string{"TLSv1.3", "TLS_AES_256_GCM_SHA384", "256 bits"} {
-		if !strings.Contains(*result.Details, want) {
-			t.Errorf("Details %q should contain %q", *result.Details, want)
-		}
+	want := "pass smtp.version=TLSv1.3 smtp.cipher=TLS_AES_256_GCM_SHA384 smtp.bits=256"
+	if result.Details == nil || *result.Details != want {
+		t.Errorf("Details = %v, want %q", result.Details, want)
 	}
 }
 
@@ -77,8 +72,7 @@ func TestReconcileXTLS(t *testing.T) {
 	t.Run("keeps existing x-tls header result", func(t *testing.T) {
 		existing := &model.AuthResult{Result: model.AuthResultResultFail}
 		results := &model.AuthenticationResults{XTls: existing}
-		chain := &[]model.ReceivedHop{{Tls: &model.TLSInfo{Version: utils.PtrTo("TLSv1.3")}}}
-		analyzer.ReconcileXTLS(results, chain)
+		analyzer.ReconcileXTLS(results, &model.ReceivedHop{Tls: &model.TLSInfo{Version: utils.PtrTo("TLSv1.3")}})
 		if results.XTls != existing {
 			t.Error("existing XTls should be preserved")
 		}
@@ -86,51 +80,54 @@ func TestReconcileXTLS(t *testing.T) {
 
 	t.Run("synthesizes pass from encrypted inbound hop", func(t *testing.T) {
 		results := &model.AuthenticationResults{}
-		chain := &[]model.ReceivedHop{{Tls: &model.TLSInfo{
+		analyzer.ReconcileXTLS(results, &model.ReceivedHop{Tls: &model.TLSInfo{
 			Version: utils.PtrTo("TLSv1.3"),
 			Cipher:  utils.PtrTo("TLS_AES_256_GCM_SHA384"),
 			Bits:    utils.PtrTo(256),
-		}}}
-		analyzer.ReconcileXTLS(results, chain)
+		}})
 		if results.XTls == nil || results.XTls.Result != model.AuthResultResultPass {
 			t.Fatalf("expected synthesized pass, got %+v", results.XTls)
 		}
-		if results.XTls.Details == nil || !strings.Contains(*results.XTls.Details, "TLSv1.3") {
-			t.Errorf("details should mention TLS version, got %v", results.XTls.Details)
+		// The parameters are the hop's to give, not the verdict's
+		if results.XTls.Details != nil {
+			t.Errorf("details should be left to the hop, got %q", *results.XTls.Details)
 		}
 	})
 
 	t.Run("synthesizes pass from ESMTPS protocol without TLS parenthetical", func(t *testing.T) {
 		// smtpd_tls_received_header disabled: no TLS details, but ESMTPS proves encryption.
 		results := &model.AuthenticationResults{}
-		chain := &[]model.ReceivedHop{{With: utils.PtrTo("ESMTPS")}}
-		analyzer.ReconcileXTLS(results, chain)
+		analyzer.ReconcileXTLS(results, &model.ReceivedHop{With: utils.PtrTo("ESMTPS")})
 		if results.XTls == nil || results.XTls.Result != model.AuthResultResultPass {
 			t.Fatalf("expected synthesized pass, got %+v", results.XTls)
+		}
+		if results.XTls.Details != nil {
+			t.Errorf("details should be left to the hop, got %q", *results.XTls.Details)
 		}
 	})
 
 	t.Run("synthesizes none from plaintext ESMTP protocol", func(t *testing.T) {
 		results := &model.AuthenticationResults{}
-		chain := &[]model.ReceivedHop{{With: utils.PtrTo("ESMTP")}}
-		analyzer.ReconcileXTLS(results, chain)
+		analyzer.ReconcileXTLS(results, &model.ReceivedHop{With: utils.PtrTo("ESMTP")})
 		if results.XTls == nil || results.XTls.Result != model.AuthResultResultNone {
 			t.Fatalf("expected synthesized none, got %+v", results.XTls)
+		}
+		if results.XTls.Details != nil {
+			t.Errorf("details should be left to the hop, got %q", *results.XTls.Details)
 		}
 	})
 
 	t.Run("leaves nil when neither TLS info nor protocol is known", func(t *testing.T) {
 		results := &model.AuthenticationResults{}
-		chain := &[]model.ReceivedHop{{}}
-		analyzer.ReconcileXTLS(results, chain)
+		analyzer.ReconcileXTLS(results, &model.ReceivedHop{})
 		if results.XTls != nil {
 			t.Errorf("expected nil XTls when undetermined, got %+v", results.XTls)
 		}
 	})
 
-	t.Run("leaves nil with empty chain", func(t *testing.T) {
+	t.Run("leaves nil without an inbound hop", func(t *testing.T) {
 		results := &model.AuthenticationResults{}
-		analyzer.ReconcileXTLS(results, &[]model.ReceivedHop{})
+		analyzer.ReconcileXTLS(results, nil)
 		if results.XTls != nil {
 			t.Errorf("expected nil XTls, got %+v", results.XTls)
 		}

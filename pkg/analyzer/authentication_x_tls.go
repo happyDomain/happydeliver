@@ -22,7 +22,6 @@
 package analyzer
 
 import (
-	"fmt"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -33,14 +32,13 @@ import (
 
 // parseXTLSResult parses the x-tls result from Authentication-Results.
 // Example: x-tls=pass smtp.version=TLSv1.3 smtp.cipher=TLS_AES_256_GCM_SHA384 smtp.bits=256
+//
+// The parameters of the connection stay in the details, as the receiver wrote them, like
+// the properties of any other method.
 func (a *AuthenticationAnalyzer) parseXTLSResult(method authresults.Method) *model.AuthResult {
 	return &model.AuthResult{
-		Result: model.AuthResultResult(method.Result),
-		Details: utils.PtrTo(formatTLSDetails(
-			method.Property("smtp.version"),
-			method.Property("smtp.cipher"),
-			method.Property("smtp.bits"),
-		)),
+		Result:  model.AuthResultResult(method.Result),
+		Details: utils.PtrTo(methodDetails(method)),
 	}
 }
 
@@ -59,52 +57,26 @@ func (a *AuthenticationAnalyzer) calculateXTLSScore(results *model.Authenticatio
 	return 0
 }
 
-// ReconcileXTLS fills in the x-tls result from the inbound connection's parsed TLS
-// information when no x-tls Authentication-Results header was present. The inbound
-// connection is the most recent hop (index 0) of the received chain.
-func (a *AuthenticationAnalyzer) ReconcileXTLS(results *model.AuthenticationResults, chain *[]model.ReceivedHop) {
-	if results == nil || results.XTls != nil {
-		return
-	}
-	if chain == nil || len(*chain) == 0 {
+// ReconcileXTLS fills in the x-tls result from the inbound hop of the received chain
+// when no x-tls Authentication-Results header was present.
+//
+// Only the verdict is filled in: the parameters of the connection it rests on are those
+// the hop already gives, in its TLS details and its transport keyword.
+func (a *AuthenticationAnalyzer) ReconcileXTLS(results *model.AuthenticationResults, inbound *model.ReceivedHop) {
+	if results == nil || results.XTls != nil || inbound == nil {
 		return
 	}
 
-	inbound := (*chain)[0]
 	switch {
-	case inbound.Tls != nil:
-		// Full TLS parenthetical present (smtpd_tls_received_header = yes).
-		var version, cipher, bits string
-		if inbound.Tls.Version != nil {
-			version = *inbound.Tls.Version
-		}
-		if inbound.Tls.Cipher != nil {
-			cipher = *inbound.Tls.Cipher
-		}
-		if inbound.Tls.Bits != nil {
-			bits = fmt.Sprintf("%d", *inbound.Tls.Bits)
-		}
-		results.XTls = &model.AuthResult{
-			Result:  model.AuthResultResultPass,
-			Details: utils.PtrTo(formatTLSDetails(version, cipher, bits)),
-		}
-
-	case protocolIndicatesTLS(inbound.With):
-		// No TLS parenthetical (smtpd_tls_received_header may be disabled), but the
-		// transport keyword (ESMTPS, ESMTPSA, ...) tells us the session was encrypted.
-		// We just don't have the cipher details.
-		results.XTls = &model.AuthResult{
-			Result:  model.AuthResultResultPass,
-			Details: utils.PtrTo(fmt.Sprintf("Encrypted connection (%s); cipher details unavailable", *inbound.With)),
-		}
+	case inbound.Tls != nil, protocolIndicatesTLS(inbound.With):
+		// Either the full TLS parenthetical (smtpd_tls_received_header = yes), or a
+		// transport keyword (ESMTPS, ESMTPSA, ...) telling the session was encrypted.
+		results.XTls = &model.AuthResult{Result: model.AuthResultResultPass}
 
 	case inbound.With != nil:
 		// A plaintext transport keyword (SMTP, ESMTP, ESMTPA, ...) is positive
 		// evidence the inbound connection was not encrypted.
-		results.XTls = &model.AuthResult{
-			Result:  model.AuthResultResultNone,
-			Details: utils.PtrTo(fmt.Sprintf("Inbound connection was not encrypted (%s)", *inbound.With)),
-		}
+		results.XTls = &model.AuthResult{Result: model.AuthResultResultNone}
 
 	default:
 		// Neither TLS details nor a transport keyword: we cannot tell whether the
@@ -122,19 +94,4 @@ func protocolIndicatesTLS(with *string) bool {
 	}
 	p := strings.ToUpper(strings.TrimSpace(*with))
 	return strings.HasSuffix(p, "S") || strings.HasSuffix(p, "SA")
-}
-
-// formatTLSDetails builds a human-readable summary of the TLS parameters.
-func formatTLSDetails(version, cipher, bits string) string {
-	var parts []string
-	if version != "" {
-		parts = append(parts, version)
-	}
-	if cipher != "" {
-		parts = append(parts, "cipher "+cipher)
-	}
-	if bits != "" {
-		parts = append(parts, bits+" bits")
-	}
-	return strings.Join(parts, ", ")
 }
