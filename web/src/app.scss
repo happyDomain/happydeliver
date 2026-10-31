@@ -2039,6 +2039,112 @@ dl.check-facts {
     }
 }
 
+// What a verdict rests on: what the receiver reported, in a framed panel.
+.verdict-facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+
+    .verdict-facts-title {
+        margin-bottom: 0.25rem;
+        font-size: $small-font-size;
+        font-weight: normal;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--hd-fg-3);
+    }
+
+    .verdict-facts-reported > .fact-list {
+        background: var(--hd-bg-subtle);
+        border: 1px solid var(--hd-border-1);
+    }
+}
+
+// Label and value pairs. On a phone, each label above its value: a column of labels would
+// take half the width.
+dl.fact-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 1rem;
+    row-gap: 0.3rem;
+    margin-bottom: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--hd-radius);
+
+    dt {
+        grid-column: 1;
+        font-weight: normal;
+        color: var(--hd-fg-3);
+
+        &:not(:first-of-type) {
+            margin-top: 0.35rem;
+        }
+    }
+
+    dd {
+        grid-column: 1;
+        margin-bottom: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    code {
+        background: var(--hd-bg-default);
+    }
+
+    .fact-mark {
+        margin-left: 0.4em;
+    }
+
+    // Some reasoning under a value: what a verdict means, what a record does
+    .fact-note {
+        display: block;
+        font-size: $small-font-size;
+        color: var(--hd-fg-3);
+    }
+
+    @include media-breakpoint-up(sm) {
+        grid-template-columns: max-content minmax(0, 1fr);
+
+        dt:not(:first-of-type) {
+            margin-top: 0;
+        }
+
+        dd {
+            grid-column: 2;
+        }
+    }
+}
+
+// The verdict as the receiver wrote it, under the facts read out of it: one quiet line to
+// copy from, rather than a fold to open.
+.check-raw {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin: 0.35rem 0 0;
+    padding: 0 0.75rem;
+    font-size: $small-font-size;
+    color: var(--hd-fg-3);
+
+    .check-raw-label {
+        flex-shrink: 0;
+        font-size: 0.85em;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    code {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+}
+
 // What a check verifies, for a reader who does not know: after the evidence, behind a
 // hairline, so it reads as context rather than as a finding. The references of the
 // check follow right under it, as part of the same block.

@@ -4,26 +4,35 @@
         AuthenticationResults,
         DnsResults,
         Issue,
+        ReceivedHop,
     } from "#lib/api/types.gen.js";
     import {
         hasNoAuthenticationResults,
         isUploadedMessage,
+        parseVerdictDetails,
+        rawVerdict,
+        verdictMeaning,
         verdictStatus,
         type MessageSource,
+        type VerdictMechanism,
     } from "#lib/authentication.js";
     import { docs } from "#lib/docs.js";
     import { listed } from "#lib/issues.js";
     import type { SectionStatus } from "#lib/sections.js";
-    import CheckCard from "./CheckCard.svelte";
+    import CheckCard, { statusTones } from "./CheckCard.svelte";
     import CheckList from "./CheckList.svelte";
+    import FactRow from "./FactRow.svelte";
     import IssueNote from "./IssueNote.svelte";
     import ReportSection from "./ReportSection.svelte";
+    import VerdictFacts from "./VerdictFacts.svelte";
 
     interface Props {
         authentication: AuthenticationResults;
         authenticationGrade?: string;
         authenticationScore?: number;
         dnsResults?: DnsResults;
+        /** The hop the message entered the receiver through, which an x-tls verdict may rest on. */
+        inboundHop?: ReceivedHop;
         source?: MessageSource;
         authservId?: string;
         status?: SectionStatus;
@@ -35,6 +44,7 @@
         authenticationGrade,
         authenticationScore,
         dnsResults,
+        inboundHop,
         source,
         authservId,
         status,
@@ -67,28 +77,60 @@
             : verdict(dkim[0]?.result, dkim[0]?.domain),
     );
 
-    // The policy the receiver applied, or failing that the one the domain publishes
-    const dmarcPolicy = $derived.by(() => {
-        const dmarc = authentication.dmarc;
-        if (!dmarc || dmarc.result === "none") return undefined;
-        const applied = dmarc.details?.match(/policy\.published-domain-policy=([^\s;]+)/)?.[1];
-        return applied ?? (dmarc.domain ? dnsResults?.dmarc_record?.policy : undefined);
-    });
-
     const serverSubject = $derived(
         authentication.x_ptr?.helo ?? authentication.iprev?.hostname ?? authentication.iprev?.ip,
     );
+
+    // The parameters of the connection: those the receiver wrote with its x-tls verdict, or,
+    // when the analyser read the verdict off the inbound hop, those of that hop.
+    const tls = $derived.by(() => {
+        const xtls = authentication.x_tls;
+        if (!xtls) return undefined;
+        if (xtls.details) {
+            const props = parseVerdictDetails(xtls.details).properties;
+            return {
+                version: props["smtp.version"],
+                cipher: props["smtp.cipher"],
+                bits: props["smtp.bits"],
+                verified: undefined,
+                transport: undefined,
+                fromHop: false,
+            };
+        }
+        if (!inboundHop) return undefined;
+        return {
+            version: inboundHop.tls?.version,
+            cipher: inboundHop.tls?.cipher,
+            bits: inboundHop.tls?.bits?.toString(),
+            verified: inboundHop.tls?.verified,
+            transport: inboundHop.with,
+            fromHop: true,
+        };
+    });
 </script>
 
-<!-- The receiver's raw verdict: needed to debug a failure, noise on a pass. -->
-{#snippet rawResult(details: string | undefined)}
-    {#if details}
-        <details class="passed-items mt-1">
-            <summary>Raw result</summary>
-            <pre
-                class="p-2 mb-0 mt-1 text-muted small"
-                style="white-space: pre-wrap">{details}</pre>
-        </details>
+<!-- The verdict, and what it means. -->
+{#snippet verdictRow(mechanism: VerdictMechanism, result: string | undefined, required = true)}
+    {@const meaning = verdictMeaning(mechanism, result)}
+    <FactRow label="Verdict">
+        <span class="fw-semibold {statusTones[verdictStatus(result, required)]}"
+            >{result ?? "not reported"}</span
+        >
+        {#if meaning}
+            <span class="fact-note">{meaning}</span>
+        {/if}
+    </FactRow>
+{/snippet}
+
+<!-- What the receiver wrote in parentheses: its own explanation, often the clearest one. -->
+{#snippet receiverNote(details: string | undefined)}
+    {@const comments = parseVerdictDetails(details).comments}
+    {#if comments.length > 0}
+        <FactRow label="Receiver's note">
+            {#each comments as comment, i (i)}
+                <span class="d-block">{comment}</span>
+            {/each}
+        </FactRow>
     {/if}
 {/snippet}
 
@@ -136,22 +178,18 @@
                         issues={at("iprev")}
                     >
                         <div class="card-body">
-                            <dl class="check-facts">
-                                {#if iprev.ip}
-                                    <dt>IP address</dt>
-                                    <dd><span class="font-monospace">{iprev.ip}</span></dd>
-                                {/if}
+                            <VerdictFacts raw={rawVerdict("iprev", iprev.result, iprev.details)}>
+                                {@render verdictRow("iprev", iprev.result)}
+                                <FactRow label="Sending IP" value={iprev.ip} mono />
                                 {#if iprev.hostname}
-                                    <dt>Hostname</dt>
-                                    <dd><span class="font-monospace">{iprev.hostname}</span></dd>
+                                    <FactRow label="Its name" value={iprev.hostname} mono />
                                 {/if}
-                            </dl>
+                            </VerdictFacts>
                             <p class="check-about">
                                 Receivers look up the name of the sending IP, and check that this
                                 name resolves back to the same IP: a server without it looks like a
                                 compromised home connection.
                             </p>
-                            {@render rawResult(iprev.details)}
                         </div>
                     </CheckCard>
                 {/if}
@@ -169,22 +207,20 @@
                         docs={[docs.ehlo]}
                     >
                         <div class="card-body">
-                            <dl class="check-facts">
-                                {#if xptr.helo}
-                                    <dt>Announced</dt>
-                                    <dd><span class="font-monospace">{xptr.helo}</span></dd>
-                                {/if}
-                                {#if xptr.ptr}
-                                    <dt>Reverse DNS</dt>
-                                    <dd><span class="font-monospace">{xptr.ptr}</span></dd>
-                                {/if}
-                            </dl>
+                            <VerdictFacts raw={rawVerdict("x-ptr", xptr.result, xptr.details)}>
+                                {@render verdictRow("x_ptr", xptr.result, false)}
+                                <FactRow label="Announced hostname" value={xptr.helo} mono />
+                                <FactRow
+                                    label="Name of the IP"
+                                    value={xptr.ptr ?? "none"}
+                                    mono={!!xptr.ptr}
+                                />
+                            </VerdictFacts>
                             <p class="check-about">
                                 When it connects, the sending server announces its hostname (HELO or
                                 EHLO). Many receivers check that it is the name its IP has in
                                 reverse DNS; a mismatch is a common spam signal.
                             </p>
-                            {@render rawResult(xptr.details)}
                         </div>
                     </CheckCard>
                 {/if}
@@ -201,28 +237,75 @@
                         issues={at("spf_helo")}
                     >
                         <div class="card-body">
+                            <VerdictFacts raw={rawVerdict("spf", helo.result, helo.details)}>
+                                {@render verdictRow("spf_helo", helo.result, false)}
+                                <FactRow label="Announced hostname" value={helo.domain} mono />
+                                {@render receiverNote(helo.details)}
+                            </VerdictFacts>
                             <p class="check-about">
                                 The same check as SPF, on the hostname the sending server announced
                                 rather than on the envelope sender: it covers the bounces, which
                                 have no envelope sender.
                             </p>
-                            {@render rawResult(helo.details)}
                         </div>
                     </CheckCard>
                 {/if}
 
                 {#if authentication.x_tls}
-                    {@const tls = authentication.x_tls}
+                    {@const xtls = authentication.x_tls}
+                    {@const encrypted = xtls.result === "pass"}
                     <CheckCard
                         id="authentication-x-tls"
                         title="Transport encryption"
                         tag="TLS"
-                        status={verdictStatus(tls.result, true)}
-                        summary={tls.details ?? verdict(tls.result)}
+                        status={verdictStatus(xtls.result, true)}
+                        summary={encrypted
+                            ? tls?.version
+                                ? `Encrypted, ${tls.version}`
+                                : "Encrypted"
+                            : "Not encrypted"}
                         docs={[docs.starttls]}
                         issues={at("x_tls")}
                     >
                         <div class="card-body">
+                            <VerdictFacts raw={rawVerdict("x-tls", xtls.result, xtls.details)}>
+                                <FactRow label="Connection">
+                                    <span
+                                        class="fw-semibold {statusTones[
+                                            verdictStatus(xtls.result, true)
+                                        ]}">{encrypted ? "encrypted" : "not encrypted"}</span
+                                    >
+                                    {#if verdictMeaning("x_tls", xtls.result)}
+                                        <span class="fact-note"
+                                            >{verdictMeaning("x_tls", xtls.result)}</span
+                                        >
+                                    {/if}
+                                    {#if tls?.fromHop}
+                                        <span class="fact-note">
+                                            Read from the Received header the receiver wrote for the
+                                            connection that delivered the message.
+                                        </span>
+                                    {/if}
+                                </FactRow>
+                                {#if tls?.version}
+                                    <FactRow label="Protocol" value={tls.version} mono />
+                                {/if}
+                                {#if tls?.cipher}
+                                    <FactRow label="Cipher" value={tls.cipher} mono />
+                                {/if}
+                                {#if tls?.bits}
+                                    <FactRow label="Key size" value="{tls.bits} bits" />
+                                {/if}
+                                {#if tls?.verified !== undefined}
+                                    <FactRow
+                                        label="Certificate"
+                                        value={tls.verified ? "verified" : "not verified"}
+                                    />
+                                {/if}
+                                {#if tls?.transport}
+                                    <FactRow label="Transport" value={tls.transport} mono />
+                                {/if}
+                            </VerdictFacts>
                             <p class="check-about">
                                 Whether the connection that delivered this message to the receiver
                                 was encrypted (STARTTLS), so that nobody along the way could read
@@ -255,18 +338,31 @@
                 issues={at("spf")}
             >
                 <div class="card-body">
-                    {#if !authentication.spf && authentication.spf_helo}
+                    {#if authentication.spf}
+                        {@const spf = authentication.spf}
+                        {@const mailfrom = parseVerdictDetails(spf.details).properties[
+                            "smtp.mailfrom"
+                        ]}
+                        <VerdictFacts raw={rawVerdict("spf", spf.result, spf.details)}>
+                            {@render verdictRow("spf", spf.result)}
+                            <FactRow label="Envelope sender" value={mailfrom || spf.domain} mono />
+                            {@render receiverNote(spf.details)}
+                        </VerdictFacts>
+                        <p class="check-about">
+                            The receiver checked that the sending IP is one the SPF record of the
+                            envelope sender domain (the Return-Path, where bounces go) allows.
+                        </p>
+                    {:else if authentication.spf_helo}
                         <p class="check-about">
                             The receiver only checked the HELO identity, so it reported no verdict
                             for the envelope sender.
                         </p>
                     {:else}
                         <p class="check-about">
-                            The receiver checked that the sending IP is one the SPF record of the
-                            envelope sender domain (the Return-Path, where bounces go) allows.
+                            The receiver reported no SPF verdict. It checks that the sending IP is
+                            one the SPF record of the envelope sender domain allows.
                         </p>
                     {/if}
-                    {@render rawResult(authentication.spf?.details)}
                 </div>
             </CheckCard>
 
@@ -280,29 +376,39 @@
                 issues={at("dkim")}
             >
                 <div class="card-body">
-                    {#if dkim.length > 0}
-                        <dl class="check-facts">
-                            {#each dkim as signature, i (i)}
-                                <dt>
-                                    {signature.domain ?? "Signature"}
-                                    {#if signature.selector}
-                                        <span class="d-block small">{signature.selector}</span>
-                                    {/if}
-                                </dt>
-                                <dd>
-                                    <span
-                                        class={verdictStatus(signature.result, true) === "pass"
-                                            ? "text-success"
-                                            : "text-danger"}>{signature.result}</span
-                                    >
-                                    {@render rawResult(signature.details)}
-                                </dd>
-                            {/each}
-                        </dl>
-                    {/if}
+                    {#each dkim as signature, i (i)}
+                        {@const props = parseVerdictDetails(signature.details).properties}
+                        {@const selector = signature.selector ?? props["header.s"]}
+                        {#if dkim.length > 1}
+                            <h6 class={["small fw-semibold mb-1", i > 0 && "mt-3"]}>
+                                Signature {i + 1} of {dkim.length}
+                            </h6>
+                        {/if}
+                        <VerdictFacts raw={rawVerdict("dkim", signature.result, signature.details)}>
+                            {@render verdictRow("dkim", signature.result)}
+                            {#if signature.domain}
+                                <FactRow
+                                    label="Signing domain (d=)"
+                                    value={signature.domain}
+                                    mono
+                                />
+                            {/if}
+                            {#if selector}
+                                <FactRow label="Selector (s=)" value={selector} mono />
+                            {/if}
+                            {#if props["header.a"]}
+                                <FactRow label="Algorithm (a=)" value={props["header.a"]} mono />
+                            {/if}
+                            {@render receiverNote(signature.details)}
+                        </VerdictFacts>
+                    {/each}
                     <p class="check-about">
-                        The receiver checked each signature against the public key its domain
-                        publishes in DNS.
+                        {#if dkim.length === 0}
+                            The receiver reported no DKIM verdict: the message is likely not signed.
+                        {:else}
+                            The receiver checked each signature against the public key its domain
+                            publishes in DNS.
+                        {/if}
                     </p>
                 </div>
             </CheckCard>
@@ -317,18 +423,33 @@
                 issues={at("dmarc")}
             >
                 <div class="card-body">
-                    {#if dmarcPolicy}
-                        <dl class="check-facts">
-                            <dt>Policy</dt>
-                            <dd><code>{dmarcPolicy}</code></dd>
-                        </dl>
+                    {#if authentication.dmarc}
+                        {@const dmarc = authentication.dmarc}
+                        {@const props = parseVerdictDetails(dmarc.details).properties}
+                        {@const headerFrom = props["header.from"] ?? dmarc.domain}
+                        <!-- The policy the receiver applied, or failing that the one the
+                             domain publishes -->
+                        {@const policy =
+                            props["policy.published-domain-policy"] ??
+                            (dmarc.result !== "none"
+                                ? dnsResults?.dmarc_record?.policy
+                                : undefined)}
+                        <VerdictFacts raw={rawVerdict("dmarc", dmarc.result, dmarc.details)}>
+                            {@render verdictRow("dmarc", dmarc.result)}
+                            {#if headerFrom}
+                                <FactRow label="From domain" value={headerFrom} mono />
+                            {/if}
+                            {#if policy}
+                                <FactRow label="Policy" value={policy} mono />
+                            {/if}
+                            {@render receiverNote(dmarc.details)}
+                        </VerdictFacts>
                     {/if}
                     <p class="check-about">
                         DMARC passes when SPF or DKIM passes for a domain aligned with the From
                         address, the one the recipient sees. Otherwise the receiver applies the
                         policy the From domain publishes.
                     </p>
-                    {@render rawResult(authentication.dmarc?.details)}
                 </div>
             </CheckCard>
 
@@ -344,11 +465,16 @@
                     issues={at("x_aligned_from")}
                 >
                     <div class="card-body">
+                        <VerdictFacts
+                            raw={rawVerdict("x-aligned-from", aligned.result, aligned.details)}
+                        >
+                            {@render verdictRow("x_aligned_from", aligned.result, false)}
+                            {@render receiverNote(aligned.details)}
+                        </VerdictFacts>
                         <p class="check-about">
                             Whether the envelope sender and the From address are in the same domain.
                             See <a href="#domain-alignment">Domain Alignment</a>.
                         </p>
-                        {@render rawResult(aligned.details)}
                     </div>
                 </CheckCard>
             {/if}
@@ -363,12 +489,29 @@
                 issues={at("bimi")}
             >
                 <div class="card-body">
+                    {#if authentication.bimi}
+                        {@const bimi = authentication.bimi}
+                        {@const props = parseVerdictDetails(bimi.details).properties}
+                        <VerdictFacts raw={rawVerdict("bimi", bimi.result, bimi.details)}>
+                            {@render verdictRow("bimi", bimi.result, false)}
+                            {#if bimi.domain ?? props["header.d"]}
+                                <FactRow
+                                    label="Domain"
+                                    value={bimi.domain ?? props["header.d"]}
+                                    mono
+                                />
+                            {/if}
+                            {#if props["header.selector"]}
+                                <FactRow label="Selector" value={props["header.selector"]} mono />
+                            {/if}
+                            {@render receiverNote(bimi.details)}
+                        </VerdictFacts>
+                    {/if}
                     <p class="check-about">
                         Whether the receiver would display your brand logo next to the message. The
                         record and the logo are checked with the <a href="#dns-bimi">DNS records</a
                         >.
                     </p>
-                    {@render rawResult(authentication.bimi?.details)}
                 </div>
             </CheckCard>
         </CheckList>
@@ -389,17 +532,25 @@
                         issues={at("x_google_dkim")}
                     >
                         <div class="card-body">
+                            <VerdictFacts
+                                raw={rawVerdict("x-google-dkim", google.result, google.details)}
+                            >
+                                {@render verdictRow("dkim", google.result, false)}
+                                {#if google.domain}
+                                    <FactRow label="Signing domain" value={google.domain} mono />
+                                {/if}
+                            </VerdictFacts>
                             <p class="check-about">
                                 Google signs the messages it routes; a signature that no longer
                                 verifies means something changed the message afterwards.
                             </p>
-                            {@render rawResult(google.details)}
                         </div>
                     </CheckCard>
                 {/if}
 
                 {#if authentication.arc}
                     {@const arc = authentication.arc}
+                    {@const raw = rawVerdict("arc", arc.result, arc.details)}
                     <CheckCard
                         id="authentication-arc"
                         title="Authenticated Received Chain"
@@ -412,11 +563,30 @@
                         issues={at("arc")}
                     >
                         <div class="card-body">
+                            <!-- The analyser words its own verdict when it checked the chain
+                                 itself: only the receiver's is raw. -->
+                            <VerdictFacts raw={raw?.startsWith("arc=") ? raw : undefined}>
+                                {@render verdictRow("arc", arc.result, false)}
+                                {#if arc.chain_length !== undefined}
+                                    <FactRow
+                                        label="Intermediaries"
+                                        value={String(arc.chain_length)}
+                                    />
+                                {/if}
+                                {#if arc.chain_valid !== undefined}
+                                    <FactRow
+                                        label="Seals"
+                                        value={arc.chain_valid ? "all verify" : "broken"}
+                                    />
+                                {/if}
+                                {#if raw && !raw.startsWith("arc=")}
+                                    <FactRow label="Details" value={raw} />
+                                {/if}
+                            </VerdictFacts>
                             <p class="check-about">
                                 The seals of the intermediaries that forwarded the message, vouching
                                 for the authentication results it had when they received it.
                             </p>
-                            {@render rawResult(arc.details)}
                         </div>
                     </CheckCard>
                 {/if}

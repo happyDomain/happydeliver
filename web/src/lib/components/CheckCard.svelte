@@ -14,6 +14,16 @@
         neutral: "bi-circle text-secondary",
     };
 
+    /** The text color of a verdict, after how it reads. */
+    export const statusTones: Record<CheckStatus, string> = {
+        pass: "text-success",
+        improve: "text-warning",
+        warn: "text-warning",
+        fail: "text-danger",
+        info: "text-info",
+        neutral: "text-body-secondary",
+    };
+
     const labels: Record<CheckStatus, string> = {
         pass: "Passed",
         improve: "Can be improved",
