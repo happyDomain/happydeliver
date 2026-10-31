@@ -69,7 +69,8 @@ $hd-gray-850: #313131;
 $hd-gray-900: #282828;
 $hd-gray-950: #1c1c1c;
 
-// Sky: only feeds Bootstrap's $blue and $cyan, never a semantic role
+// Sky: feeds Bootstrap's $blue and $cyan, and decorative accents (the
+// homepage feature icons); never a semantic role
 $hd-sky-50: #f1f8fe;
 $hd-sky-100: #e0efff;
 $hd-sky-200: #c1defe;
@@ -737,6 +738,18 @@ $theme-colors: map-merge($theme-colors, $custom-theme-colors);
     --hd-purple-800: #{$hd-purple-800};
     --hd-purple-900: #{$hd-purple-900};
     --hd-purple-950: #{$hd-purple-950};
+
+    --hd-sky-50: #{$hd-sky-50};
+    --hd-sky-100: #{$hd-sky-100};
+    --hd-sky-200: #{$hd-sky-200};
+    --hd-sky-300: #{$hd-sky-300};
+    --hd-sky-400: #{$hd-sky-400};
+    --hd-sky-500: #{$hd-sky-500};
+    --hd-sky-600: #{$hd-sky-600};
+    --hd-sky-700: #{$hd-sky-700};
+    --hd-sky-800: #{$hd-sky-800};
+    --hd-sky-900: #{$hd-sky-900};
+    --hd-sky-950: #{$hd-sky-950};
 
     --hd-sand-50: #{$hd-sand-50};
     --hd-sand-100: #{$hd-sand-100};

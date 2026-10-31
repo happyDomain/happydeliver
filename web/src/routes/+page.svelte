@@ -113,20 +113,23 @@
         }
     }
 
+    /* Laid out so that no two neighbouring cards share a colour, on the
+       4-column grid as well as the 2-column one: info and primary are the
+       same purple in this theme, so the blue comes from the "sky" tone. */
     const features = $derived([
         {
             icon: "bi-shield-check",
             title: "Authentication",
             description:
                 "SPF, DKIM, DMARC, and BIMI validation with detailed results and recommendations.",
-            variant: "primary" as const,
+            variant: "sky" as const,
         },
         {
             icon: "bi-building-check",
             title: "BIMI Support",
             description:
                 "Brand Indicators for Message Identification - verify your brand logo configuration.",
-            variant: "info" as const,
+            variant: "primary" as const,
             href: resolve("bimi"),
             linkLabel: "Check a BIMI record",
         },
@@ -135,21 +138,21 @@
             title: "ARC Verification",
             description:
                 "Authenticated Received Chain validation for forwarded emails and mailing lists.",
-            variant: "primary" as const,
+            variant: "success" as const,
         },
         {
             icon: "bi-check2-circle",
             title: "Domain Alignment",
             description:
                 "Verify alignment between From, Return-Path, and DKIM domains for DMARC compliance.",
-            variant: "success" as const,
+            variant: "sky" as const,
         },
         {
             icon: "bi-globe",
             title: "DNS Records",
             description:
                 "Verify PTR, MX, SPF, DKIM, DMARC, and BIMI records are properly configured.",
-            variant: "success" as const,
+            variant: "primary" as const,
         },
         {
             icon: "bi-bug",
@@ -173,21 +176,21 @@
             icon: "bi-file-text",
             title: "Content Analysis",
             description: "HTML structure, link validation, image analysis, and more.",
-            variant: "info" as const,
+            variant: "success" as const,
         },
         {
             icon: "bi-bar-chart",
             title: "Detailed Scoring",
             description:
                 "A to F deliverability grade with breakdown by category and recommendations.",
-            variant: "primary" as const,
+            variant: "sky" as const,
         },
         {
             icon: "bi-file-earmark-arrow-up",
             title: "EML Upload",
             description:
                 "Analyze a message you already received elsewhere: authentication results are read from the server that handled it.",
-            variant: "info" as const,
+            variant: "primary" as const,
         },
         {
             icon: "bi-lock",
