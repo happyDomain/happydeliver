@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    isAlignedWith,
     parseVerdictDetails,
     rawVerdict,
+    sameDomain,
     verdictMeaning,
     verdictStatus,
 } from "#lib/authentication.js";
@@ -77,6 +79,51 @@ describe("rawVerdict", () => {
 
     it("has nothing to show without details", () => {
         expect(rawVerdict("spf", "pass", undefined)).toBeUndefined();
+    });
+});
+
+describe("sameDomain", () => {
+    it("ignores the case and a trailing dot", () => {
+        expect(sameDomain("Example.COM.", "example.com")).toBe(true);
+        expect(sameDomain("mail.example.com", "example.com")).toBe(false);
+    });
+
+    it("never matches a missing domain", () => {
+        expect(sameDomain(undefined, undefined)).toBe(false);
+        expect(sameDomain("", "")).toBe(false);
+    });
+});
+
+describe("isAlignedWith", () => {
+    it("aligns the From domain with itself, whatever the mode", () => {
+        expect(isAlignedWith("Example.com.", undefined, "example.com", undefined, "strict")).toBe(
+            true,
+        );
+    });
+
+    it("compares organizational domains in relaxed mode only", () => {
+        expect(isAlignedWith("mail.example.com", "example.com", "example.com", "example.com")).toBe(
+            true,
+        );
+        expect(
+            isAlignedWith(
+                "mail.example.com",
+                "example.com",
+                "example.com",
+                "example.com",
+                "strict",
+            ),
+        ).toBe(false);
+        expect(isAlignedWith("example.net", "example.net", "example.com", "example.com")).toBe(
+            false,
+        );
+    });
+
+    it("cannot tell without the organizational domains", () => {
+        expect(isAlignedWith("mail.example.com", undefined, "example.com", undefined)).toBe(
+            undefined,
+        );
+        expect(isAlignedWith(undefined, undefined, "example.com", "example.com")).toBe(undefined);
     });
 });
 

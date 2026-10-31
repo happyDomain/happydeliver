@@ -2039,12 +2039,20 @@ dl.check-facts {
     }
 }
 
-// What a verdict rests on: what the receiver reported, in a framed panel.
+// What a verdict rests on, apart from what helps act on it: what the receiver reported in
+// a framed panel, what the report knows besides in a lighter one, side by side on a wide
+// screen.
 .verdict-facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     margin-bottom: 0.75rem;
+
+    @include media-breakpoint-up(lg) {
+        &.with-help {
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        }
+    }
 
     .verdict-facts-title {
         margin-bottom: 0.25rem;
@@ -2058,6 +2066,17 @@ dl.check-facts {
     .verdict-facts-reported > .fact-list {
         background: var(--hd-bg-subtle);
         border: 1px solid var(--hd-border-1);
+    }
+
+    .verdict-facts-help > .fact-list {
+        border: 1px dashed var(--hd-border-2);
+    }
+
+    .verdict-facts-links {
+        margin: 0.35rem 0 0;
+        padding: 0 0.75rem;
+        font-size: $small-font-size;
+        color: var(--hd-fg-3);
     }
 }
 

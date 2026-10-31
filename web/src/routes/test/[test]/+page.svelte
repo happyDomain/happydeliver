@@ -384,6 +384,7 @@
                             authenticationGrade={report.summary?.authentication_grade}
                             authenticationScore={report.summary?.authentication_score}
                             dnsResults={report.dns_results}
+                            alignment={report.header_analysis?.domain_alignment}
                             inboundHop={report.header_analysis?.received_chain?.find(
                                 (hop) => hop.inbound,
                             )}

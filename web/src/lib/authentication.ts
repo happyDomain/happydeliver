@@ -130,6 +130,32 @@ export function rawVerdict(method: string, result: string, details?: string): st
     return startsWithResult ? `${method}=${details}` : details;
 }
 
+const normalizeDomain = (domain: string) => domain.trim().replace(/\.$/, "").toLowerCase();
+
+/** Whether two domains are the same, whatever their case and a trailing dot. */
+export function sameDomain(a: string | undefined, b: string | undefined): boolean {
+    return !!a && !!b && normalizeDomain(a) === normalizeDomain(b);
+}
+
+/**
+ * Whether an authenticated domain is aligned with the From domain, as DMARC compares them:
+ * the same domain in strict mode, the same organizational domain in relaxed mode. Undefined
+ * when the organizational domains this takes are unknown.
+ */
+export function isAlignedWith(
+    domain: string | undefined,
+    orgDomain: string | undefined,
+    fromDomain: string | undefined,
+    fromOrgDomain: string | undefined,
+    mode: "relaxed" | "strict" = "relaxed",
+): boolean | undefined {
+    if (!domain || !fromDomain) return undefined;
+    if (sameDomain(domain, fromDomain)) return true;
+    if (mode === "strict") return false;
+    if (!orgDomain || !fromOrgDomain) return undefined;
+    return sameDomain(orgDomain, fromOrgDomain);
+}
+
 /** The mechanisms whose verdicts the report explains. */
 export type VerdictMechanism =
     | "spf"
