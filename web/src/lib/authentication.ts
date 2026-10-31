@@ -1,4 +1,10 @@
-import type { AuthenticationResults, Report } from "#lib/api/types.gen.js";
+import type {
+    AuthenticationResults,
+    AuthResult,
+    DmarcRecord,
+    DomainAlignment,
+    Report,
+} from "#lib/api/types.gen.js";
 import type { CheckStatus } from "#lib/components/CheckCard.svelte";
 
 /**
@@ -278,4 +284,114 @@ export function verdictStatus(result: string | undefined, required: boolean): Ch
         default:
             return "neutral";
     }
+}
+
+/** How a domain relates to the From domain, which is all DMARC alignment asks. */
+export type DomainRelation = "same" | "organizational" | "unrelated";
+
+/**
+ * One identity DMARC may rest on, held against the From domain: the Return-Path, which SPF
+ * authenticates, or the domain a DKIM signature is made for.
+ */
+export interface AlignmentIdentity {
+    mechanism: "SPF" | "DKIM";
+    /** The DMARC tag setting how closely this identity has to match. */
+    tag: "aspf" | "adkim";
+    mode?: "relaxed" | "strict";
+    domain: string;
+    orgDomain?: string;
+    /** The Return-Path address, for SPF. */
+    address?: string;
+    /** The selector of the signature, for DKIM. */
+    selector?: string;
+    relation: DomainRelation;
+    /** Aligned under the mode of the policy: strict alignment wants the same domain. */
+    aligned: boolean;
+    /** The verdict of its mechanism, when the receiver reported one for this domain. */
+    verdict?: AuthResult;
+    /** Aligned and passing: this identity alone is enough for DMARC. */
+    counts: boolean;
+}
+
+/** The identities DMARC may rest on, each with the verdict of its mechanism. */
+export function alignmentIdentities(
+    alignment: DomainAlignment | undefined,
+    authentication: AuthenticationResults | undefined,
+    dmarcRecord: DmarcRecord | undefined,
+): AlignmentIdentity[] {
+    if (!alignment) return [];
+
+    const identity = (
+        found: Pick<AlignmentIdentity, "mechanism" | "tag" | "mode" | "domain" | "orgDomain">,
+        verdict: AuthResult | undefined,
+    ) => {
+        const relation: DomainRelation = sameDomain(found.domain, alignment.from_domain)
+            ? "same"
+            : sameDomain(found.orgDomain, alignment.from_org_domain)
+              ? "organizational"
+              : "unrelated";
+        const aligned =
+            isAlignedWith(
+                found.domain,
+                found.orgDomain,
+                alignment.from_domain,
+                alignment.from_org_domain,
+                found.mode,
+            ) ?? false;
+        return {
+            ...found,
+            relation,
+            aligned,
+            verdict,
+            counts: aligned && verdict?.result === "pass",
+        };
+    };
+
+    const identities: AlignmentIdentity[] = [];
+    if (alignment.return_path_domain) {
+        const spf = authentication?.spf;
+        identities.push({
+            ...identity(
+                {
+                    mechanism: "SPF",
+                    tag: "aspf",
+                    mode: dmarcRecord?.spf_alignment,
+                    domain: alignment.return_path_domain,
+                    orgDomain: alignment.return_path_org_domain,
+                },
+                // The envelope sender SPF checked is the Return-Path, unless the receiver
+                // names another one
+                spf && (!spf.domain || sameDomain(spf.domain, alignment.return_path_domain))
+                    ? spf
+                    : undefined,
+            ),
+            address: alignment.return_path,
+        });
+    }
+
+    // The analysis lists the domains of the signatures in the order the receiver reported
+    // them, leaving out those it named no domain for, so both lists match one for one:
+    // matching by domain is only a safeguard, should they ever differ.
+    const signatures = (authentication?.dkim ?? []).filter((d) => d.domain);
+    const zipped = signatures.length === alignment.dkim_domains?.length;
+    (alignment.dkim_domains ?? []).forEach((dkim, i) => {
+        const signature = zipped
+            ? signatures[i]
+            : signatures.find((d) => sameDomain(d.domain, dkim.domain));
+        identities.push({
+            ...identity(
+                {
+                    mechanism: "DKIM",
+                    tag: "adkim",
+                    mode: dmarcRecord?.dkim_alignment,
+                    domain: dkim.domain,
+                    orgDomain: dkim.org_domain,
+                },
+                signature,
+            ),
+            selector: signature?.selector,
+        });
+    });
+
+    return identities;
 }

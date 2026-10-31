@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { AuthenticationResults, DomainAlignment } from "#lib/api/types.gen.js";
 import {
+    alignmentIdentities,
     isAlignedWith,
     parseVerdictDetails,
     rawVerdict,
@@ -151,5 +153,91 @@ describe("verdictStatus", () => {
         expect(verdictStatus("softfail", true)).toBe("warn");
         expect(verdictStatus("orgdomain_pass", true)).toBe("pass");
         expect(verdictStatus("skipped", true)).toBe("info");
+    });
+});
+
+describe("alignmentIdentities", () => {
+    const alignment: DomainAlignment = {
+        from_domain: "example.com",
+        from_org_domain: "example.com",
+        return_path: "bounce@mail.example.com",
+        return_path_domain: "mail.example.com",
+        return_path_org_domain: "example.com",
+        dkim_domains: [
+            { domain: "example.net", org_domain: "example.net" },
+            { domain: "example.com", org_domain: "example.com" },
+        ],
+    };
+    const authentication: AuthenticationResults = {
+        spf: { result: "pass", domain: "mail.example.com" },
+        dkim: [
+            { result: "pass", domain: "example.net", selector: "s1" },
+            { result: "fail", domain: "example.com", selector: "s2" },
+        ],
+    };
+
+    it("holds each identity against the From domain, with its own verdict", () => {
+        const [spf, net, com] = alignmentIdentities(alignment, authentication, undefined);
+        expect(spf).toMatchObject({
+            mechanism: "SPF",
+            address: "bounce@mail.example.com",
+            relation: "organizational",
+            aligned: true,
+            counts: true,
+        });
+        expect(net).toMatchObject({
+            relation: "unrelated",
+            aligned: false,
+            counts: false,
+            selector: "s1",
+        });
+        expect(com).toMatchObject({ relation: "same", aligned: true, counts: false });
+        expect(com.verdict?.selector).toBe("s2");
+    });
+
+    it("asks for the From domain itself under strict alignment", () => {
+        const [spf] = alignmentIdentities(alignment, authentication, {
+            valid: true,
+            spf_alignment: "strict",
+        });
+        expect(spf).toMatchObject({ relation: "organizational", aligned: false, counts: false });
+    });
+
+    it("leaves out the SPF verdict of another envelope sender", () => {
+        const [spf] = alignmentIdentities(
+            alignment,
+            { spf: { result: "pass", domain: "example.org" } },
+            undefined,
+        );
+        expect(spf.verdict).toBeUndefined();
+        expect(spf.counts).toBe(false);
+    });
+
+    it("takes an SPF verdict naming no domain as the Return-Path's", () => {
+        const [spf] = alignmentIdentities(alignment, { spf: { result: "pass" } }, undefined);
+        expect(spf).toMatchObject({ verdict: { result: "pass" }, counts: true });
+    });
+
+    it("matches the signatures in order, skipping those without a domain", () => {
+        const [, net, com] = alignmentIdentities(
+            alignment,
+            { dkim: [{ result: "none" }, ...authentication.dkim!] },
+            undefined,
+        );
+        expect(net.verdict?.selector).toBe("s1");
+        expect(com.verdict?.selector).toBe("s2");
+    });
+
+    it("matches the signatures by domain when the lists differ", () => {
+        const [, net] = alignmentIdentities(
+            alignment,
+            { dkim: [{ result: "pass", domain: "example.net", selector: "s1" }] },
+            undefined,
+        );
+        expect(net.verdict?.selector).toBe("s1");
+    });
+
+    it("has nothing to compare without an alignment", () => {
+        expect(alignmentIdentities(undefined, authentication, undefined)).toEqual([]);
     });
 });

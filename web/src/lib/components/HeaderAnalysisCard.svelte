@@ -1,13 +1,30 @@
 <script lang="ts">
-    import type { DmarcRecord, HeaderAnalysis, HeaderCheck, Issue } from "#lib/api/types.gen.js";
+    import type {
+        AuthenticationResults,
+        DmarcRecord,
+        HeaderAnalysis,
+        HeaderCheck,
+        Issue,
+    } from "#lib/api/types.gen.js";
+    import {
+        alignmentIdentities,
+        sameDomain,
+        verdictStatus,
+        type AlignmentIdentity,
+        type DomainRelation,
+    } from "#lib/authentication.js";
     import { docs, headerDocLinks } from "#lib/docs.js";
     import type { SectionStatus } from "#lib/sections.js";
-    import CheckCard from "./CheckCard.svelte";
+    import CheckCard, { statusTones } from "./CheckCard.svelte";
     import CheckList from "./CheckList.svelte";
+    import FactRow from "./FactRow.svelte";
     import IssueNote from "./IssueNote.svelte";
     import ReportSection from "./ReportSection.svelte";
+    import VerdictFacts from "./VerdictFacts.svelte";
 
     interface Props {
+        /** The verdicts of the identities compared: alignment only counts on a pass. */
+        authentication?: AuthenticationResults;
         dmarcRecord?: DmarcRecord;
         headerAnalysis: HeaderAnalysis;
         headerGrade?: string;
@@ -17,6 +34,7 @@
     }
 
     let {
+        authentication,
         dmarcRecord,
         headerAnalysis,
         headerGrade,
@@ -41,62 +59,10 @@
 
     // ─── Alignment ─────────────────────────────────────────────────────────────
 
-    type Relation = "same" | "organizational" | "unrelated";
-
-    /** How one identity relates to the From domain, which is all DMARC alignment asks. */
-    interface Identity {
-        label: string;
-        /** The DMARC tag setting how closely this identity has to match. */
-        tag: "aspf" | "adkim";
-        mode?: string;
-        domain: string;
-        relation: Relation;
-        /** Whether DMARC counts it: a policy asking for strict alignment wants the same domain. */
-        counts: boolean;
-    }
-
     const alignment = $derived(headerAnalysis.domain_alignment);
+    const identities = $derived(alignmentIdentities(alignment, authentication, dmarcRecord));
 
-    function relationOf(domain: string, orgDomain?: string): Relation {
-        const same = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
-        if (same(domain, alignment?.from_domain)) return "same";
-        if (same(orgDomain, alignment?.from_org_domain)) return "organizational";
-        return "unrelated";
-    }
-
-    const identities = $derived.by<Identity[]>(() => {
-        if (!alignment) return [];
-        const found: Omit<Identity, "counts">[] = [];
-        if (alignment.return_path_domain) {
-            found.push({
-                label: "Return-Path (SPF)",
-                tag: "aspf",
-                mode: dmarcRecord?.spf_alignment,
-                domain: alignment.return_path_domain,
-                relation: relationOf(
-                    alignment.return_path_domain,
-                    alignment.return_path_org_domain,
-                ),
-            });
-        }
-        for (const dkim of alignment.dkim_domains ?? []) {
-            found.push({
-                label: "DKIM signature",
-                tag: "adkim",
-                mode: dmarcRecord?.dkim_alignment,
-                domain: dkim.domain,
-                relation: relationOf(dkim.domain, dkim.org_domain),
-            });
-        }
-        return found.map((identity) => ({
-            ...identity,
-            counts:
-                identity.relation === "same" ||
-                (identity.relation === "organizational" && identity.mode !== "strict"),
-        }));
-    });
-
-    const relationText: Record<Relation, string> = {
+    const relationText: Record<DomainRelation, string> = {
         same: "same domain",
         organizational: "same organizational domain",
         unrelated: "unrelated domain",
@@ -108,7 +74,7 @@
         const through = [
             ...new Set(
                 identities
-                    .filter((i) => i.counts)
+                    .filter((i) => i.aligned)
                     .map((i) => (i.tag === "aspf" ? "the Return-Path" : "DKIM")),
             ),
         ];
@@ -116,6 +82,39 @@
             ? `Aligned through ${through.join(" and ")}`
             : "Neither the Return-Path nor DKIM is aligned";
     });
+
+    /** What DMARC makes of an identity, said in the heading of its block. */
+    function outcome(identity: AlignmentIdentity): { icon: string; text: string } {
+        if (identity.counts) {
+            return {
+                icon: "bi-check-circle-fill text-success",
+                text: "aligned and passing: enough for DMARC",
+            };
+        }
+        if (identity.aligned) {
+            return {
+                icon: "bi-exclamation-triangle-fill text-warning",
+                text: identity.verdict
+                    ? `aligned, but ${identity.mechanism} does not pass`
+                    : `aligned, but no ${identity.mechanism} verdict was reported`,
+            };
+        }
+        return { icon: "bi-x-circle-fill text-danger", text: "not aligned: DMARC ignores it" };
+    }
+
+    /** Why an identity is aligned or not, in the terms of its relation and of the mode. */
+    function alignmentReason(identity: AlignmentIdentity): string {
+        switch (identity.relation) {
+            case "same":
+                return "It is the From domain itself: aligned in both modes.";
+            case "organizational":
+                return identity.mode === "strict"
+                    ? `It shares the organizational domain of the From domain, but the DMARC record sets ${identity.tag}=s, which asks for the From domain itself.`
+                    : "It shares the organizational domain of the From domain, which relaxed alignment accepts.";
+            default:
+                return "It does not share the organizational domain of the From domain: it cannot be aligned, whatever the mode.";
+        }
+    }
 
     // ─── Headers ───────────────────────────────────────────────────────────────
 
@@ -243,7 +242,7 @@
                     tag="DMARC"
                     status={identities.length === 0
                         ? "neutral"
-                        : identities.some((i) => i.counts)
+                        : identities.some((i) => i.aligned)
                           ? "pass"
                           : "fail"}
                     summary={alignmentSummary}
@@ -251,38 +250,173 @@
                     issues={headerAnalysis.issues?.domain_alignment}
                 >
                     <div class="card-body">
+                        <VerdictFacts title="The From domain, which each identity is held against">
+                            {#if headerAnalysis.headers?.from?.value}
+                                <FactRow
+                                    label="From"
+                                    value={headerAnalysis.headers.from.value}
+                                    mono
+                                />
+                            {/if}
+                            {#if alignment.from_domain}
+                                <FactRow label="Domain" value={alignment.from_domain} mono />
+                            {/if}
+                            {#if alignment.from_org_domain}
+                                <FactRow label="Organizational domain">
+                                    <span class="font-monospace">{alignment.from_org_domain}</span>
+                                    <span class="fact-note"
+                                        >The domain registered right under its public suffix (.com,
+                                        .co.uk…): the one its owner bought.</span
+                                    >
+                                </FactRow>
+                            {/if}
+                        </VerdictFacts>
+
                         {#if identities.length > 0}
-                            <dl class="check-facts">
-                                {#each identities as identity, i (i)}
-                                    <dt>{identity.label}</dt>
-                                    <dd>
-                                        <span class="font-monospace">{identity.domain}</span>
-                                        <span class="small text-body-secondary ms-1 text-nowrap">
-                                            <i
-                                                class="bi me-1 {identity.counts
-                                                    ? 'bi-check-circle-fill text-success'
-                                                    : 'bi-x-circle text-danger'}"
-                                                aria-hidden="true"
-                                            ></i>{relationText[identity.relation]}
-                                        </span>
-                                        {#if identity.relation === "organizational" && identity.mode === "strict"}
-                                            <div class="small text-danger">
-                                                Your DMARC policy sets {identity.tag}=s: only the
-                                                same domain counts.
-                                            </div>
-                                        {/if}
-                                    </dd>
-                                {/each}
-                            </dl>
+                            <p class="small text-body-secondary mb-0">
+                                {identities.length === 1
+                                    ? "DMARC passes on the identity below if it is"
+                                    : `DMARC passes on any of the ${identities.length} identities below that is`}
+                                both aligned with the From domain and passing:
+                            </p>
                         {/if}
+
+                        {#each identities as identity, i (i)}
+                            {@const result = outcome(identity)}
+                            <h6
+                                class="alignment-identity d-flex flex-wrap align-items-baseline column-gap-2 mb-1"
+                            >
+                                <i class="bi {result.icon}" aria-hidden="true"></i>
+                                <span class="fw-semibold"
+                                    >{identity.mechanism === "SPF"
+                                        ? "SPF, through the Return-Path"
+                                        : `DKIM signature by ${identity.domain}`}</span
+                                >
+                                <span class="small fw-normal text-body-secondary"
+                                    >{result.text}</span
+                                >
+                            </h6>
+                            <VerdictFacts
+                                title="Found in the message"
+                                links={identity.mechanism === "SPF"
+                                    ? [
+                                          { href: "#authentication-spf", label: "SPF verdict" },
+                                          { href: "#dns-spf", label: "SPF record" },
+                                      ]
+                                    : [
+                                          { href: "#authentication-dkim", label: "DKIM verdicts" },
+                                          { href: "#dns-dkim", label: "DKIM records" },
+                                      ]}
+                            >
+                                {#if identity.mechanism === "SPF"}
+                                    {#if identity.address}
+                                        <FactRow
+                                            label="Return-Path"
+                                            value={identity.address}
+                                            mono
+                                        />
+                                    {/if}
+                                    <FactRow label="Domain" value={identity.domain} mono />
+                                {:else}
+                                    <FactRow
+                                        label="Signing domain (d=)"
+                                        value={identity.domain}
+                                        mono
+                                    />
+                                    {#if identity.selector}
+                                        <FactRow
+                                            label="Selector (s=)"
+                                            value={identity.selector}
+                                            mono
+                                        />
+                                    {/if}
+                                {/if}
+                                {#if identity.orgDomain}
+                                    {@const sameOrg = sameDomain(
+                                        identity.orgDomain,
+                                        alignment.from_org_domain,
+                                    )}
+                                    <FactRow
+                                        label="Organizational domain"
+                                        value={identity.orgDomain}
+                                        mono
+                                        ok={alignment.from_org_domain ? sameOrg : undefined}
+                                        okLabel={sameOrg
+                                            ? "the From domain's"
+                                            : `not ${alignment.from_org_domain}`}
+                                    />
+                                {/if}
+                                <FactRow label="Alignment">
+                                    <span
+                                        class="fw-semibold {identity.aligned
+                                            ? 'text-success'
+                                            : 'text-danger'}"
+                                        >{identity.aligned ? "aligned" : "not aligned"}</span
+                                    >
+                                    <span class="text-body-secondary"
+                                        >({relationText[identity.relation]})</span
+                                    >
+                                    <span class="fact-note">{alignmentReason(identity)}</span>
+                                </FactRow>
+                                {#snippet help()}
+                                    <FactRow label="{identity.mechanism} verdict">
+                                        {#if identity.verdict}
+                                            <span
+                                                class="fw-semibold {statusTones[
+                                                    verdictStatus(identity.verdict.result, true)
+                                                ]}">{identity.verdict.result}</span
+                                            >
+                                        {:else}
+                                            <span class="text-body-secondary">not reported</span>
+                                        {/if}
+                                        <span class="fact-note">
+                                            {#if identity.counts}
+                                                Aligned and passing: DMARC passes on this identity
+                                                alone.
+                                            {:else if identity.aligned}
+                                                Aligned, so DMARC would count it, if it passed.
+                                            {:else}
+                                                Whatever it is, DMARC does not count it: the domain
+                                                is not aligned.
+                                            {/if}
+                                        </span>
+                                    </FactRow>
+                                    <FactRow label="Alignment mode">
+                                        <span class="font-monospace"
+                                            >{identity.tag}={identity.mode === "strict"
+                                                ? "s"
+                                                : "r"}</span
+                                        >
+                                        <span class="text-body-secondary"
+                                            >({identity.mode === "strict"
+                                                ? "strict"
+                                                : "relaxed"}{dmarcRecord
+                                                ? ""
+                                                : ", by default"})</span
+                                        >
+                                        <span class="fact-note">
+                                            {#if !dmarcRecord}
+                                                The From domain publishes no DMARC record: no policy
+                                                applies to what fails.
+                                            {:else if identity.mode === "strict"}
+                                                Only the From domain itself is aligned.
+                                            {:else}
+                                                Any domain sharing the organizational domain of the
+                                                From domain is aligned.
+                                            {/if}
+                                        </span>
+                                    </FactRow>
+                                {/snippet}
+                            </VerdictFacts>
+                        {/each}
+
                         <p class="check-about">
-                            DMARC passes when SPF or DKIM passes for a domain aligned with the From
-                            domain{alignment.from_domain ? ` (${alignment.from_domain})` : ""}: the
-                            same domain or, unless the policy asks for strict alignment, one sharing
-                            its organizational domain{alignment.from_org_domain &&
-                            alignment.from_org_domain !== alignment.from_domain
-                                ? ` (${alignment.from_org_domain})`
-                                : ""}. One aligned identity is enough.
+                            DMARC ties SPF and DKIM to the From address, the one the recipient sees:
+                            it passes when one of them passes for a domain aligned with the From
+                            domain. Relaxed alignment, the default, accepts any domain sharing its
+                            organizational domain (news.example.com for example.com); strict
+                            alignment, set by aspf=s or adkim=s, only the From domain itself. One
+                            identity aligned and passing is enough.
                         </p>
                     </div>
                 </CheckCard>
@@ -346,6 +480,14 @@
 </ReportSection>
 
 <style>
+    /* Each identity DMARC may rest on, apart from the others: what it says about one does
+       not hold for the next. */
+    .alignment-identity {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px dashed var(--hd-border-1);
+    }
+
     /* The headers as a message writes them, each line on the columns of the whole block:
        the flag of a reported one, the name, the value wrapping under itself. */
     .header-lines {

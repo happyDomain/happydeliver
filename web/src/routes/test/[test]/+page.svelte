@@ -432,6 +432,7 @@
                 <div class="row mb-4" id="header">
                     <div class="col-12">
                         <HeaderAnalysisCard
+                            authentication={report.authentication}
                             dmarcRecord={report.dns_results?.dmarc_record}
                             headerAnalysis={report.header_analysis}
                             headerGrade={report.summary?.header_grade}

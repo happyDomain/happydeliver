@@ -2,6 +2,8 @@
     import type { Snippet } from "svelte";
 
     interface Props {
+        /** What the first block holds, when not the facts the receiver reported. */
+        title?: string;
         /** The verdict as the receiver wrote it, quoted under what was read out of it. */
         raw?: string;
         /** FactRows: the verdict, and the facts the receiver reported with it. */
@@ -15,7 +17,7 @@
         links?: { href: string; label: string }[];
     }
 
-    let { raw, children, help, links }: Props = $props();
+    let { title = "Reported by the receiver", raw, children, help, links }: Props = $props();
 
     const hasHelp = $derived(!!help || !!links?.length);
 </script>
@@ -24,7 +26,7 @@
      screen, the one under the other on a narrow one. -->
 <div class={["verdict-facts", hasHelp && "with-help"]}>
     <section class="verdict-facts-reported">
-        <h6 class="verdict-facts-title">Reported by the receiver</h6>
+        <h6 class="verdict-facts-title">{title}</h6>
         <dl class="fact-list">
             {@render children()}
         </dl>
