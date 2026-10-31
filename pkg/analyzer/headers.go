@@ -423,6 +423,16 @@ func (h *HeaderAnalyzer) checkHeader(email *mailmsg.Message, headerName string, 
 	return check, issues
 }
 
+// returnPathAddress reads the address out of a Return-Path header, which
+// wraps it in angle brackets: "<>" is the null sender of a bounce, and reads
+// as an empty address.
+func returnPathAddress(value string) string {
+	if addr, err := mail.ParseAddress(value); err == nil {
+		return addr.Address
+	}
+	return strings.Trim(value, "<> \t")
+}
+
 // analyzeDomainAlignment checks domain alignment between headers and DKIM signatures
 func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResults *model.AuthenticationResults) *model.DomainAlignment {
 	alignment := &model.DomainAlignment{
@@ -445,6 +455,7 @@ func (h *HeaderAnalyzer) analyzeDomainAlignment(email *mailmsg.Message, authResu
 	// Extract Return-Path domain
 	returnPath := email.GetHeaderValue("Return-Path")
 	if returnPath != "" {
+		alignment.ReturnPath = utils.PtrTo(returnPathAddress(returnPath))
 		domain := mailmsg.AddressDomain(returnPath)
 		if domain != "" {
 			alignment.ReturnPathDomain = &domain

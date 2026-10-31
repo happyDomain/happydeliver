@@ -363,20 +363,24 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 		returnPath    string
 		expectAligned bool
 		expectIssues  []model.IssueType
+		// The address reported for the Return-Path, nil when there is none
+		expectReturnPath *string
 	}{
 		{
-			name:          "Aligned domains",
-			fromHeader:    "sender@example.com",
-			returnPath:    "bounce@example.com",
-			expectAligned: true,
-			expectIssues:  nil,
+			name:             "Aligned domains",
+			fromHeader:       "sender@example.com",
+			returnPath:       "<bounce@example.com>",
+			expectAligned:    true,
+			expectIssues:     nil,
+			expectReturnPath: utils.PtrTo("bounce@example.com"),
 		},
 		{
-			name:          "Misaligned domains",
-			fromHeader:    "sender@example.com",
-			returnPath:    "bounce@different.com",
-			expectAligned: false,
-			expectIssues:  []model.IssueType{model.IssueTypeDomainMisaligned},
+			name:             "Misaligned domains",
+			fromHeader:       "sender@example.com",
+			returnPath:       "bounce@different.com",
+			expectAligned:    false,
+			expectIssues:     []model.IssueType{model.IssueTypeDomainMisaligned},
+			expectReturnPath: utils.PtrTo("bounce@different.com"),
 		},
 		{
 			name:          "Only From header",
@@ -384,6 +388,15 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 			returnPath:    "",
 			expectAligned: true,
 			expectIssues:  nil,
+		},
+		{
+			// A bounce has no domain to compare
+			name:             "Null sender",
+			fromHeader:       "sender@example.com",
+			returnPath:       "<>",
+			expectAligned:    true,
+			expectIssues:     nil,
+			expectReturnPath: utils.PtrTo(""),
 		},
 	}
 
@@ -412,10 +425,32 @@ func TestAnalyzeDomainAlignment(t *testing.T) {
 				t.Errorf("Aligned = %v, want %v", *alignment.Aligned, tt.expectAligned)
 			}
 
+			if tt.expectReturnPath == nil && alignment.ReturnPath != nil {
+				t.Errorf("ReturnPath = %q, want none", *alignment.ReturnPath)
+			} else if tt.expectReturnPath != nil && (alignment.ReturnPath == nil || *alignment.ReturnPath != *tt.expectReturnPath) {
+				t.Errorf("ReturnPath = %v, want %q", alignment.ReturnPath, *tt.expectReturnPath)
+			}
+
 			if _, issues := calculateAlignmentScore(alignment, nil); fmt.Sprint(issueTypes(issues)) != fmt.Sprint(tt.expectIssues) {
 				t.Errorf("issues = %v, want %v", issueTypes(issues), tt.expectIssues)
 			}
 		})
+	}
+}
+
+// The Return-Path is reported as the address it wraps, the null sender of a
+// bounce as an empty one.
+func TestReturnPathAddress(t *testing.T) {
+	for value, want := range map[string]string{
+		"<bounce@example.com>":            "bounce@example.com",
+		"bounce@example.com":              "bounce@example.com",
+		" <bounce+tag@mail.example.com> ": "bounce+tag@mail.example.com",
+		"<>":                              "",
+		"<bounce@example.com> (comment)":  "bounce@example.com",
+	} {
+		if got := returnPathAddress(value); got != want {
+			t.Errorf("returnPathAddress(%q) = %q, want %q", value, got, want)
+		}
 	}
 }
 

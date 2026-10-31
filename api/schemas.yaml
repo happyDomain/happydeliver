@@ -835,6 +835,13 @@ components:
           type: string
           description: Organizational domain extracted from From header (using Public Suffix List)
           example: "example.com"
+        return_path:
+          type: string
+          description: >-
+            Address of the Return-Path header, the envelope sender the receiving server
+            recorded, without its angle brackets: the address SPF checks the domain of.
+            Empty for the null sender of a bounce.
+          example: "bounce@example.com"
         return_path_domain:
           type: string
           description: Domain from Return-Path header
