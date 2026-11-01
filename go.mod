@@ -14,6 +14,7 @@ require (
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
+	github.com/miekg/dns v1.1.73
 	github.com/oapi-codegen/runtime v1.9.0
 	github.com/tdewolff/parse/v2 v2.8.20
 	golang.org/x/image v0.46.0

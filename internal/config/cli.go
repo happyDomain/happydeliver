@@ -38,6 +38,7 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.Email.LMTPAddr, "lmtp-addr", o.Email.LMTPAddr, "LMTP server listen address")
 	flag.StringVar(&o.Email.ReceiverHostname, "receiver-hostname", o.Email.ReceiverHostname, "Hostname used to filter Authentication-Results headers (defaults to os.Hostname())")
 	flag.DurationVar(&o.Analysis.DNSTimeout, "dns-timeout", o.Analysis.DNSTimeout, "Timeout when performing DNS query")
+	flag.StringVar(&o.Analysis.DNSResolver, "dns-resolver", o.Analysis.DNSResolver, "DNSSEC-validating resolver (host or host:port) the domain test uses for DNSSEC and DANE (default: first nameserver of /etc/resolv.conf)")
 	flag.DurationVar(&o.Analysis.HTTPTimeout, "http-timeout", o.Analysis.HTTPTimeout, "Timeout when performing HTTP query")
 	flag.Var(&StringArray{&o.Analysis.RBLs}, "rbl", "Append a RBL (use this option multiple time to append multiple RBLs)")
 	flag.BoolVar(&o.Analysis.CheckAllIPs, "check-all-ips", o.Analysis.CheckAllIPs, "Check all IPs found in email headers against RBLs (not just the first one)")

@@ -537,6 +537,9 @@ components:
             - mta_sts_mx_mismatch
             - tls_rpt_missing
             - tls_rpt_invalid
+            - dnssec_unsigned
+            - dnssec_unvalidated
+            - dnssec_broken
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
@@ -550,7 +553,7 @@ components:
             its BIMI record, those from rbl_listed to domain_listed off the
             blacklists listing its sending addresses or its domain.
             dns_lookup_failed says a lookup the DNS checks rely on
-            did not answer. Those from mta_sts_missing to tls_rpt_invalid are
+            did not answer. Those from mta_sts_missing to dnssec_broken are
             only reported by the domain test, off the policies a domain
             publishes for the mail it receives. The authentication verdicts
             also report spf_missing, dkim_missing and dmarc_missing, for what
@@ -2417,8 +2420,8 @@ components:
     MailPolicies:
       type: object
       description: >-
-        The policies a domain publishes about how mail should reach it: MTA-STS and
-        TLS-RPT. Only the domain test reads them; a report on a
+        The policies a domain publishes about how mail should reach it: MTA-STS,
+        TLS-RPT and DNSSEC. Only the domain test reads them; a report on a
         received message never carries them. They weigh on the score of the
         domain test only when published but broken.
       properties:
@@ -2426,6 +2429,14 @@ components:
           $ref: '#/components/schemas/MTASTSResult'
         tls_rpt:
           $ref: '#/components/schemas/TLSRPTResult'
+        dnssec:
+          $ref: '#/components/schemas/DNSSECResult'
+        dane_hosts:
+          type: array
+          items:
+            type: string
+          description: MX hosts publishing TLSA records at _25._tcp.<host>, that is deploying DANE.
+          example: ["mx.example.com"]
         penalty:
           type: integer
           minimum: 0
@@ -2443,6 +2454,10 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
         tls_rpt:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        dnssec:
           type: array
           items:
             $ref: '#/components/schemas/Issue'
@@ -2542,6 +2557,30 @@ components:
         error:
           type: string
           description: Why the record is not valid.
+
+    DNSSECResult:
+      type: object
+      description: Whether the zone of the domain is signed and validates.
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [secure, insecure, unvalidated, broken, unknown]
+          description: >-
+            secure: a validating resolver vouched for the answer (AD flag);
+            insecure: the zone is not signed; unvalidated: the zone carries
+            signatures but the resolver did not validate them, so nothing can
+            be said; broken: validation fails, so validating resolvers cannot
+            resolve the domain at all; unknown: the lookup failed.
+          example: "secure"
+        resolver:
+          type: string
+          description: Which resolver answered, as configured.
+          example: "127.0.0.1:53"
+        error:
+          type: string
+          description: What went wrong.
 
     BIMICheckRequest:
       type: object

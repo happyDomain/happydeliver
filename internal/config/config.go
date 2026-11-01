@@ -73,8 +73,13 @@ type EmailConfig struct {
 
 // AnalysisConfig contains timeout and behavior settings for email analysis
 type AnalysisConfig struct {
-	DNSTimeout   time.Duration
-	HTTPTimeout  time.Duration
+	DNSTimeout  time.Duration
+	HTTPTimeout time.Duration
+	// DNSResolver is the DNSSEC-validating resolver ("host" or "host:port")
+	// the domain test asks for DNSSEC and DANE. Empty takes the first
+	// nameserver of /etc/resolv.conf. The analysis of received mail never
+	// uses it.
+	DNSResolver  string
 	RBLs         []string
 	DNSWLs       []string
 	CheckAllIPs  bool   // Check all IPs found in headers, not just the first one

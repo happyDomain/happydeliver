@@ -139,7 +139,7 @@ func validTLSRPTURI(uri string) error {
 const tlsRPTPenaltyInvalid = 5
 
 // tlsRPTIssues is what the TLS-RPT record of domain calls for, knowing the
-// MTA-STS policy: reports matter most to who enforces TLS.
+// other policies: reports matter most to who enforces TLS.
 func tlsRPTIssues(policies *model.MailPolicies, domain string, charge policyCharge) {
 	result := policies.TlsRpt
 	if result == nil {
@@ -148,12 +148,13 @@ func tlsRPTIssues(policies *model.MailPolicies, domain string, charge policyChar
 	location := "_smtp._tls." + domain
 	switch result.Status {
 	case model.TLSRPTResultStatusAbsent:
-		enforcing := policies.MtaSts != nil && policies.MtaSts.Status != model.MTASTSResultStatusAbsent
+		enforcing := (policies.MtaSts != nil && policies.MtaSts.Status != model.MTASTSResultStatusAbsent) ||
+			len(utils.Deref(policies.DaneHosts)) > 0
 		severity, message := model.IssueSeverityLow,
 			fmt.Sprintf("%s publishes no TLS-RPT record, so senders cannot tell you when they fail to deliver to it over TLS. Optional: it does not affect the score.", domain)
 		if enforcing {
 			severity = model.IssueSeverityMedium
-			message = fmt.Sprintf("%s requires TLS from senders (MTA-STS) but publishes no TLS-RPT record: when a certificate or policy problem makes them refuse to deliver, nobody tells you.", domain)
+			message = fmt.Sprintf("%s requires TLS from senders (MTA-STS or DANE) but publishes no TLS-RPT record: when a certificate or policy problem makes them refuse to deliver, nobody tells you.", domain)
 		}
 		charge(0, newIssue(model.IssueTypeTlsRptMissing, severity, location, message,
 			fmt.Sprintf(`Publish _smtp._tls.%s IN TXT "v=TLSRPTv1; rua=mailto:tlsrpt@%s".`, domain, domain)))

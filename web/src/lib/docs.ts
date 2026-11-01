@@ -64,6 +64,8 @@ export const docs = {
     starttls: rfc(3207, "SMTP over TLS (STARTTLS)"),
     mtaSts: rfc(8461, "MTA Strict Transport Security"),
     tlsRpt: rfc(8460, "SMTP TLS Reporting"),
+    dnssec: rfc(4033, "DNS Security Introduction and Requirements"),
+    dane: rfc(7672, "SMTP security via opportunistic DANE TLS"),
     dnsbl: rfc(5782, "DNS blacklists and whitelists"),
 
     // Message format
@@ -249,6 +251,9 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     mta_sts_mx_mismatch: [docs.mtaSts],
     tls_rpt_missing: [docs.tlsRpt],
     tls_rpt_invalid: [docs.tlsRpt],
+    dnssec_unsigned: [docs.dnssec],
+    dnssec_unvalidated: [docs.dnssec],
+    dnssec_broken: [docs.dnssec],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

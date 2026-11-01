@@ -140,6 +140,9 @@ const issueLabels: Record<Issue["type"], string> = {
     mta_sts_mx_mismatch: "MTA-STS policy does not cover every MX",
     tls_rpt_missing: "No TLS-RPT record",
     tls_rpt_invalid: "TLS-RPT record is invalid",
+    dnssec_unsigned: "Zone is not signed with DNSSEC",
+    dnssec_unvalidated: "DNSSEC could not be validated",
+    dnssec_broken: "DNSSEC validation fails",
 };
 
 export function issueLabel(type: Issue["type"]): string {

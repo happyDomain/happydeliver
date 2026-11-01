@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -104,9 +105,14 @@ type APIAdapter struct {
 
 // NewAPIAdapter creates a new API adapter for the email analyzer
 func NewAPIAdapter(cfg *config.Config) *APIAdapter {
+	secure, err := NewValidatingResolver(cfg.Analysis.DNSResolver, cfg.Analysis.DNSTimeout)
+	if err != nil {
+		log.Printf("DNSSEC and DANE checks of the domain test disabled: %v", err)
+		secure = nil
+	}
 	return &APIAdapter{
 		analyzer: NewEmailAnalyzer(cfg),
-		policies: NewMailPolicyChecker(cfg.Analysis.DNSTimeout, cfg.Analysis.HTTPTimeout, nil),
+		policies: NewMailPolicyChecker(cfg.Analysis.DNSTimeout, cfg.Analysis.HTTPTimeout, nil).WithSecureResolver(secure),
 	}
 }
 

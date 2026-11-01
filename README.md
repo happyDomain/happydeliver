@@ -228,7 +228,13 @@ As any other option, each can be given through the environment, e.g. `HAPPYDELIV
 
 #### Domain Test: Receiving Policies
 
-Beyond the records a received message is also checked against (MX, SPF, DMARC, BIMI), the domain test (`/domain/<name>`) reads the policies a domain publishes about the mail it receives: **MTA-STS** (the `_mta-sts` record and the policy fetched from `https://mta-sts.<domain>/.well-known/mta-sts.txt`, checked against the MX records) and **TLS-RPT** (`_smtp._tls`). They are never looked up when analyzing a received message. Absent, they are only suggested; published but broken (an enforced MTA-STS policy leaving an MX out), they cost points of the domain score.
+Beyond the records a received message is also checked against (MX, SPF, DMARC, BIMI), the domain test (`/domain/<name>`) reads the policies a domain publishes about the mail it receives: **MTA-STS** (the `_mta-sts` record and the policy fetched from `https://mta-sts.<domain>/.well-known/mta-sts.txt`, checked against the MX records), **TLS-RPT** (`_smtp._tls`) and **DNSSEC**, along with the MX hosts publishing **DANE** TLSA records. They are never looked up when analyzing a received message. Absent, they are only suggested; published but broken (an enforced MTA-STS policy leaving an MX out, a broken DNSSEC chain), they cost points of the domain score.
+
+DNSSEC needs a validating resolver to tell a signed zone from a forged answer:
+
+| Flag | Environment variable | Default | Description |
+|------|----------------------|---------|-------------|
+| `-dns-resolver` | `HAPPYDELIVER_DNS_RESOLVER` | first `nameserver` of `/etc/resolv.conf` | DNSSEC-validating resolver (`host` or `host:port`) asked for DNSSEC and TLSA records. With a resolver that does not validate, signed zones are reported as *unvalidated* |
 
 #### Postfix LMTP Transport
 

@@ -104,6 +104,9 @@ func TestDefaultConfig(t *testing.T) {
 	if c.Analysis.Blacklist.WarmupInterval != 24*time.Hour {
 		t.Errorf("Analysis.Blacklist.WarmupInterval = %v, want 24h", c.Analysis.Blacklist.WarmupInterval)
 	}
+	if c.Analysis.DNSResolver != "" {
+		t.Errorf("Analysis.DNSResolver = %q, want empty: /etc/resolv.conf is read", c.Analysis.DNSResolver)
+	}
 }
 
 // TestValidate exercises Config.Validate. A config is valid when: the email

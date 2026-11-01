@@ -5,6 +5,7 @@
     import CheckList from "./CheckList.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
+    import DnssecDisplay from "./DnssecDisplay.svelte";
     import DomainInfoDisplay from "./DomainInfoDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
@@ -29,8 +30,8 @@
         dnsScore?: number;
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
         /**
-         * The policies the domain publishes for the mail it receives (MTA-STS and
-         * TLS-RPT). Only the domain test reads them: a report on a received message has none.
+         * The policies the domain publishes for the mail it receives (MTA-STS, TLS-RPT,
+         * DNSSEC). Only the domain test reads them: a report on a received message has none.
          */
         mailPolicies?: MailPolicies;
         status?: SectionStatus;
@@ -208,6 +209,11 @@
                     <TlsRptDisplay
                         tlsRpt={mailPolicies.tls_rpt}
                         issues={mailPolicies.issues?.tls_rpt}
+                    />
+                    <DnssecDisplay
+                        dnssec={mailPolicies.dnssec}
+                        daneHosts={mailPolicies.dane_hosts}
+                        issues={mailPolicies.issues?.dnssec}
                     />
                 </CheckList>
             {/if}

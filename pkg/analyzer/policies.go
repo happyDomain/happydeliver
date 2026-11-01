@@ -34,7 +34,7 @@ import (
 )
 
 // MailPolicyChecker reads the policies a domain publishes about the mail it
-// receives: MTA-STS and TLS-RPT. They answer the domain test only:
+// receives: MTA-STS, TLS-RPT and DNSSEC. They answer the domain test only:
 // the analysis of a received message never builds one, so none of their
 // lookups, HTTPS fetches included, ever runs for a report.
 type MailPolicyChecker struct {
@@ -45,6 +45,9 @@ type MailPolicyChecker struct {
 	// addresses as the BIMI assets are, and following no redirect, which
 	// RFC 8461 section 3.3 forbids.
 	httpClient *http.Client
+	// secure answers the lookups that need the DNSSEC flags. Nil leaves
+	// DNSSEC and DANE unread.
+	secure SecureResolver
 }
 
 // NewMailPolicyChecker builds a checker over resolver, fetching policies
@@ -73,6 +76,14 @@ func (m *MailPolicyChecker) Check(ctx context.Context, domain string) *model.Mai
 	var wg sync.WaitGroup
 	wg.Go(func() { policies.MtaSts = m.checkMTASTS(ctx, domain) })
 	wg.Go(func() { policies.TlsRpt = m.checkTLSRPT(ctx, domain) })
+	if m.secure != nil {
+		wg.Go(func() { policies.Dnssec = m.checkDNSSEC(ctx, domain) })
+		wg.Go(func() {
+			if hosts := m.checkDANEHosts(ctx, domain); len(hosts) > 0 {
+				policies.DaneHosts = &hosts
+			}
+		})
+	}
 	wg.Wait()
 	return policies
 }
@@ -122,15 +133,19 @@ func EvaluateMailPolicies(policies *model.MailPolicies, domain string, mxRecords
 		*list = append(*list, issue)
 	}
 
-	var mtaSTS, tlsRPT []model.Issue
+	var mtaSTS, tlsRPT, dnssec []model.Issue
 	mtaSTSIssues(policies.MtaSts, domain, hosts, func(points int, issue model.Issue) { charge(&mtaSTS, points, issue) })
 	tlsRPTIssues(policies, domain, func(points int, issue model.Issue) { charge(&tlsRPT, points, issue) })
+	dnssecIssues(policies.Dnssec, domain, func(points int, issue model.Issue) { charge(&dnssec, points, issue) })
 
 	if policies.MtaSts != nil {
 		issues.MtaSts = issueList(mtaSTS)
 	}
 	if policies.TlsRpt != nil {
 		issues.TlsRpt = issueList(tlsRPT)
+	}
+	if policies.Dnssec != nil {
+		issues.Dnssec = issueList(dnssec)
 	}
 	policies.Issues = issues
 	policies.Penalty = utils.PtrTo(penalty)
