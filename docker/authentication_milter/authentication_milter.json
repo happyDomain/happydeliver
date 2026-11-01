@@ -9,6 +9,12 @@
     "rungroup"    : "mail",
     "authserv_id" : "__HOSTNAME__",
 
+    "min_children"           : 2,
+    "max_children"           : 10,
+    "min_spare_children"     : 1,
+    "max_spare_children"     : 3,
+    "max_requests_per_child" : 200,
+
     "connect_timeout" : 30,
     "command_timeout" : 30,
     "content_timeout" : 300,
