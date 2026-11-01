@@ -281,7 +281,7 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 			"p=quarantine sends failing mail to spam; p=reject is the strongest protection.",
 			"Move to p=reject once you are confident all your legitimate mail passes."))
 	case "none":
-		c.deduct(50, newIssue(model.IssueTypeDmarcPolicyNone, model.IssueSeverityMedium, domain,
+		c.deduct(50, newIssue(model.IssueTypeDmarcPolicyNone, model.IssueSeverityLow, domain,
 			"Mail failing DMARC is delivered as usual, so your domain is not protected from spoofing.",
 			"Once the aggregate reports show all your legitimate mail passing, move to p=quarantine, then p=reject."))
 	}

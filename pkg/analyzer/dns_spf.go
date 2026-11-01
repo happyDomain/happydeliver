@@ -612,7 +612,7 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 				c.cap(95, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
 					"Mail from unlisted servers only soft-fails; your enforced DMARC policy does most of the rejecting.", advice))
 			} else {
-				c.cap(75, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityMedium, domain,
+				c.cap(75, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
 					"Mail from unlisted servers only soft-fails, and no enforcing DMARC policy backs it up.", advice))
 			}
 		case "+":

@@ -67,7 +67,7 @@ func TestSPFScoreIssues(t *testing.T) {
 	}{
 		{"strict", utils.PtrTo(record("-")), nil, 100, nil, ""},
 		{"no record", nil, nil, 0, []model.IssueType{model.IssueTypeSpfMissing}, model.IssueSeverityHigh},
-		{"softfail alone", utils.PtrTo(record("~")), nil, 75, []model.IssueType{model.IssueTypeSpfAllSoftfail}, model.IssueSeverityMedium},
+		{"softfail alone", utils.PtrTo(record("~")), nil, 75, []model.IssueType{model.IssueTypeSpfAllSoftfail}, model.IssueSeverityLow},
 		{"softfail behind DMARC", utils.PtrTo(record("~")), enforced, 95, []model.IssueType{model.IssueTypeSpfAllSoftfail}, model.IssueSeverityLow},
 		{"pass", utils.PtrTo(record("+")), nil, 50, []model.IssueType{model.IssueTypeSpfAllPass}, model.IssueSeverityHigh},
 		{"pass behind DMARC", utils.PtrTo(record("+")), enforced, 75, []model.IssueType{model.IssueTypeSpfAllPass}, model.IssueSeverityHigh},
