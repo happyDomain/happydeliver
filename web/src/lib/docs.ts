@@ -66,6 +66,8 @@ export const docs = {
     tlsRpt: rfc(8460, "SMTP TLS Reporting"),
     dnssec: rfc(4033, "DNS Security Introduction and Requirements"),
     dane: rfc(7672, "SMTP security via opportunistic DANE TLS"),
+    postmaster: rfc(5321, "The postmaster mailbox", "4.5.1"),
+    nullSender: rfc(5321, "Null reverse-path for bounces", "4.5.5"),
     dnsbl: rfc(5782, "DNS blacklists and whitelists"),
 
     // Message format
@@ -254,6 +256,16 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dnssec_unsigned: [docs.dnssec],
     dnssec_unvalidated: [docs.dnssec],
     dnssec_broken: [docs.dnssec],
+    smtp_unreachable: [docs.mxLookup],
+    smtp_starttls_missing: [docs.starttls],
+    smtp_starttls_failed: [docs.starttls],
+    smtp_cert_invalid: [docs.mtaSts],
+    smtp_ptr_missing: [docs.reverseDns],
+    smtp_fcrdns_mismatch: [docs.reverseDns],
+    smtp_null_sender_rejected: [docs.nullSender],
+    smtp_postmaster_rejected: [docs.postmaster],
+    smtp_dane_mismatch: [docs.dane],
+    smtp_mta_sts_cert_invalid: [docs.mtaSts],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

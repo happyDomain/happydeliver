@@ -34,6 +34,7 @@ import (
 	"git.happydns.org/happyDeliver/internal/api"
 	"git.happydns.org/happyDeliver/internal/config"
 	"git.happydns.org/happyDeliver/internal/lmtp"
+	"git.happydns.org/happyDeliver/internal/mailservers"
 	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
 	"git.happydns.org/happyDeliver/pkg/analyzer"
@@ -74,6 +75,9 @@ func RunServer(cfg *config.Config) error {
 	// Create API handler
 	blacklistChecker := reputation.NewChecker(blacklist.Provider(), cfg.Analysis.Blacklist)
 	handler := api.NewAPIHandler(store, cfg, analyzerAdapter, blacklistChecker)
+	if svc := mailservers.NewFromConfig(cfg); svc != nil {
+		handler.WithMailServers(svc)
+	}
 
 	// Keep the blacklist feed caches warm so no check pays for filling them
 	warmupSvc := NewBlacklistWarmupService(blacklistChecker, cfg)

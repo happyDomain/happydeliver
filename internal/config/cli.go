@@ -53,6 +53,11 @@ func declareFlags(o *Config) {
 	flag.StringVar(&o.CustomLogoURL, "custom-logo-url", o.CustomLogoURL, "URL for custom logo image in the web UI")
 	flag.BoolVar(&o.DisableTestList, "disable-test-list", o.DisableTestList, "Disable the public test listing endpoint")
 	flag.BoolVar(&o.DisableEmlUpload, "disable-eml-upload", o.DisableEmlUpload, "Disable the EML file upload endpoint")
+	flag.BoolVar(&o.DisableMXProbes, "disable-mx-probes", o.DisableMXProbes, "Disable the Mail Servers section of the domain test, which connects to the MX of the tested domain on port 25")
+	flag.DurationVar(&o.Analysis.MXProbe.Timeout, "mx-probe-timeout", o.Analysis.MXProbe.Timeout, "Timeout of the SMTP probe of one MX address")
+	flag.StringVar(&o.Analysis.MXProbe.HeloName, "mx-probe-helo", o.Analysis.MXProbe.HeloName, "Hostname announced in EHLO when probing MX (default: -receiver-hostname); give it matching A and PTR records")
+	flag.StringVar(&o.Analysis.MXProbe.Witness, "mx-probe-witness", o.Analysis.MXProbe.Witness, "MX host known to accept connections on port 25, used to tell when this instance cannot reach port 25 at all")
+	flag.DurationVar(&o.Analysis.MXProbe.CacheTTL, "mx-probe-cache-ttl", o.Analysis.MXProbe.CacheTTL, "How long the Mail Servers result of a domain is reused before probing it again")
 	flag.Int64Var(&o.MaxMessageSize, "max-message-size", o.MaxMessageSize, "Maximum size in bytes of a message, received over LMTP or uploaded as EML")
 
 	// Others flags are declared in some other files likes sources, storages, ... when they need specials configurations

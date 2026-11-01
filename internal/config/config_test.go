@@ -107,6 +107,12 @@ func TestDefaultConfig(t *testing.T) {
 	if c.Analysis.DNSResolver != "" {
 		t.Errorf("Analysis.DNSResolver = %q, want empty: /etc/resolv.conf is read", c.Analysis.DNSResolver)
 	}
+	if c.DisableMXProbes {
+		t.Error("DisableMXProbes = true, want false")
+	}
+	if p := c.Analysis.MXProbe; p.Timeout != 12*time.Second || p.CacheTTL != 10*time.Minute || p.HeloName != "" || p.Witness == "" {
+		t.Errorf("Analysis.MXProbe = %+v, want 12s timeout, 10m cache, no EHLO name and a witness", p)
+	}
 }
 
 // TestValidate exercises Config.Validate. A config is valid when: the email

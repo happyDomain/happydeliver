@@ -4,7 +4,10 @@ go 1.26.0
 
 require (
 	git.happydns.org/checker-blacklist v0.5.2
+	git.happydns.org/checker-dane v0.2.0
 	git.happydns.org/checker-sdk-go v1.11.1
+	git.happydns.org/checker-smtp v0.1.0
+	git.happydns.org/checker-tls v0.8.0
 	git.happydns.org/happyDomain v0.8.0-rc2.0.20260922103041-4cc15a04ea07
 	git.happydns.org/svg-tiny-ps v1.0.0
 	github.com/JGLTechnologies/gin-rate-limit v1.5.9
@@ -28,6 +31,7 @@ require (
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
+	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.2 // indirect
@@ -52,6 +56,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/likexian/gokit v0.25.16 // indirect
@@ -68,6 +73,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect
 	github.com/redis/go-redis/v9 v9.18.0 // indirect
+	github.com/refraction-networking/utls v1.8.2 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.3 // indirect
 	github.com/speakeasy-api/openapi v1.24.0 // indirect

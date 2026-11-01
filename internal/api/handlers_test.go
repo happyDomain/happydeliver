@@ -41,6 +41,7 @@ import (
 	sdk "git.happydns.org/checker-sdk-go/checker"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/mailservers"
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
@@ -655,6 +656,79 @@ func TestTestDomain(t *testing.T) {
 		}
 		if response.DomainReputation != nil {
 			t.Errorf("Response carries a blacklist result %+v, expected none", response.DomainReputation)
+		}
+	})
+}
+
+// fakeMailServers answers the probes of mail servers without connecting
+// anywhere.
+type fakeMailServers struct {
+	err    error
+	client string
+	domain string
+}
+
+func (f *fakeMailServers) Check(_ context.Context, client, domain string) (*model.MailServersResult, error) {
+	f.client, f.domain = client, domain
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &model.MailServersResult{Domain: domain, Status: model.MailServersResultStatusComplete}, nil
+}
+
+func TestTestMailServers(t *testing.T) {
+	post := func(handler *APIHandler, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/domain/mail-servers", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		handler.TestMailServers(c)
+		return rec
+	}
+
+	t.Run("disabled without a checker", func(t *testing.T) {
+		handler, _, _ := newTestHandler(t, nil)
+		if rec := post(handler, `{"domain":"example.com"}`); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "feature_disabled") {
+			t.Errorf("status = %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("disabled by configuration", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.DisableMXProbes = true
+		handler, _, _ := newTestHandler(t, cfg)
+		handler.WithMailServers(&fakeMailServers{})
+		if rec := post(handler, `{"domain":"example.com"}`); rec.Code != http.StatusForbidden {
+			t.Errorf("status = %d", rec.Code)
+		}
+	})
+
+	t.Run("probes a normalized domain", func(t *testing.T) {
+		handler, _, _ := newTestHandler(t, nil)
+		fake := &fakeMailServers{}
+		handler.WithMailServers(fake)
+		rec := post(handler, `{"domain":"Example.COM."}`)
+		if rec.Code != http.StatusOK || fake.domain != "example.com" {
+			t.Errorf("status = %d, domain = %q: %s", rec.Code, fake.domain, rec.Body.String())
+		}
+	})
+
+	t.Run("refuses what is not a domain", func(t *testing.T) {
+		handler, _, _ := newTestHandler(t, nil)
+		fake := &fakeMailServers{}
+		handler.WithMailServers(fake)
+		for _, body := range []string{`{"domain":"example.com\r\nDATA"}`, `{"domain":"localhost"}`, `{}`} {
+			if rec := post(handler, body); rec.Code != http.StatusBadRequest || fake.domain != "" {
+				t.Errorf("%s: status = %d", body, rec.Code)
+			}
+		}
+	})
+
+	t.Run("rate limited", func(t *testing.T) {
+		handler, _, _ := newTestHandler(t, nil)
+		handler.WithMailServers(&fakeMailServers{err: mailservers.ErrRateLimited})
+		if rec := post(handler, `{"domain":"example.com"}`); rec.Code != http.StatusTooManyRequests {
+			t.Errorf("status = %d", rec.Code)
 		}
 	})
 }

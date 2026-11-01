@@ -24,6 +24,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,6 +38,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"git.happydns.org/happyDeliver/internal/config"
+	"git.happydns.org/happyDeliver/internal/mailservers"
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/reputation"
 	"git.happydns.org/happyDeliver/internal/storage"
@@ -53,13 +55,27 @@ type EmailAnalyzer interface {
 	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord, issues *model.DNSIssues)
 }
 
+// MailServersChecker probes the mail servers of a domain, for the Mail
+// Servers section of the domain test.
+type MailServersChecker interface {
+	Check(ctx context.Context, client, domain string) (*model.MailServersResult, error)
+}
+
 // APIHandler implements the ServerInterface for handling API requests
 type APIHandler struct {
-	storage   storage.Storage
-	config    *config.Config
-	analyzer  EmailAnalyzer
-	blacklist *reputation.Checker
-	startTime time.Time
+	storage     storage.Storage
+	config      *config.Config
+	analyzer    EmailAnalyzer
+	blacklist   *reputation.Checker
+	mailServers MailServersChecker
+	startTime   time.Time
+}
+
+// WithMailServers sets what probes the mail servers of tested domains. Left
+// unset, POST /domain/mail-servers answers that the feature is disabled.
+func (h *APIHandler) WithMailServers(checker MailServersChecker) *APIHandler {
+	h.mailServers = checker
+	return h
 }
 
 // NewAPIHandler creates a new API handler
@@ -453,6 +469,59 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// TestMailServers probes the MX of a domain on port 25
+// (POST /domain/mail-servers)
+func (h *APIHandler) TestMailServers(c *gin.Context) {
+	if h.mailServers == nil || h.config.DisableMXProbes {
+		c.JSON(http.StatusForbidden, model.Error{
+			Error:   "feature_disabled",
+			Message: "Mail server probes are disabled on this instance",
+		})
+		return
+	}
+
+	var request model.DomainTestRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	// The domain ends up in SMTP commands and DNS queries: only a plain
+	// hostname gets through.
+	domain := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(request.Domain), "."))
+	if !bimiDomainPattern.MatchString(domain) || !strings.Contains(domain, ".") {
+		c.JSON(http.StatusBadRequest, model.Error{
+			Error:   "invalid_domain",
+			Message: "Invalid domain name",
+			Details: utils.PtrTo("Expected a domain name such as example.com"),
+		})
+		return
+	}
+
+	result, err := h.mailServers.Check(c.Request.Context(), c.ClientIP(), domain)
+	switch {
+	case errors.Is(err, mailservers.ErrRateLimited):
+		c.JSON(http.StatusTooManyRequests, model.Error{
+			Error:   "rate_limit_exceeded",
+			Message: "Too many mail server probes were requested from your address or for this domain; try again later",
+		})
+		return
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, model.Error{
+			Error:   "probe_failed",
+			Message: "The mail servers could not be probed",
+			Details: utils.PtrTo(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // bimiSelectorPattern is the shape of a selector that can be prepended to

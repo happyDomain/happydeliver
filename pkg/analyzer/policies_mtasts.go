@@ -343,3 +343,22 @@ func mtaSTSIssues(result *model.MTASTSResult, domain string, hosts []string, cha
 		}
 	}
 }
+
+// CheckMTASTS reads the MTA-STS record and policy of domain, for the probes
+// of its mail servers, which check every MX against it.
+func (m *MailPolicyChecker) CheckMTASTS(ctx context.Context, domain string) *model.MTASTSResult {
+	return m.checkMTASTS(ctx, domain)
+}
+
+// MTASTSCoversHost tells whether a sound MTA-STS policy covers the MX host.
+func MTASTSCoversHost(result *model.MTASTSResult, host string) bool {
+	if result == nil || result.Mx == nil {
+		return false
+	}
+	for _, pattern := range *result.Mx {
+		if mxPatternMatches(pattern, host) {
+			return true
+		}
+	}
+	return false
+}

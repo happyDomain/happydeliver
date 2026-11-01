@@ -54,6 +54,7 @@ type Config struct {
 	CustomLogoURL    string        // URL for custom logo image in the web UI
 	DisableTestList  bool          // Disable the public test listing endpoint
 	DisableEmlUpload bool          // Disable the EML file upload endpoint
+	DisableMXProbes  bool          // Disable the SMTP probes of the Mail Servers section of the domain test
 	MaxMessageSize   int64         // Maximum size in bytes of a message, whether received over LMTP or uploaded as EML
 }
 
@@ -100,6 +101,27 @@ type AnalysisConfig struct {
 	// trust policy is reported there rather than on every analysis.
 	VMCRoots  *x509.CertPool `json:"-"`
 	Blacklist BlacklistConfig
+	MXProbe   MXProbeConfig
+}
+
+// MXProbeConfig sets how the domain test connects to the MX of a domain, to
+// tell what a sending server sees delivering to it. The analysis of received
+// mail never connects to any MX.
+type MXProbeConfig struct {
+	// Timeout bounds the probe of one MX address: connection, banner,
+	// EHLO, STARTTLS and the RCPT transactions.
+	Timeout time.Duration
+	// HeloName is the hostname announced in EHLO. It should have an A
+	// record and a matching PTR, or some MX refuse the connection. Empty
+	// takes Email.ReceiverHostname.
+	HeloName string
+	// Witness is an MX host known to accept connections on port 25, asked
+	// when no MX of a domain answers, to tell a domain whose servers are
+	// down from an instance whose outbound port 25 is blocked.
+	Witness string
+	// CacheTTL is how long the result of a domain is served again before
+	// its servers are probed anew.
+	CacheTTL time.Duration
 }
 
 const (
@@ -156,6 +178,11 @@ func DefaultConfig() *Config {
 			Blacklist: BlacklistConfig{
 				Warmup:         false, // Opt-in: warming downloads other people's feeds
 				WarmupInterval: DefaultBlacklistWarmupInterval,
+			},
+			MXProbe: MXProbeConfig{
+				Timeout:  12 * time.Second,
+				Witness:  "gmail-smtp-in.l.google.com",
+				CacheTTL: 10 * time.Minute,
 			},
 		},
 	}

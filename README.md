@@ -236,6 +236,20 @@ DNSSEC needs a validating resolver to tell a signed zone from a forged answer:
 |------|----------------------|---------|-------------|
 | `-dns-resolver` | `HAPPYDELIVER_DNS_RESOLVER` | first `nameserver` of `/etc/resolv.conf` | DNSSEC-validating resolver (`host` or `host:port`) asked for DNSSEC and TLSA records. With a resolver that does not validate, signed zones are reported as *unvalidated* |
 
+#### Domain Test: Mail Servers
+
+The domain page also probes the MX of the domain on port 25, as a sending server delivering to it would (`POST /api/domain/mail-servers`, asked in parallel of `POST /api/domain` as it can take tens of seconds): TCP reachability of every address of every MX, 220 banner, EHLO, STARTTLS and the certificate presented (through [checker-smtp](https://git.happydns.org/checker-smtp) and [checker-tls](https://git.happydns.org/checker-tls)), DANE TLSA matching ([checker-dane](https://git.happydns.org/checker-dane)), reverse DNS, and whether the null sender, `postmaster@` and relaying are accepted. **No mail is sent**: every transaction stops at `RCPT`. It is graded on its own: A+ is reserved to domains deploying MTA-STS in enforce mode or DANE correctly; an open relay or authentication offered in clear yields an F. The analysis of a received message never connects to any MX.
+
+Safeguards: addresses not routable on the Internet are never connected to, results are cached per domain, and the probes are limited per client address and per domain. The open relay test sends `RCPT TO:<relay-test@DOMAIN>`, `DOMAIN` being the receiving domain of the instance (`-domain`), so a relay accepting it would only bring the message back to you; it is skipped while that domain is the default `happydeliver.local`. When no MX answers and neither does a server known to accept connections, the result says this instance cannot reach port 25 instead of blaming the domain.
+
+| Flag | Environment variable | Default | Description |
+|------|----------------------|---------|-------------|
+| `-disable-mx-probes` | `HAPPYDELIVER_DISABLE_MX_PROBES` | *enabled* | Turn the probes off, for hosts blocking outbound port 25 (the section disappears from the web UI) |
+| `-mx-probe-helo` | `HAPPYDELIVER_MX_PROBE_HELO` | `-receiver-hostname` | Hostname announced in EHLO; give it matching A and PTR records, or some MX refuse the connection |
+| `-mx-probe-timeout` | `HAPPYDELIVER_MX_PROBE_TIMEOUT` | `12s` | Timeout of the probe of one MX address |
+| `-mx-probe-witness` | `HAPPYDELIVER_MX_PROBE_WITNESS` | `gmail-smtp-in.l.google.com` | MX known to accept connections, to tell a blocked port 25 from servers that are down |
+| `-mx-probe-cache-ttl` | `HAPPYDELIVER_MX_PROBE_CACHE_TTL` | `10m` | How long the result of a domain is reused |
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.
@@ -337,6 +351,7 @@ curl http://localhost:8080/api/report/550e8400-e29b-41d4-a716-446655440000
 | `/api/report/{id}/raw` | GET | Get raw annotated email |
 | `/api/status` | GET | Service health and status |
 | `/api/domain` | POST | Test the DNS configuration, receiving policies and reputation of a domain |
+| `/api/domain/mail-servers` | POST | Probe the MX of a domain on port 25 (no mail sent) |
 
 ## Email Analyzer (CLI Mode)
 

@@ -540,6 +540,26 @@ components:
             - dnssec_unsigned
             - dnssec_unvalidated
             - dnssec_broken
+
+            # Read off the probes of the mail servers in the domain test
+            - smtp_unreachable
+            - smtp_banner_invalid
+            - smtp_ehlo_failed
+            - smtp_starttls_missing
+            - smtp_starttls_failed
+            - smtp_cert_invalid
+            - smtp_cert_expiring
+            - smtp_ptr_missing
+            - smtp_fcrdns_mismatch
+            - smtp_null_sender_rejected
+            - smtp_postmaster_rejected
+            - smtp_open_relay
+            - smtp_auth_plaintext
+            - smtp_no_ipv6
+            - smtp_dane_mismatch
+            - smtp_mta_sts_cert_invalid
+            - smtp_probe_skipped
+            - smtp_probe_inconclusive
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
@@ -555,11 +575,13 @@ components:
             dns_lookup_failed says a lookup the DNS checks rely on
             did not answer. Those from mta_sts_missing to dnssec_broken are
             only reported by the domain test, off the policies a domain
-            publishes for the mail it receives. The authentication verdicts
-            also report spf_missing, dkim_missing and dmarc_missing, for what
-            the records show missing. attachment_risk is what the spam filter saw wrong with
-            the files a message carries when no type above names it more
-            precisely.
+            publishes for the mail it receives. Those from smtp_unreachable
+            to smtp_probe_inconclusive only come from the probes of the mail
+            servers of a tested domain. The authentication verdicts also
+            report spf_missing, dkim_missing and dmarc_missing, for what the
+            records show missing. attachment_risk is what the spam filter saw
+            wrong with the files a message carries when no type above names
+            it more precisely.
           example: "missing_alt"
         category:
           type: string
@@ -2581,6 +2603,219 @@ components:
         error:
           type: string
           description: What went wrong.
+
+    MailServersResult:
+      type: object
+      description: >-
+        What a sending server sees when it delivers mail to the domain: one
+        entry per MX host, and per address of each, probed on port 25. Only
+        the domain test asks for it.
+      required:
+        - domain
+        - status
+      properties:
+        domain:
+          type: string
+          example: "example.com"
+        status:
+          type: string
+          enum: [complete, inconclusive, no_mx, null_mx]
+          description: >-
+            complete: the servers were probed and scored; inconclusive: no MX
+            answered, and neither did a server known to accept connections,
+            so this instance cannot reach port 25 and the domain is not to
+            blame; no_mx: the domain has neither MX nor address to deliver
+            to; null_mx: it declares it accepts no mail (RFC 7505).
+          example: "complete"
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Absent when status is not complete.
+          example: 92
+        grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: >-
+            A+ is reserved to a domain deploying MTA-STS in enforce mode or
+            DANE correctly on every MX; an open relay or authentication offered
+            in clear caps it at F.
+          example: "A"
+        error:
+          type: string
+          description: Why the probes could not conclude, when status is inconclusive.
+        implicit_mx:
+          type: boolean
+          description: The domain has no MX record, so its own address was probed (RFC 5321 section 5.1).
+        servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MailServer'
+        mta_sts_enforced:
+          type: boolean
+          description: MTA-STS is in enforce mode, covers every MX, and every MX presents a certificate valid for its name.
+        dane_valid:
+          type: boolean
+          description: Every MX publishes TLSA records in a signed zone, matching the certificate it presents.
+        open_relay_tested:
+          type: boolean
+          description: >-
+            Whether the open relay test ran. It needs a recipient in the
+            receiving domain of this instance, and is skipped while that domain
+            is not a real one.
+        cached_at:
+          type: string
+          format: date-time
+          description: When the servers were probed.
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+
+    MailServer:
+      type: object
+      required:
+        - host
+        - priority
+        - endpoints
+      properties:
+        host:
+          type: string
+          example: "mx.example.com"
+        priority:
+          type: integer
+          example: 10
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/MailServerEndpoint'
+        skip_reason:
+          type: string
+          description: Why this MX was not probed at all.
+        tlsa_records:
+          type: integer
+          description: How many TLSA records _25._tcp.<host> publishes.
+        tlsa_dnssec:
+          type: boolean
+          description: Whether those TLSA records came with DNSSEC validation.
+        mta_sts_covered:
+          type: boolean
+          description: Whether the MTA-STS policy of the domain covers this host, when there is one.
+
+    MailServerEndpoint:
+      type: object
+      required:
+        - ip
+        - probed
+      properties:
+        ip:
+          type: string
+          example: "192.0.2.25"
+        ipv6:
+          type: boolean
+        probed:
+          type: boolean
+          description: Whether the address was connected to.
+        skip_reason:
+          type: string
+          description: Why the address was not connected to, such as an address not routable on the Internet.
+        latency_ms:
+          type: integer
+          description: How long the whole probe of the address took.
+        error:
+          type: string
+          description: Where the probe stopped, and why.
+        tcp_connected:
+          type: boolean
+        banner:
+          type: string
+          description: The 220 greeting.
+        banner_hostname:
+          type: string
+        ehlo:
+          type: boolean
+          description: Whether EHLO (or HELO) was accepted.
+        ehlo_hostname:
+          type: string
+        ehlo_fallback_helo:
+          type: boolean
+          description: EHLO was refused and only HELO accepted.
+        extensions:
+          type: array
+          items:
+            type: string
+        starttls_offered:
+          type: boolean
+        starttls:
+          type: boolean
+          description: Whether the STARTTLS handshake completed.
+        tls_version:
+          type: string
+          example: "TLS 1.3"
+        tls_cipher:
+          type: string
+        auth_before_tls:
+          type: array
+          items:
+            type: string
+          description: Authentication mechanisms offered before STARTTLS, so in clear.
+        ptr:
+          type: string
+          description: Reverse DNS of the address.
+        fcrdns:
+          type: boolean
+          description: Whether the reverse DNS name resolves back to the address.
+        null_sender_accepted:
+          type: boolean
+          description: Whether MAIL FROM:<> then RCPT TO:<postmaster@domain> was accepted.
+        null_sender_response:
+          type: string
+        postmaster_accepted:
+          type: boolean
+          description: Whether RCPT TO:<postmaster@domain> was accepted.
+        postmaster_response:
+          type: string
+        open_relay:
+          type: boolean
+          description: Whether the server accepted to relay to a domain it does not serve.
+        open_relay_response:
+          type: string
+        certificate:
+          $ref: '#/components/schemas/MailServerCertificate'
+        dane:
+          type: string
+          enum: [match, mismatch, unverified]
+          description: >-
+            Whether the certificate matches the TLSA records of the host:
+            match, mismatch, or unverified when the records lack DNSSEC or the
+            handshake failed. Absent when the host publishes no TLSA record.
+        dane_message:
+          type: string
+
+    MailServerCertificate:
+      type: object
+      properties:
+        subject:
+          type: string
+        issuer:
+          type: string
+        dns_names:
+          type: array
+          items:
+            type: string
+        not_after:
+          type: string
+          format: date-time
+        days_left:
+          type: integer
+        chain_valid:
+          type: boolean
+          description: Whether the chain leads to a public root.
+        hostname_match:
+          type: boolean
+          description: Whether the certificate is valid for the MX hostname.
+        chain_error:
+          type: string
 
     BIMICheckRequest:
       type: object
