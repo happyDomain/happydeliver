@@ -87,6 +87,8 @@ const issueLabels: Record<Issue["type"], string> = {
     dmarc_np_weaker: "Non-existent subdomains are less protected",
     dmarc_report_uri_invalid: "DMARC reporting address is invalid",
     dmarc_deprecated_tags: "DMARC record uses deprecated tags",
+    dmarc_no_rua: "DMARC asks for no aggregate report",
+    dmarc_report_unauthorized: "Report destination has not authorized your reports",
     ptr_missing: "Sending IP has no valid reverse DNS",
     ptr_multiple: "Sending IP has several PTR records",
     fcrdns_mismatch: "Reverse DNS is not forward-confirmed",

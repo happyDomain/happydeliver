@@ -248,6 +248,8 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 		return rec
 	}
 
+	d.checkDMARCReportDestinations(rec, tags)
+
 	if !d.validateDMARC(rawRecord) {
 		rec.Valid = false
 		rec.Error = utils.PtrTo("DMARC record appears malformed")
@@ -505,6 +507,8 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 			fmt.Sprintf("Receivers cannot send reports to %s: it is not a valid reporting URI.", strings.Join(*dmarc.InvalidReportUris, ", ")),
 			"Write each address as a URI, such as rua=mailto:dmarc@example.com, and separate them with commas."))
 	}
+
+	dmarcReportIssues(&c, dmarc, domain)
 
 	var deprecated []string
 	if dmarc.DeprecatedRf != nil && *dmarc.DeprecatedRf {

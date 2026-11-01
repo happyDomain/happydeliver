@@ -132,6 +132,45 @@
                         >
                     </dd>
                 {/if}
+                {#if dmarcRecord.record}
+                    <dt>Reports</dt>
+                    <dd>
+                        {#if dmarcRecord.report_authorizations && dmarcRecord.report_authorizations.length > 0}
+                            <ul class="list-unstyled mb-0">
+                                {#each dmarcRecord.report_authorizations as dest, i (i)}
+                                    <li>
+                                        <span class="badge text-bg-light border me-1"
+                                            >{dest.tag === "rua" ? "aggregate" : "failure"}</span
+                                        >
+                                        <code>{dest.uri}</code>
+                                        {#if !dest.valid}
+                                            <span class="small text-danger ms-1"
+                                                >{dest.error ?? "invalid"}</span
+                                            >
+                                        {:else if dest.external && dest.authorized}
+                                            <span class="small text-success ms-1"
+                                                ><i class="bi bi-check-circle me-1"></i>external,
+                                                authorized</span
+                                            >
+                                        {:else if dest.external}
+                                            <span class="small text-warning ms-1"
+                                                ><i class="bi bi-exclamation-triangle me-1"
+                                                ></i>external, not authorized: no
+                                                <code
+                                                    >{dmarcRecord.domain}._report._dmarc.{dest.domain}</code
+                                                > record</span
+                                            >
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                        {:else}
+                            <span class="text-body-secondary"
+                                >none requested (no <code>rua=</code> nor <code>ruf=</code>)</span
+                            >
+                        {/if}
+                    </dd>
+                {/if}
                 {#if dmarcRecord.error}
                     <dt>Error</dt>
                     <dd class="text-danger">{dmarcRecord.error}</dd>

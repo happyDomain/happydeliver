@@ -474,6 +474,8 @@ components:
             - dmarc_np_weaker
             - dmarc_deprecated_tags
             - dmarc_report_uri_invalid
+            - dmarc_no_rua
+            - dmarc_report_unauthorized
             - ptr_missing
             - ptr_multiple
             - fcrdns_mismatch
@@ -2020,6 +2022,26 @@ components:
           enum: [relaxed, strict]
           description: DKIM alignment mode (adkim tag)
           example: "relaxed"
+        rua:
+          type: array
+          items:
+            type: string
+          description: Destinations of the aggregate reports (rua tag), as published.
+          example: ["mailto:dmarc@example.com"]
+        ruf:
+          type: array
+          items:
+            type: string
+          description: Destinations of the failure reports (ruf tag), as published.
+          example: ["mailto:dmarc-failures@example.com"]
+        report_authorizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DMARCReportDestination'
+          description: >-
+            One entry per rua or ruf destination: whether its URI is valid, and
+            for one outside the organizational domain, whether the destination
+            agreed to receive the reports (RFC 7489 section 7.1).
         valid:
           type: boolean
           description: Whether the DMARC record is valid
@@ -2028,6 +2050,50 @@ components:
           type: string
           description: Error message if validation failed
           example: "No DMARC record found"
+
+    DMARCReportDestination:
+      type: object
+      required:
+        - uri
+        - tag
+        - valid
+      properties:
+        uri:
+          type: string
+          description: The destination as published.
+          example: "mailto:reports@dmarc.example.net"
+        tag:
+          type: string
+          enum: [rua, ruf]
+          description: Which tag the destination was published under.
+          example: "rua"
+        valid:
+          type: boolean
+          description: >-
+            Whether the URI can receive reports: a well-formed URI, holding an
+            address when it is a mailto: one.
+          example: true
+        error:
+          type: string
+          description: Why the URI is not valid.
+        domain:
+          type: string
+          description: >-
+            Domain a mailto: destination sends the reports to. Absent for the
+            other schemes, whose consent cannot be checked.
+          example: "dmarc.example.net"
+        external:
+          type: boolean
+          description: Whether the destination is outside the organizational domain of the policy.
+          example: true
+        authorized:
+          type: boolean
+          description: >-
+            For an external destination, whether it publishes
+            <policy domain>._report._dmarc.<destination> with v=DMARC1. Absent
+            for a destination within the organizational domain, which needs no
+            authorization.
+          example: true
 
     BIMIRecord:
       type: object

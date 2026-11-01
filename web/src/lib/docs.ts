@@ -37,6 +37,7 @@ export const docs = {
     // RFC 9989 obsoletes it, but most guides and tools still cite it: the reader who knows
     // DMARC by this number finds it here.
     dmarcV1: rfc(7489, "DMARC v1, obsoleted by RFC 9989"),
+    dmarcExternalReports: rfc(7489, "Verifying external destinations", "7.1"),
     dmarcbis: {
         label: "RFC 9989 App. C.5",
         title: "Changes from DMARC v1 (pct=, rf=, ri= removed; t=, np=, psd= added)",
@@ -202,6 +203,8 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dmarc_np_weaker: [docs.dmarcbis],
     dmarc_deprecated_tags: [docs.dmarcbis],
     dmarc_report_uri_invalid: [docs.dmarcPolicy],
+    dmarc_no_rua: [docs.dmarcPolicy],
+    dmarc_report_unauthorized: [docs.dmarcExternalReports],
     ptr_missing: [docs.reverseDns, docs.googleSenders],
     ptr_multiple: [docs.reverseDns],
     fcrdns_mismatch: [docs.reverseDns, docs.googleSenders],
