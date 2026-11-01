@@ -115,68 +115,83 @@
 
     /* Laid out so that no two neighbouring cards share a colour, on the
        4-column grid as well as the 2-column one: info and primary are the
-       same purple in this theme, so the blue comes from the "sky" tone. */
+       same purple in this theme, so the blue comes from the "sky" tone.
+       The EML card comes last, so that hiding it keeps the rule. */
     const features = $derived([
         {
             icon: "bi-shield-check",
             title: "Authentication",
             description:
-                "SPF, DKIM, DMARC, and BIMI validation with detailed results and recommendations.",
+                "SPF, DKIM and DMARC checked on a real message, with detailed results and recommendations.",
             variant: "sky" as const,
+            onclick: createTest,
+            linkLabel: "Send a test email",
+        },
+        {
+            icon: "bi-globe",
+            title: "Domain DNS Check",
+            description:
+                "MX, SPF, DMARC and BIMI records of any domain, verified without sending a single email.",
+            variant: "primary" as const,
+            href: resolve("domain"),
+            linkLabel: "Check a domain",
         },
         {
             icon: "bi-building-check",
             title: "BIMI Support",
             description:
-                "Brand Indicators for Message Identification - verify your brand logo configuration.",
-            variant: "primary" as const,
+                "Brand Indicators for Message Identification: record, logo and Verified Mark Certificate.",
+            variant: "success" as const,
             href: resolve("bimi"),
             linkLabel: "Check a BIMI record",
         },
         {
-            icon: "bi-link-45deg",
-            title: "ARC Verification",
+            icon: "bi-shield-exclamation",
+            title: "IP Blacklists",
             description:
-                "Authenticated Received Chain validation for forwarded emails and mailing lists.",
-            variant: "success" as const,
+                "Check whether an IP is listed in major DNS-based blacklists (RBLs) and whitelists.",
+            variant: "danger" as const,
+            href: resolve("blacklist"),
+            linkLabel: "Check an IP",
         },
         {
-            icon: "bi-check2-circle",
-            title: "Domain Alignment",
+            icon: "bi-patch-check",
+            title: "Domain Reputation",
             description:
-                "Verify alignment between From, Return-Path, and DKIM domains for DMARC compliance.",
-            variant: "sky" as const,
-        },
-        {
-            icon: "bi-globe",
-            title: "DNS Records",
-            description:
-                "Verify PTR, MX, SPF, DKIM, DMARC, and BIMI records are properly configured.",
-            variant: "primary" as const,
+                "Domain blocklists and phishing feeds, registration age, and disposable domain detection.",
+            variant: "secondary" as const,
+            href: resolve("domain"),
+            linkLabel: "Check a domain",
         },
         {
             icon: "bi-bug",
             title: "Spam Score",
-            description: "SpamAssassin analysis with detailed test results and scoring.",
+            description:
+                "SpamAssassin analysis of your message with detailed test results and scoring.",
             variant: "warning" as const,
+            onclick: createTest,
+            linkLabel: "Send a test email",
         },
         {
-            icon: "bi-list-check",
-            title: "Blacklists",
-            description: "Check if your IP is listed in major DNS-based blacklists (RBLs).",
-            variant: "danger" as const,
-        },
-        {
-            icon: "bi-card-heading",
-            title: "Header Quality",
-            description: "Validate required headers, check for missing fields and alignment.",
-            variant: "secondary" as const,
+            icon: "bi-link-45deg",
+            title: "ARC & Alignment",
+            description:
+                "Authenticated Received Chain for forwarded mail, and From, Return-Path and DKIM domains alignment.",
+            variant: "sky" as const,
         },
         {
             icon: "bi-file-text",
-            title: "Content Analysis",
-            description: "HTML structure, link validation, image analysis, and more.",
-            variant: "success" as const,
+            title: "Headers & Content",
+            description:
+                "Required headers, HTML structure, links, images and text alternative reviewed.",
+            variant: "primary" as const,
+        },
+        {
+            icon: "bi-hdd-network",
+            title: "Sending Server",
+            description:
+                "Reverse DNS of the sending IP, forward confirmation and HELO consistency.",
+            variant: "warning" as const,
         },
         {
             icon: "bi-bar-chart",
@@ -186,18 +201,24 @@
             variant: "sky" as const,
         },
         {
-            icon: "bi-file-earmark-arrow-up",
-            title: "EML Upload",
-            description:
-                "Analyze a message you already received elsewhere: authentication results are read from the server that handled it.",
-            variant: "primary" as const,
-        },
-        {
             icon: "bi-lock",
             title: "Privacy First",
             description: `Self-hosted solution, your data never leaves your infrastructure. Reports retained for ${getRetentionTimeText()}.`,
             variant: "success" as const,
         },
+        ...($appConfig.eml_upload_enabled
+            ? [
+                  {
+                      icon: "bi-file-earmark-arrow-up",
+                      title: "EML Upload",
+                      description:
+                          "Analyze a message you already received elsewhere: authentication results are read from the server that handled it.",
+                      variant: "secondary" as const,
+                      onclick: () => fileInput?.click(),
+                      linkLabel: "Analyze an .eml file",
+                  },
+              ]
+            : []),
     ]);
 
     const steps = [
@@ -345,7 +366,7 @@
         <div class="row g-4 justify-content-center">
             {#each features as feature (feature.title)}
                 <div class="col-md-6 col-lg-3">
-                    <FeatureCard {...feature} />
+                    <FeatureCard {...feature} disabled={loading} />
                 </div>
             {/each}
         </div>
@@ -386,33 +407,6 @@
                     Get Started Now
                 {/if}
             </button>
-        </div>
-
-        <div class="text-center mt-4">
-            {#if $appConfig.eml_upload_enabled}
-                <button
-                    class="btn btn-secondary btn-lg me-2"
-                    onclick={() => fileInput?.click()}
-                    disabled={loading}
-                >
-                    <i class="bi bi-file-earmark-arrow-up me-2"></i>
-                    Analyze an .eml File
-                </button>
-            {/if}
-
-            <a href={resolve("domain")} class="btn btn-secondary btn-lg me-2"
-                ><i class="bi bi-globe me-2"></i>Test Domain Only</a
-            >
-
-            <a href={resolve("bimi")} class="btn btn-secondary btn-lg me-2">
-                <i class="bi bi-building-check me-2"></i>
-                Check BIMI Only
-            </a>
-
-            <a href={resolve("blacklist")} class="btn btn-secondary btn-lg">
-                <i class="bi bi-shield-exclamation me-2"></i>
-                Check IP Blacklist
-            </a>
         </div>
     </div>
 </section>

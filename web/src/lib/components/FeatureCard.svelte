@@ -12,9 +12,22 @@
            action to appear: a link with no wording is not one. */
         href?: string;
         linkLabel?: string;
+        /* For a tool that is an action rather than a page, such as creating
+           a test or picking a file: used in place of href. */
+        onclick?: () => void;
+        disabled?: boolean;
     }
 
-    let { icon, title, description, variant = "primary", href, linkLabel }: Props = $props();
+    let {
+        icon,
+        title,
+        description,
+        variant = "primary",
+        href,
+        linkLabel,
+        onclick,
+        disabled = false,
+    }: Props = $props();
 
     const iconTone = $derived(
         variant === "sky" ? "tone-sky" : `bg-${variant} bg-opacity-10 text-${variant}`,
@@ -33,13 +46,25 @@
     <p class="text-muted small">
         {description}
     </p>
-    {#if href && linkLabel}
+    {#if linkLabel && (href || onclick)}
         <div class="mt-auto pt-2">
-            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- the caller passes an already resolved route -->
-            <a {href} class="btn btn-sm btn-outline-{buttonVariant}">
-                {linkLabel}
-                <i class="bi bi-arrow-right ms-1"></i>
-            </a>
+            {#if href}
+                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- the caller passes an already resolved route -->
+                <a {href} class="btn btn-sm btn-outline-{buttonVariant}">
+                    {linkLabel}
+                    <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            {:else}
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-{buttonVariant}"
+                    {onclick}
+                    {disabled}
+                >
+                    {linkLabel}
+                    <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            {/if}
         </div>
     {/if}
 </div>
