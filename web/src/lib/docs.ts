@@ -63,6 +63,7 @@ export const docs = {
     nullMx: rfc(7505, "Null MX: a domain that accepts no mail"),
     starttls: rfc(3207, "SMTP over TLS (STARTTLS)"),
     mtaSts: rfc(8461, "MTA Strict Transport Security"),
+    tlsRpt: rfc(8460, "SMTP TLS Reporting"),
     dnsbl: rfc(5782, "DNS blacklists and whitelists"),
 
     // Message format
@@ -239,6 +240,15 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     bimi_vmc_missing: [docs.bimi, docs.googleBimi],
     bimi_check_warning: [docs.bimi, docs.bimiGroup],
     rbl_listed: [docs.dnsbl],
+    mta_sts_missing: [docs.mtaSts],
+    mta_sts_invalid: [docs.mtaSts],
+    mta_sts_policy_unreachable: [docs.mtaSts],
+    mta_sts_policy_invalid: [docs.mtaSts],
+    mta_sts_max_age_short: [docs.mtaSts],
+    mta_sts_mode_testing: [docs.mtaSts],
+    mta_sts_mx_mismatch: [docs.mtaSts],
+    tls_rpt_missing: [docs.tlsRpt],
+    tls_rpt_invalid: [docs.tlsRpt],
 };
 
 export function issueDocLinks(type: string): DocLink[] {

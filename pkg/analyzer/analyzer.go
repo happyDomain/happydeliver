@@ -22,8 +22,10 @@
 package analyzer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -94,12 +96,17 @@ func (a *EmailAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, opt
 // This adapter implements the interface expected by the API handler
 type APIAdapter struct {
 	analyzer *EmailAnalyzer
+	// policies reads the mail policies of a tested domain. It belongs to
+	// the adapter, not to the report generator: the analysis of a received
+	// message has no way to reach it.
+	policies *MailPolicyChecker
 }
 
 // NewAPIAdapter creates a new API adapter for the email analyzer
 func NewAPIAdapter(cfg *config.Config) *APIAdapter {
 	return &APIAdapter{
 		analyzer: NewEmailAnalyzer(cfg),
+		policies: NewMailPolicyChecker(cfg.Analysis.DNSTimeout, cfg.Analysis.HTTPTimeout, nil),
 	}
 }
 
@@ -122,15 +129,25 @@ func (a *APIAdapter) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source
 	return reportJSON, nil
 }
 
-// AnalyzeDomain performs DNS analysis for a domain and returns the results
-func (a *APIAdapter) AnalyzeDomain(domain string) (*model.DNSResults, int, string) {
-	// Perform DNS analysis
-	dnsResults := a.analyzer.generator.dnsAnalyzer.AnalyzeDomainOnly(domain)
+// AnalyzeDomain performs DNS analysis for a domain and returns the results,
+// with the mail policies of the domain read alongside: they wait on other
+// lookups, and an HTTPS fetch, so both run at once.
+func (a *APIAdapter) AnalyzeDomain(ctx context.Context, domain string) (*model.DNSResults, *model.MailPolicies, int, string) {
+	dnsAnalyzer := a.analyzer.generator.dnsAnalyzer
 
-	// Calculate score
-	score, grade := a.analyzer.generator.dnsAnalyzer.CalculateDomainOnlyScore(dnsResults)
+	var policies *model.MailPolicies
+	var wg sync.WaitGroup
+	if a.policies != nil {
+		wg.Go(func() { policies = a.policies.Check(ctx, domain) })
+	}
 
-	return dnsResults, score, grade
+	dnsResults := dnsAnalyzer.AnalyzeDomainOnly(domain)
+	wg.Wait()
+
+	EvaluateMailPolicies(policies, domain, dnsResults.FromMxRecords)
+	score, grade := dnsAnalyzer.CalculateDomainOnlyScoreWithPolicies(dnsResults, policies)
+
+	return dnsResults, policies, score, grade
 }
 
 // CheckBIMI validates the BIMI record a domain publishes under the given

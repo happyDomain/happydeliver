@@ -22,6 +22,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,7 +48,7 @@ import (
 // This interface breaks the circular dependency with pkg/analyzer
 type EmailAnalyzer interface {
 	AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) (reportJSON []byte, err error)
-	AnalyzeDomain(domain string) (dnsResults *model.DNSResults, score int, grade string)
+	AnalyzeDomain(ctx context.Context, domain string) (dnsResults *model.DNSResults, mailPolicies *model.MailPolicies, score int, grade string)
 	CheckBlacklistIP(ip string) (checks []model.BlacklistCheck, whitelists []model.BlacklistCheck, issues []model.Issue, listedCount int, score int, grade string, err error)
 	CheckBIMI(domain, selector, localPart string) (bimiRecord *model.BIMIRecord, dmarcRecord *model.DMARCRecord, issues *model.DNSIssues)
 }
@@ -417,7 +418,7 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 	})
 
 	// Perform domain analysis
-	dnsResults, score, grade := h.analyzer.AnalyzeDomain(request.Domain)
+	dnsResults, mailPolicies, score, grade := h.analyzer.AnalyzeDomain(c.Request.Context(), request.Domain)
 	wg.Wait()
 
 	// Convert grade string to DomainTestResponseGrade enum
@@ -448,6 +449,7 @@ func (h *APIHandler) TestDomain(c *gin.Context) {
 		Grade:            responseGrade,
 		DnsResults:       *dnsResults,
 		DomainReputation: domainReputation,
+		MailPolicies:     mailPolicies,
 	}
 
 	c.JSON(http.StatusOK, response)

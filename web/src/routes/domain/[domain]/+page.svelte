@@ -83,7 +83,7 @@
                         <TileLoader class="mb-3" />
                         <h3 class="h5">Analyzing {domain}...</h3>
                         <p class="text-muted mb-0">
-                            Checking DNS records, configuration and domain reputation
+                            Checking DNS records, receiving policies and domain reputation
                         </p>
                     </div>
                 </div>
@@ -160,6 +160,7 @@
                         dnsScore={result.score}
                         dnsGrade={result.grade}
                         domainOnly={true}
+                        mailPolicies={result.mail_policies}
                     />
 
                     <!-- Domain Reputation / Blacklist -->

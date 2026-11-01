@@ -131,6 +131,15 @@ const issueLabels: Record<Issue["type"], string> = {
     rbl_network_listed: "Network of the sending address is listed",
     domain_listed: "Domain is on a blocklist",
     dns_lookup_failed: "A DNS lookup failed",
+    mta_sts_missing: "No MTA-STS policy",
+    mta_sts_invalid: "MTA-STS record is invalid",
+    mta_sts_policy_unreachable: "MTA-STS policy cannot be fetched",
+    mta_sts_policy_invalid: "MTA-STS policy is invalid",
+    mta_sts_max_age_short: "MTA-STS policy is cached briefly",
+    mta_sts_mode_testing: "MTA-STS policy is not enforced",
+    mta_sts_mx_mismatch: "MTA-STS policy does not cover every MX",
+    tls_rpt_missing: "No TLS-RPT record",
+    tls_rpt_invalid: "TLS-RPT record is invalid",
 };
 
 export function issueLabel(type: Issue["type"]): string {

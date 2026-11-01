@@ -117,6 +117,8 @@ type fakeAnalyzer struct {
 	lastBIMIDomain    string
 	lastBIMISelector  string
 	lastBIMILocalPart string
+
+	mailPolicies *model.MailPolicies
 }
 
 func (f *fakeAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, source model.ReportSource) ([]byte, error) {
@@ -134,8 +136,8 @@ func (f *fakeAnalyzer) AnalyzeEmailBytes(rawEmail []byte, testID uuid.UUID, sour
 	})
 }
 
-func (f *fakeAnalyzer) AnalyzeDomain(domain string) (*model.DNSResults, int, string) {
-	return &model.DNSResults{}, 0, "F"
+func (f *fakeAnalyzer) AnalyzeDomain(_ context.Context, domain string) (*model.DNSResults, *model.MailPolicies, int, string) {
+	return &model.DNSResults{}, f.mailPolicies, 0, "F"
 }
 
 func (f *fakeAnalyzer) CheckBlacklistIP(ip string) ([]model.BlacklistCheck, []model.BlacklistCheck, []model.Issue, int, int, string, error) {
@@ -525,6 +527,27 @@ func domainRequest(t *testing.T, body string) *http.Request {
 }
 
 func TestTestDomain(t *testing.T) {
+	t.Run("the mail policies are included in the response", func(t *testing.T) {
+		handler, _, analyzer := newTestHandler(t, nil)
+		analyzer.mailPolicies = &model.MailPolicies{
+			MtaSts:  &model.MTASTSResult{Status: model.MTASTSResultStatusValid},
+			Penalty: utils.PtrTo(0),
+		}
+
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = domainRequest(t, `{"domain":"example.com"}`)
+		handler.TestDomain(c)
+
+		var response model.DomainTestResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response.MailPolicies == nil || response.MailPolicies.MtaSts == nil || response.MailPolicies.MtaSts.Status != model.MTASTSResultStatusValid {
+			t.Errorf("mail_policies = %+v, want the analyzer's", response.MailPolicies)
+		}
+	})
+
 	t.Run("a populated blacklist result is included in the response", func(t *testing.T) {
 		provider := &fakeBlacklistProvider{
 			data: &blacklist.BlacklistData{

@@ -319,6 +319,14 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
 // Returns a score from 0-100 where higher is better
 // This version excludes PTR and DKIM checks since they require email context
 func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, string) {
+	return d.CalculateDomainOnlyScoreWithPolicies(results, nil)
+}
+
+// CalculateDomainOnlyScoreWithPolicies is CalculateDomainOnlyScore taking
+// off what the mail policies of the domain cost, as EvaluateMailPolicies
+// charged them. Only the domain test reads those policies: the score of a
+// received message never counts them.
+func (d *DNSAnalyzer) CalculateDomainOnlyScoreWithPolicies(results *model.DNSResults, policies *model.MailPolicies) (int, string) {
 	if results == nil {
 		return 0, ""
 	}
@@ -351,16 +359,22 @@ func (d *DNSAnalyzer) CalculateDomainOnlyScore(results *model.DNSResults) (int, 
 	// Penalty for what the sender domains are, whatever their records say
 	score += calculateDomainInfoPenalty(results)
 
+	// Ensure score doesn't exceed maximum
+	if score > 100 {
+		score = 100
+	}
+
+	// Penalty for the mail policies published but broken, out of the 100
+	// points the records earned: no bonus absorbs it.
+	if policies != nil && policies.Penalty != nil {
+		score -= *policies.Penalty
+	}
+
 	// BIMI Record: only bonus
 	if results.BimiRecord != nil && results.BimiRecord.Valid {
 		if score >= 100 {
 			return 100, "A+"
 		}
-	}
-
-	// Ensure score doesn't exceed maximum
-	if score > 100 {
-		score = 100
 	}
 
 	// Ensure score is non-negative

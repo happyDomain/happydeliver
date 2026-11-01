@@ -526,6 +526,17 @@ components:
 
             # A lookup the DNS checks rely on
             - dns_lookup_failed
+
+            # Read off the policies of the domain test
+            - mta_sts_missing
+            - mta_sts_invalid
+            - mta_sts_policy_unreachable
+            - mta_sts_policy_invalid
+            - mta_sts_max_age_short
+            - mta_sts_mode_testing
+            - mta_sts_mx_mismatch
+            - tls_rpt_missing
+            - tls_rpt_invalid
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
@@ -539,9 +550,11 @@ components:
             its BIMI record, those from rbl_listed to domain_listed off the
             blacklists listing its sending addresses or its domain.
             dns_lookup_failed says a lookup the DNS checks rely on
-            did not answer. The authentication verdicts also report spf_missing,
-            dkim_missing and dmarc_missing, for what the records show
-            missing. attachment_risk is what the spam filter saw wrong with
+            did not answer. Those from mta_sts_missing to tls_rpt_invalid are
+            only reported by the domain test, off the policies a domain
+            publishes for the mail it receives. The authentication verdicts
+            also report spf_missing, dkim_missing and dmarc_missing, for what
+            the records show missing. attachment_risk is what the spam filter saw wrong with
             the files a message carries when no type above names it more
             precisely.
           example: "missing_alt"
@@ -2398,6 +2411,137 @@ components:
         domain_reputation:
           $ref: '#/components/schemas/DomainBlacklistResult'
           description: Domain reputation/blacklist aggregation (omitted when the check could not be run)
+        mail_policies:
+          $ref: '#/components/schemas/MailPolicies'
+
+    MailPolicies:
+      type: object
+      description: >-
+        The policies a domain publishes about how mail should reach it: MTA-STS and
+        TLS-RPT. Only the domain test reads them; a report on a
+        received message never carries them. They weigh on the score of the
+        domain test only when published but broken.
+      properties:
+        mta_sts:
+          $ref: '#/components/schemas/MTASTSResult'
+        tls_rpt:
+          $ref: '#/components/schemas/TLSRPTResult'
+        penalty:
+          type: integer
+          minimum: 0
+          description: Points these policies cost the score of the domain test.
+          example: 0
+        issues:
+          $ref: '#/components/schemas/MailPoliciesIssues'
+
+    MailPoliciesIssues:
+      type: object
+      description: What each policy calls for changing.
+      properties:
+        mta_sts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        tls_rpt:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+
+    MTASTSResult:
+      type: object
+      description: The MTA-STS policy of the domain (RFC 8461).
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [absent, valid, invalid]
+          description: >-
+            absent: no _mta-sts TXT record; valid: record and policy are sound;
+            invalid: something published is broken.
+          example: "valid"
+        record:
+          type: string
+          description: The _mta-sts TXT record.
+          example: "v=STSv1; id=20240101T000000"
+        id:
+          type: string
+          description: The id= of the TXT record.
+          example: "20240101T000000"
+        record_error:
+          type: string
+          description: Why the TXT record is not valid.
+        policy_url:
+          type: string
+          description: Where the policy was fetched from.
+          example: "https://mta-sts.example.com/.well-known/mta-sts.txt"
+        policy:
+          type: string
+          description: The policy file as fetched.
+        policy_error:
+          type: string
+          description: Why the policy could not be fetched or read.
+        mode:
+          type: string
+          enum: [enforce, testing, none]
+          description: The mode of the policy.
+          example: "enforce"
+        max_age:
+          type: integer
+          description: How long senders cache the policy, in seconds.
+          example: 604800
+        mx:
+          type: array
+          items:
+            type: string
+          description: The mx patterns of the policy.
+          example: ["mx.example.com", "*.example.net"]
+        mx_coverage:
+          type: array
+          items:
+            $ref: '#/components/schemas/MTASTSMXCoverage'
+          description: Whether each published MX host is covered by an mx pattern of the policy.
+
+    MTASTSMXCoverage:
+      type: object
+      required:
+        - host
+        - covered
+      properties:
+        host:
+          type: string
+          example: "mx.example.com"
+        covered:
+          type: boolean
+          example: true
+        pattern:
+          type: string
+          description: The mx pattern covering the host.
+          example: "mx.example.com"
+
+    TLSRPTResult:
+      type: object
+      description: The SMTP TLS Reporting record of the domain (RFC 8460).
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [absent, valid, invalid]
+          example: "valid"
+        record:
+          type: string
+          description: The _smtp._tls TXT record.
+          example: "v=TLSRPTv1; rua=mailto:tlsrpt@example.com"
+        rua:
+          type: array
+          items:
+            type: string
+          description: Where reports are sent.
+          example: ["mailto:tlsrpt@example.com"]
+        error:
+          type: string
+          description: Why the record is not valid.
 
     BIMICheckRequest:
       type: object

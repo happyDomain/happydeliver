@@ -226,6 +226,10 @@ The domain check (`/domain/<name>`) queries free blocklists (DNSBLs, Quad9, OISD
 
 As any other option, each can be given through the environment, e.g. `HAPPYDELIVER_BLACKLIST_ABUSECH_AUTH_KEY`.
 
+#### Domain Test: Receiving Policies
+
+Beyond the records a received message is also checked against (MX, SPF, DMARC, BIMI), the domain test (`/domain/<name>`) reads the policies a domain publishes about the mail it receives: **MTA-STS** (the `_mta-sts` record and the policy fetched from `https://mta-sts.<domain>/.well-known/mta-sts.txt`, checked against the MX records) and **TLS-RPT** (`_smtp._tls`). They are never looked up when analyzing a received message. Absent, they are only suggested; published but broken (an enforced MTA-STS policy leaving an MX out), they cost points of the domain score.
+
 #### Postfix LMTP Transport
 
 You'll obtain the best results with a custom [transport rule](https://www.postfix.org/transport.5.html) using LMTP.
@@ -326,6 +330,7 @@ curl http://localhost:8080/api/report/550e8400-e29b-41d4-a716-446655440000
 | `/api/report/{id}` | GET | Get detailed analysis report |
 | `/api/report/{id}/raw` | GET | Get raw annotated email |
 | `/api/status` | GET | Service health and status |
+| `/api/domain` | POST | Test the DNS configuration, receiving policies and reputation of a domain |
 
 ## Email Analyzer (CLI Mode)
 

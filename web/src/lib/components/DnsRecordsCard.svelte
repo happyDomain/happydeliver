@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DnsResults, Issue } from "#lib/api/types.gen.js";
+    import type { DnsResults, Issue, MailPolicies } from "#lib/api/types.gen.js";
     import type { SectionStatus } from "#lib/sections.js";
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import CheckList from "./CheckList.svelte";
@@ -9,12 +9,14 @@
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
     import HeloSpfRecordDisplay from "./HeloSpfRecordDisplay.svelte";
     import IssueNote from "./IssueNote.svelte";
+    import MtaStsDisplay from "./MtaStsDisplay.svelte";
     import MxRecordsDisplay from "./MxRecordsDisplay.svelte";
     import PtrForwardRecordsDisplay from "./PtrForwardRecordsDisplay.svelte";
     import PtrRecordsDisplay from "./PtrRecordsDisplay.svelte";
     import ReportSection from "./ReportSection.svelte";
     import SenderOriginDisplay from "./SenderOriginDisplay.svelte";
     import SpfRecordsDisplay from "./SpfRecordsDisplay.svelte";
+    import TlsRptDisplay from "./TlsRptDisplay.svelte";
 
     interface Props {
         /**
@@ -26,6 +28,11 @@
         dnsGrade?: string;
         dnsScore?: number;
         domainOnly?: boolean; // If true, only shows domain-level DNS records (no PTR, no DKIM, simplified view)
+        /**
+         * The policies the domain publishes for the mail it receives (MTA-STS and
+         * TLS-RPT). Only the domain test reads them: a report on a received message has none.
+         */
+        mailPolicies?: MailPolicies;
         status?: SectionStatus;
         open?: boolean;
     }
@@ -36,6 +43,7 @@
         dnsGrade,
         dnsScore,
         domainOnly = false,
+        mailPolicies,
         status,
         open = true,
     }: Props = $props();
@@ -185,6 +193,22 @@
                         issues={issues.dmarc}
                     />
                     <BimiRecordDisplay bimiRecord={dnsResults.bimi_record} issues={issues.bimi} />
+                </CheckList>
+            {/if}
+
+            {#if mailPolicies}
+                <CheckList title="Receiving policies" subject={dnsResults.from_domain}>
+                    {#snippet aside()}
+                        <span class="text-body-secondary">how senders reach your servers</span>
+                    {/snippet}
+                    <MtaStsDisplay
+                        mtaSts={mailPolicies.mta_sts}
+                        issues={mailPolicies.issues?.mta_sts}
+                    />
+                    <TlsRptDisplay
+                        tlsRpt={mailPolicies.tls_rpt}
+                        issues={mailPolicies.issues?.tls_rpt}
+                    />
                 </CheckList>
             {/if}
         {/if}
