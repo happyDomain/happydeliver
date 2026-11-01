@@ -935,20 +935,20 @@ func TestCheckSPFRecordsFollowsIncludesBeforeRedirect(t *testing.T) {
 // the record after it is then its first include, which must not be scored
 // as the domain's policy.
 func TestCheckSPFRecordsStopsAtAll(t *testing.T) {
-	const record = "v=spf1 mx -all include:gone.example.org"
+	const record = "v=spf1 ip4:192.0.2.1 -all include:gone.example.org"
 	tests := []struct {
 		name   string
 		record string
 	}{
 		{"include after all", record},
-		{"redirect beside all", "v=spf1 mx redirect=gone.example.org -all"},
+		{"redirect beside all", "v=spf1 ip4:192.0.2.1 redirect=gone.example.org -all"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := newMockAnalyzer(map[string][]string{"example.com": {tt.record}}, nil)
 
-			records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+			records := analyzer.resolveSPFRecords("example.com", &spfWalk{visited: map[string]bool{}, void: map[string]bool{}}, 0, true)
 			if len(*records) != 1 {
 				t.Fatalf("records = %+v, want the record alone", *records)
 			}
@@ -986,7 +986,7 @@ func TestSPFScoreOfAnInvalidRecordThatRedirects(t *testing.T) {
 				"b.example.org": {"v=spf1 mx -all"},
 			}, nil)
 
-			records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+			records := analyzer.resolveSPFRecords("example.com", &spfWalk{visited: map[string]bool{}, void: map[string]bool{}}, 0, true)
 			score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
 			if score != 25 || len(issues) != 1 || issues[0].Type != model.IssueTypeSpfInvalid {
 				t.Errorf("score = %d, issues = %v, want 25 and spf_invalid: a sound target does not fix the record", score, issues)
@@ -1001,7 +1001,7 @@ func TestSPFScoreTakesTheIncludeNamedLikeAnIgnoredRedirectForAnInclude(t *testin
 		"_spf.example.org": {"v=spf1 mx ?all"},
 	}, nil)
 
-	records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+	records := analyzer.resolveSPFRecords("example.com", &spfWalk{visited: map[string]bool{}, void: map[string]bool{}}, 0, true)
 	score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
 	if score != 100 || len(issues) != 0 {
 		t.Errorf("score = %d, issues = %v, want the -all of the record to count", score, issues)

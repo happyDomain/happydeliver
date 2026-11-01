@@ -448,6 +448,8 @@ components:
             - spf_all_pass
             - spf_all_neutral
             - spf_all_softfail
+            - spf_void_lookups
+            - spf_ptr
             - dkim_missing
             - dkim_invalid
             - dkim_sha1
@@ -1892,6 +1894,14 @@ components:
             could not be fetched, a loop), so that the true count of
             dns_lookups may be higher.
           example: false
+        void_lookups:
+          type: integer
+          description: >-
+            DNS lookups made evaluating this record, and the records it
+            includes or redirects to, that return no answer at all (NXDOMAIN or
+            an empty answer). RFC 7208 section 4.6.4 lets receivers stop with a
+            permerror past 2 of them.
+          example: 0
 
     DKIMRecord:
       type: object

@@ -37,12 +37,86 @@ import (
 
 // checkSPFRecords looks up and validates SPF records for a domain, including resolving include: directives
 func (d *DNSAnalyzer) checkSPFRecords(domain string) *[]model.SPFRecord {
-	visited := make(map[string]bool)
-	records := d.resolveSPFRecords(domain, visited, 0, true)
+	walk := &spfWalk{visited: make(map[string]bool), void: make(map[string]bool)}
+	records := d.resolveSPFRecords(domain, walk, 0, true)
 	if records != nil {
 		countSPFLookups(*records)
 	}
 	return records
+}
+
+// spfWalk is what one resolution of an SPF policy carries from record to
+// record: the domains already fetched, and those whose TXT lookup came back
+// void.
+type spfWalk struct {
+	visited map[string]bool
+	void    map[string]bool
+}
+
+// spfVoidLookupLimit is how many lookups returning nothing receivers put up
+// with before failing the evaluation with a permerror (RFC 7208 section
+// 4.6.4).
+const spfVoidLookupLimit = 2
+
+// isVoidAnswer tells whether a lookup came back with no answer at all, as
+// RFC 7208 section 4.6.4 counts it: NXDOMAIN, or no record of the type asked.
+// A lookup that failed otherwise is not void, merely unanswered.
+func isVoidAnswer(err error, answers int) bool {
+	if err != nil {
+		dnsErr, ok := err.(*net.DNSError)
+		return ok && dnsErr.IsNotFound
+	}
+	return answers == 0
+}
+
+// countOwnVoidLookups counts the void lookups the terms of record cost by
+// themselves: the a, mx and exists mechanisms it resolves, and the include
+// and redirect targets the walk found void. Terms holding macros depend on
+// the message evaluated and are left out.
+func (d *DNSAnalyzer) countOwnVoidLookups(domain, record string, walk *spfWalk) int {
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
+	defer cancel()
+
+	voids := 0
+	hasAll := false
+	redirect := ""
+	for _, token := range strings.Fields(record)[1:] {
+		name, value, modifier := splitSPFTerm(strings.TrimLeft(token, "+-~?"))
+		if strings.Contains(value, "%") {
+			continue
+		}
+		target := value
+		if target == "" {
+			target = domain
+		}
+		switch {
+		case modifier && name == "redirect":
+			redirect = value
+		case modifier:
+		case name == "all":
+			// Evaluation never goes past it
+			hasAll = true
+		case hasAll:
+		case name == "include":
+			if walk.void[strings.ToLower(value)] {
+				voids++
+			}
+		case name == "a", name == "exists":
+			addrs, err := d.resolver.LookupHost(ctx, target)
+			if isVoidAnswer(err, len(addrs)) {
+				voids++
+			}
+		case name == "mx":
+			mxs, err := d.resolver.LookupMX(ctx, target)
+			if isVoidAnswer(err, len(mxs)) {
+				voids++
+			}
+		}
+	}
+	if redirect != "" && !hasAll && walk.void[strings.ToLower(redirect)] {
+		voids++
+	}
+	return voids
 }
 
 // spfLookupLimit is how many DNS-querying terms one SPF evaluation may go
@@ -67,9 +141,17 @@ func countSPFLookups(records []model.SPFRecord) {
 
 	type tally struct {
 		lookups int
+		voids   int
 		partial bool
 	}
 	memo := make(map[int]tally, len(records))
+
+	// Void lookups were counted record by record during the resolution;
+	// each record now carries those of what it leads to as well.
+	ownVoids := make([]int, len(records))
+	for i, r := range records {
+		ownVoids[i] = utils.Deref(r.VoidLookups)
+	}
 
 	var count func(i int, path map[int]bool) tally
 	count = func(i int, path map[int]bool) tally {
@@ -96,9 +178,11 @@ func countSPFLookups(records []model.SPFRecord) {
 			default:
 				sub := count(j, path)
 				t.lookups += sub.lookups
+				t.voids += sub.voids
 				t.partial = t.partial || sub.partial
 			}
 		}
+		t.voids += ownVoids[i]
 
 		hasAll := false
 		redirect := ""
@@ -138,10 +222,25 @@ func countSPFLookups(records []model.SPFRecord) {
 			continue
 		}
 		records[i].DnsLookups = utils.PtrTo(t.lookups)
+		if records[i].VoidLookups != nil || t.voids > 0 {
+			records[i].VoidLookups = utils.PtrTo(t.voids)
+		}
 		if t.partial {
 			records[i].DnsLookupsPartial = utils.PtrTo(true)
 		}
 	}
+}
+
+// spfHasMechanism tells whether record holds the named mechanism, with any
+// qualifier and value.
+func spfHasMechanism(record, mechanism string) bool {
+	for _, token := range strings.Fields(record)[1:] {
+		name, _, modifier := splitSPFTerm(strings.TrimLeft(token, "+-~?"))
+		if !modifier && name == mechanism {
+			return true
+		}
+	}
+	return false
 }
 
 // splitSPFTerm splits an SPF term, its qualifier removed, into its name and
@@ -169,7 +268,7 @@ func splitSPFTerm(term string) (name, value string, modifier bool) {
 
 // resolveSPFRecords recursively resolves SPF records including include: directives
 // isMainRecord indicates if this is the primary domain's record (not an included one)
-func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, depth int, isMainRecord bool) *[]model.SPFRecord {
+func (d *DNSAnalyzer) resolveSPFRecords(domain string, walk *spfWalk, depth int, isMainRecord bool) *[]model.SPFRecord {
 	const maxDepth = 10 // Prevent infinite recursion
 
 	if depth > maxDepth {
@@ -183,15 +282,18 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	}
 
 	// Prevent circular references
-	if visited[domain] {
+	if walk.visited[domain] {
 		return &[]model.SPFRecord{}
 	}
-	visited[domain] = true
+	walk.visited[domain] = true
 
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	txtRecords, err := d.resolver.LookupTXT(ctx, domain)
+	if isVoidAnswer(err, len(txtRecords)) {
+		walk.void[strings.ToLower(domain)] = true
+	}
 	if err != nil {
 		return &[]model.SPFRecord{
 			{
@@ -261,7 +363,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	// With an all mechanism in the record, it is never reached.
 	redirectDomain := d.extractSPFRedirect(spfRecord)
 	if redirectDomain != "" && extractSPFAllQualifier(spfRecord) == nil {
-		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1, false)
+		redirectRecords := d.resolveSPFRecords(redirectDomain, walk, depth+1, false)
 		if redirectRecords != nil {
 			results = append(results, *redirectRecords...)
 		}
@@ -270,11 +372,15 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	// Extract and resolve include: directives
 	includes := d.extractSPFIncludes(spfRecord)
 	for _, includeDomain := range includes {
-		includedRecords := d.resolveSPFRecords(includeDomain, visited, depth+1, false)
+		includedRecords := d.resolveSPFRecords(includeDomain, walk, depth+1, false)
 		if includedRecords != nil {
 			results = append(results, *includedRecords...)
 		}
 	}
+
+	// What this record costs in void lookups by itself, once its targets
+	// were fetched; countSPFLookups adds those of the records it leads to.
+	results[0].VoidLookups = utils.PtrTo(d.countOwnVoidLookups(domain, spfRecord, walk))
 
 	return &results
 }
@@ -630,6 +736,42 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 		c.cap(25, newIssue(model.IssueTypeSpfTooManyLookups, model.IssueSeverityHigh, rootDomain,
 			fmt.Sprintf("Evaluating the SPF record of %s takes %d DNS lookups, more than the %d receivers allow: they stop with a permanent error, so SPF fails for every message.", rootDomain, *root.DnsLookups, spfLookupLimit),
 			"Remove the include: of services that no longer send your mail, replace a, mx and ptr with the ip4: and ip6: addresses they stand for, or ask a provider for a lighter include."))
+	}
+
+	// Lookups answering nothing are counted apart: past two, receivers stop
+	// with a permerror as surely as past the lookup limit.
+	if root := (*results.SpfRecords)[0]; root.VoidLookups != nil && *root.VoidLookups > 0 {
+		rootDomain := domain
+		if root.Domain != nil {
+			rootDomain = *root.Domain
+		}
+		advice := "Remove the mechanisms pointing to names that no longer exist: an include: of a former provider, an a: or mx: of a decommissioned host."
+		if *root.VoidLookups > spfVoidLookupLimit {
+			c.cap(25, newIssue(model.IssueTypeSpfVoidLookups, model.IssueSeverityHigh, rootDomain,
+				fmt.Sprintf("Evaluating the SPF record of %s runs into %d lookups returning nothing, more than the %d receivers allow (RFC 7208 section 4.6.4): most of them stop with a permanent error.", rootDomain, *root.VoidLookups, spfVoidLookupLimit),
+				advice))
+		} else {
+			c.note(newIssue(model.IssueTypeSpfVoidLookups, model.IssueSeverityMedium, rootDomain,
+				fmt.Sprintf("Evaluating the SPF record of %s runs into %d lookup(s) returning nothing. Receivers tolerate up to %d before failing with a permanent error.", rootDomain, *root.VoidLookups, spfVoidLookupLimit),
+				advice))
+		}
+	}
+
+	// The ptr mechanism is slow, unreliable, and ignored by some receivers
+	// (RFC 7208 section 5.5): wherever it hides in the policy, it is worth
+	// replacing.
+	for _, r := range *results.SpfRecords {
+		if r.Record == nil || !spfHasMechanism(*r.Record, "ptr") {
+			continue
+		}
+		where := domain
+		if r.Domain != nil {
+			where = *r.Domain
+		}
+		c.deduct(10, newIssue(model.IssueTypeSpfPtr, model.IssueSeverityMedium, where,
+			fmt.Sprintf("The SPF record of %s uses the ptr mechanism, which RFC 7208 section 5.5 says not to use: it is slow, costs extra lookups, and some receivers ignore it.", where),
+			"Replace ptr with the ip4: and ip6: ranges, or the a: hostnames, of the servers it was meant to authorize."))
+		break
 	}
 
 	// Check if DMARC is configured with strict policy as all mechanism is less significant

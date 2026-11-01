@@ -164,6 +164,8 @@
 
     // Receivers give up past this many DNS lookups (RFC 7208 section 4.6.4)
     const lookupLimit = 10;
+    // ... and past this many lookups that return nothing at all
+    const voidLimit = 2;
 </script>
 
 <!-- What evaluating a record costs, its includes counted in. Only the sender's record
@@ -188,6 +190,16 @@
         >
             {n}{partial ? "+" : ""}{root ? ` / ${lookupLimit}` : ""}
             DNS {n === 1 && !root ? "lookup" : "lookups"}
+        </span>
+    {/if}
+    {@const v = node.record.void_lookups}
+    {#if v !== undefined && v > 0}
+        <span
+            class="spf-lookups"
+            data-tone={node.role === "root" ? (v > voidLimit ? "fail" : "soft") : undefined}
+            title="Lookups answering NXDOMAIN or nothing at all; receivers fail past {voidLimit}"
+        >
+            {v}{node.role === "root" ? ` / ${voidLimit}` : ""} void
         </span>
     {/if}
 {/snippet}

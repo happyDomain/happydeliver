@@ -61,6 +61,8 @@ const issueLabels: Record<Issue["type"], string> = {
     spf_all_pass: "SPF authorizes every server",
     spf_all_neutral: "SPF says nothing about other servers",
     spf_all_softfail: "SPF only soft-fails other servers",
+    spf_void_lookups: "SPF lookups return nothing",
+    spf_ptr: "SPF uses the ptr mechanism",
     dkim_missing: "Message is not DKIM-signed",
     dkim_invalid: "Invalid DKIM key",
     dkim_sha1: "DKIM signs with SHA-1",
