@@ -30,7 +30,7 @@
     const allValid = $derived(mxRecords.every((r) => r.valid));
     const sorted = $derived([...mxRecords].sort((a, b) => a.priority - b.priority));
 
-    const nullMx = $derived(mxRecords.length === 1 && mxRecords[0].host === ".");
+    const nullMx = $derived(mxRecords.length === 1 && mxRecords[0].null_mx === true);
 
     const summary = $derived(
         nullMx
@@ -61,14 +61,32 @@
         {issues}
     >
         <div class="card-body">
-            {#if sorted.length > 0}
+            {#if nullMx}
+                <p class="small mb-2">
+                    <span class="font-monospace">MX 0 .</span> is an RFC 7505 null MX: the domain states
+                    that it receives no mail, so replies and bounces sent to it are refused.
+                </p>
+            {:else if sorted.length > 0}
                 <dl class="check-facts">
                     {#each sorted as mx, i (i)}
                         <dt>{mx.priority}</dt>
                         <dd>
                             <span class="font-monospace">{mx.host}</span>
+                            {#if mx.cname_target}
+                                <span class="small text-warning ms-1"
+                                    >alias of <span class="font-monospace">{mx.cname_target}</span
+                                    ></span
+                                >
+                            {/if}
                             {#if !mx.valid}
                                 <span class="small text-danger ms-1">{mx.error ?? "invalid"}</span>
+                            {:else if mx.error}
+                                <span class="small text-warning ms-1">{mx.error}</span>
+                            {/if}
+                            {#if mx.addresses && mx.addresses.length > 0}
+                                <div class="small text-muted font-monospace">
+                                    {mx.addresses.join(", ")}
+                                </div>
                             {/if}
                         </dd>
                     {/each}

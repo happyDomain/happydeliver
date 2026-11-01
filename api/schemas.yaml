@@ -456,6 +456,8 @@ components:
             - mx_missing
             - mx_invalid
             - mx_null
+            - mx_cname
+            - mx_no_ipv6
             - domain_unreachable
             - helo_spf_missing
             - helo_spf_invalid
@@ -1820,8 +1822,33 @@ components:
           example: true
         error:
           type: string
-          description: Error message if validation failed
+          description: >-
+            Why the record is invalid; on a valid record, a problem that does
+            not keep it from working, such as a target resolving to private
+            addresses besides public ones.
           example: "Failed to lookup MX records"
+        null_mx:
+          type: boolean
+          description: >-
+            Whether this is an RFC 7505 null MX ("MX 0 ."), by which the domain
+            declares it accepts no mail at all. Its host is ".", and no target
+            is looked up.
+          example: false
+        addresses:
+          type: array
+          items:
+            type: string
+          description: >-
+            The IPv4 and IPv6 addresses the MX hostname resolves to. Empty when
+            it resolves to none, which makes the record useless to a sender.
+          example: ["192.0.2.25", "2001:db8::25"]
+        cname_target:
+          type: string
+          description: >-
+            Canonical name the MX hostname is an alias of. RFC 5321 section 5.1
+            and RFC 2181 section 10.3 forbid an MX pointing to a CNAME; some
+            senders refuse to follow it.
+          example: "mx.provider.example.net"
 
     SPFRecord:
       type: object

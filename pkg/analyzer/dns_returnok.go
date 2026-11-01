@@ -38,25 +38,27 @@ const (
 )
 
 // domainCanReceive reports whether a domain can accept mail, looking up records
-// in the same order as Fastmail's ReturnOK milter: MX first, then A/AAAA.
-func (d *DNSAnalyzer) domainCanReceive(domain string) (hasMX, hasAddress bool) {
+// in the same order as Fastmail's ReturnOK milter: MX first, then A/AAAA. An
+// RFC 7505 null MX says the domain accepts none, whatever its A/AAAA records:
+// nullMX is then true, and neither of the others.
+func (d *DNSAnalyzer) domainCanReceive(domain string) (hasMX, hasAddress, nullMX bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
 	if mxRecords, err := d.resolver.LookupMX(ctx, domain); err == nil && len(mxRecords) > 0 {
 		// A null MX also rules out the fallback on the address (RFC 7505
 		// section 3)
-		if len(mxRecords) == 1 && mxRecords[0].Host == nullMXHost {
-			return false, false
+		if isNullMX(mxRecords) {
+			return false, false, true
 		}
-		return true, false
+		return true, false, false
 	}
 
 	if addrs, err := d.resolver.LookupHost(ctx, domain); err == nil && len(addrs) > 0 {
-		return false, true
+		return false, true, false
 	}
 
-	return false, false
+	return false, false, false
 }
 
 // checkReturnOKDomain verifies that a domain can receive replies/bounces.
@@ -69,11 +71,12 @@ func (d *DNSAnalyzer) checkReturnOKDomain(domain, orgDomain string) *model.Retur
 
 	result := &model.ReturnOKDomain{Domain: domain}
 
-	hasMX, hasAddress := d.domainCanReceive(domain)
+	hasMX, hasAddress, nullMX := d.domainCanReceive(domain)
 
-	// Fall back to the organizational domain when the domain itself has nothing.
-	if !hasMX && !hasAddress && orgDomain != "" && orgDomain != domain {
-		if orgMX, orgAddr := d.domainCanReceive(orgDomain); orgMX || orgAddr {
+	// Fall back to the organizational domain when the domain itself has
+	// nothing; a null MX is no absence but a refusal, and has the last word.
+	if !hasMX && !hasAddress && !nullMX && orgDomain != "" && orgDomain != domain {
+		if orgMX, orgAddr, _ := d.domainCanReceive(orgDomain); orgMX || orgAddr {
 			hasMX, hasAddress = orgMX, orgAddr
 			result.OrgDomain = utils.PtrTo(orgDomain)
 		}

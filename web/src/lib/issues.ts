@@ -69,6 +69,8 @@ const issueLabels: Record<Issue["type"], string> = {
     mx_missing: "No MX record",
     mx_invalid: "Invalid MX records",
     mx_null: "Domain declares it accepts no mail",
+    mx_cname: "MX record points to an alias",
+    mx_no_ipv6: "MX hosts have no IPv6 address",
     domain_unreachable: "Domain cannot receive mail",
     helo_spf_missing: "HELO hostname publishes no SPF policy",
     helo_spf_invalid: "SPF policy of the HELO hostname does not validate",

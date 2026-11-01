@@ -105,6 +105,15 @@ type DNSResolver interface {
 	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
+// cnameResolver is implemented by the resolvers able to tell the canonical
+// name of an alias. It is optional: the checks that need it are skipped with
+// a resolver that cannot answer.
+type cnameResolver interface {
+	// LookupCNAME returns the canonical name of host, host itself when it is
+	// no alias.
+	LookupCNAME(ctx context.Context, host string) (string, error)
+}
+
 // StandardDNSResolver is the default DNS resolver implementation that uses net.Resolver.
 type StandardDNSResolver struct {
 	resolver *net.Resolver
@@ -137,6 +146,11 @@ func (r *StandardDNSResolver) LookupAddr(ctx context.Context, addr string) ([]st
 // LookupHost implements DNSResolver.LookupHost using net.Resolver.
 func (r *StandardDNSResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
 	return r.resolver.LookupHost(ctx, absoluteDNSName(host))
+}
+
+// LookupCNAME implements cnameResolver using net.Resolver.
+func (r *StandardDNSResolver) LookupCNAME(ctx context.Context, host string) (string, error) {
+	return r.resolver.LookupCNAME(ctx, absoluteDNSName(host))
 }
 
 // absoluteDNSName returns name as an absolute (fully qualified) DNS name, so

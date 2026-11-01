@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"crypto/x509"
+	"net"
 	"net/http"
 	"slices"
 	"sync"
@@ -65,6 +66,10 @@ type DNSAnalyzer struct {
 	// must lead to (see bimi.LoadVMCRoots). A nil pool leaves the issuer's
 	// legitimacy unexamined, which the report says rather than hides.
 	VMCRoots *x509.CertPool
+	// publicAddr tells the addresses a sender on the Internet can reach.
+	// Nil means netguard.IsPublic; tests swap it to accept the documentation
+	// ranges they use.
+	publicAddr func(net.IP) bool
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer with configurable timeout

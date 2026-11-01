@@ -340,8 +340,9 @@ func TestMXIssuesOfANullMX(t *testing.T) {
 }
 
 func TestMXIssuesOfANullMXBesideARealOne(t *testing.T) {
-	analyzer := NewDNSAnalyzerWithResolver(time.Second, nil, &returnOKMockResolver{
-		mx: map[string][]*net.MX{"example.com": {{Host: ".", Pref: 0}, {Host: "mail.example.com", Pref: 10}}},
+	analyzer := newFakeAnalyzer(&fakeResolver{
+		mx:    map[string][]*net.MX{"example.com": {{Host: ".", Pref: 0}, {Host: "mail.example.com", Pref: 10}}},
+		hosts: map[string][]string{"mail.example.com": {"192.0.2.25", "2001:db8::25"}},
 	})
 
 	records, _ := analyzer.checkMXRecords("example.com")

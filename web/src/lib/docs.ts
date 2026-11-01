@@ -184,6 +184,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     mx_missing: [docs.mxLookup],
     mx_invalid: [docs.mxLookup],
     mx_null: [docs.nullMx],
+    mx_cname: [docs.mxLookup],
     domain_unreachable: [docs.mxLookup],
     helo_spf_missing: [docs.spfHelo],
     helo_spf_invalid: [docs.spfHelo],
