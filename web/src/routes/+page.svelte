@@ -116,7 +116,8 @@
     /* Laid out so that no two neighbouring cards share a colour, on the
        4-column grid as well as the 2-column one: info and primary are the
        same purple in this theme, so the blue comes from the "sky" tone.
-       The EML card comes last, so that hiding it keeps the rule. */
+       The Mail Servers and EML cards come last, so that hiding them keeps
+       the rule. */
     const features = $derived([
         {
             icon: "bi-shield-check",
@@ -131,7 +132,7 @@
             icon: "bi-globe",
             title: "Domain DNS Check",
             description:
-                "MX, SPF, DMARC and BIMI records of any domain, verified without sending a single email.",
+                "MX, SPF, DMARC, BIMI, MTA-STS and TLS-RPT records of any domain, verified without sending a single email.",
             variant: "primary" as const,
             href: resolve("domain"),
             linkLabel: "Check a domain",
@@ -206,6 +207,19 @@
             description: `Self-hosted solution, your data never leaves your infrastructure. Reports retained for ${getRetentionTimeText()}.`,
             variant: "success" as const,
         },
+        ...($appConfig.mx_probes_enabled
+            ? [
+                  {
+                      icon: "bi-hdd-rack",
+                      title: "Mail Servers",
+                      description:
+                          "What a sending server sees delivering to your domain: MX reachability, STARTTLS and certificates, DANE, bounces and postmaster.",
+                      variant: "danger" as const,
+                      href: resolve("domain"),
+                      linkLabel: "Probe your MX",
+                  },
+              ]
+            : []),
         ...($appConfig.eml_upload_enabled
             ? [
                   {

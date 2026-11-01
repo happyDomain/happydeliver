@@ -28,6 +28,7 @@ interface AppConfig {
     rbls?: string[];
     test_list_enabled?: boolean;
     eml_upload_enabled?: boolean;
+    mx_probes_enabled?: boolean;
     max_message_size?: number;
 }
 

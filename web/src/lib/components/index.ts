@@ -20,6 +20,7 @@ export { default as HeaderAnalysisCard } from "./HeaderAnalysisCard.svelte";
 export { default as HowItWorksStep } from "./HowItWorksStep.svelte";
 export { default as IssueAlert } from "./IssueAlert.svelte";
 export { default as Logo } from "./Logo.svelte";
+export { default as MailServersCard } from "./MailServersCard.svelte";
 export { default as MxRecordsDisplay } from "./MxRecordsDisplay.svelte";
 export { default as PendingState } from "./PendingState.svelte";
 export { default as PtrForwardRecordsDisplay } from "./PtrForwardRecordsDisplay.svelte";

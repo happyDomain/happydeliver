@@ -1,6 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
+    import { appConfig } from "#lib/stores/config.js";
 
     let domain = $state("");
     let error = $state<string | null>(null);
@@ -112,6 +113,19 @@
                                 </li>
                                 <li class="mb-2">
                                     <i class="bi bi-arrow-right me-2"></i>BIMI Support
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>MTA-STS, TLS-RPT and
+                                    DNSSEC
+                                </li>
+                                {#if $appConfig.mx_probes_enabled}
+                                    <li class="mb-2">
+                                        <i class="bi bi-arrow-right me-2"></i>Mail Servers: port 25,
+                                        STARTTLS, certificates, DANE, bounces
+                                    </li>
+                                {/if}
+                                <li class="mb-2">
+                                    <i class="bi bi-arrow-right me-2"></i>Domain Reputation
                                 </li>
                                 <li class="mb-0">
                                     <i class="bi bi-arrow-right me-2"></i>Disposable Domain Check

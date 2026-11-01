@@ -4,16 +4,18 @@
     import { onMount } from "svelte";
     import TileLoader from "#lib/components/TileLoader.svelte";
 
-    import { testDomain } from "#lib/api/index.js";
-    import type { DomainTestResponse } from "#lib/api/types.gen.js";
+    import { testDomain, testMailServers } from "#lib/api/index.js";
+    import type { DomainTestResponse, MailServersResult } from "#lib/api/types.gen.js";
     import {
         DnsRecordsCard,
         DomainReputationCard,
         ErrorDisplay,
+        MailServersCard,
         ScoreLink,
         TinySurvey,
     } from "#lib/components/index.js";
     import { apiMessage } from "#lib/errors.js";
+    import { appConfig } from "#lib/stores/config.js";
 
     let domain = $derived(page.params.domain);
     let loading = $state(true);
@@ -22,6 +24,35 @@
     let result = $state<DomainTestResponse | null>(null);
 
     let blacklist = $derived(result?.domain_reputation ?? null);
+
+    // The probes of the mail servers take longer than the rest: they are asked
+    // for at the same time, and shown when they come.
+    const mxProbes = $derived(!!$appConfig.mx_probes_enabled);
+    let mailServers = $state<MailServersResult | null>(null);
+    let mailServersLoading = $state(false);
+    let mailServersError = $state<string | null>(null);
+
+    async function probeMailServers(name: string) {
+        mailServers = null;
+        mailServersError = null;
+        mailServersLoading = true;
+        try {
+            const response = await testMailServers({ body: { domain: name } });
+            if (name !== domain) return;
+            if (response.response?.ok && response.data) {
+                mailServers = response.data;
+            } else {
+                mailServersError =
+                    apiMessage(response.error) ?? "The mail servers could not be probed";
+            }
+        } catch (err) {
+            if (name !== domain) return;
+            mailServersError =
+                err instanceof Error ? err.message : "The mail servers could not be probed";
+        } finally {
+            if (name === domain) mailServersLoading = false;
+        }
+    }
 
     async function analyzeDomain() {
         loading = true;
@@ -34,6 +65,8 @@
             loading = false;
             return;
         }
+
+        if (mxProbes) probeMailServers(domain);
 
         try {
             const response = await testDomain({ body: { domain } });
@@ -133,6 +166,24 @@
                                                 score={result.score}
                                             />
                                         </div>
+                                        {#if mxProbes}
+                                            <div class="score-tile">
+                                                <ScoreLink
+                                                    href="#mail-servers-details"
+                                                    label="Mail Servers"
+                                                    grade={mailServers?.grade ??
+                                                        (mailServersLoading ? undefined : "?")}
+                                                    score={mailServers?.score}
+                                                    unavailable={!mailServersLoading &&
+                                                        mailServers?.score === undefined}
+                                                    tooltipTitle={mailServersLoading
+                                                        ? "Probing the mail servers…"
+                                                        : mailServers?.status === "inconclusive"
+                                                          ? "Inconclusive: this instance cannot reach port 25"
+                                                          : "Not graded"}
+                                                />
+                                            </div>
+                                        {/if}
                                         {#if blacklist}
                                             <div class="score-tile">
                                                 <ScoreLink
@@ -162,6 +213,15 @@
                         domainOnly={true}
                         mailPolicies={result.mail_policies}
                     />
+
+                    <!-- Mail Servers: what a sending server sees -->
+                    {#if mxProbes}
+                        <MailServersCard
+                            result={mailServers}
+                            loading={mailServersLoading}
+                            error={mailServersError}
+                        />
+                    {/if}
 
                     <!-- Domain Reputation / Blacklist -->
                     {#if blacklist}
@@ -194,7 +254,7 @@
 
 <style>
     .score-tiles {
-        width: 12rem;
+        width: 18rem;
     }
 
     .score-tile {

@@ -245,6 +245,10 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 		appConfig["test_list_enabled"] = true
 	}
 
+	if !cfg.DisableMXProbes {
+		appConfig["mx_probes_enabled"] = true
+	}
+
 	if !cfg.DisableEmlUpload {
 		appConfig["eml_upload_enabled"] = true
 		appConfig["max_message_size"] = cfg.MaxMessageSize
