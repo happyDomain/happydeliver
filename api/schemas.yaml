@@ -476,6 +476,7 @@ components:
             - dmarc_report_uri_invalid
             - dmarc_no_rua
             - dmarc_report_unauthorized
+            - dmarc_inherited
             - ptr_missing
             - ptr_multiple
             - fcrdns_mismatch

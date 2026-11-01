@@ -97,3 +97,26 @@ func TestDMARCNoRua(t *testing.T) {
 		t.Errorf("issues = %+v, want a free low dmarc_no_rua", issues)
 	}
 }
+
+func TestDMARCInheritedAppliesSp(t *testing.T) {
+	d := newFakeAnalyzer(&fakeResolver{txt: map[string][]string{
+		"_dmarc.example.com": {"v=DMARC1; p=reject; sp=none; rua=mailto:d@example.com"},
+	}})
+	rec := d.checkDMARCRecord("news.example.com")
+	if utils.Deref(rec.Domain) != "example.com" {
+		t.Fatalf("record found at %v, want example.com", rec.Domain)
+	}
+	score, issues := d.calculateDMARCScore(&model.DNSResults{FromDomain: "news.example.com", DmarcRecord: rec})
+	if hasIssue(issues, model.IssueTypeDmarcInherited) == nil || hasIssue(issues, model.IssueTypeDmarcPolicyNone) == nil || hasIssue(issues, model.IssueTypeDmarcSpWeaker) != nil {
+		t.Errorf("issues = %v, want dmarc_inherited and dmarc_policy_none, no dmarc_sp_weaker", issueTypes(issues))
+	}
+	if score != 55 {
+		t.Errorf("score = %d, want 55 (sp=none applied)", score)
+	}
+
+	// The organizational domain itself is judged on p=
+	_, issues = d.calculateDMARCScore(&model.DNSResults{FromDomain: "example.com", DmarcRecord: d.checkDMARCRecord("example.com")})
+	if hasIssue(issues, model.IssueTypeDmarcInherited) != nil || hasIssue(issues, model.IssueTypeDmarcSpWeaker) == nil {
+		t.Errorf("issues = %v, want dmarc_sp_weaker only", issueTypes(issues))
+	}
+}

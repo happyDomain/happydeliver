@@ -64,7 +64,8 @@
                         <div class="small text-body-secondary">
                             {fromDomain} has no record of its own: this one is inherited from {isPsdFallback
                                 ? "the Public Suffix Domain"
-                                : "the organizational domain"} through the DMARCbis DNS tree walk.
+                                : "the organizational domain"} through the DMARCbis DNS tree walk, and
+                            its subdomain policy (<code>sp=</code>, or <code>p=</code> without it) applies.
                         </div>
                     </dd>
                 {/if}

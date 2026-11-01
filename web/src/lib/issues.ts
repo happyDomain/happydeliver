@@ -89,6 +89,7 @@ const issueLabels: Record<Issue["type"], string> = {
     dmarc_deprecated_tags: "DMARC record uses deprecated tags",
     dmarc_no_rua: "DMARC asks for no aggregate report",
     dmarc_report_unauthorized: "Report destination has not authorized your reports",
+    dmarc_inherited: "DMARC policy inherited from the parent domain",
     ptr_missing: "Sending IP has no valid reverse DNS",
     ptr_multiple: "Sending IP has several PTR records",
     fcrdns_mismatch: "Reverse DNS is not forward-confirmed",

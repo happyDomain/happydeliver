@@ -205,6 +205,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dmarc_report_uri_invalid: [docs.dmarcPolicy],
     dmarc_no_rua: [docs.dmarcPolicy],
     dmarc_report_unauthorized: [docs.dmarcExternalReports],
+    dmarc_inherited: [docs.dmarcPolicy],
     ptr_missing: [docs.reverseDns, docs.googleSenders],
     ptr_multiple: [docs.reverseDns],
     fcrdns_mismatch: [docs.reverseDns, docs.googleSenders],

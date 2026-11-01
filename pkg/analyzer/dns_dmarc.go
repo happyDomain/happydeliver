@@ -430,6 +430,21 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 	if dmarc.Policy != nil {
 		policy = string(*dmarc.Policy)
 	}
+
+	// A subdomain without a record of its own falls under the record of its
+	// organizational domain, whose sp= applies to it rather than p=.
+	inherited := results.FromDomain != "" && dmarc.Domain != nil &&
+		domainname.Normalize(*dmarc.Domain) != domainname.Normalize(results.FromDomain)
+	if inherited {
+		applied := "p=" + policy
+		if dmarc.SubdomainPolicy != nil && *dmarc.SubdomainPolicy != model.DMARCRecordSubdomainPolicyUnknown {
+			policy = string(*dmarc.SubdomainPolicy)
+			applied = "sp=" + policy
+		}
+		c.note(newIssue(model.IssueTypeDmarcInherited, model.IssueSeverityInfo, results.FromDomain,
+			fmt.Sprintf("%s publishes no DMARC record of its own: receivers apply the one of %s, and its %s.", results.FromDomain, *dmarc.Domain, applied),
+			fmt.Sprintf("Nothing to do if this policy suits %s; publish a record at _dmarc.%s to give it another.", results.FromDomain, results.FromDomain)))
+	}
 	switch policy {
 	case "quarantine":
 		c.deduct(25, newIssue(model.IssueTypeDmarcPolicyQuarantine, model.IssueSeverityLow, domain,
@@ -462,7 +477,7 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 
 	// Subdomain policy (sp tag): one weaker than the policy in effect costs 30
 	effectiveSubPolicy := effectivePolicy
-	if dmarc.SubdomainPolicy != nil {
+	if dmarc.SubdomainPolicy != nil && !inherited {
 		effectiveSubPolicy = string(*dmarc.SubdomainPolicy)
 		if dmarcPolicyStrength[effectiveSubPolicy] < dmarcPolicyStrength[effectivePolicy] {
 			c.deduct(30, newIssue(model.IssueTypeDmarcSpWeaker, model.IssueSeverityLow, domain,
