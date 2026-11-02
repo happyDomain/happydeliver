@@ -22,6 +22,11 @@ function rfc(number: number, title: string, section?: string): DocLink {
     };
 }
 
+/** An Internet-Draft, linked on the datatracker, which always shows its latest revision. */
+function draft(name: string, label: string, title: string): DocLink {
+    return { label, title, url: `https://datatracker.ietf.org/doc/${name}/` };
+}
+
 export const docs = {
     // Authentication
     spf: rfc(7208, "Sender Policy Framework"),
@@ -30,6 +35,18 @@ export const docs = {
     spfHelo: rfc(7208, "Checking the HELO identity", "2.3"),
     dkim: rfc(6376, "DomainKeys Identified Mail"),
     dkimKeySize: rfc(8301, "DKIM cryptographic algorithm and key usage update", "3.2"),
+    // DKIM2 is still an Internet-Draft: the links follow its latest revision.
+    dkim2: draft("draft-ietf-dkim-dkim2-spec", "DKIM2", "DomainKeys Identified Mail Signatures v2"),
+    dkim2Dns: draft(
+        "draft-ietf-dkim-dkim2-dns",
+        "DKIM2 DNS",
+        "Domain Name Specification for DKIM2",
+    ),
+    dkim2AuthResults: draft(
+        "draft-gondwana-dkim2-authres",
+        "DKIM2 A-R",
+        "Reporting DKIM2 verification results in Authentication-Results",
+    ),
     dmarc: rfc(9989, "Domain-based Message Authentication, Reporting, and Conformance (DMARC)"),
     dmarcAlignment: rfc(9989, "DMARC identifier alignment", "4.4"),
     dmarcPolicy: rfc(9989, "DMARC policy record", "4.7"),
@@ -138,6 +155,8 @@ const headerDocs: Record<string, DocLink[]> = {
     "list-unsubscribe-post": [docs.oneClickUnsubscribe],
     "authentication-results": [docs.authResults],
     "dkim-signature": [docs.dkim],
+    "dkim2-signature": [docs.dkim2],
+    "message-instance": [docs.dkim2],
     "arc-seal": [docs.arc],
 };
 
@@ -177,6 +196,9 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dkim_sha1: [docs.dkimKeySize],
     dkim_key_short: [docs.dkimKeySize],
     dkim_key_weak: [docs.dkimKeySize],
+    dkim2_invalid: [docs.dkim2Dns],
+    dkim2_key_weak: [docs.dkim2Dns],
+    dkim2_deprecated_tags: [docs.dkim2Dns],
     mx_missing: [docs.mxLookup],
     mx_invalid: [docs.mxLookup],
     domain_unreachable: [docs.mxLookup],
@@ -215,6 +237,10 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     tls_missing: [docs.starttls, docs.googleSenders],
     x_aligned_from_fail: [docs.dmarcAlignment],
     x_google_dkim_fail: [docs.dkim],
+    dkim2_fail: [docs.dkim2, docs.dkim2AuthResults],
+    dkim2_permerror: [docs.dkim2, docs.dkim2AuthResults],
+    dkim2_temperror: [docs.dkim2Dns],
+    dkim2_unevaluated: [docs.dkim2AuthResults],
     arc_fail: [docs.arc],
     bimi_declined: [docs.bimi, docs.bimiGroup],
     bimi_not_honored: [docs.bimi, docs.bimiGroup],

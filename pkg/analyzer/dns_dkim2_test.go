@@ -403,3 +403,27 @@ func TestAnalyzeDNSWithDKIMAndDKIM2(t *testing.T) {
 		t.Errorf("DKIM2 policy = %+v, want strict", results.Dkim2PolicyRecords)
 	}
 }
+
+// A selector a signature names twice is reported rather than looked up twice.
+func TestCheckDKIM2RecordsDuplicateSelector(t *testing.T) {
+	keys := newTestKeys(t)
+	analyzer := newMockAnalyzer(map[string][]string{
+		"sel._domainkey.example.com": {"v=DKIM1; p=" + keys.rsaSPKI},
+	}, nil)
+
+	records := analyzer.checkDKIM2Records([]mailmsg.DKIM2Signature{{
+		Instance: 1,
+		Domain:   "example.com",
+		Keys: []mailmsg.DKIM2Key{
+			{Selector: "sel", Algorithm: "rsa-sha256", Group: 0},
+			{Selector: "sel", Algorithm: "rsa-sha256", Group: 1},
+		},
+	}})
+
+	if len(records) != 2 || !records[0].Valid || records[1].Valid {
+		t.Fatalf("records = %+v, want the first valid and the repeated one not", records)
+	}
+	if !strings.Contains(utils.Deref(records[1].Error), "PERMERROR: DKIM2-Signature i=1 has a duplicate selector") {
+		t.Errorf("Error = %q", utils.Deref(records[1].Error))
+	}
+}

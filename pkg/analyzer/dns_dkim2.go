@@ -82,7 +82,22 @@ const dkim2RSAMinBits = 1024
 func (d *DNSAnalyzer) checkDKIM2Records(signatures []mailmsg.DKIM2Signature) []model.DKIM2Record {
 	var records []model.DKIM2Record
 	for _, sig := range signatures {
+		seen := map[string]bool{}
 		for _, key := range sig.Keys {
+			// A selector named twice in one signature is the signer trying to
+			// confuse the verifier, whatever its key says.
+			if seen[key.Selector] {
+				records = append(records, model.DKIM2Record{
+					Instance:         sig.Instance,
+					Alternative:      utils.PtrTo(key.Group),
+					Selector:         key.Selector,
+					Domain:           sig.Domain,
+					SigningAlgorithm: signingAlgorithmPtr(key.Algorithm),
+					Error:            utils.PtrTo(fmt.Sprintf("PERMERROR: DKIM2-Signature i=%d has a duplicate selector", sig.Instance)),
+				})
+				continue
+			}
+			seen[key.Selector] = true
 			records = append(records, *d.checkDKIM2Record(sig, key))
 		}
 	}
@@ -371,7 +386,9 @@ func dkim2KeyIssues(results *model.DNSResults) ([]model.Issue, int) {
 			for _, rec := range group {
 				if !rec.Valid {
 					all = false
-					reasons = append(reasons, utils.Deref(rec.Error))
+					if reason := utils.Deref(rec.Error); !slices.Contains(reasons, reason) {
+						reasons = append(reasons, reason)
+					}
 				}
 			}
 			usable = usable || all

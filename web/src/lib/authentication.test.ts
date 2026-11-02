@@ -136,6 +136,12 @@ describe("verdictMeaning", () => {
         expect(verdictMeaning("spf_helo", "softfail")).toBe(verdictMeaning("spf", "softfail"));
     });
 
+    it("explains the DKIM2 verdicts apart from the DKIM ones", () => {
+        expect(verdictMeaning("dkim2", "fail")).toMatch(/chain/);
+        expect(verdictMeaning("dkim2", "none")).toMatch(/no DKIM2 header/);
+        expect(verdictMeaning("dkim2", "neutral")).toBeUndefined();
+    });
+
     it("says nothing of a verdict it does not know", () => {
         expect(verdictMeaning("dkim", "policy")).toBeUndefined();
         expect(verdictMeaning("dkim", undefined)).toBeUndefined();

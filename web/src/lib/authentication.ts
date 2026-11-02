@@ -167,6 +167,7 @@ export type VerdictMechanism =
     | "spf"
     | "spf_helo"
     | "dkim"
+    | "dkim2"
     | "dmarc"
     | "iprev"
     | "x_ptr"
@@ -198,6 +199,15 @@ const verdictMeanings: Record<VerdictMechanism, Record<string, string>> = {
         temperror: "The public key could not be fetched because of a temporary DNS error.",
         permerror:
             "The signature cannot be verified: the public key is missing or invalid, or the signature is malformed.",
+    },
+    // draft-gondwana-dkim2-authres: one verdict for the whole chain of signatures.
+    dkim2: {
+        pass: "Every DKIM2 signature verifies: the message travelled the path its signatures record, without undeclared changes.",
+        fail: "The DKIM2 chain does not verify: the message was changed without declaring it, or did not travel the path its signatures record.",
+        none: "The message carries no DKIM2 header.",
+        temperror: "A DKIM2 public key could not be fetched because of a temporary DNS error.",
+        permerror:
+            "The DKIM2 chain cannot be verified: a DKIM2 header or a public key is missing or malformed.",
     },
     dmarc: {
         pass: "SPF or DKIM passed for a domain aligned with the From address.",

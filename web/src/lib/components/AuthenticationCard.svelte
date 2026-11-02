@@ -563,6 +563,66 @@
                 </div>
             </CheckCard>
 
+            <!-- DKIM2 only when there is something to say: a verdict, or DKIM2 signatures
+                 the receiver did not verify. During the transition most messages carry
+                 DKIM alone, and the DKIM card above stays about DKIM. -->
+            {#if authentication.dkim2 || dnsResults?.dkim2_records?.length}
+                {@const dkim2 = authentication.dkim2}
+                <CheckCard
+                    id="authentication-dkim2"
+                    title="DomainKeys Identified Mail v2 (draft)"
+                    tag="DKIM2"
+                    status={dkim2 ? verdictStatus(dkim2.result, false) : "info"}
+                    summary={dkim2
+                        ? verdict(dkim2.result, dkim2.domain)
+                        : "Not verified by the receiver"}
+                    docs={[docs.dkim2, docs.dkim2AuthResults]}
+                    issues={at("dkim2")}
+                >
+                    <div class="card-body">
+                        {#if dkim2}
+                            <VerdictFacts
+                                raw={rawVerdict("dkim2", dkim2.result, dkim2.details)}
+                                links={dnsResults?.dkim2_records?.length
+                                    ? [{ href: "#dns-dkim2", label: "DKIM2 key check" }]
+                                    : undefined}
+                            >
+                                {@render verdictRow("dkim2", dkim2.result, false)}
+                                {#if dkim2.domain}
+                                    <FactRow
+                                        label="Originator"
+                                        value={dkim2.domain}
+                                        mono
+                                    />
+                                {/if}
+                                {#if dkim2.instance && dkim2.result !== "pass" && dkim2.result !== "none"}
+                                    <FactRow
+                                        label="Failing signature"
+                                        value={`i=${dkim2.instance}`}
+                                        mono
+                                    />
+                                {/if}
+                                {#if dkim2.comment}
+                                    <FactRow label="Receiver's note" value={dkim2.comment} />
+                                {/if}
+                            </VerdictFacts>
+                        {/if}
+                        <p class="check-about">
+                            {#if !dkim2}
+                                The message carries DKIM2 signatures, but the receiver reported no
+                                DKIM2 verdict: few receivers verify DKIM2 yet. The keys the
+                                signatures point to are checked with the
+                                <a href="#dns-dkim2">DNS records</a>.
+                            {:else}
+                                DKIM2, still an IETF draft, verifies the chain of signatures each
+                                hop added, and the changes they declared. DMARC does not take it
+                                into account yet: it relies on the DKIM verdict.
+                            {/if}
+                        </p>
+                    </div>
+                </CheckCard>
+            {/if}
+
             <CheckCard
                 id="authentication-dmarc"
                 title="Domain-based Message Authentication"
