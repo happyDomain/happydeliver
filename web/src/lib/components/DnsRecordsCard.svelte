@@ -4,6 +4,7 @@
     import BimiRecordDisplay from "./BimiRecordDisplay.svelte";
     import CheckList from "./CheckList.svelte";
     import DkimRecordsDisplay from "./DkimRecordsDisplay.svelte";
+    import Dkim2RecordsDisplay from "./Dkim2RecordsDisplay.svelte";
     import DmarcRecordDisplay from "./DmarcRecordDisplay.svelte";
     import DomainInfoDisplay from "./DomainInfoDisplay.svelte";
     import HeloPtrMatchDisplay from "./HeloPtrMatchDisplay.svelte";
@@ -178,6 +179,15 @@
                             dkimRecords={dnsResults.dkim_records}
                             issues={issues.dkim}
                         />
+                        <!-- DKIM2 only when the message carries a DKIM2 signature: during the
+                             transition most messages carry DKIM alone. -->
+                        {#if dnsResults.dkim2_records?.length}
+                            <Dkim2RecordsDisplay
+                                dkim2Records={dnsResults.dkim2_records}
+                                policyRecords={dnsResults.dkim2_policy_records}
+                                issues={issues.dkim2}
+                            />
+                        {/if}
                     {/if}
                     <DmarcRecordDisplay
                         dmarcRecord={dnsResults.dmarc_record}
