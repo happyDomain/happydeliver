@@ -23,7 +23,6 @@ package analyzer
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -61,15 +60,14 @@ func parseKeySize(keyType, p string) *int {
 				return nil
 			}
 		}
-		pub, err := x509.ParsePKIXPublicKey(der)
+		// Published as SubjectPublicKeyInfo almost always, sometimes as
+		// the bare RSAPublicKey RFC 6376 literally names.
+		pub, err := parseRSAPublicKey(der)
 		if err != nil {
 			return nil
 		}
-		if rsaPub, ok := pub.(interface{ Size() int }); ok {
-			bits := rsaPub.Size() * 8
-			return &bits
-		}
-		return nil
+		bits := pub.Size() * 8
+		return &bits
 	}
 	return nil
 }
@@ -193,6 +191,14 @@ func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (int, []mode
 	c := checkScore{score: 100}
 
 	if results.DkimRecords == nil || len(*results.DkimRecords) == 0 {
+		// Signed with DKIM2 only: the message is authenticated, but DMARC and
+		// most receivers do not read DKIM2 yet, so half the check is lost.
+		if hasValidDKIM2Key(results) {
+			c.cap(50, newIssue(model.IssueTypeDkimMissing, model.IssueSeverityMedium, results.FromDomain,
+				"The message carries a DKIM2 signature but no DKIM one. DKIM2 is still an IETF draft: DMARC does not take it into account and most receivers do not verify it yet.",
+				"Keep signing with DKIM alongside DKIM2 during the transition; both can use the same key."))
+			return c.score, c.issues
+		}
 		c.cap(0, newIssue(model.IssueTypeDkimMissing, model.IssueSeverityHigh, results.FromDomain,
 			"Without a DKIM signature, DMARC can only rely on SPF, which does not survive forwarding.",
 			"Enable DKIM signing on your mail server or email provider, and publish the public key it gives you in DNS."))

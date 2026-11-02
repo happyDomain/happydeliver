@@ -54,6 +54,12 @@ func (a *AuthenticationAnalyzer) AnalyzeAuthentication(email *mailmsg.Message, a
 		a.parseAuthenticationResultsHeader(header, results)
 	}
 
+	// The message itself says who the originator is: a receiver may report the
+	// last signer of the chain instead.
+	if results.Dkim2 != nil {
+		reconcileDKIM2Originator(results.Dkim2, email)
+	}
+
 	// If the Authentication-Results headers reported no verdict on the envelope
 	// sender, fall back to the legacy Received-SPF ones, which may carry either
 	// identity. They are only consulted then: when the modern headers did report
@@ -118,6 +124,13 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 				results.Dkim = &dkimList
 			} else {
 				*results.Dkim = append(*results.Dkim, *dkimResult)
+			}
+
+		// DKIM2 reports one verdict for the whole chain of signatures, kept
+		// apart from the DKIM ones: a message may carry either kind, or both.
+		case "dkim2":
+			if results.Dkim2 == nil {
+				results.Dkim2 = a.parseDKIM2Result(method)
 			}
 
 		case "dmarc":
@@ -220,6 +233,9 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 	if iprevScore := a.calculateIPRevScore(results); iprevScore < 100 {
 		score += 7 * (iprevScore - 100) / 100
 	}
+
+	// Penalty-only: DKIM2, still a draft (up to -5 points on failure)
+	score += authWeightDKIM2 * a.calculateDKIM2Score(results) / 100
 
 	// Penalty-only: X-Google-DKIM (up to -12 points on failure)
 	score += 12 * a.calculateXGoogleDKIMScore(results) / 100

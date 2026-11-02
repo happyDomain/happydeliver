@@ -386,7 +386,7 @@ components:
       properties:
         type:
           type: string
-          enum: [broken_html, missing_plaintext, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, duplicate_header, invalid_date, invalid_mime_version, invalid_address, domain_misaligned, domain_relaxed_aligned, return_path_misaligned, dkim_misaligned, spf_missing, spf_invalid, spf_include_invalid, spf_too_many_lookups, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young, auth_unavailable, auth_unevaluated, spf_fail, spf_softfail, spf_neutral, spf_permerror, spf_temperror, spf_helo_fail, dkim_fail, dkim_temperror, dkim_extra_fail, dmarc_fail, dmarc_permerror, dmarc_temperror, iprev_fail, iprev_error, tls_missing, x_aligned_from_fail, x_google_dkim_fail, arc_fail, bimi_declined, bimi_not_honored, bimi_missing, bimi_dmarc_not_enforced, bimi_invalid, bimi_unverified, bimi_vmc_missing, bimi_check_warning, rbl_listed, rbl_network_listed, domain_listed, dns_lookup_failed]
+          enum: [broken_html, missing_plaintext, missing_alt, excessive_images, excessive_links, obfuscated_url, suspicious_link, dangerous_html, unreplaced_template, truncated_body, unreachable_link, excessive_redirects, hidden_text, image_only_content, attachment_risk, link_reputation, homograph_url, client_compat, text_html_mismatch, low_contrast, sender_domain_mismatch, malware_detected, type_mismatch, double_extension, dangerous_extension, macro_detected, pdf_active_content, executable_content, script_content, password_protected, nested_archive, archive_bomb, scan_error, scan_skipped, missing_header, invalid_message_id, reply_without_references, duplicate_header, invalid_date, invalid_mime_version, invalid_address, domain_misaligned, domain_relaxed_aligned, return_path_misaligned, dkim_misaligned, spf_missing, spf_invalid, spf_include_invalid, spf_too_many_lookups, spf_all_pass, spf_all_neutral, spf_all_missing, spf_all_softfail, dkim_missing, dkim_invalid, dkim_sha1, dkim_key_short, dkim_key_weak, dkim2_invalid, dkim2_key_weak, dkim2_deprecated_tags, mx_missing, mx_invalid, domain_unreachable, helo_spf_missing, helo_spf_invalid, dmarc_missing, dmarc_invalid, dmarc_policy_none, dmarc_policy_quarantine, dmarc_test_mode, dmarc_pct, dmarc_pct_deprecated, dmarc_sp_weaker, dmarc_np_weaker, dmarc_deprecated_tags, ptr_missing, ptr_multiple, fcrdns_mismatch, helo_ptr_mismatch, domain_disposable, domain_free_provider, domain_lapsing, domain_expiring, domain_young, auth_unavailable, auth_unevaluated, spf_fail, spf_softfail, spf_neutral, spf_permerror, spf_temperror, spf_helo_fail, dkim_fail, dkim_temperror, dkim_extra_fail, dmarc_fail, dmarc_permerror, dmarc_temperror, iprev_fail, iprev_error, tls_missing, x_aligned_from_fail, x_google_dkim_fail, arc_fail, dkim2_fail, dkim2_permerror, dkim2_temperror, dkim2_unevaluated, bimi_declined, bimi_not_honored, bimi_missing, bimi_dmarc_not_enforced, bimi_invalid, bimi_unverified, bimi_vmc_missing, bimi_check_warning, rbl_listed, rbl_network_listed, domain_listed, dns_lookup_failed]
           description: >-
             What the report files the finding under. The values from
             broken_html to sender_domain_mismatch are read off the body of the
@@ -400,7 +400,10 @@ components:
             its BIMI record, those from rbl_listed to domain_listed off the
             blacklists listing its sending addresses or its domain.
             dns_lookup_failed says a lookup the DNS checks rely on
-            did not answer. The authentication verdicts also report spf_missing,
+            did not answer. The dkim2_ values are about DKIM2, still an IETF
+            draft: dkim2_invalid to dkim2_deprecated_tags off the keys its
+            DKIM2-Signature headers point to, dkim2_fail to dkim2_unevaluated
+            off the dkim2 verdict of its receiver. The authentication verdicts also report spf_missing,
             dkim_missing and dmarc_missing, for what the records show
             missing. attachment_risk
             predates the attachment reading and is kept for the reports that
@@ -897,6 +900,13 @@ components:
         x_google_dkim:
           $ref: '#/components/schemas/AuthResult'
           description: Google-specific DKIM authentication result (x-google-dkim)
+        dkim2:
+          allOf:
+            - $ref: '#/components/schemas/DKIM2Result'
+          description: >-
+            DKIM2 verdict (draft-gondwana-dkim2-authres), for the chain of
+            DKIM2-Signature headers as a whole. DKIM2 is still an IETF draft:
+            DMARC does not take it into account.
         x_aligned_from:
           $ref: '#/components/schemas/AuthResult'
           description: X-Aligned-From authentication result (checks address alignment)
@@ -940,6 +950,38 @@ components:
         details:
           type: string
           description: Additional details about the result
+
+    DKIM2Result:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [none, pass, fail, permerror, temperror]
+          description: >-
+            DKIM2 verdict on the message: none when it carries no DKIM2 header
+            field, pass when its Chain of Custody verified.
+          example: "pass"
+        domain:
+          type: string
+          description: Signing domain of the originator (the d= of the DKIM2-Signature with i=1, else header.d)
+          example: "example.com"
+        instance:
+          type: integer
+          description: >-
+            The i= of the DKIM2-Signature the receiver attributed the failure to,
+            absent when it attributed it to none.
+          example: 2
+        comment:
+          type: string
+          description: >-
+            Comment the receiver wrote next to the verdict, its per-hop detail
+            and diagnostic, for a human to read: its form is not standardized.
+          example: "i=1 sender.example.com pass, i=2 fwd.example.org fail; FAIL: DKIM2-Signature i=2 MAIL FROM did not match"
+        details:
+          type: string
+          description: The verdict as the receiver wrote it
 
     ARCResult:
       type: object
@@ -1188,6 +1230,21 @@ components:
           items:
             $ref: '#/components/schemas/DKIMRecord'
           description: DKIM records found
+        dkim2_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DKIM2Record'
+          description: >-
+            Keys the DKIM2-Signature headers of the message point to, one per
+            selector of each signature, in the order of the signatures.
+        dkim2_policy_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DKIM2PolicyRecord'
+          description: >-
+            DKIM2 Domain Policy Record (_domainkey.<domain>) of the From domain,
+            the only one that matters to it, looked up when the message carries
+            DKIM2 signatures.
         dmarc_record:
           $ref: '#/components/schemas/DMARCRecord'
         bimi_record:
@@ -1267,6 +1324,11 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
           description: About the DKIM verdicts on the signatures of the message.
+        dkim2:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the DKIM2 verdict on the chain of signatures of the message.
         dmarc:
           type: array
           items:
@@ -1345,6 +1407,11 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
           description: About the DKIM keys the message's signatures point to.
+        dkim2:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: About the keys the DKIM2 signatures of the message point to.
         dmarc:
           type: array
           items:
@@ -1673,6 +1740,95 @@ components:
           type: string
           description: Error message if validation failed
           example: "No DKIM record found"
+
+    DKIM2Record:
+      type: object
+      required:
+        - instance
+        - selector
+        - domain
+        - valid
+      properties:
+        instance:
+          type: integer
+          description: The i= of the DKIM2-Signature naming this key (1 for the originator)
+          example: 1
+        alternative:
+          type: integer
+          description: >-
+            Which alternative of the s= tag the signature belongs to, counted
+            from 0: alternatives are separated by "|", and the signatures of
+            one alternative must all pass for it to pass.
+          example: 0
+        selector:
+          type: string
+          description: Selector, from the s= tag of the DKIM2-Signature
+          example: "default"
+        domain:
+          type: string
+          description: Signing domain, from the d= tag of the DKIM2-Signature
+          example: "example.com"
+        signing_algorithm:
+          type: string
+          description: "Algorithm the DKIM2-Signature names for this selector (rsa-sha256, ed25519-sha256, mldsa44...)"
+          example: "ed25519-sha256"
+        record:
+          type: string
+          description: Key record content
+          example: "v=DKIM1; k=ed25519; p=11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+        key_type:
+          type: string
+          description: "Key type from k= tag; defaults to rsa if absent"
+          example: "ed25519"
+        key_size:
+          type: integer
+          description: "Public key size in bits (RSA modulus, 256 for Ed25519)"
+          example: 256
+        deprecated_tags:
+          type: array
+          items:
+            type: string
+          description: >-
+            Deprecated tags of the record (h=, n=, s=, t=): ignored by DKIM2
+            verifiers, and DKIM1 records should not use them either.
+          example: ["t"]
+        valid:
+          type: boolean
+          description: Whether a DKIM2 verifier can use the key for this signature
+          example: true
+        error:
+          type: string
+          description: Why it cannot, worded as the DKIM2 draft does
+          example: "PERMERROR: DKIM2-Signature i=1 public key default does not exist"
+
+    DKIM2PolicyRecord:
+      type: object
+      required:
+        - domain
+        - valid
+      properties:
+        domain:
+          type: string
+          description: Domain the policy is about (the record is at _domainkey.<domain>)
+          example: "example.com"
+        record:
+          type: string
+          description: Record content, when one is published
+          example: "v=DKIM1; f=strict"
+        strict:
+          type: boolean
+          description: >-
+            Whether the strict flag is set: subdomains of the domain may not
+            make From header fields using it Authentic.
+          example: false
+        valid:
+          type: boolean
+          description: Whether the record, when there is one, is usable. No record at all is valid (subdomains authorized).
+          example: true
+        error:
+          type: string
+          description: Why the record cannot be used
+          example: "Multiple Domain Policy Records found"
 
     DMARCRecord:
       type: object

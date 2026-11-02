@@ -230,6 +230,17 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.H
 		}
 	}
 
+	// Check DKIM2 keys, apart from the DKIM ones: during the transition a
+	// message may carry either kind of signature, or both, possibly naming the
+	// same keys. The Domain Policy Record only matters to a DKIM2 verifier, so
+	// it is looked up only when there is a DKIM2 signature to verify, and only
+	// at the From domain: it applies to the domain holding it and no other.
+	if dkim2Signatures := email.DKIM2Signatures(); len(dkim2Signatures) > 0 {
+		dkim2Records := d.checkDKIM2Records(dkim2Signatures)
+		results.Dkim2Records = &dkim2Records
+		results.Dkim2PolicyRecords = &[]model.DKIM2PolicyRecord{d.checkDKIM2PolicyRecord(fromDomain)}
+	}
+
 	// Check DMARC record (for From domain - DMARC protects the visible sender)
 	// DMARC validates alignment between SPF/DKIM and the From domain
 	results.DmarcRecord = d.checkDMARCRecord(fromDomain)
@@ -413,7 +424,11 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	d.addSectionIssues(results, mxRP, 20, totalWeight)
 	results.Issues.Bimi = optionalIssueList(bimiIssues(results.BimiRecord, results.DmarcRecord, results.FromDomain))
 
-	score := weightedScore / totalWeight
+	// DKIM2 keys, still a draft, only take a few points off
+	dkim2Issues, dkim2Points := dkim2KeyIssues(results)
+	results.Issues.Dkim2 = optionalIssueList(dkim2Issues)
+
+	score := weightedScore/totalWeight - dkim2Points
 
 	// Penalty when a sender domain cannot receive replies/bounces at all
 	score += calculateReturnOKPenalty(results)

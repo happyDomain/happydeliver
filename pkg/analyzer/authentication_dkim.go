@@ -49,6 +49,22 @@ func (a *AuthenticationAnalyzer) parseDKIMResult(method authresults.Method) *mod
 }
 
 func (a *AuthenticationAnalyzer) calculateDKIMScore(results *model.AuthenticationResults) (score int) {
+	score = a.calculateDKIM1Score(results)
+
+	// Signed with DKIM2 only, and verified: the message is authenticated,
+	// though DMARC and most receivers cannot take it into account yet.
+	if score < dkimScoreDKIM2Only && dkim2Passed(results) {
+		score = dkimScoreDKIM2Only
+	}
+
+	return score
+}
+
+// dkimScoreDKIM2Only is the DKIM score of a message no DKIM signature
+// authenticates, but whose DKIM2 chain verified.
+const dkimScoreDKIM2Only = 50
+
+func (a *AuthenticationAnalyzer) calculateDKIM1Score(results *model.AuthenticationResults) (score int) {
 	// Expect at least one passing signature
 	if results.Dkim != nil && len(*results.Dkim) > 0 {
 		hasPass := false

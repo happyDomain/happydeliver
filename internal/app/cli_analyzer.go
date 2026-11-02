@@ -236,6 +236,41 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 			}
 		}
 
+		// DKIM2 Records (IETF draft): the keys of each signature of the chain
+		if dns.Dkim2Records != nil && len(*dns.Dkim2Records) > 0 {
+			fmt.Fprintln(writer, "\n  DKIM2 Records (draft):")
+			for _, dkim2 := range *dns.Dkim2Records {
+				status := "✓"
+				if !dkim2.Valid {
+					status = "✗"
+				}
+				fmt.Fprintf(writer, "    %s i=%d Selector: %s, Domain: %s", status, dkim2.Instance, dkim2.Selector, dkim2.Domain)
+				if dkim2.SigningAlgorithm != nil {
+					fmt.Fprintf(writer, ", Algorithm: %s", *dkim2.SigningAlgorithm)
+				}
+				fmt.Fprintln(writer)
+				if dkim2.Record != nil {
+					fmt.Fprintf(writer, "      %s\n", *dkim2.Record)
+				}
+				if dkim2.DeprecatedTags != nil && len(*dkim2.DeprecatedTags) > 0 {
+					fmt.Fprintf(writer, "      NOTE: deprecated tags, ignored by DKIM2: %s\n", strings.Join(*dkim2.DeprecatedTags, ", "))
+				}
+				if dkim2.Error != nil {
+					fmt.Fprintf(writer, "      ERROR: %s\n", *dkim2.Error)
+				}
+			}
+		}
+		if dns.Dkim2PolicyRecords != nil {
+			for _, policy := range *dns.Dkim2PolicyRecords {
+				switch {
+				case policy.Error != nil:
+					fmt.Fprintf(writer, "    ✗ DKIM2 Domain Policy (_domainkey.%s): %s\n", policy.Domain, *policy.Error)
+				case policy.Record != nil:
+					fmt.Fprintf(writer, "    ✓ DKIM2 Domain Policy (_domainkey.%s): %s\n", policy.Domain, *policy.Record)
+				}
+			}
+		}
+
 		// DMARC Record
 		if dns.DmarcRecord != nil {
 			fmt.Fprintln(writer, "\n  DMARC Record:")
@@ -362,6 +397,22 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 				}
 				fmt.Fprintln(writer)
 			}
+		}
+
+		// DKIM2 (IETF draft): one verdict for the whole chain
+		if auth.Dkim2 != nil {
+			fmt.Fprintf(writer, "\n  DKIM2 (draft): %s", strings.ToUpper(string(auth.Dkim2.Result)))
+			if auth.Dkim2.Domain != nil {
+				fmt.Fprintf(writer, " (domain: %s", *auth.Dkim2.Domain)
+				if auth.Dkim2.Instance != nil {
+					fmt.Fprintf(writer, ", signature i=%d", *auth.Dkim2.Instance)
+				}
+				fmt.Fprintf(writer, ")")
+			}
+			if auth.Dkim2.Comment != nil {
+				fmt.Fprintf(writer, "\n      Comment: %s", *auth.Dkim2.Comment)
+			}
+			fmt.Fprintln(writer)
 		}
 
 		// DMARC

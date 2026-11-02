@@ -63,6 +63,9 @@ func senderDomains(email *mailmsg.Message) []string {
 	for _, signature := range email.DKIMSignatures() {
 		add(signature.Domain)
 	}
+	for _, signature := range email.DKIM2Signatures() {
+		add(signature.Domain)
+	}
 
 	return domains
 }
