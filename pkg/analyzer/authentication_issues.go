@@ -34,6 +34,7 @@ import (
 const (
 	authWeightSPF          = 30
 	authWeightDKIM         = 30
+	authWeightDKIM2        = 5
 	authWeightDMARC        = 30
 	authWeightBIMI         = 10
 	authWeightSPFHelo      = 5
@@ -102,6 +103,9 @@ func (a *AuthenticationAnalyzer) ReportIssues(results *model.AuthenticationResul
 	}
 	if results.Iprev != nil {
 		issues.Iprev = chargedIssues(100-a.calculateIPRevScore(results), authWeightIPRev, iprevVerdictIssues(results.Iprev, dns)...)
+	}
+	if signed := dns.Dkim2Records != nil && len(*dns.Dkim2Records) > 0; results.Dkim2 != nil || signed {
+		issues.Dkim2 = chargedIssues(-a.calculateDKIM2Score(results), authWeightDKIM2, dkim2VerdictIssues(results.Dkim2, signed)...)
 	}
 	if results.XGoogleDkim != nil {
 		issues.XGoogleDkim = chargedIssues(-a.calculateXGoogleDKIMScore(results), authWeightXGoogleDKIM, xGoogleDKIMVerdictIssues(results.XGoogleDkim)...)
@@ -199,8 +203,19 @@ func spfVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResult
 	}
 }
 
+// dkimOnlyDKIM2Issue says that only a DKIM2 signature authenticates the
+// message, which DMARC and most receivers do not take into account yet.
+func dkimOnlyDKIM2Issue(dns *model.DNSResults) model.Issue {
+	return newIssue(model.IssueTypeDkimMissing, model.IssueSeverityMedium, dns.FromDomain,
+		"Only a DKIM2 signature authenticates the message. DKIM2 is still an IETF draft: DMARC does not take it into account and most receivers do not verify it yet.",
+		"Keep signing with DKIM alongside DKIM2 during the transition; both can use the same key.")
+}
+
 func dkimVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResults, uploaded bool) []model.Issue {
 	if results.Dkim == nil || len(*results.Dkim) == 0 {
+		if dkim2Passed(results) {
+			return []model.Issue{dkimOnlyDKIM2Issue(dns)}
+		}
 		return []model.Issue{unevaluatedIssue("DKIM", uploaded)}
 	}
 
@@ -242,6 +257,8 @@ func dkimVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResul
 		return []model.Issue{newIssue(model.IssueTypeDkimExtraFail, model.IssueSeverityLow, utils.Deref(others[0].Domain),
 			fmt.Sprintf("Another signature passes, so the message is authenticated, but the one of %s does not verify.", strings.Join(names, ", ")),
 			"Fix or remove the failing signature: some filters count every broken signature against the message.")}
+	case len(failing) == 0 && dkim2Passed(results):
+		return []model.Issue{dkimOnlyDKIM2Issue(dns)}
 	case len(failing) == 0:
 		return []model.Issue{newIssue(model.IssueTypeDkimMissing, model.IssueSeverityHigh, dns.FromDomain,
 			"Without a DKIM signature, DMARC can only rely on SPF, which does not survive forwarding.",

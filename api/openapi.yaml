@@ -418,6 +418,8 @@ components:
       $ref: './schemas.yaml#/components/schemas/AuthenticationResults'
     AuthResult:
       $ref: './schemas.yaml#/components/schemas/AuthResult'
+    DKIM2Result:
+      $ref: './schemas.yaml#/components/schemas/DKIM2Result'
     ARCResult:
       $ref: './schemas.yaml#/components/schemas/ARCResult'
     IPRevResult:
@@ -442,6 +444,10 @@ components:
       $ref: './schemas.yaml#/components/schemas/SPFRecord'
     DKIMRecord:
       $ref: './schemas.yaml#/components/schemas/DKIMRecord'
+    DKIM2Record:
+      $ref: './schemas.yaml#/components/schemas/DKIM2Record'
+    DKIM2PolicyRecord:
+      $ref: './schemas.yaml#/components/schemas/DKIM2PolicyRecord'
     DMARCRecord:
       $ref: './schemas.yaml#/components/schemas/DMARCRecord'
     BIMIRecord:
