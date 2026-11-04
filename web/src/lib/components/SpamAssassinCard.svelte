@@ -93,7 +93,7 @@
             tag={plural(spamassassin.tests.length, "rule")}
         >
             <div class="card-body">
-                {#each spamassassin.tests as test (test)}
+                {#each spamassassin.tests as test, i (i)}
                     <span class="badge text-bg-light font-monospace me-1 mb-1">{test}</span>
                 {/each}
             </div>

@@ -139,7 +139,7 @@
      the address stands out by its colour, not by a layout of its own. -->
 {#snippet lists(checks: BlacklistCheck[], whitelist: boolean)}
     <ul class="lists list-unstyled small mb-2">
-        {#each checks as check (check.rbl)}
+        {#each checks as check, i (i)}
             {@const verdict = verdictOf(check, whitelist)}
             {@const lookup = !whitelist && check.listed ? rblLookupLink(check.rbl) : undefined}
             <li class={verdict.row}>

@@ -257,7 +257,7 @@
         {#if vmc.san_domains && vmc.san_domains.length > 0}
             <div class="small">
                 <span class="text-body-secondary me-1">Covers</span>
-                {#each vmc.san_domains as san (san)}
+                {#each vmc.san_domains as san, i (i)}
                     <span
                         class="d-inline-block me-1 mb-1 px-1 font-monospace bg-body border rounded-1"
                         >{san}</span

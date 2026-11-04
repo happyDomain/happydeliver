@@ -259,7 +259,7 @@
                         <summary>Details</summary>
                         {#if r.reasons && r.reasons.length > 1}
                             <ul class="mb-2 mt-1">
-                                {#each r.reasons as reason (reason)}
+                                {#each r.reasons as reason, i (i)}
                                     <li>{reason}</li>
                                 {/each}
                             </ul>
