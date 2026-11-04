@@ -14,7 +14,10 @@
         /** What ran the filter: its version, its server. */
         subject?: string;
         score: number;
-        /** In increasing order; the last one is where the message is treated as spam. */
+        /**
+         * In increasing order; the last one is where the message is treated as spam. Empty
+         * when the filter gave no threshold: there is then no gauge.
+         */
         steps: GaugeStep[];
         /** What becomes of the message below the first step. */
         base: string;
@@ -102,15 +105,17 @@
                     ></i>{verdict}
                 </span>
             </div>
-            <div class="meter">
-                <SpamScoreGauge
-                    {score}
-                    {steps}
-                    {base}
-                    {tone}
-                    label="{name} score against its thresholds"
-                />
-            </div>
+            {#if steps.length > 0}
+                <div class="meter">
+                    <SpamScoreGauge
+                        {score}
+                        {steps}
+                        {base}
+                        {tone}
+                        label="{name} score against its thresholds"
+                    />
+                </div>
+            {/if}
         </div>
         <p class="check-about mb-3">
             {about}

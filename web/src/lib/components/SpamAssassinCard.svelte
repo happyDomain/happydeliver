@@ -57,7 +57,9 @@
     name="SpamAssassin"
     subject={spamassassin.version}
     score={spamassassin.score}
-    steps={[{ at: spamassassin.required_score, label: "Spam", zone: "Spam" }]}
+    steps={spamassassin.required_score > 0
+        ? [{ at: spamassassin.required_score, label: "Spam", zone: "Spam" }]
+        : []}
     base="Not spam"
     verdict={spamassassin.is_spam ? "Spam" : "Not spam"}
     isSpam={spamassassin.is_spam}

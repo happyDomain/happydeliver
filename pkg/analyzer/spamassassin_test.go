@@ -551,3 +551,25 @@ func TestAnalyzeSpamAssassinStatusVerdictWinsOverFlag(t *testing.T) {
 		t.Error("IsSpam should be true: X-Spam-Status said Yes, X-Spam-Flag must not override it")
 	}
 }
+
+func TestCalculateSpamAssassinScoreWithoutThreshold(t *testing.T) {
+	analyzer := NewSpamAssassinAnalyzer()
+
+	tests := []struct {
+		score     float32
+		wantScore int
+	}{
+		{score: -1, wantScore: 100},
+		{score: 0, wantScore: 100},
+		{score: 2, wantScore: 80},
+		{score: 5, wantScore: 0},
+	}
+
+	for _, tt := range tests {
+		got, _ := analyzer.CalculateSpamAssassinScore(&model.SpamAssassinResult{Score: tt.score})
+		want, _ := analyzer.CalculateSpamAssassinScore(&model.SpamAssassinResult{Score: tt.score, RequiredScore: spamAssassinDefaultRequiredScore})
+		if got != tt.wantScore || got != want {
+			t.Errorf("score %v: got %d, want %d as with the default threshold (%d)", tt.score, got, tt.wantScore, want)
+		}
+	}
+}

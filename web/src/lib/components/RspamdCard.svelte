@@ -23,27 +23,29 @@
     // (always "no action").
     const RSPAMD_GREYLIST_THRESHOLD = 4;
     const RSPAMD_ADD_HEADER_THRESHOLD = 6;
-    const RSPAMD_DEFAULT_REJECT_THRESHOLD = 15;
 
-    // The reported threshold is the score at which that instance rejects, so
-    // prefer it: hardcoding rspamd's default would mislabel an instance that
-    // rejects elsewhere.
-    const rejectThreshold = $derived(rspamd.threshold ?? RSPAMD_DEFAULT_REJECT_THRESHOLD);
+    // The score at which that instance rejects, 0 when it did not say.
+    const rejectThreshold = $derived(rspamd.threshold ?? 0);
 
     // The steps below the reject threshold only: an instance rejecting from 5 never
-    // gets to add a header at 6.
-    const steps = $derived<GaugeStep[]>([
-        ...[
-            { at: RSPAMD_GREYLIST_THRESHOLD, label: "Greylist", zone: "Greylisted" },
-            { at: RSPAMD_ADD_HEADER_THRESHOLD, label: "Add header", zone: "Spam folder" },
-        ].filter((s) => s.at < rejectThreshold),
-        { at: rejectThreshold, label: "Reject", zone: "Rejected" },
-    ]);
+    // gets to add a header at 6. None without a threshold to place them against.
+    const steps = $derived<GaugeStep[]>(
+        rejectThreshold > 0
+            ? [
+                  ...[
+                      { at: RSPAMD_GREYLIST_THRESHOLD, label: "Greylist", zone: "Greylisted" },
+                      { at: RSPAMD_ADD_HEADER_THRESHOLD, label: "Add header", zone: "Spam folder" },
+                  ].filter((s) => s.at < rejectThreshold),
+                  { at: rejectThreshold, label: "Reject", zone: "Rejected" },
+              ]
+            : [],
+    );
 
     // What becomes of the message, in the words the gauge uses for the stretch it is in.
     const DELIVERED = "Delivered";
     const outcome = $derived(
-        [...steps].reverse().find((s) => rspamd.score >= s.at)?.zone ?? DELIVERED,
+        [...steps].reverse().find((s) => rspamd.score >= s.at)?.zone ??
+            (rspamd.is_spam ? "Spam" : DELIVERED),
     );
 
     const symbols = $derived(Object.entries(rspamd.symbols ?? {}));
@@ -94,10 +96,7 @@
     deliverabilityScore={rspamd.deliverability_score}
     deliverabilityGrade={rspamd.deliverability_grade}
     site={spamFilterSites.rspamd}
-    about="rspamd adds up the weight of every symbol it raises, then acts by steps: greylisting delays the message, an added header has it filed as spam, and from the last step on it is refused.{rspamd.threshold ===
-    undefined
-        ? " This instance did not say where it rejects: the threshold shown is rspamd's default."
-        : ''}"
+    about="rspamd adds up the weight of every symbol it raises, then acts by steps: greylisting delays the message, an added header has it filed as spam, and from the last step on it is refused."
 >
     {#if symbols.length > 0}
         <CheckCard

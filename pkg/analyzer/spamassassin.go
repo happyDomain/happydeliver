@@ -205,6 +205,19 @@ func (a *SpamAssassinAnalyzer) parseSpamReport(report string, result *model.Spam
 	}
 }
 
+// spamAssassinDefaultRequiredScore is SpamAssassin's built-in required_score.
+const spamAssassinDefaultRequiredScore float32 = 5
+
+// effectiveRequiredScore returns the threshold to score a message against: the
+// one reported, or SpamAssassin's default for a filter that gave none, as another
+// filter writing X-Spam-Status may. Only a reported one is published.
+func effectiveRequiredScore(result *model.SpamAssassinResult) float32 {
+	if result.RequiredScore > 0 {
+		return result.RequiredScore
+	}
+	return spamAssassinDefaultRequiredScore
+}
+
 // CalculateSpamAssassinScore calculates the SpamAssassin contribution to deliverability
 func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *model.SpamAssassinResult) (int, string) {
 	if result == nil {
@@ -217,17 +230,18 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *model.SpamAssa
 	// Score > 5 is likely spam
 
 	score := result.Score
+	required := effectiveRequiredScore(result)
 
 	// Convert SpamAssassin score to 0-100 scale (inverted - lower SA score is better)
 	if score < 0 {
 		return 100, "A+" // Perfect score for ham
 	} else if score == 0 {
 		return 100, "A" // Perfect score for ham
-	} else if score >= result.RequiredScore {
+	} else if score >= required {
 		return 0, "F" // Failed spam test
 	} else {
 		// Linear scale between 0 and required threshold
-		percentage := 100 - int(math.Round(float64(score*100/(2*result.RequiredScore))))
+		percentage := 100 - int(math.Round(float64(score*100/(2*required))))
 		return percentage, grade.Of(percentage - 5)
 	}
 }

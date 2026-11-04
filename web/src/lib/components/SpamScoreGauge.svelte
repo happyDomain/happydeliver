@@ -12,7 +12,7 @@
 <script lang="ts">
     interface Props {
         score: number;
-        /** In increasing order; the last one is where the message is treated as spam. */
+        /** At least one, in increasing order; the last one is where the message is treated as spam. */
         steps: GaugeStep[];
         /** What the message is below the first step. */
         base: string;
@@ -26,7 +26,7 @@
 
     // Wide enough to show the last step with room past it, and the score wherever it falls:
     // a message far beyond the threshold, or far below zero, still has its needle on the bar.
-    const top = $derived(steps.length > 0 ? steps[steps.length - 1].at : 5);
+    const top = $derived(steps[steps.length - 1].at);
     const lo = $derived(Math.min(0, score));
     const hi = $derived(Math.max(top * 1.25, score + top * 0.05));
     const pos = (value: number) => ((value - lo) / (hi - lo)) * 100;
@@ -65,13 +65,13 @@
         {#if lo < 0}
             <span class="zero" style:left="{pos(0)}%"></span>
         {/if}
-        {#each steps as step (step.at)}
+        {#each steps as step, i (i)}
             <span class="tick" style:left="{pos(step.at)}%" title="{step.label} from {step.at}"
             ></span>
         {/each}
     </div>
     <div class="scale small">
-        {#each zones as zone (zone.from)}
+        {#each zones as zone, i (i)}
             <span
                 class={["zone", zone === current && `current text-${tone}-emphasis`]}
                 style:left="{pos(zone.from)}%"
@@ -82,7 +82,7 @@
         {#if lo < 0}
             <span class="value" style:left="{pos(0)}%">0</span>
         {/if}
-        {#each steps as step (step.at)}
+        {#each steps as step, i (i)}
             <span class="value" style:left="{pos(step.at)}%" title="{step.label} from {step.at}"
                 >{step.at}</span
             >
