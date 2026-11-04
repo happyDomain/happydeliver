@@ -701,3 +701,15 @@ func TestCalculateScoreForASingleAddress(t *testing.T) {
 		})
 	}
 }
+
+func TestListCheckersQueryEachListOnce(t *testing.T) {
+	lists := []string{"a.example", "b.example", "a.example"}
+	want := []string{"a.example", "b.example"}
+
+	if got := NewRBLChecker(0, lists, false).Lists; !slices.Equal(got, want) {
+		t.Errorf("RBL lists = %v, want %v", got, want)
+	}
+	if got := NewDNSWLChecker(0, lists, false).Lists; !slices.Equal(got, want) {
+		t.Errorf("DNSWL lists = %v, want %v", got, want)
+	}
+}

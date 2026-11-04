@@ -124,7 +124,7 @@ func NewRBLChecker(timeout time.Duration, rbls []string, checkAllIPs bool) *DNSL
 	}
 	return &DNSListChecker{
 		Timeout:          timeout,
-		Lists:            rbls,
+		Lists:            uniqueLists(rbls),
 		CheckAllIPs:      checkAllIPs,
 		filterErrorCodes: true,
 		resolver:         &net.Resolver{PreferGo: true},
@@ -142,12 +142,26 @@ func NewDNSWLChecker(timeout time.Duration, dnswls []string, checkAllIPs bool) *
 	}
 	return &DNSListChecker{
 		Timeout:          timeout,
-		Lists:            dnswls,
+		Lists:            uniqueLists(dnswls),
 		CheckAllIPs:      checkAllIPs,
 		filterErrorCodes: false,
 		resolver:         &net.Resolver{PreferGo: true},
 		informationalSet: make(map[string]bool),
 	}
+}
+
+// uniqueLists drops the lists named more than once, keeping the first of each:
+// querying a list twice would count its listing twice.
+func uniqueLists(lists []string) []string {
+	seen := make(map[string]bool, len(lists))
+	unique := make([]string, 0, len(lists))
+	for _, list := range lists {
+		if !seen[list] {
+			seen[list] = true
+			unique = append(unique, list)
+		}
+	}
+	return unique
 }
 
 // DNSListResults represents the results of DNS list checks
