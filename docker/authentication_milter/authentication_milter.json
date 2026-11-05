@@ -45,6 +45,11 @@
             "hide_none" : 0,
         },
 
+        "DKIM2Verify" : {
+            "hide_none" : 1,
+            "add_message_instance" : 0
+        },
+
         "XGoogleDKIM" : {
             "hide_none" : 1,
         },

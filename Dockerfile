@@ -80,11 +80,16 @@ RUN apk add --no-cache \
 ARG MAIL_DMARC_VERSION=1.20260306
 # renovate: datasource=cpan depName=Mail::Milter::Authentication
 ARG AUTHENTICATION_MILTER_VERSION=4.20261020
+# Ships the DKIM2Verify handler. Its API is 0.x and its wire format follows the
+# draft, so it only moves on purpose.
+# renovate: datasource=cpan depName=Mail::DKIM2
+ARG MAIL_DKIM2_VERSION=0.30
 
 RUN cpanm --notest Mail::SPF && \
     cpanm --notest Mail::DKIM && \
     cpanm --notest "Mail::DMARC~== ${MAIL_DMARC_VERSION}" && \
-    cpanm --notest "Mail::Milter::Authentication~== ${AUTHENTICATION_MILTER_VERSION}";
+    cpanm --notest "Mail::Milter::Authentication~== ${AUTHENTICATION_MILTER_VERSION}" && \
+    cpanm --notest "Mail::DKIM2~== ${MAIL_DKIM2_VERSION}";
 
 # renovate: datasource=custom.savannah-spamass-milter depName=spamass-milter versioning=loose
 ARG SPAMASS_MILT_VERSION=0.4.0
