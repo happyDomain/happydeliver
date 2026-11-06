@@ -333,12 +333,24 @@ func (r *DNSListChecker) reverseIP(ipStr string) string {
 	return utils.ReverseLabels(ip)
 }
 
+// scoringListCount is how many of the configured lists count toward the score:
+// the informational lists left out of the configuration take nothing off it.
+func (r *DNSListChecker) scoringListCount() int {
+	count := 0
+	for _, list := range r.Lists {
+		if !r.informationalSet[list] {
+			count++
+		}
+	}
+	return count
+}
+
 // CalculateScore calculates the list contribution to deliverability.
 // Informational lists don't count proportionally; instead, if any
 // informational list triggers, a flat 10% penalty is applied regardless
 // of how many of them fire.
 func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bool) (int, string) {
-	scoringListCount := len(r.Lists) - len(r.informationalSet)
+	scoringListCount := r.scoringListCount()
 
 	if forWhitelist {
 		if results.ListedCount >= scoringListCount {
@@ -373,7 +385,7 @@ func (r *DNSListChecker) ListingIssues(results *DNSListResults) map[string][]mod
 // 100 points; the first on an informational list costs the flat penalty,
 // those after it nothing more.
 func (r *DNSListChecker) chargeListings(results *DNSListResults) (int, map[string][]model.Issue) {
-	scoringListCount := len(r.Lists) - len(r.informationalSet)
+	scoringListCount := r.scoringListCount()
 	c := checkScore{score: 100}
 	issues := map[string][]model.Issue{}
 	if results == nil {

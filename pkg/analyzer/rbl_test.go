@@ -617,6 +617,54 @@ func TestListingIssuesWithoutScoringLists(t *testing.T) {
 	}
 }
 
+// The share of a listing comes from the lists configured: an informational
+// list left out of them takes nothing off the count of scoring lists.
+func TestCalculateScoreCountsConfiguredLists(t *testing.T) {
+	tests := []struct {
+		name  string
+		rbls  []string
+		want  int
+		grade string
+	}{
+		{"single list", []string{"a.example"}, 0, "F"},
+		{"two lists", []string{"a.example", "b.example"}, 50, "E"},
+		{"five lists", []string{"a.example", "b.example", "c.example", "d.example", "e.example"}, 80, "C"},
+		{"one informational list configured", []string{"a.example", "b.example", "dnsbl-2.uceprotect.net"}, 50, "E"},
+		{"both informational lists configured", []string{"a.example", "b.example", "dnsbl-2.uceprotect.net", "dnsbl-3.uceprotect.net"}, 50, "E"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			checker := NewRBLChecker(0, tt.rbls, false)
+			results := &DNSListResults{
+				IPsChecked:  []string{"192.0.2.1"},
+				Checks:      map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "a.example", Listed: true}}},
+				ListedCount: 1,
+			}
+
+			score, gotGrade := checker.CalculateScore(results, false)
+			if score != tt.want || gotGrade != tt.grade {
+				t.Errorf("CalculateScore = %d, %q, want %d, %q", score, gotGrade, tt.want, tt.grade)
+			}
+		})
+	}
+}
+
+// A network-wide list costs its flat penalty as soon as one list scores, even
+// with the other informational list left out of the configuration.
+func TestInformationalPenaltyWithOneScoringList(t *testing.T) {
+	checker := NewRBLChecker(0, []string{"a.example", "dnsbl-2.uceprotect.net"}, false)
+	results := &DNSListResults{
+		IPsChecked:  []string{"192.0.2.1"},
+		Checks:      map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: "dnsbl-2.uceprotect.net", Listed: true}}},
+		ListedCount: 1,
+	}
+
+	if score, _ := checker.CalculateScore(results, false); score != 100-informationalPenalty {
+		t.Errorf("score = %d, want %d", score, 100-informationalPenalty)
+	}
+}
+
 // A single address is scored from its checks, informational lists apart, as
 // the address checker scores it.
 func TestCalculateScoreForASingleAddress(t *testing.T) {
