@@ -568,7 +568,10 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 		fmt.Fprintln(writer, strings.Repeat("-", 70))
 
 		sa := report.Spamassassin
-		fmt.Fprintf(writer, "\n  Score: %.2f / %.2f", sa.Score, sa.RequiredScore)
+		fmt.Fprintf(writer, "\n  Score: %.2f", sa.Score)
+		if sa.RequiredScore > 0 {
+			fmt.Fprintf(writer, " / %.2f", sa.RequiredScore)
+		}
 		if sa.IsSpam {
 			fmt.Fprintf(writer, " (SPAM)")
 		} else {
