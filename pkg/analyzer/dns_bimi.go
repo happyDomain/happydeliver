@@ -359,7 +359,7 @@ func bimiRecordIssues(record *model.BIMIRecord, domain string) (issues []model.I
 		// A certificate that was fetched and parsed is not a missing one:
 		// whatever the warning says (a Content-Type, an expiry close by),
 		// it is a reservation about that certificate, reported as such.
-		if check.Name == "vmc" && record.Vmc == nil && record.VmcUrl == nil {
+		if check.Name == "vmc" && record.Vmc == nil && utils.Deref(record.VmcUrl) == "" {
 			if message == "" {
 				message = "No mark certificate vouches for the logo, and most mailbox providers only display one that has it."
 			}

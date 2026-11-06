@@ -447,3 +447,16 @@ func TestBIMIRecordIssuesOfAPublishedCertificateWarning(t *testing.T) {
 		t.Errorf("issues = %v, want one bimi_check_warning", issues)
 	}
 }
+
+// A record without a= reaches the issues with an empty certificate URL, not an
+// absent one: the conversion always fills the field in.
+func TestBIMIRecordIssuesSelfAsserted(t *testing.T) {
+	rec := bimi.ParseRecord("example.com", "default", "v=BIMI1; l=https://example.com/logo.svg")
+	rec.Checks = []bimi.Check{{Name: "vmc", Description: "Verified Mark Certificate", Status: bimi.StatusWarning}}
+
+	issues := bimiRecordIssues(bimiRecordToModel(rec), "example.com")
+
+	if got := issueTypes(issues); len(got) != 1 || got[0] != model.IssueTypeBimiVmcMissing {
+		t.Errorf("types = %v, want bimi_vmc_missing", got)
+	}
+}
