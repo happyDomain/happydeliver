@@ -937,6 +937,13 @@ components:
             SPF identity the result applies to (for SPF only): the envelope sender
             (smtp.mailfrom) or the HELO/EHLO name (smtp.helo).
           example: "mailfrom"
+        authority:
+          type: string
+          description: >-
+            What the receiver found of the mark certificate of the logo (for
+            BIMI only, policy.authority): pass or fail when the record publishes
+            one, absent when it does not, or when the receiver does not say.
+          example: "pass"
         details:
           type: string
           description: Additional details about the result

@@ -123,19 +123,24 @@ func TestBIMIPassNeedsACertificate(t *testing.T) {
 
 	tests := []struct {
 		name      string
+		authority *string
 		record    *model.BIMIRecord
 		wantScore int
 		wantIssue model.IssueType
 	}{
-		{"not analysed", nil, 100, ""},
-		{"valid certificate", &model.BIMIRecord{Valid: true, Vmc: &model.VMCInfo{Valid: true}}, 100, ""},
-		{"self-asserted", &model.BIMIRecord{Valid: true, VmcUrl: utils.PtrTo("")}, 50, model.IssueTypeBimiVmcMissing},
-		{"invalid certificate", &model.BIMIRecord{Vmc: &model.VMCInfo{Valid: false}}, 50, model.IssueTypeBimiUnverified},
+		{"not analysed", nil, nil, 100, ""},
+		{"valid certificate", nil, &model.BIMIRecord{Valid: true, Vmc: &model.VMCInfo{Valid: true}}, 100, ""},
+		{"self-asserted", nil, &model.BIMIRecord{Valid: true, VmcUrl: utils.PtrTo("")}, 50, model.IssueTypeBimiVmcMissing},
+		{"invalid certificate", nil, &model.BIMIRecord{Vmc: &model.VMCInfo{Valid: false}}, 50, model.IssueTypeBimiUnverified},
+		// The receiver's word goes before an analysis made afterwards
+		{"receiver vouches", utils.PtrTo("pass"), &model.BIMIRecord{Valid: true, VmcUrl: utils.PtrTo("")}, 100, ""},
+		{"receiver refuses", utils.PtrTo("fail"), &model.BIMIRecord{Valid: true, Vmc: &model.VMCInfo{Valid: true}}, 50, model.IssueTypeBimiUnverified},
+		{"receiver refuses, not analysed", utils.PtrTo("fail"), nil, 50, model.IssueTypeBimiUnverified},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := &model.AuthenticationResults{Bimi: &model.AuthResult{Result: model.AuthResultResultPass}, Spf: &model.AuthResult{Result: model.AuthResultResultPass}}
+			results := &model.AuthenticationResults{Bimi: &model.AuthResult{Result: model.AuthResultResultPass, Authority: tt.authority}, Spf: &model.AuthResult{Result: model.AuthResultResultPass}}
 			dns := &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced, BimiRecord: tt.record}
 
 			if score := a.calculateBIMIScore(results, dns); score != tt.wantScore {
@@ -151,5 +156,20 @@ func TestBIMIPassNeedsACertificate(t *testing.T) {
 				t.Errorf("issues = %+v, want one %s costing 5", issues, tt.wantIssue)
 			}
 		})
+	}
+}
+
+// policy.authority is read off the verdict, and stays absent when not written.
+func TestParseBIMIAuthority(t *testing.T) {
+	a := NewAuthenticationAnalyzer("")
+	for part, want := range map[string]*string{
+		"bimi=pass header.d=example.com policy.authority=pass": utils.PtrTo("pass"),
+		"bimi=fail policy.authority=fail":                      utils.PtrTo("fail"),
+		"bimi=pass header.d=example.com":                       nil,
+	} {
+		got := a.parseBIMIResult(readMethod(t, part)).Authority
+		if (got == nil) != (want == nil) || (got != nil && *got != *want) {
+			t.Errorf("%s: authority = %v, want %v", part, got, want)
+		}
 	}
 }

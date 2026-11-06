@@ -29,7 +29,7 @@ import (
 )
 
 // parseBIMIResult parses BIMI result from Authentication-Results
-// Example: bimi=pass header.d=example.com header.selector=default
+// Example: bimi=pass header.d=example.com header.selector=default policy.authority=pass
 func (a *AuthenticationAnalyzer) parseBIMIResult(method authresults.Method) *model.AuthResult {
 	result := &model.AuthResult{
 		Result:  model.AuthResultResult(method.Result),
@@ -42,13 +42,22 @@ func (a *AuthenticationAnalyzer) parseBIMIResult(method authresults.Method) *mod
 	if selector := method.Property("header.selector", "selector"); selector != "" {
 		result.Selector = &selector
 	}
+	if authority := method.Property("policy.authority"); authority != "" {
+		result.Authority = &authority
+	}
 
 	return result
 }
 
-// bimiUncertified tells whether the analysis of the BIMI record found no valid
-// mark certificate behind it. Without an analysis, nothing says so.
-func bimiUncertified(dns *model.DNSResults) bool {
+// bimiUncertified tells whether no valid mark certificate backs the logo. The
+// receiver says so with policy.authority when the record publishes a
+// certificate; when it says nothing, because there is none or because it is
+// not one to write that property, the analysis of the record decides. Without
+// an analysis, nothing says so.
+func bimiUncertified(results *model.AuthenticationResults, dns *model.DNSResults) bool {
+	if results.Bimi != nil && results.Bimi.Authority != nil {
+		return *results.Bimi.Authority != "pass"
+	}
 	if dns == nil || dns.BimiRecord == nil {
 		return false
 	}
@@ -57,14 +66,13 @@ func bimiUncertified(dns *model.DNSResults) bool {
 }
 
 // calculateBIMIScore only grants all the points to a logo a mark certificate
-// vouches for: a verdict of pass says nothing of the certificate, as the
-// receiver reports the same for a self-asserted logo, which earns what
-// declining does. dns is what the records of the sender say.
+// vouches for: a receiver also reports pass for a self-asserted logo, which
+// earns what declining does. dns is what the records of the sender say.
 func (a *AuthenticationAnalyzer) calculateBIMIScore(results *model.AuthenticationResults, dns *model.DNSResults) (score int) {
 	if results.Bimi != nil {
 		switch results.Bimi.Result {
 		case model.AuthResultResultPass:
-			if bimiUncertified(dns) {
+			if bimiUncertified(results, dns) {
 				return 50
 			}
 			return 100

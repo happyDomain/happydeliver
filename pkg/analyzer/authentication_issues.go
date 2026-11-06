@@ -318,8 +318,8 @@ func bimiVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResul
 	location := bimiLocation(record, dns.FromDomain)
 
 	switch {
-	case result == model.AuthResultResultPass && bimiUncertified(dns):
-		if record.Vmc != nil {
+	case result == model.AuthResultResultPass && bimiUncertified(results, dns):
+		if results.Bimi.Authority != nil || (record != nil && record.Vmc != nil) {
 			return []model.Issue{newIssue(model.IssueTypeBimiUnverified, model.IssueSeverityLow, location,
 				"The mark certificate published for your logo does not validate, and only a valid one earns all the points BIMI counts for in the authentication score.",
 				"Check the mark certificate published at the a= URL in the BIMI details.")}
