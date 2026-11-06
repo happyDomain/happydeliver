@@ -1,6 +1,7 @@
 <script lang="ts">
     import { resolve } from "$app/paths";
 
+    import { ageLevel, analysisLag, formatDuration } from "#lib/age.js";
     import type { Report } from "#lib/api/types.gen.js";
     import { hasNoAuthenticationResults, isUploadedMessage } from "#lib/authentication.js";
     import { hasNoSpamResults } from "#lib/spam.js";
@@ -599,12 +600,10 @@
     const reportAge = $derived(Date.now() - new Date(report.created_at).getTime());
     const knownAge = $derived(!Number.isNaN(reportAge));
 
-    const staleness = $derived.by((): "info" | "warning" | null => {
-        if (!knownAge) return null;
-        if (reportAge > 24 * 3600 * 1000) return "warning";
-        if (reportAge > 6 * 3600 * 1000) return "info";
-        return null;
-    });
+    const staleness = $derived(knownAge ? ageLevel(reportAge) : null);
+
+    const lag = $derived(analysisLag(report));
+    const lagLevel = $derived(lag === null ? null : ageLevel(lag));
 
     const summarySegments = $derived(buildSummary());
 </script>
@@ -659,6 +658,14 @@
                 This report was generated <strong>{formatAge(reportAge)}</strong> and may no longer reflect
                 your current configuration. Send another email to the same test address to re-run the
                 checks.
+            </div>
+        {/if}
+        {#if lag !== null && lagLevel}
+            <div class="alert alert-{lagLevel} py-2 px-3 mb-3 small">
+                <i class="bi bi-hourglass-split me-2"></i>
+                This report was generated <strong>{formatDuration(lag)}</strong> after the message was
+                received. The authentication results date from its reception, while the DNS records, the
+                blacklists and the logo are those of the report: they may disagree.
             </div>
         {/if}
         <p
