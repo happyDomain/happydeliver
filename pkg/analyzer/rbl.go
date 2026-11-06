@@ -83,7 +83,8 @@ var DefaultRBLs = []string{
 	"bl.nszones.com",         // NSZones
 }
 
-// DefaultInformationalRBLs lists RBLs that are checked but not counted in the score.
+// DefaultInformationalRBLs lists RBLs that are checked but not counted proportionally:
+// a listing costs informationalPenalty, whichever of them it is on.
 // These are typically broader lists where being listed is less definitive.
 var DefaultInformationalRBLs = []string{
 	"dnsbl-2.uceprotect.net", // UCEPROTECT Level 2: entire netblocks, may cause false positives
@@ -99,8 +100,9 @@ var majorRBLs = map[string]bool{
 }
 
 // informationalPenalty is what a listing on any informational list costs,
-// once, however many of them list the address.
-const informationalPenalty = 10
+// once, however many of them list the address: just enough to keep the
+// blacklist score from an A, and less than a scoring list takes off.
+const informationalPenalty = 6
 
 // DefaultDNSWLs is a list of commonly used DNSWL providers
 var DefaultDNSWLs = []string{
@@ -361,7 +363,7 @@ func (r *DNSListChecker) scoringListCount() int {
 
 // CalculateScore calculates the list contribution to deliverability.
 // Informational lists don't count proportionally; instead, if any
-// informational list triggers, a flat 10% penalty is applied regardless
+// informational list triggers, a flat penalty is applied regardless
 // of how many of them fire.
 func (r *DNSListChecker) CalculateScore(results *DNSListResults, forWhitelist bool) (int, string) {
 	scoringListCount := r.scoringListCount()

@@ -565,7 +565,7 @@ func TestListingIssues(t *testing.T) {
 		"192.0.2.1": {
 			{model.IssueTypeRblListed, model.IssueSeverityCritical, 33},
 			{model.IssueTypeRblListed, model.IssueSeverityHigh, 33},
-			{model.IssueTypeRblNetworkListed, model.IssueSeverityLow, 10},
+			{model.IssueTypeRblNetworkListed, model.IssueSeverityLow, 6},
 		},
 		"198.51.100.2": {
 			{model.IssueTypeRblNetworkListed, model.IssueSeverityLow, 0},
@@ -665,6 +665,28 @@ func TestInformationalPenaltyWithOneScoringList(t *testing.T) {
 	}
 }
 
+// A network-wide listing alone keeps the score from an A, and still costs less
+// than a listing on any of the default scoring lists.
+func TestInformationalPenaltyStaysBelowAnA(t *testing.T) {
+	checker := NewRBLChecker(0, nil, false)
+	score := func(list string) (int, string) {
+		return checker.CalculateScore(&DNSListResults{
+			IPsChecked: []string{"192.0.2.1"},
+			Checks:     map[string][]model.BlacklistCheck{"192.0.2.1": {{Rbl: list, Listed: true}}},
+		}, false)
+	}
+
+	informational, informationalGrade := score("dnsbl-3.uceprotect.net")
+	scoring, _ := score("zen.spamhaus.org")
+
+	if informationalGrade != "B" {
+		t.Errorf("grade = %s, want B", informationalGrade)
+	}
+	if informational <= scoring {
+		t.Errorf("informational listing scores %d, a scoring one %d: it must cost less", informational, scoring)
+	}
+}
+
 // A single address is scored from its checks, informational lists apart, as
 // the address checker scores it.
 func TestCalculateScoreForASingleAddress(t *testing.T) {
@@ -680,7 +702,7 @@ func TestCalculateScoreForASingleAddress(t *testing.T) {
 		// A scoring list costs its share, not the flat penalty of an informational one
 		{"listed on a scoring list", []string{"zen.spamhaus.org"}, 92},
 		{"listed on three scoring lists", []string{"zen.spamhaus.org", "bl.spamcop.net", "b.barracudacentral.org"}, 75},
-		{"listed on an informational list", []string{"dnsbl-3.uceprotect.net"}, 90},
+		{"listed on an informational list", []string{"dnsbl-3.uceprotect.net"}, 94},
 	}
 
 	for _, tt := range tests {
