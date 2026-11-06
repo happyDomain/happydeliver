@@ -61,7 +61,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/oapi-codegen/oapi-codegen/v2 v2.8.1 // indirect
+	github.com/oapi-codegen/oapi-codegen/v2 v2.8.2 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/openrdap/rdap v0.10.2 // indirect
