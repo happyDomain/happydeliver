@@ -324,7 +324,8 @@ func bimiVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResul
 				"The mark certificate published for your logo does not validate, and only a valid one earns all the points BIMI counts for in the authentication score.",
 				"Check the mark certificate published at the a= URL in the BIMI details.")}
 		}
-		return []model.Issue{bimiVmcMissingIssue(location, "")}
+		return []model.Issue{bimiVmcMissingIssue(location,
+			"No mark certificate vouches for your logo, which earns half of the points BIMI counts for in the authentication score. Most mailbox providers only display a logo that has one.")}
 	case result == model.AuthResultResultPass:
 		return nil
 	case !dmarcEnforced(dns.DmarcRecord):
@@ -333,8 +334,8 @@ func bimiVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResul
 			"Move the DMARC policy to p=quarantine or p=reject first; publish a BIMI record once it is.")}
 	case result == model.AuthResultResultDeclined:
 		return []model.Issue{newIssue(model.IssueTypeBimiDeclined, model.IssueSeverityInfo, location,
-			"Your domain declines BIMI, which earns most of its points; a logo would earn the rest.",
-			"Publish a BIMI record pointing to your logo in SVG Tiny PS format if you want it displayed.")}
+			"Your domain declines BIMI, which earns half of its points: only a logo backed by a mark certificate earns them all. That is how this report grades BIMI, not a sign of how receivers treat your mail.",
+			"Nothing to fix if you do not want a logo. Otherwise publish a BIMI record pointing to your logo in SVG Tiny PS format, with a Verified or Common Mark Certificate in a=.")}
 	case record != nil && record.Record != nil && record.Valid:
 		return []model.Issue{newIssue(model.IssueTypeBimiNotHonored, model.IssueSeverityLow, location,
 			fmt.Sprintf(`Your BIMI record validates here, but the server that checked this message reported "%s" for it. The authentication score counts BIMI.`, result),

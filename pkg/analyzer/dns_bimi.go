@@ -304,7 +304,7 @@ func bimiMissingIssue(record *model.BIMIRecord, domain string) model.Issue {
 		message = *record.Error + ". " + message
 	}
 	return newIssue(model.IssueTypeBimiMissing, model.IssueSeverityLow, bimiLocation(record, domain), message,
-		fmt.Sprintf(`Publish a BIMI record at %s pointing to your logo in SVG Tiny PS format. If you do not want a logo, publish "v=BIMI1; l=; a=" instead to decline explicitly: it also keeps mail clients from falling back to a parent domain's record, and earns most of the points.`, bimiLocation(record, domain)))
+		fmt.Sprintf(`Publish a BIMI record at %s pointing to your logo in SVG Tiny PS format, with a mark certificate to earn all the points. If you do not want a logo, publish "v=BIMI1; l=; a=" instead to decline explicitly: it also keeps mail clients from falling back to a parent domain's record, and earns half of the points.`, bimiLocation(record, domain)))
 }
 
 // bimiVmcMissingIssue says no certificate backs the logo, in the given words
