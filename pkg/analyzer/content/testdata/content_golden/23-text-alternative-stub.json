@@ -1,0 +1,48 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": true,
+    "issues": {
+      "rendering": [
+        {
+          "advice": "Add \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e to the head; without it a mobile client renders at desktop width and scales the result down",
+          "category": "rendering",
+          "location": "\u003chead\u003e",
+          "message": "The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        }
+      ],
+      "text_alternative": [
+        {
+          "advice": "Generate the text part from the HTML at send time, or send HTML alone; a text part that only announces the message is in HTML is what clients preferring text display",
+          "category": "content",
+          "message": "The plain text part carries a fraction of what the HTML says, rather than an alternative to it.",
+          "penalty": 15,
+          "severity": "high",
+          "type": "text_html_mismatch"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://stub-alternative.example/collection/spring"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://stub-alternative.example/unsubscribe"
+      }
+    ],
+    "unsubscribe_methods": [
+      "link",
+      "list-unsubscribe-header"
+    ]
+  },
+  "score": 85,
+  "grade": "B"
+}

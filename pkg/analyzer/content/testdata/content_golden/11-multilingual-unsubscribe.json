@@ -1,0 +1,139 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": true,
+    "issues": {
+      "rendering": [
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 3.0:1; this text is large enough for the lower WCAG AA bar and misses it even so",
+          "category": "accessibility",
+          "location": "\"News and updates this month:\"",
+          "message": "Text in #28a745 on #f8f9fa measures 2.97:1, below the 3.0:1 WCAG AA asks of it.",
+          "penalty": 3,
+          "severity": "high",
+          "type": "low_contrast"
+        },
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 4.5:1",
+          "category": "accessibility",
+          "location": "\"Manage your subscription in your preferred language:\"",
+          "message": "Text in #6c757d on #f8f9fa measures 4.45:1, below the 4.5:1 WCAG AA asks of it (22 places).",
+          "penalty": 2,
+          "severity": "medium",
+          "type": "low_contrast"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/news/october-2025"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/unsubscribe?lang=en"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/abmelden?id=42"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=fr"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=ru"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=zh"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=ja"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=ko"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=nl"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=pl"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://international.example/manage?id=42\u0026lang=tr"
+      },
+      {
+        "is_shortened": false,
+        "issues": [
+          {
+            "advice": "Check that both parts lead to the same places; clients preferring text otherwise offer a destination the HTML does not, and filters compare the two parts",
+            "category": "content",
+            "location": "https://international.example/se-desabonner?id=42",
+            "message": "The plain text part offers a destination the HTML part does not: https://international.example/se-desabonner?id=42",
+            "penalty": 0,
+            "severity": "low",
+            "type": "text_html_mismatch"
+          }
+        ],
+        "status": "valid",
+        "url": "https://international.example/se-desabonner?id=42"
+      },
+      {
+        "is_shortened": false,
+        "issues": [
+          {
+            "advice": "Check that both parts lead to the same places; clients preferring text otherwise offer a destination the HTML does not, and filters compare the two parts",
+            "category": "content",
+            "location": "https://international.example/otpisatsya",
+            "message": "The plain text part offers a destination the HTML part does not: https://international.example/otpisatsya",
+            "penalty": 0,
+            "severity": "low",
+            "type": "text_html_mismatch"
+          }
+        ],
+        "status": "valid",
+        "url": "https://international.example/otpisatsya"
+      },
+      {
+        "is_shortened": false,
+        "issues": [
+          {
+            "advice": "Check that both parts lead to the same places; clients preferring text otherwise offer a destination the HTML does not, and filters compare the two parts",
+            "category": "content",
+            "location": "https://international.example/tuiding",
+            "message": "The plain text part offers a destination the HTML part does not: https://international.example/tuiding",
+            "penalty": 0,
+            "severity": "low",
+            "type": "text_html_mismatch"
+          }
+        ],
+        "status": "valid",
+        "url": "https://international.example/tuiding"
+      }
+    ],
+    "unsubscribe_methods": [
+      "link"
+    ]
+  },
+  "score": 95,
+  "grade": "A"
+}

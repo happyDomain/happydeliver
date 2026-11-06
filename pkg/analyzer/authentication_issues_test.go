@@ -56,7 +56,8 @@ func TestAuthenticationIssuesExplainEveryLostPoint(t *testing.T) {
 					if !a.hasRequiredResults(results) {
 						continue
 					}
-					a.ReportIssues(results, &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced}, model.ReportSourceReceived)
+					dns := &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced}
+					a.ReportIssues(results, dns, model.ReportSourceReceived)
 
 					charged, total := 0, 0
 					for name, check := range map[string]struct {
@@ -66,7 +67,7 @@ func TestAuthenticationIssuesExplainEveryLostPoint(t *testing.T) {
 						"spf":   {100 - a.calculateSPFScore(results), results.Issues.Spf},
 						"dkim":  {100 - a.calculateDKIMScore(results), results.Issues.Dkim},
 						"dmarc": {100 - a.calculateDMARCScore(results), results.Issues.Dmarc},
-						"bimi":  {100 - a.calculateBIMIScore(results), results.Issues.Bimi},
+						"bimi":  {100 - a.calculateBIMIScore(results, dns), results.Issues.Bimi},
 					} {
 						if check.issues == nil {
 							t.Fatalf("%s/%s/%s/%s: no %s issues reported", spf, dkim, dmarc, bimi, name)
@@ -86,7 +87,7 @@ func TestAuthenticationIssuesExplainEveryLostPoint(t *testing.T) {
 					// The penalties weigh each check as the score does: they add
 					// up to what it lost, but for the rounding of each check. A
 					// score clamped at 0 lost less than its checks did.
-					if score, _ := a.CalculateAuthenticationScore(results); score > 0 {
+					if score, _ := a.CalculateAuthenticationScore(results, nil); score > 0 {
 						if diff := 100 - score - total; diff > charged || -diff > charged {
 							t.Errorf("%s/%s/%s/%s: penalties add up to %d, the score lost %d", spf, dkim, dmarc, bimi, total, 100-score)
 						}

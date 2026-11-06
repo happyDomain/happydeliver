@@ -148,7 +148,7 @@ func TestGetAuthenticationScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, gotGrade := scorer.CalculateAuthenticationScore(tt.results)
+			score, gotGrade := scorer.CalculateAuthenticationScore(tt.results, nil)
 
 			if score != tt.expectedScore {
 				t.Errorf("Score = %v, want %v", score, tt.expectedScore)

@@ -1,0 +1,65 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": false,
+    "has_unsubscribe_link": false,
+    "issues": {
+      "rendering": [
+        {
+          "advice": "Add \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e to the head; without it a mobile client renders at desktop width and scales the result down",
+          "category": "rendering",
+          "location": "\u003chead\u003e",
+          "message": "The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        }
+      ],
+      "structure": [
+        {
+          "advice": "Send a text/plain part, generated from the HTML when there is one; clients and readers preferring text display it, and filters expect it",
+          "category": "deliverability",
+          "message": "The message carries no plain text part.",
+          "penalty": 12,
+          "severity": "medium",
+          "type": "missing_plaintext"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "issues": [
+          {
+            "advice": "Serve the same URL over https: and use that one; mail clients warn about plain http: URLs, and filters score them as a negative signal",
+            "category": "security",
+            "location": "http://suspicious-link.example/claim?id=12345",
+            "message": "Link is served over http: instead of https:, so it travels in clear text and can be read or altered on the way",
+            "penalty": 2,
+            "severity": "medium",
+            "type": "suspicious_link"
+          },
+          {
+            "advice": "Serve the same URL over https: and use that one; mail clients warn about plain http: URLs, and filters score them as a negative signal",
+            "category": "security",
+            "location": "http://suspicious-link.example/claim?id=12345",
+            "message": "Link is served over http: instead of https:, so it travels in clear text and can be read or altered on the way",
+            "penalty": 2,
+            "severity": "medium",
+            "type": "suspicious_link"
+          }
+        ],
+        "status": "suspicious",
+        "url": "http://suspicious-link.example/claim?id=12345"
+      },
+      {
+        "is_shortened": false,
+        "status": "suspicious",
+        "url": "http://suspicious-link.example/claim?id=12345"
+      }
+    ],
+    "unsubscribe_methods": []
+  },
+  "score": 84,
+  "grade": "C"
+}

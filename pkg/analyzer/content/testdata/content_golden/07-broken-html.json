@@ -1,0 +1,101 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": false,
+    "images": [
+      {
+        "has_alt": false,
+        "is_broken": false,
+        "is_tracking_pixel": false,
+        "issues": [
+          {
+            "advice": "Add an alt text saying what the image shows, or an empty one (alt=\"\") for a decoration",
+            "category": "accessibility",
+            "location": "https://bad-html-company.example/banner.jpg",
+            "message": "The image carries no alt attribute: a recipient who cannot see it is told nothing of it.",
+            "penalty": 3,
+            "severity": "medium",
+            "type": "missing_alt"
+          }
+        ],
+        "src": "https://bad-html-company.example/banner.jpg"
+      },
+      {
+        "has_alt": false,
+        "is_broken": false,
+        "is_tracking_pixel": false,
+        "issues": [
+          {
+            "advice": "Add an alt text saying what the image shows, or an empty one (alt=\"\") for a decoration",
+            "category": "accessibility",
+            "location": "https://bad-html-company.example/product.png",
+            "message": "The image carries no alt attribute: a recipient who cannot see it is told nothing of it.",
+            "penalty": 3,
+            "severity": "medium",
+            "type": "missing_alt"
+          }
+        ],
+        "src": "https://bad-html-company.example/product.png"
+      }
+    ],
+    "issues": {
+      "markup": [
+        {
+          "advice": "Remove dangerous HTML tags like \u003cscript\u003e, \u003ciframe\u003e, \u003cobject\u003e, \u003cembed\u003e, \u003capplet\u003e, \u003cform\u003e, and \u003cbase\u003e from email content",
+          "category": "security",
+          "message": "Dangerous \u003cscript\u003e tag detected - JavaScript is blocked by most email clients",
+          "penalty": 20,
+          "severity": "critical",
+          "type": "dangerous_html"
+        }
+      ],
+      "rendering": [
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 4.5:1",
+          "category": "accessibility",
+          "location": "\"Important message\"",
+          "message": "Text in #ff0000 on #f0f0f0 measures 3.51:1, below the 4.5:1 WCAG AA asks of it (2 places).",
+          "penalty": 2,
+          "severity": "medium",
+          "type": "low_contrast"
+        },
+        {
+          "advice": "Add \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e to the head; without it a mobile client renders at desktop width and scales the result down",
+          "category": "rendering",
+          "location": "\u003chead\u003e",
+          "message": "The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        }
+      ],
+      "text_alternative": [
+        {
+          "advice": "Generate the text part from the HTML at send time rather than maintaining it by hand; two parts this far apart usually mean the text of a previous campaign was left in place while the HTML was rewritten",
+          "category": "content",
+          "message": "The plain text and HTML parts do not say the same thing.",
+          "penalty": 15,
+          "severity": "high",
+          "type": "text_html_mismatch"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://bad-html-company.example/more"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://bad-html-company.example/more"
+      }
+    ],
+    "text_to_image_ratio": 321,
+    "unsubscribe_methods": []
+  },
+  "score": 57,
+  "grade": "E"
+}

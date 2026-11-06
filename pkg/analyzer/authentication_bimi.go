@@ -46,10 +46,27 @@ func (a *AuthenticationAnalyzer) parseBIMIResult(method authresults.Method) *mod
 	return result
 }
 
-func (a *AuthenticationAnalyzer) calculateBIMIScore(results *model.AuthenticationResults) (score int) {
+// bimiUncertified tells whether the analysis of the BIMI record found no valid
+// mark certificate behind it. Without an analysis, nothing says so.
+func bimiUncertified(dns *model.DNSResults) bool {
+	if dns == nil || dns.BimiRecord == nil {
+		return false
+	}
+	vmc := dns.BimiRecord.Vmc
+	return vmc == nil || !vmc.Valid
+}
+
+// calculateBIMIScore only grants all the points to a logo a mark certificate
+// vouches for: a verdict of pass says nothing of the certificate, as the
+// receiver reports the same for a self-asserted logo, which earns what
+// declining does. dns is what the records of the sender say.
+func (a *AuthenticationAnalyzer) calculateBIMIScore(results *model.AuthenticationResults, dns *model.DNSResults) (score int) {
 	if results.Bimi != nil {
 		switch results.Bimi.Result {
 		case model.AuthResultResultPass:
+			if bimiUncertified(dns) {
+				return 50
+			}
 			return 100
 		case model.AuthResultResultDeclined:
 			return 50

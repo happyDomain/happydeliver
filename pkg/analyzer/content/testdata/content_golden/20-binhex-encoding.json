@@ -1,0 +1,22 @@
+{
+  "content_analysis": {
+    "has_html": false,
+    "has_plaintext": false,
+    "has_unsubscribe_link": false,
+    "issues": {
+      "structure": [
+        {
+          "advice": "Send a text/plain part, generated from the HTML when there is one; clients and readers preferring text display it, and filters expect it",
+          "category": "deliverability",
+          "message": "The message carries no readable text: neither a plain text nor an HTML part.",
+          "penalty": 14,
+          "severity": "medium",
+          "type": "missing_plaintext"
+        }
+      ]
+    },
+    "unsubscribe_methods": []
+  },
+  "score": 86,
+  "grade": "B"
+}

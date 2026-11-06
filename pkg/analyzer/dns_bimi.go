@@ -291,6 +291,16 @@ func bimiMissingIssue(record *model.BIMIRecord, domain string) model.Issue {
 		fmt.Sprintf(`Publish a BIMI record at %s pointing to your logo in SVG Tiny PS format. If you do not want a logo, publish "v=BIMI1; l=; a=" instead to decline explicitly: it also keeps mail clients from falling back to a parent domain's record, and earns most of the points.`, bimiLocation(record, domain)))
 }
 
+// bimiVmcMissingIssue says no certificate backs the logo, in the given words
+// if there are any.
+func bimiVmcMissingIssue(location, message string) model.Issue {
+	if message == "" {
+		message = "No mark certificate vouches for the logo, and most mailbox providers only display one that has it."
+	}
+	return newIssue(model.IssueTypeBimiVmcMissing, model.IssueSeverityLow, location, message,
+		"Obtain a Verified or Common Mark Certificate for the logo and publish its URL in a=.")
+}
+
 // bimiRecordIssues is what a published BIMI record calls for, each issue
 // uncharged: what keeps it from being displayed, the record that cannot be
 // read, the checks that fail, and those that pass with a reservation.
@@ -360,11 +370,7 @@ func bimiRecordIssues(record *model.BIMIRecord, domain string) (issues []model.I
 		// whatever the warning says (a Content-Type, an expiry close by),
 		// it is a reservation about that certificate, reported as such.
 		if check.Name == "vmc" && record.Vmc == nil && utils.Deref(record.VmcUrl) == "" {
-			if message == "" {
-				message = "No mark certificate vouches for the logo, and most mailbox providers only display one that has it."
-			}
-			issues = append(issues, newIssue(model.IssueTypeBimiVmcMissing, model.IssueSeverityLow, location, message,
-				"Obtain a Verified or Common Mark Certificate for the logo and publish its URL in a=."))
+			issues = append(issues, bimiVmcMissingIssue(location, message))
 			continue
 		}
 		what := check.Description

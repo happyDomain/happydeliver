@@ -1,0 +1,19 @@
+{
+  "content_analysis": {
+    "has_html": false,
+    "has_plaintext": true,
+    "has_unsubscribe_link": false,
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.org/unsubscribe/12345"
+      }
+    ],
+    "unsubscribe_methods": [
+      "list-unsubscribe-header"
+    ]
+  },
+  "score": 100,
+  "grade": "A"
+}

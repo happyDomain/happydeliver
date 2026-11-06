@@ -105,11 +105,51 @@ func TestBIMIDeclinedIssueMatchesTheScore(t *testing.T) {
 	}
 	enforced := &model.DMARCRecord{Valid: true, Policy: utils.PtrTo(model.DMARCRecordPolicy("reject"))}
 
-	score, _ := a.CalculateAuthenticationScore(results)
-	a.ReportIssues(results, &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced}, model.ReportSourceReceived)
+	dns := &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced}
+	score, _ := a.CalculateAuthenticationScore(results, dns)
+	a.ReportIssues(results, dns, model.ReportSourceReceived)
 
 	issues := *results.Issues.Bimi
 	if len(issues) != 1 || 100-score != *issues[0].Penalty {
 		t.Errorf("score = %d, issues = %+v: the penalty must be what the score lost", score, issues)
+	}
+}
+
+// A pass only earns all the points with a valid mark certificate behind the
+// logo, the receiver reporting the same without one.
+func TestBIMIPassNeedsACertificate(t *testing.T) {
+	a := NewAuthenticationAnalyzer("")
+	enforced := &model.DMARCRecord{Valid: true, Policy: utils.PtrTo(model.DMARCRecordPolicy("reject"))}
+
+	tests := []struct {
+		name      string
+		record    *model.BIMIRecord
+		wantScore int
+		wantIssue model.IssueType
+	}{
+		{"not analysed", nil, 100, ""},
+		{"valid certificate", &model.BIMIRecord{Valid: true, Vmc: &model.VMCInfo{Valid: true}}, 100, ""},
+		{"self-asserted", &model.BIMIRecord{Valid: true, VmcUrl: utils.PtrTo("")}, 50, model.IssueTypeBimiVmcMissing},
+		{"invalid certificate", &model.BIMIRecord{Vmc: &model.VMCInfo{Valid: false}}, 50, model.IssueTypeBimiUnverified},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := &model.AuthenticationResults{Bimi: &model.AuthResult{Result: model.AuthResultResultPass}, Spf: &model.AuthResult{Result: model.AuthResultResultPass}}
+			dns := &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced, BimiRecord: tt.record}
+
+			if score := a.calculateBIMIScore(results, dns); score != tt.wantScore {
+				t.Errorf("score = %d, want %d", score, tt.wantScore)
+			}
+
+			a.ReportIssues(results, dns, model.ReportSourceReceived)
+			issues := *results.Issues.Bimi
+			switch {
+			case tt.wantIssue == "" && len(issues) != 0:
+				t.Errorf("issues = %+v, want none", issues)
+			case tt.wantIssue != "" && (len(issues) != 1 || issues[0].Type != tt.wantIssue || *issues[0].Penalty != 5):
+				t.Errorf("issues = %+v, want one %s costing 5", issues, tt.wantIssue)
+			}
+		})
 	}
 }

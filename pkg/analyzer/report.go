@@ -296,7 +296,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 	authScore := 0
 	var authGrade string
 	if results.Authentication != nil {
-		authScore, authGrade = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication)
+		authScore, authGrade = r.authAnalyzer.CalculateAuthenticationScore(results.Authentication, results.DNS)
 		r.authAnalyzer.ReportIssues(results.Authentication, results.DNS, results.Source)
 	}
 

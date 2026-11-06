@@ -94,7 +94,7 @@ func (a *AuthenticationAnalyzer) ReportIssues(results *model.AuthenticationResul
 	issues.Spf = chargedIssues(100-a.calculateSPFScore(results), authWeightSPF, spfVerdictIssues(results, dns, uploaded)...)
 	issues.Dkim = chargedIssues(100-a.calculateDKIMScore(results), authWeightDKIM, dkimVerdictIssues(results, dns, uploaded)...)
 	issues.Dmarc = chargedIssues(100-a.calculateDMARCScore(results), authWeightDMARC, dmarcVerdictIssues(results, dns, uploaded)...)
-	issues.Bimi = chargedIssues(100-a.calculateBIMIScore(results), authWeightBIMI, bimiVerdictIssues(results, dns)...)
+	issues.Bimi = chargedIssues(100-a.calculateBIMIScore(results, dns), authWeightBIMI, bimiVerdictIssues(results, dns)...)
 
 	// The verdicts that only take points off
 	if results.SpfHelo != nil {
@@ -306,9 +306,9 @@ func dmarcVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResu
 	}
 }
 
-// bimiVerdictIssues says why the BIMI verdict cost points: before DMARC is
-// enforced, that is the step; after it, what the record calls for, or the
-// record to publish.
+// bimiVerdictIssues says why the BIMI verdict cost points: a pass, for want of
+// a valid certificate; otherwise before DMARC is enforced, that is the step;
+// after it, what the record calls for, or the record to publish.
 func bimiVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResults) []model.Issue {
 	result := model.AuthResultResultNone
 	if results.Bimi != nil {
@@ -318,6 +318,13 @@ func bimiVerdictIssues(results *model.AuthenticationResults, dns *model.DNSResul
 	location := bimiLocation(record, dns.FromDomain)
 
 	switch {
+	case result == model.AuthResultResultPass && bimiUncertified(dns):
+		if record.Vmc != nil {
+			return []model.Issue{newIssue(model.IssueTypeBimiUnverified, model.IssueSeverityLow, location,
+				"The mark certificate published for your logo does not validate, and only a valid one earns all the points BIMI counts for in the authentication score.",
+				"Check the mark certificate published at the a= URL in the BIMI details.")}
+		}
+		return []model.Issue{bimiVmcMissingIssue(location, "")}
 	case result == model.AuthResultResultPass:
 		return nil
 	case !dmarcEnforced(dns.DmarcRecord):

@@ -1,0 +1,10 @@
+{
+  "content_analysis": {
+    "has_html": false,
+    "has_plaintext": true,
+    "has_unsubscribe_link": false,
+    "unsubscribe_methods": []
+  },
+  "score": 100,
+  "grade": "A"
+}

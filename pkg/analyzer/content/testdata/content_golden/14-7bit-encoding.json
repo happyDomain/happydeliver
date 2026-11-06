@@ -1,0 +1,22 @@
+{
+  "content_analysis": {
+    "has_html": false,
+    "has_plaintext": true,
+    "has_unsubscribe_link": false,
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/campaign/7bit-ok"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/unsubscribe/7bit"
+      }
+    ],
+    "unsubscribe_methods": []
+  },
+  "score": 100,
+  "grade": "A"
+}

@@ -193,7 +193,8 @@ func (a *AuthenticationAnalyzer) hasRequiredResults(results *model.Authenticatio
 // Returns a score from 0-100 where higher is better, and an empty grade when no
 // receiver reported any of the required mechanisms: the category did not run,
 // so it must not weigh on the report as if the sender had failed everything.
-func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.AuthenticationResults) (int, string) {
+// dns is what the records of the sender say, nil when they were not analysed.
+func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.AuthenticationResults, dns *model.DNSResults) (int, string) {
 	if results == nil || !a.hasRequiredResults(results) {
 		return 0, ""
 	}
@@ -211,7 +212,7 @@ func (a *AuthenticationAnalyzer) CalculateAuthenticationScore(results *model.Aut
 	score += 30 * a.calculateDMARCScore(results) / 100
 
 	// BIMI (10 points)
-	score += 10 * a.calculateBIMIScore(results) / 100
+	score += 10 * a.calculateBIMIScore(results, dns) / 100
 
 	// Penalty-only: SPF on the HELO identity (up to -5 points on failure)
 	score += 5 * a.calculateSPFHeloScore(results) / 100

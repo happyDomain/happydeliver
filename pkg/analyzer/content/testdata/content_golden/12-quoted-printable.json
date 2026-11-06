@@ -1,0 +1,67 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": false,
+    "images": [
+      {
+        "has_alt": false,
+        "is_broken": false,
+        "is_tracking_pixel": false,
+        "issues": [
+          {
+            "advice": "Add an alt text saying what the image shows, or an empty one (alt=\"\") for a decoration",
+            "category": "accessibility",
+            "location": "https://example.com/pixel.png",
+            "message": "The image carries no alt attribute: a recipient who cannot see it is told nothing of it.",
+            "penalty": 3,
+            "severity": "medium",
+            "type": "missing_alt"
+          }
+        ],
+        "src": "https://example.com/pixel.png"
+      }
+    ],
+    "issues": {
+      "images": [
+        {
+          "advice": "Reduce the number of images relative to text content",
+          "category": "deliverability",
+          "message": "Email is excessively image-heavy",
+          "penalty": 15,
+          "severity": "medium",
+          "type": "excessive_images"
+        }
+      ],
+      "rendering": [
+        {
+          "advice": "Add \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e to the head; without it a mobile client renders at desktop width and scales the result down",
+          "category": "rendering",
+          "location": "\u003chead\u003e",
+          "message": "The HTML declares no viewport, so a phone renders it at desktop width and scales the result down.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/campaign/4bdad7fe-ef36-4abc"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/subscription/4bdad7fe-ef36-4abc"
+      }
+    ],
+    "text_to_image_ratio": 50,
+    "unsubscribe_methods": [
+      "list-unsubscribe-header"
+    ]
+  },
+  "score": 82,
+  "grade": "C"
+}

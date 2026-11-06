@@ -1,0 +1,72 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": true,
+    "issues": {
+      "rendering": [
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 3.0:1; this text is large enough for the lower WCAG AA bar and misses it even so",
+          "category": "accessibility",
+          "location": "\"In this month's newsletter:\"",
+          "message": "Text in #28a745 on #f8f9fa measures 2.97:1, below the 3.0:1 WCAG AA asks of it.",
+          "penalty": 3,
+          "severity": "high",
+          "type": "low_contrast"
+        },
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 4.5:1",
+          "category": "accessibility",
+          "location": "\"help center\"",
+          "message": "Text in #007bff on #f8f9fa measures 3.78:1, below the 4.5:1 WCAG AA asks of it.",
+          "penalty": 2,
+          "severity": "medium",
+          "type": "low_contrast"
+        },
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 4.5:1",
+          "category": "accessibility",
+          "location": "\"Read Full Newsletter\"",
+          "message": "Text in #ffffff on #007bff measures 3.98:1, below the 4.5:1 WCAG AA asks of it.",
+          "penalty": 2,
+          "severity": "medium",
+          "type": "low_contrast"
+        },
+        {
+          "advice": "Darken the text or lighten what is behind it until the pair reaches 4.5:1",
+          "category": "accessibility",
+          "location": "\"You're receiving this email because you subscribed to our...\"",
+          "message": "Text in #6c757d on #f8f9fa measures 4.45:1, below the 4.5:1 WCAG AA asks of it (3 places).",
+          "penalty": 2,
+          "severity": "medium",
+          "type": "low_contrast"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/newsletter/october-2025"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/help"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://example.com/unsubscribe/12345"
+      }
+    ],
+    "unsubscribe_methods": [
+      "link",
+      "mailto",
+      "list-unsubscribe-header",
+      "one-click"
+    ]
+  },
+  "score": 91,
+  "grade": "B"
+}

@@ -1,0 +1,173 @@
+{
+  "content_analysis": {
+    "has_html": true,
+    "has_plaintext": true,
+    "has_unsubscribe_link": true,
+    "images": [
+      {
+        "alt_text": "A workbench with hand planes and a half-finished stool",
+        "has_alt": true,
+        "is_broken": false,
+        "is_tracking_pixel": false,
+        "src": "https://assets.compat-risk.example/workshop-bench.jpg"
+      },
+      {
+        "alt_text": "Close grain in a length of ash",
+        "has_alt": true,
+        "is_broken": false,
+        "is_tracking_pixel": false,
+        "issues": [
+          {
+            "advice": "Serve PNG or JPEG instead, and keep AVIF for the web; a client that cannot decode it shows an empty box; the client-by-client detail is at https://www.caniemail.com/features/image-avif/",
+            "category": "rendering",
+            "location": "https://assets.compat-risk.example/timber-detail.avif",
+            "message": "One image is served as AVIF, which Outlook (Windows, Windows Mail), 1\u00261, Fastmail and 5 other clients do not support.",
+            "penalty": 0,
+            "severity": "medium",
+            "type": "client_compat"
+          }
+        ],
+        "src": "https://assets.compat-risk.example/timber-detail.avif"
+      }
+    ],
+    "issues": {
+      "markup": [
+        {
+          "advice": "Remove the handlers and move what they did to a page the message links to; email clients strip them, and those that keep them do not run them",
+          "category": "rendering",
+          "location": "onclick on \u003ca\u003e",
+          "message": "The HTML carries 1 event-handler attribute (onclick on \u003ca\u003e), which no email client runs.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        }
+      ],
+      "rendering": [
+        {
+          "advice": "Use inline CSS instead of external stylesheets for better email compatibility",
+          "category": "rendering",
+          "message": "External stylesheet link detected: https://fonts.googleapis.com/css2?family=Inter:wght@400;700\u0026display=swap - may cause rendering issues or privacy concerns",
+          "penalty": 0,
+          "severity": "low",
+          "type": "broken_html"
+        },
+        {
+          "advice": "Place the element with nested tables, cell padding and spacer rows instead; where position is dropped the element falls back into the document flow; the client-by-client detail is at https://www.caniemail.com/features/css-position/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element (position: absolute)",
+          "message": "The styles use position in one place, which Gmail, Outlook (Windows, Windows Mail, iOS) and Mail.ru do not support.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Lay the row out as a table with one cell per column; flexbox is dropped rather than approximated, so its children stack into a single column; the client-by-client detail is at https://www.caniemail.com/features/css-display-flex/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element and style attribute (display: flex)",
+          "message": "The styles use display:flex in 3 places, which Outlook (Windows, Windows Mail), GMX (Desktop Webmail), Orange and 1 other client do not support.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Lay the grid out as a table, one row per row and one cell per cell; a client that does not know grid keeps the children and loses their positions; the client-by-client detail is at https://www.caniemail.com/features/css-display-grid/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element (display: grid)",
+          "message": "The styles use display:grid in one place, which Outlook (Windows, Windows Mail), GMX (Desktop Webmail), Orange and 1 other client do not support.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Decide the order in the markup rather than in the styles; where flex-direction is dropped the children appear in the order they are written; the client-by-client detail is at https://www.caniemail.com/features/css-flex-direction/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element and style attribute (flex-direction: column)",
+          "message": "The styles use flex-direction:column in 2 places, which Gmail, Outlook (Android, Windows, Windows Mail), Yahoo! Mail and 4 other clients do not support.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Give the rows and cells their sizes as a table instead; where the grid template is dropped, every child sizes and places itself; the client-by-client detail is at https://www.caniemail.com/features/css-grid-template/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element (grid-template-columns: 2fr 1fr)",
+          "message": "The styles use grid-template-* properties in one place, which Gmail, Outlook, Yahoo! Mail and 4 other clients do not support.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Name a web-safe font first in every font-family and treat the downloaded one as a bonus; a client that ignores @font-face falls back to a font of its own choosing; the client-by-client detail is at https://www.caniemail.com/features/css-at-font-face/",
+          "category": "rendering",
+          "location": "\u003cstyle\u003e element and linked stylesheet (@font-face)",
+          "message": "The styles use @font-face in 2 places, which Gmail, Outlook (Android, Outlook.com, Windows Mail, iOS, macOS), Yahoo! Mail and 10 other clients do not support.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Move the element into the \u003chead\u003e: a client that accepts a stylesheet at all may still refuse one it finds in the body, and there is nothing to gain by putting it there; the client-by-client detail is at https://www.caniemail.com/features/html-style/",
+          "category": "rendering",
+          "location": "\u003cbody\u003e",
+          "message": "A \u003cstyle\u003e element is written inside the body, which Gmail (Mobile Webmail), GMX (Desktop Webmail), LaPoste.net and 3 other clients do not support.",
+          "penalty": 0,
+          "severity": "low",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Export the drawing as a PNG and reference it with \u003cimg\u003e; most clients strip inline SVG, leaving the space it occupied empty; the client-by-client detail is at https://www.caniemail.com/features/html-svg/",
+          "category": "rendering",
+          "location": "\u003csvg\u003e",
+          "message": "The HTML uses \u003csvg\u003e in one place, which Gmail, Outlook, Yahoo! Mail and 7 other clients do not support.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        },
+        {
+          "advice": "Drop user-scalable=no and maximum-scale from the viewport so the recipient can enlarge the text",
+          "category": "accessibility",
+          "location": "\u003chead\u003e",
+          "message": "The viewport forbids zooming, which a recipient who needs to enlarge the text cannot override.",
+          "penalty": 0,
+          "severity": "medium",
+          "type": "client_compat"
+        }
+      ]
+    },
+    "links": [
+      {
+        "is_shortened": false,
+        "issues": [
+          {
+            "advice": "Link to a page instead of to a place in the message, or accept that the jump does nothing: where anchors are not followed the reader stays where they were, and one webmail sends them to its own home page; the client-by-client detail is at https://www.caniemail.com/features/html-anchor-links/",
+            "category": "rendering",
+            "location": "#what-to-bring",
+            "message": "One link points to an anchor inside the message itself, which Gmail (iOS), Yahoo! Mail (Android, iOS), Samsung Email and 8 other clients do not support.",
+            "penalty": 0,
+            "severity": "low",
+            "type": "client_compat"
+          }
+        ],
+        "status": "valid",
+        "url": "#what-to-bring"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://compat-risk.example/workshop/autumn"
+      },
+      {
+        "is_shortened": false,
+        "status": "valid",
+        "url": "https://compat-risk.example/unsubscribe"
+      }
+    ],
+    "text_to_image_ratio": 494.5,
+    "unsubscribe_methods": [
+      "link",
+      "list-unsubscribe-header"
+    ]
+  },
+  "score": 100,
+  "grade": "A"
+}
