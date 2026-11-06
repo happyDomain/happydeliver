@@ -63,13 +63,12 @@ func TestCheckBIMIRecordLookup(t *testing.T) {
 			wantErrSubst: "No BIMI record found",
 		},
 		{
-			name:   "malformed record (missing version)",
+			name:   "TXT record without the BIMI version",
 			domain: "example.com",
 			txt: map[string][]string{
 				"default._bimi.example.com": {"l=https://example.com/logo.svg"},
 			},
 			wantValid:    false,
-			wantLogoURL:  "https://example.com/logo.svg",
 			wantErrSubst: "v=BIMI1",
 		},
 		{
@@ -458,5 +457,34 @@ func TestBIMIRecordIssuesSelfAsserted(t *testing.T) {
 
 	if got := issueTypes(issues); len(got) != 1 || got[0] != model.IssueTypeBimiVmcMissing {
 		t.Errorf("types = %v, want bimi_vmc_missing", got)
+	}
+}
+
+// A TXT record of another kind at the BIMI location, as a wildcard leaves
+// there, is the absence of a BIMI record rather than an invalid one, and the
+// issue says what answered.
+func TestBIMIForeignRecordIsNoRecord(t *testing.T) {
+	enforced := &model.DMARCRecord{Valid: true, Policy: utils.PtrTo(model.DMARCRecordPolicy("reject"))}
+	record := bimiRecordToModel(bimi.ParseRecord("example.com", "default", "v=spf1 mx -all"))
+
+	if record.Record != nil || record.RecordValid != nil {
+		t.Errorf("record = %v, record_valid = %v, want neither", record.Record, record.RecordValid)
+	}
+
+	issues := bimiIssues(record, enforced, "example.com")
+	if got := issueTypes(issues); len(got) != 1 || got[0] != model.IssueTypeBimiMissing {
+		t.Fatalf("types = %v, want bimi_missing", got)
+	}
+	if !strings.Contains(issues[0].Message, "an SPF record") {
+		t.Errorf("message = %q, want it to name the record found", issues[0].Message)
+	}
+}
+
+// A BIMI record that does not parse stays an invalid one.
+func TestBIMIMalformedRecordStaysInvalid(t *testing.T) {
+	record := bimiRecordToModel(bimi.ParseRecord("example.com", "default", "v=BIMI1; a=https://example.com/vmc.pem"))
+
+	if got := issueTypes(bimiIssues(record, nil, "example.com")); len(got) != 1 || got[0] != model.IssueTypeBimiInvalid {
+		t.Errorf("types = %v, want bimi_invalid", got)
 	}
 }

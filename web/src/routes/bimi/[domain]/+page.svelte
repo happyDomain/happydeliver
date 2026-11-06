@@ -110,7 +110,7 @@
                 level: "danger",
                 icon: "bi-x-octagon-fill",
                 title: "No BIMI record published",
-                text: `Nothing is published at ${record.selector}._bimi.${record.domain}, so no mail client will show an indicator for this domain.`,
+                text: `No BIMI record answers at ${record.selector}._bimi.${record.domain}, so no mail client will show an indicator for this domain.`,
             };
         }
         if (!record.record_valid) {

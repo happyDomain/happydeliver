@@ -41,6 +41,9 @@ import (
 // single TXT record stall a delivery for the sum of the per-fetch timeouts.
 const DefaultBIMIAssetsTimeout = 45 * time.Second
 
+// bimiNoRecord is the error of a location that holds nothing at all.
+const bimiNoRecord = "No BIMI record found"
+
 func (d *DNSAnalyzer) bimiAssetsTimeout() time.Duration {
 	if d.BIMIAssetsTimeout > 0 {
 		return d.BIMIAssetsTimeout
@@ -84,7 +87,7 @@ func (d *DNSAnalyzer) checkBIMIRecord(domain, selector, localPart string, dmarc 
 
 	rec, err := validator.LookupForLocalPart(lookupCtx, domain, selector, localPart)
 	if err != nil {
-		msg := "No BIMI record found"
+		msg := bimiNoRecord
 		if !errors.Is(err, bimi.ErrNoRecord) {
 			msg = fmt.Sprintf("Failed to lookup BIMI record: %s", formatDNSError(err))
 		}
@@ -125,8 +128,18 @@ func bimiDMARCPolicy(rec *model.DMARCRecord) *bimi.DMARCPolicy {
 	}
 }
 
-// bimiRecordToModel converts a *bimi.Record into the API *model.BIMIRecord.
+// bimiRecordToModel converts a *bimi.Record into the API *model.BIMIRecord. A
+// TXT record of another kind found at the location is no BIMI record, valid or
+// not: the domain publishes none, which only its error goes on to explain.
 func bimiRecordToModel(r *bimi.Record) *model.BIMIRecord {
+	if !bimi.IsBIMIRecord(r.Record) {
+		return &model.BIMIRecord{
+			Selector: r.Selector,
+			Domain:   r.Domain,
+			Error:    utils.PtrToNonZero(r.Error),
+		}
+	}
+
 	m := &model.BIMIRecord{
 		Selector:    r.Selector,
 		Domain:      r.Domain,
@@ -286,8 +299,11 @@ func bimiMissingIssue(record *model.BIMIRecord, domain string) model.Issue {
 	if record != nil && record.Domain != "" {
 		domain = record.Domain
 	}
-	return newIssue(model.IssueTypeBimiMissing, model.IssueSeverityLow, bimiLocation(record, domain),
-		"Your DMARC policy is enforced, which is what BIMI requires: supporting mailboxes could display your brand logo next to your messages. The authentication score counts BIMI.",
+	message := "Your DMARC policy is enforced, which is what BIMI requires: supporting mailboxes could display your brand logo next to your messages. The authentication score counts BIMI."
+	if record != nil && record.Error != nil && *record.Error != bimiNoRecord {
+		message = *record.Error + ". " + message
+	}
+	return newIssue(model.IssueTypeBimiMissing, model.IssueSeverityLow, bimiLocation(record, domain), message,
 		fmt.Sprintf(`Publish a BIMI record at %s pointing to your logo in SVG Tiny PS format. If you do not want a logo, publish "v=BIMI1; l=; a=" instead to decline explicitly: it also keeps mail clients from falling back to a parent domain's record, and earns most of the points.`, bimiLocation(record, domain)))
 }
 

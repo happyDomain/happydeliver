@@ -93,6 +93,13 @@ func hasBIMIVersionTag(txt string) bool {
 	return tagsHaveBIMIVersion(tags)
 }
 
+// IsBIMIRecord tells whether txt is a BIMI record at all, well-formed or not:
+// any other TXT record at a BIMI location, which a wildcard is enough to put
+// there, is one receivers ignore.
+func IsBIMIRecord(txt string) bool {
+	return hasBIMIVersionTag(txt)
+}
+
 // tagsHaveBIMIVersion is hasBIMIVersionTag for a record already split into
 // tags, so that a parser holding them does not split the record a second time.
 func tagsHaveBIMIVersion(tags []bimiTagSpec) bool {
@@ -196,7 +203,7 @@ func enumerate(items []string) string {
 // record placed there by mistake).
 func notABIMIRecordError(txt string) string {
 	if desc := describeMisplacedRecord(leadingVersion(txt), "BIMI"); desc != "" {
-		return fmt.Sprintf("No BIMI record found (%s is published at the BIMI location; this is a misconfiguration)", desc)
+		return fmt.Sprintf("No BIMI record found (%s answers at the BIMI location, which a wildcard TXT record is enough to cause, and receivers ignore it)", desc)
 	}
 	return "No BIMI record found (the record at the BIMI location does not start with a v=BIMI1 tag)"
 }
