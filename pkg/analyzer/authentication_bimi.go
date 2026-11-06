@@ -52,7 +52,7 @@ func (a *AuthenticationAnalyzer) calculateBIMIScore(results *model.Authenticatio
 		case model.AuthResultResultPass:
 			return 100
 		case model.AuthResultResultDeclined:
-			return 59
+			return 50
 		default: // fail
 			return 0
 		}

@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 func TestParseBIMIResult(t *testing.T) {
@@ -90,5 +91,25 @@ func TestParseBIMIResult(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A declined BIMI costs the section what its issue says: the score and the
+// issue round differently, so the value has to come out even on the weight.
+func TestBIMIDeclinedIssueMatchesTheScore(t *testing.T) {
+	a := NewAuthenticationAnalyzer("")
+	pass := &model.AuthResult{Result: model.AuthResultResultPass}
+	results := &model.AuthenticationResults{
+		Spf: pass, Dkim: &[]model.AuthResult{*pass}, Dmarc: pass,
+		Bimi: &model.AuthResult{Result: model.AuthResultResultDeclined},
+	}
+	enforced := &model.DMARCRecord{Valid: true, Policy: utils.PtrTo(model.DMARCRecordPolicy("reject"))}
+
+	score, _ := a.CalculateAuthenticationScore(results)
+	a.ReportIssues(results, &model.DNSResults{FromDomain: "example.com", DmarcRecord: enforced}, model.ReportSourceReceived)
+
+	issues := *results.Issues.Bimi
+	if len(issues) != 1 || 100-score != *issues[0].Penalty {
+		t.Errorf("score = %d, issues = %+v: the penalty must be what the score lost", score, issues)
 	}
 }
