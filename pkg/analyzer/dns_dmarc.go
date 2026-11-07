@@ -71,6 +71,25 @@ func parseDMARCTags(record string) map[string]string {
 	return tags
 }
 
+// duplicateDMARCTag returns the first tag a record holds twice, or "". Such a
+// tag list is invalid as a whole (RFC 6376 section 3.2, which DMARC takes it
+// from).
+func duplicateDMARCTag(record string) string {
+	seen := make(map[string]bool)
+	for _, part := range strings.Split(record, ";") {
+		name, _, found := strings.Cut(part, "=")
+		if !found {
+			continue
+		}
+		name = strings.ToLower(strings.TrimSpace(name))
+		if seen[name] {
+			return name
+		}
+		seen[name] = true
+	}
+	return ""
+}
+
 // parseDMARCRecord parses a raw DMARC TXT record into a DMARCRecord model.
 func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMARCRecord {
 	tags := parseDMARCTags(rawRecord)
@@ -150,6 +169,12 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 	}
 	if _, ok := tags["ri"]; ok {
 		rec.DeprecatedRi = utils.PtrTo(true)
+	}
+
+	if tag := duplicateDMARCTag(rawRecord); tag != "" {
+		rec.Valid = false
+		rec.Error = utils.PtrTo(fmt.Sprintf("The %s= tag appears more than once, so receivers ignore the record", tag))
+		return rec
 	}
 
 	if !d.validateDMARC(rawRecord) {
@@ -272,7 +297,7 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 				message = *dmarc.Error
 			}
 			c.cap(20, newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityHigh, domain, message,
-				"Fix the syntax of the record: it must start with v=DMARC1 and use only known tags."))
+				"Fix the syntax of the record: it must start with v=DMARC1, and give each tag once."))
 		}
 		return c.score, c.issues
 	}

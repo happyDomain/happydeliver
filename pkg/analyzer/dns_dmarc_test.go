@@ -407,6 +407,24 @@ func TestParseDMARCRecordDeprecatedTags(t *testing.T) {
 	}
 }
 
+func TestParseDMARCRecordDuplicateTag(t *testing.T) {
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
+
+	for _, record := range []string{"v=DMARC1; p=reject; p=none", "v=DMARC1; p=reject; P=none"} {
+		rec := analyzer.parseDMARCRecord("example.com", record)
+		if rec.Valid {
+			t.Errorf("parseDMARCRecord(%q).Valid = true, want false", record)
+		}
+		if rec.Error == nil || !strings.Contains(*rec.Error, "p= tag appears more than once") {
+			t.Errorf("parseDMARCRecord(%q).Error = %v, want it to name the tag", record, rec.Error)
+		}
+	}
+
+	if rec := analyzer.parseDMARCRecord("example.com", "v=DMARC1; p=reject; sp=none"); !rec.Valid {
+		t.Errorf("distinct tags refused: %v", utils.Deref(rec.Error))
+	}
+}
+
 func TestValidateDMARC(t *testing.T) {
 	tests := []struct {
 		name     string
