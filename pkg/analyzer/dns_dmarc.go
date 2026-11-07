@@ -403,10 +403,10 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 			// Partial credit if a DMARC record exists but has issues
 			message := "Receivers cannot parse the DMARC record and ignore it."
 			if dmarc.Error != nil {
-				message = *dmarc.Error
+				message = *dmarc.Error + "."
 			}
 			advice := "Fix the syntax of the record: it must start with v=DMARC1, and give each tag once."
-			if message == dmarcMultipleRecordsError {
+			if utils.Deref(dmarc.Error) == dmarcMultipleRecordsError {
 				advice = fmt.Sprintf("Keep a single DMARC record at _dmarc.%s.", domain)
 			}
 			c.cap(20, newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityHigh, domain, message, advice))
