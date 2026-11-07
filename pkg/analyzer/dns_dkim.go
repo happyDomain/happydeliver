@@ -142,6 +142,18 @@ func (d *DNSAnalyzer) checkDKIMRecord(h mailmsg.DKIMSignature) *model.DKIMRecord
 		}
 	}
 
+	// An empty p= tag revokes the key (RFC 6376 section 3.6.1)
+	if tags["p"] == "" {
+		return &model.DKIMRecord{
+			Selector:         h.Selector,
+			Domain:           h.Domain,
+			Record:           utils.PtrTo(dkimRecord),
+			SigningAlgorithm: signingAlgorithmPtr(h.Algorithm),
+			Valid:            false,
+			Error:            utils.PtrTo("the key has been revoked (its p= tag is empty)"),
+		}
+	}
+
 	keyType := tags["k"]
 	if keyType == "" {
 		keyType = "rsa" // RFC 6376 default

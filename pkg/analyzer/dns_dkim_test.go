@@ -26,6 +26,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/mailmsg"
 	"strings"
 	"testing"
@@ -76,6 +77,25 @@ func TestCheckDKIMRecordMissingPublicKey(t *testing.T) {
 	}
 	if rec.Error == nil || !strings.Contains(*rec.Error, "public key") {
 		t.Errorf("Error = %v, want to mention the missing public key", rec.Error)
+	}
+}
+
+func TestCheckDKIMRecordRevokedKey(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"sel._domainkey.example.com": {"v=DKIM1; k=rsa; p="},
+	}, nil)
+
+	rec := analyzer.checkDKIMRecord(mailmsg.DKIMSignature{Domain: "example.com", Selector: "sel", Algorithm: "rsa-sha256"})
+	if rec.Valid {
+		t.Error("Valid = true, want false for a revoked key")
+	}
+	if rec.Error == nil || !strings.Contains(*rec.Error, "revoked") {
+		t.Errorf("Error = %v, want it to say the key is revoked", rec.Error)
+	}
+
+	score, issues := analyzer.calculateDKIMScore(&model.DNSResults{FromDomain: "example.com", DkimRecords: &[]model.DKIMRecord{*rec}})
+	if score != 25 || len(issues) != 1 || issues[0].Type != model.IssueTypeDkimInvalid {
+		t.Errorf("score = %d, issues = %v, want 25 and dkim_invalid", score, issues)
 	}
 }
 
