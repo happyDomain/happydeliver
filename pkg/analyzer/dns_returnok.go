@@ -44,6 +44,11 @@ func (d *DNSAnalyzer) domainCanReceive(domain string) (hasMX, hasAddress bool) {
 	defer cancel()
 
 	if mxRecords, err := d.resolver.LookupMX(ctx, domain); err == nil && len(mxRecords) > 0 {
+		// A null MX also rules out the fallback on the address (RFC 7505
+		// section 3)
+		if len(mxRecords) == 1 && mxRecords[0].Host == nullMXHost {
+			return false, false
+		}
 		return true, false
 	}
 
@@ -119,7 +124,7 @@ func chargeUnreachable(issues *[]model.Issue, reach ...*model.ReturnOKDomain) {
 		}
 	}
 	for i := range *issues {
-		if (*issues)[i].Type == model.IssueTypeDomainUnreachable {
+		if (*issues)[i].Type == model.IssueTypeDomainUnreachable || (*issues)[i].Type == model.IssueTypeMxNull {
 			penalty := *(*issues)[i].Penalty + points
 			(*issues)[i].Penalty = &penalty
 			return

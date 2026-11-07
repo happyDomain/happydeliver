@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"git.happydns.org/happyDeliver/internal/model"
+	"git.happydns.org/happyDeliver/internal/utils"
 )
 
 // returnOKMockResolver lets tests control MX and host (A/AAAA) lookups per domain.
@@ -133,6 +134,24 @@ func TestCheckReturnOKDomain(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCheckReturnOKDomainNullMX(t *testing.T) {
+	analyzer := NewDNSAnalyzerWithResolver(time.Second, nil, &returnOKMockResolver{
+		mx:    map[string][]*net.MX{"example.com": {{Host: ".", Pref: 0}}},
+		hosts: map[string][]string{"example.com": {"192.0.2.1"}},
+	})
+
+	result := analyzer.checkReturnOKDomain("example.com", "")
+	if result.Status != returnOKStatusFail {
+		t.Errorf("Status = %q, want fail: a null MX rules out the address too", result.Status)
+	}
+
+	issues := []model.Issue{{Type: model.IssueTypeMxNull, Penalty: utils.PtrTo(50)}}
+	chargeUnreachable(&issues, result)
+	if got := *issues[0].Penalty; got != 50+returnOKPenalty {
+		t.Errorf("Penalty = %d, want what the section really loses", got)
 	}
 }
 
