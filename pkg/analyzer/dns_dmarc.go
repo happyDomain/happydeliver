@@ -240,8 +240,10 @@ func (d *DNSAnalyzer) validateDMARC(record string) bool {
 	}
 
 	// p= absent is allowed in DMARCbis when rua= is present (treated as p=none).
-	if !strings.Contains(record, "p=") {
-		return strings.Contains(record, "rua=")
+	tags := parseDMARCTags(record)
+	if _, hasPolicy := tags["p"]; !hasPolicy {
+		_, hasReports := tags["rua"]
+		return hasReports
 	}
 
 	return true

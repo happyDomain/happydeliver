@@ -439,6 +439,16 @@ func TestValidateDMARC(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "Invalid DMARC - sp= is not p=",
+			record:   "v=DMARC1; sp=reject",
+			expected: false,
+		},
+		{
+			name:     "Invalid DMARC - np= is not p=",
+			record:   "v=DMARC1; np=reject",
+			expected: false,
+		},
+		{
 			name:     "Invalid DMARC - wrong version",
 			record:   "v=DMARC2; p=reject",
 			expected: false,
