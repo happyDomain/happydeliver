@@ -111,6 +111,17 @@ func TestValidateSPF(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "Valid SPF with an upper case version",
+			record:      "V=SPF1 mx -all",
+			expectError: false,
+		},
+		{
+			name:        "Invalid SPF - a longer version",
+			record:      "v=spf10 mx -all",
+			expectError: true,
+			errorMsg:    "must start with 'v=spf1'",
+		},
+		{
 			name:        "Invalid SPF - no version",
 			record:      "include:_spf.example.com -all",
 			expectError: true,

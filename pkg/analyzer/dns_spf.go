@@ -200,7 +200,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	var spfRecord string
 	spfCount := 0
 	for _, txt := range txtRecords {
-		if strings.HasPrefix(txt, "v=spf1") {
+		if isSPFRecord(txt) {
 			spfRecord = txt
 			spfCount++
 		}
@@ -288,6 +288,13 @@ func extractSPFAllQualifier(record string) *model.SPFRecordAllQualifier {
 		return utils.PtrTo(model.SPFRecordAllQualifier("+"))
 	}
 	return nil
+}
+
+// isSPFRecord reports whether a TXT record is an SPF one: its first term is
+// the version, whatever its case, and nothing longer such as v=spf10.
+func isSPFRecord(txt string) bool {
+	fields := strings.Fields(txt)
+	return len(fields) > 0 && strings.EqualFold(fields[0], "v=spf1")
 }
 
 // spfTerms returns the terms of a record, its version left out.
@@ -455,7 +462,7 @@ func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 // isMainRecord indicates if this is the primary domain's record (not an included one)
 func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 	// Must start with v=spf1
-	if !strings.HasPrefix(record, "v=spf1") {
+	if !isSPFRecord(record) {
 		return fmt.Errorf("SPF record must start with 'v=spf1'")
 	}
 
@@ -465,7 +472,7 @@ func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 
 	for i, token := range tokens {
 		// Skip the version tag
-		if i == 0 && token == "v=spf1" {
+		if i == 0 {
 			continue
 		}
 
