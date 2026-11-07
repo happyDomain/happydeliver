@@ -258,8 +258,9 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 	// redirect= only applies once every mechanism failed to match (RFC 7208
 	// section 6.1), so the includes before it are evaluated all the same. Its
 	// target still comes right after this record: the scoring reads it there.
+	// With an all mechanism in the record, it is never reached.
 	redirectDomain := d.extractSPFRedirect(spfRecord)
-	if redirectDomain != "" {
+	if redirectDomain != "" && extractSPFAllQualifier(spfRecord) == nil {
 		redirectRecords := d.resolveSPFRecords(redirectDomain, visited, depth+1, false)
 		if redirectRecords != nil {
 			results = append(results, *redirectRecords...)
@@ -389,14 +390,18 @@ func noSPFRecordError(txtRecords []string) string {
 	return "No SPF record found"
 }
 
-// extractSPFIncludes extracts all include: domains from an SPF record
+// extractSPFIncludes extracts the include: domains evaluation can reach in an
+// SPF record: it never gets past the all mechanism.
 func (d *DNSAnalyzer) extractSPFIncludes(record string) []string {
 	var includes []string
-	re := regexp.MustCompile(`(?i)include:([^\s]+)`)
-	matches := re.FindAllStringSubmatch(record, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			includes = append(includes, match[1])
+	for _, term := range spfTerms(record) {
+		name, value, modifier := splitSPFTerm(strings.TrimLeft(term, "+-~?"))
+		switch {
+		case modifier:
+		case name == "all":
+			return includes
+		case name == "include" && value != "":
+			includes = append(includes, value)
 		}
 	}
 	return includes

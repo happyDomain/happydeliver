@@ -22,6 +22,7 @@
 package analyzer
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -933,6 +934,41 @@ func TestCheckSPFRecordsFollowsIncludesBeforeRedirect(t *testing.T) {
 // A redirect back to the record itself is a loop the resolution cuts short:
 // the record after it is then its first include, which must not be scored
 // as the domain's policy.
+func TestCheckSPFRecordsStopsAtAll(t *testing.T) {
+	const record = "v=spf1 mx -all include:gone.example.org"
+	tests := []struct {
+		name   string
+		record string
+	}{
+		{"include after all", record},
+		{"redirect beside all", "v=spf1 mx redirect=gone.example.org -all"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := newMockAnalyzer(map[string][]string{"example.com": {tt.record}}, nil)
+
+			records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+			if len(*records) != 1 {
+				t.Fatalf("records = %+v, want the record alone", *records)
+			}
+
+			score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
+			if score != 100 || len(issues) != 0 {
+				t.Errorf("score = %d, issues = %v, want 100 and none: receivers never go there", score, issues)
+			}
+		})
+	}
+}
+
+func TestExtractSPFIncludes(t *testing.T) {
+	got := (&DNSAnalyzer{}).extractSPFIncludes("v=spf1 INCLUDE:a.example.com ~include:b.example.com x-note=include:c.example.com -all include:d.example.com")
+	want := []string{"a.example.com", "b.example.com"}
+	if !slices.Equal(got, want) {
+		t.Errorf("extractSPFIncludes = %v, want %v", got, want)
+	}
+}
+
 func TestSPFScoreTakesNoIncludeForTheRedirectTarget(t *testing.T) {
 	analyzer := newMockAnalyzer(map[string][]string{
 		"example.com":      {"v=spf1 include:_spf.example.net redirect=example.com"},
