@@ -81,6 +81,7 @@ const issueLabels: Record<Issue["type"], string> = {
     dmarc_pct_deprecated: "DMARC record uses the deprecated pct= tag",
     dmarc_sp_weaker: "Subdomains are less protected than the domain",
     dmarc_np_weaker: "Non-existent subdomains are less protected",
+    dmarc_report_uri_invalid: "DMARC reporting address is invalid",
     dmarc_deprecated_tags: "DMARC record uses deprecated tags",
     ptr_missing: "Sending IP has no valid reverse DNS",
     ptr_multiple: "Sending IP has several PTR records",

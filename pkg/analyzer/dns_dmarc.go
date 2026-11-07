@@ -25,6 +25,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -88,6 +90,53 @@ func duplicateDMARCTag(record string) string {
 		seen[name] = true
 	}
 	return ""
+}
+
+// dmarcReportURI is the shape of a reporting URI: a scheme, what follows it, and
+// the size limit RFC 7489 section 6.2 allowed after a "!".
+var dmarcReportURI = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9+.-]*:[^\s!]+)(![0-9]+[kKmMgGtT]?)?$`)
+
+// validDMARCReportURI reports whether uri can receive reports: a syntactically
+// valid URI, holding an address when it is a mailto: one.
+func validDMARCReportURI(uri string) bool {
+	match := dmarcReportURI.FindStringSubmatch(uri)
+	if match == nil {
+		return false
+	}
+
+	parsed, err := url.Parse(match[1])
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(parsed.Scheme, "mailto") {
+		local, domain, found := strings.Cut(parsed.Opaque, "@")
+		return found && local != "" && domain != ""
+	}
+	return true
+}
+
+// dmarcReportURIs splits the comma-separated value of a rua= or ruf= tag.
+func dmarcReportURIs(value string) []string {
+	var uris []string
+	for _, uri := range strings.Split(value, ",") {
+		if uri = strings.TrimSpace(uri); uri != "" {
+			uris = append(uris, uri)
+		}
+	}
+	return uris
+}
+
+// invalidDMARCReportURIs returns the entries of rua= and ruf= that cannot
+// receive reports.
+func invalidDMARCReportURIs(tags map[string]string) (invalid []string) {
+	for _, tag := range []string{"rua", "ruf"} {
+		for _, uri := range dmarcReportURIs(tags[tag]) {
+			if !validDMARCReportURI(uri) {
+				invalid = append(invalid, uri)
+			}
+		}
+	}
+	return invalid
 }
 
 // parseDMARCRecord parses a raw DMARC TXT record into a DMARCRecord model.
@@ -169,6 +218,10 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 	}
 	if _, ok := tags["ri"]; ok {
 		rec.DeprecatedRi = utils.PtrTo(true)
+	}
+
+	if invalid := invalidDMARCReportURIs(tags); len(invalid) > 0 {
+		rec.InvalidReportUris = &invalid
 	}
 
 	if tag := duplicateDMARCTag(rawRecord); tag != "" {
@@ -378,6 +431,12 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 		c.note(newIssue(model.IssueTypeDmarcPctDeprecated, model.IssueSeverityInfo, domain,
 			"pct=100 is the default and DMARCbis removes the tag.",
 			"Remove pct= from the record."))
+	}
+
+	if dmarc.InvalidReportUris != nil && len(*dmarc.InvalidReportUris) > 0 {
+		c.note(newIssue(model.IssueTypeDmarcReportUriInvalid, model.IssueSeverityLow, domain,
+			fmt.Sprintf("Receivers cannot send reports to %s: it is not a valid reporting URI.", strings.Join(*dmarc.InvalidReportUris, ", ")),
+			"Write each address as a URI, such as rua=mailto:dmarc@example.com, and separate them with commas."))
 	}
 
 	var deprecated []string

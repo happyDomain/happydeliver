@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
@@ -422,6 +423,55 @@ func TestParseDMARCRecordDuplicateTag(t *testing.T) {
 
 	if rec := analyzer.parseDMARCRecord("example.com", "v=DMARC1; p=reject; sp=none"); !rec.Valid {
 		t.Errorf("distinct tags refused: %v", utils.Deref(rec.Error))
+	}
+}
+
+func TestValidDMARCReportURI(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"mailto:dmarc@example.com", true},
+		{"MAILTO:dmarc@example.com", true},
+		{"mailto:dmarc@example.com!10m", true},
+		{"mailto:dmarc@example.com?subject=dmarc", true},
+		{"https://reports.example.com/dmarc", true},
+		{"dmarc@example.com", false},
+		{"mailto:", false},
+		{"mailto:example.com", false},
+		{"mailto:@example.com", false},
+		{"mailto:dmarc@", false},
+		{"mailto:dmarc@example.com!big", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.uri, func(t *testing.T) {
+			if got := validDMARCReportURI(tt.uri); got != tt.want {
+				t.Errorf("validDMARCReportURI(%q) = %v, want %v", tt.uri, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDMARCInvalidReportURIs(t *testing.T) {
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
+
+	rec := analyzer.parseDMARCRecord("example.com", "v=DMARC1; p=reject; rua=mailto:ok@example.com, dmarc@example.com; ruf=forensic.example.com")
+	if rec.InvalidReportUris == nil || strings.Join(*rec.InvalidReportUris, " ") != "dmarc@example.com forensic.example.com" {
+		t.Fatalf("InvalidReportUris = %v, want the two bad entries", rec.InvalidReportUris)
+	}
+
+	score, issues := analyzer.calculateDMARCScore(&model.DNSResults{FromDomain: "example.com", DmarcRecord: rec})
+	if score != 105 {
+		t.Errorf("score = %d, want 105: the policy holds without reports", score)
+	}
+	if len(issues) != 1 || issues[0].Type != model.IssueTypeDmarcReportUriInvalid {
+		t.Errorf("issues = %v, want dmarc_report_uri_invalid", issues)
+	}
+
+	good := analyzer.parseDMARCRecord("example.com", "v=DMARC1; p=reject; rua=mailto:dmarc@example.com")
+	if good.InvalidReportUris != nil {
+		t.Errorf("InvalidReportUris = %v, want nil", *good.InvalidReportUris)
 	}
 }
 
