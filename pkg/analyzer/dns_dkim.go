@@ -26,6 +26,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -171,7 +172,7 @@ func (d *DNSAnalyzer) checkDKIMRecord(h mailmsg.DKIMSignature) *model.DKIMRecord
 		hashAlgorithms = []string{}
 	}
 
-	return &model.DKIMRecord{
+	record := &model.DKIMRecord{
 		Selector:         h.Selector,
 		Domain:           h.Domain,
 		Record:           &dkimRecord,
@@ -181,6 +182,15 @@ func (d *DNSAnalyzer) checkDKIMRecord(h mailmsg.DKIMSignature) *model.DKIMRecord
 		KeySize:          parseKeySize(keyType, tags["p"]),
 		Valid:            true,
 	}
+
+	// The h= tag lists the only hash algorithms the key may be used with
+	if _, hash, found := strings.Cut(strings.ToLower(h.Algorithm), "-"); found && len(hashAlgorithms) > 0 &&
+		!slices.ContainsFunc(hashAlgorithms, func(allowed string) bool { return strings.EqualFold(allowed, hash) }) {
+		record.Valid = false
+		record.Error = utils.PtrTo(fmt.Sprintf("the key only allows h=%s, and the message is signed with %s", strings.Join(hashAlgorithms, ":"), hash))
+	}
+
+	return record
 }
 
 func signingAlgorithmPtr(a string) *string {

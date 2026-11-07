@@ -99,6 +99,34 @@ func TestCheckDKIMRecordRevokedKey(t *testing.T) {
 	}
 }
 
+func TestCheckDKIMRecordHashRestriction(t *testing.T) {
+	const key = "k=ed25519; p=11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+	tests := []struct {
+		name      string
+		record    string
+		algorithm string
+		valid     bool
+	}{
+		{"no h= tag", "v=DKIM1; " + key, "ed25519-sha256", true},
+		{"hash listed", "v=DKIM1; h=sha256; " + key, "ed25519-sha256", true},
+		{"hash among several", "v=DKIM1; h=sha1:sha256; " + key, "ed25519-sha256", true},
+		{"hash in another case", "v=DKIM1; h=SHA256; " + key, "ed25519-sha256", true},
+		{"hash not listed", "v=DKIM1; h=sha1; " + key, "ed25519-sha256", false},
+		{"signature without an algorithm", "v=DKIM1; h=sha1; " + key, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := newMockAnalyzer(map[string][]string{"sel._domainkey.example.com": {tt.record}}, nil)
+
+			rec := analyzer.checkDKIMRecord(mailmsg.DKIMSignature{Domain: "example.com", Selector: "sel", Algorithm: tt.algorithm})
+			if rec.Valid != tt.valid {
+				t.Errorf("Valid = %v, want %v (error: %v)", rec.Valid, tt.valid, rec.Error)
+			}
+		})
+	}
+}
+
 func TestCheckDKIMRecordUnrelatedTXT(t *testing.T) {
 	// An unrelated TXT value (no DKIM version tag, no public key) served at the
 	// DKIM location is not a malformed DKIM record; it is simply not a DKIM
