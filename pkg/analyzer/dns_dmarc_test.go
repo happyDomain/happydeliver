@@ -560,6 +560,39 @@ func TestDMARCUnknownPolicy(t *testing.T) {
 	}
 }
 
+func TestCheckDMARCRecordMultipleRecords(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"_dmarc.mail.example.com": {"v=DMARC1; p=reject", "v=DMARC1; p=none"},
+		"_dmarc.example.com":      {"v=DMARC1; p=quarantine"},
+	}, nil)
+
+	rec := analyzer.checkDMARCRecord("mail.example.com")
+	if rec.Valid {
+		t.Error("Valid = true, want false: none of them applies")
+	}
+	if got := utils.Deref(rec.Domain); got != "mail.example.com" {
+		t.Errorf("Domain = %q, want the walk to stop at mail.example.com", got)
+	}
+
+	score, issues := analyzer.calculateDMARCScore(&model.DNSResults{FromDomain: "mail.example.com", DmarcRecord: rec})
+	if score != 20 || len(issues) != 1 || issues[0].Type != model.IssueTypeDmarcInvalid {
+		t.Fatalf("score = %d, issues = %v, want 20 and dmarc_invalid", score, issues)
+	}
+	if advice := utils.Deref(issues[0].Advice); !strings.Contains(advice, "single DMARC record at _dmarc.mail.example.com") {
+		t.Errorf("advice = %q", advice)
+	}
+}
+
+func TestCheckDMARCRecordIgnoresOtherTXT(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"_dmarc.example.com": {"unrelated=1", "v=DMARC1; p=reject"},
+	}, nil)
+
+	if rec := analyzer.checkDMARCRecord("example.com"); !rec.Valid {
+		t.Errorf("Valid = false: %s", utils.Deref(rec.Error))
+	}
+}
+
 func TestValidateDMARC(t *testing.T) {
 	tests := []struct {
 		name     string

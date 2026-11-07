@@ -23,6 +23,7 @@ package analyzer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -38,8 +39,16 @@ import (
 
 var dmarcPolicyStrength = map[string]int{"none": 0, "quarantine": 1, "reject": 2}
 
+// errMultipleDMARCRecords says a domain publishes several DMARC records: policy
+// discovery stops there and none of them applies (RFC 7489 section 6.6.3).
+var errMultipleDMARCRecords = errors.New("multiple DMARC records")
+
+// dmarcMultipleRecordsError is what a record reports for that error.
+const dmarcMultipleRecordsError = "Multiple DMARC records found, so receivers apply none of them"
+
 // lookupDMARCAt queries _dmarc.<domain> and returns the raw DMARC1 TXT record.
 // notFound=true means no record exists (NXDOMAIN or empty); false means a real DNS error occurred.
+// With errMultipleDMARCRecords, the first of them is returned along.
 func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
@@ -52,12 +61,20 @@ func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool
 		return "", false, lookupErr
 	}
 
+	var records []string
 	for _, txt := range txtRecords {
 		if strings.HasPrefix(txt, "v=DMARC1") {
-			return txt, false, nil
+			records = append(records, txt)
 		}
 	}
-	return "", true, nil
+	switch len(records) {
+	case 0:
+		return "", true, nil
+	case 1:
+		return records[0], false, nil
+	default:
+		return records[0], false, errMultipleDMARCRecords
+	}
 }
 
 // parseDMARCTags splits a DMARC record into a tag→value map. Unlike DKIM's, its
@@ -265,6 +282,9 @@ func (d *DNSAnalyzer) walkDNSForDMARC(domain string) (record, foundDomain string
 		current := strings.Join(labels[i:], ".")
 
 		raw, notFound, lookupErr := d.lookupDMARCAt(current)
+		if errors.Is(lookupErr, errMultipleDMARCRecords) {
+			return raw, current, lookupErr
+		}
 		if lookupErr != nil {
 			return "", "", lookupErr
 		}
@@ -294,6 +314,14 @@ func (d *DNSAnalyzer) walkDNSForDMARC(domain string) (record, foundDomain string
 // experimental fallback.
 func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 	raw, foundDomain, err := d.walkDNSForDMARC(domain)
+	if errors.Is(err, errMultipleDMARCRecords) {
+		return &model.DMARCRecord{
+			Domain: &foundDomain,
+			Record: &raw,
+			Valid:  false,
+			Error:  utils.PtrTo(dmarcMultipleRecordsError),
+		}
+	}
 	if err != nil {
 		return &model.DMARCRecord{
 			Valid: false,
@@ -377,8 +405,11 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 			if dmarc.Error != nil {
 				message = *dmarc.Error
 			}
-			c.cap(20, newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityHigh, domain, message,
-				"Fix the syntax of the record: it must start with v=DMARC1, and give each tag once."))
+			advice := "Fix the syntax of the record: it must start with v=DMARC1, and give each tag once."
+			if message == dmarcMultipleRecordsError {
+				advice = fmt.Sprintf("Keep a single DMARC record at _dmarc.%s.", domain)
+			}
+			c.cap(20, newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityHigh, domain, message, advice))
 		}
 		return c.score, c.issues
 	}
