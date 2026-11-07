@@ -30,14 +30,18 @@
     const allValid = $derived(mxRecords.every((r) => r.valid));
     const sorted = $derived([...mxRecords].sort((a, b) => a.priority - b.priority));
 
+    const nullMx = $derived(mxRecords.length === 1 && mxRecords[0].host === ".");
+
     const summary = $derived(
-        mxRecords.length > 0
-            ? sorted.map((mx) => mx.host).join(", ")
-            : returnOk?.status === "warn"
-              ? "No MX record, mail goes to the A/AAAA address"
-              : returnOk?.status === "fail"
-                ? "No MX nor A/AAAA record: cannot receive mail"
-                : "No MX record",
+        nullMx
+            ? "Null MX: this domain declares it accepts no mail"
+            : mxRecords.length > 0
+              ? sorted.map((mx) => mx.host).join(", ")
+              : returnOk?.status === "warn"
+                ? "No MX record, mail goes to the A/AAAA address"
+                : returnOk?.status === "fail"
+                  ? "No MX nor A/AAAA record: cannot receive mail"
+                  : "No MX record",
     );
 </script>
 
