@@ -143,10 +143,20 @@ func TestValidateSPF(t *testing.T) {
 			errorMsg:    "unknown mechanism",
 		},
 		{
-			name:        "Invalid SPF - unknown modifier",
+			name:        "Valid SPF with an unknown modifier",
 			record:      "v=spf1 -all unknown=value",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with an unknown modifier before all",
+			record:      "v=spf1 ip4:192.0.2.1 x-note=hello -all",
+			expectError: false,
+		},
+		{
+			name:        "Invalid SPF - not a modifier name",
+			record:      "v=spf1 1x=value -all",
 			expectError: true,
-			errorMsg:    "unknown modifier",
+			errorMsg:    "invalid modifier name",
 		},
 		{
 			name:        "Valid SPF with RFC 6652 ra modifier",

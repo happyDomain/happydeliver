@@ -400,35 +400,30 @@ func (d *DNSAnalyzer) extractSPFRedirect(record string) string {
 	return ""
 }
 
+// spfModifierName is the shape of a modifier's name (RFC 7208 section 12).
+var spfModifierName = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
+
 // isValidSPFMechanism checks if a token is a valid SPF mechanism or modifier
 func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 	// Remove qualifier prefix if present (+, -, ~, ?)
 	mechanism := strings.TrimLeft(token, "+-~?")
 
-	// Check if it's a modifier (contains =)
-	if strings.Contains(mechanism, "=") {
-		// Allow known modifiers: redirect=, exp=, and RFC 6652 modifiers (ra=, rp=, rr=)
-		if strings.HasPrefix(mechanism, "redirect=") ||
-			strings.HasPrefix(mechanism, "exp=") ||
-			strings.HasPrefix(mechanism, "ra=") ||
-			strings.HasPrefix(mechanism, "rp=") ||
-			strings.HasPrefix(mechanism, "rr=") {
-			return nil
-		}
-
+	// Check if it's a modifier (name=value)
+	if name, _, modifier := splitSPFTerm(mechanism); modifier {
 		// Check if it's a common mistake (using = instead of :)
-		parts := strings.SplitN(mechanism, "=", 2)
-		if len(parts) == 2 {
-			mechanismName := parts[0]
-			knownMechanisms := []string{"include", "a", "mx", "ptr", "exists"}
-			for _, known := range knownMechanisms {
-				if mechanismName == known {
-					return fmt.Errorf("invalid syntax '%s': mechanism '%s' should use ':' not '='", token, mechanismName)
-				}
+		knownMechanisms := []string{"include", "a", "mx", "ptr", "exists"}
+		for _, known := range knownMechanisms {
+			if name == known {
+				return fmt.Errorf("invalid syntax '%s': mechanism '%s' should use ':' not '='", token, name)
 			}
 		}
 
-		return fmt.Errorf("unknown modifier '%s'", token)
+		// Receivers ignore the modifiers they do not know (RFC 7208 section
+		// 6): only a name no modifier can have is an error.
+		if !spfModifierName.MatchString(name) {
+			return fmt.Errorf("invalid modifier name '%s'", token)
+		}
+		return nil
 	}
 
 	// Check standalone mechanisms (no domain/value required)
