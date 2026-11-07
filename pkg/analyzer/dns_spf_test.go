@@ -824,6 +824,21 @@ func TestCountSPFLookups(t *testing.T) {
 	}
 }
 
+func TestCountSPFLookupsStopsAtAll(t *testing.T) {
+	records := []model.SPFRecord{
+		{Domain: utils.PtrTo("example.com"), Record: utils.PtrTo("v=spf1 mx -all a exists:x.example.com include:_spf.example.org")},
+	}
+
+	countSPFLookups(records)
+
+	if got := utils.Deref(records[0].DnsLookups); got != 1 {
+		t.Errorf("DnsLookups = %d, want 1: nothing after all is evaluated", got)
+	}
+	if records[0].DnsLookupsPartial != nil {
+		t.Errorf("DnsLookupsPartial = %v, want nil", *records[0].DnsLookupsPartial)
+	}
+}
+
 func TestSPFTooManyLookups(t *testing.T) {
 	analyzer := newMockAnalyzer(map[string][]string{
 		"example.com":      {"v=spf1 include:_spf.example.net include:_spf.example.org -all"},

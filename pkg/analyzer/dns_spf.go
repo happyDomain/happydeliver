@@ -102,7 +102,7 @@ func countSPFLookups(records []model.SPFRecord) {
 
 		hasAll := false
 		redirect := ""
-		for _, token := range strings.Fields(*records[i].Record)[1:] {
+		for _, token := range spfTerms(*records[i].Record) {
 			name, value, modifier := splitSPFTerm(strings.TrimLeft(token, "+-~?"))
 			switch {
 			case modifier && name == "redirect":
@@ -115,6 +115,10 @@ func countSPFLookups(records []model.SPFRecord) {
 				t.lookups++
 			case name == "all":
 				hasAll = true
+			}
+			if hasAll {
+				// Evaluation never gets past it: what follows costs nothing
+				break
 			}
 		}
 		// redirect is ignored when the record has an all mechanism anywhere
