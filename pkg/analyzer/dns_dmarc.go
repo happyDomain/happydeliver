@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -233,10 +234,20 @@ func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMA
 	if !d.validateDMARC(rawRecord) {
 		rec.Valid = false
 		rec.Error = utils.PtrTo("DMARC record appears malformed")
+		if problem := dmarcPolicyProblem(tags); problem != "" {
+			rec.Error = utils.PtrTo(fmt.Sprintf("%s and rua= holds no valid address, so receivers ignore the record", problem))
+		}
 		return rec
 	}
 
 	rec.Valid = true
+	if _, hasPolicy := tags["p"]; !hasPolicy {
+		rec.Policy = utils.PtrTo(model.DMARCRecordPolicy("none"))
+	}
+	if problem := dmarcPolicyProblem(tags); problem != "" {
+		rec.Policy = utils.PtrTo(model.DMARCRecordPolicy("none"))
+		rec.Error = utils.PtrTo(fmt.Sprintf("%s, so receivers treat the record as p=none", problem))
+	}
 	return rec
 }
 
@@ -309,19 +320,36 @@ func (d *DNSAnalyzer) extractDMARCPSDValue(record string) string {
 	return ""
 }
 
+// dmarcPolicyProblem says what is wrong with the policies of a record, or "" if
+// they are fine. A record without p= has no problem of its own: see validateDMARC.
+func dmarcPolicyProblem(tags map[string]string) string {
+	for _, tag := range []string{"p", "sp"} {
+		if value, found := tags[tag]; found {
+			if _, known := dmarcPolicyStrength[value]; !known {
+				return fmt.Sprintf("%s=%s is not a DMARC policy", tag, value)
+			}
+		}
+	}
+	return ""
+}
+
+// hasValidDMARCReportURI reports whether rua= holds a URI that can receive reports.
+func hasValidDMARCReportURI(tags map[string]string) bool {
+	return slices.ContainsFunc(dmarcReportURIs(tags["rua"]), validDMARCReportURI)
+}
+
 // validateDMARC performs basic DMARC record validation.
-// Per DMARCbis, p= is now RECOMMENDED (not required): a record with a valid
-// rua= but no p= is treated as p=none and considered valid.
+// A record with no p= tag, or with an invalid p= or sp= tag, only stands on a
+// valid rua=, which makes it a p=none record (RFC 7489 section 6.6.3; DMARCbis
+// makes p= RECOMMENDED, not required).
 func (d *DNSAnalyzer) validateDMARC(record string) bool {
 	if !strings.HasPrefix(record, "v=DMARC1") {
 		return false
 	}
 
-	// p= absent is allowed in DMARCbis when rua= is present (treated as p=none).
 	tags := parseDMARCTags(record)
-	if _, hasPolicy := tags["p"]; !hasPolicy {
-		_, hasReports := tags["rua"]
-		return hasReports
+	if _, hasPolicy := tags["p"]; !hasPolicy || dmarcPolicyProblem(tags) != "" {
+		return hasValidDMARCReportURI(tags)
 	}
 
 	return true
@@ -431,6 +459,14 @@ func (d *DNSAnalyzer) calculateDMARCScore(results *model.DNSResults) (int, []mod
 		c.note(newIssue(model.IssueTypeDmarcPctDeprecated, model.IssueSeverityInfo, domain,
 			"pct=100 is the default and DMARCbis removes the tag.",
 			"Remove pct= from the record."))
+	}
+
+	// A policy that does not exist, which rua= saved from being ignored: what
+	// p=none costs is already charged, and it does not say why.
+	if dmarc.Error != nil {
+		c.note(newIssue(model.IssueTypeDmarcInvalid, model.IssueSeverityMedium, domain,
+			fmt.Sprintf("%s.", *dmarc.Error),
+			"Set p= and sp= to none, quarantine or reject."))
 	}
 
 	if dmarc.InvalidReportUris != nil && len(*dmarc.InvalidReportUris) > 0 {

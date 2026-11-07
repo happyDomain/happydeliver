@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -475,6 +476,90 @@ func TestDMARCInvalidReportURIs(t *testing.T) {
 	}
 }
 
+func TestDMARCUnknownPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		record     string
+		valid      bool
+		policy     string
+		score      int
+		issues     []model.IssueType
+		wantInText string
+	}{
+		{
+			name:       "typo without reports",
+			record:     "v=DMARC1; p=rejet",
+			policy:     "unknown",
+			score:      20,
+			issues:     []model.IssueType{model.IssueTypeDmarcInvalid},
+			wantInText: "p=rejet is not a DMARC policy",
+		},
+		{
+			name:       "typo with reports that cannot work",
+			record:     "v=DMARC1; p=rejet; rua=dmarc@example.com",
+			policy:     "unknown",
+			score:      20,
+			issues:     []model.IssueType{model.IssueTypeDmarcInvalid},
+			wantInText: "rua= holds no valid address",
+		},
+		{
+			name:       "typo with reports",
+			record:     "v=DMARC1; p=rejet; rua=mailto:dmarc@example.com",
+			valid:      true,
+			policy:     "none",
+			score:      55,
+			issues:     []model.IssueType{model.IssueTypeDmarcPolicyNone, model.IssueTypeDmarcInvalid},
+			wantInText: "treat the record as p=none",
+		},
+		{
+			name:       "subdomain typo with reports overrides a good policy",
+			record:     "v=DMARC1; p=reject; sp=foo; rua=mailto:dmarc@example.com",
+			valid:      true,
+			policy:     "none",
+			score:      55,
+			issues:     []model.IssueType{model.IssueTypeDmarcPolicyNone, model.IssueTypeDmarcInvalid},
+			wantInText: "sp=foo is not a DMARC policy",
+		},
+		{
+			name:   "no policy with reports",
+			record: "v=DMARC1; rua=mailto:dmarc@example.com",
+			valid:  true,
+			policy: "none",
+			score:  55,
+			issues: []model.IssueType{model.IssueTypeDmarcPolicyNone},
+		},
+	}
+
+	analyzer := NewDNSAnalyzer(5*time.Second, nil)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := analyzer.parseDMARCRecord("example.com", tt.record)
+			if rec.Valid != tt.valid {
+				t.Errorf("Valid = %v, want %v", rec.Valid, tt.valid)
+			}
+			if got := string(utils.Deref(rec.Policy)); got != tt.policy {
+				t.Errorf("Policy = %q, want %q", got, tt.policy)
+			}
+			if !strings.Contains(utils.Deref(rec.Error), tt.wantInText) {
+				t.Errorf("Error = %q, want it to hold %q", utils.Deref(rec.Error), tt.wantInText)
+			}
+
+			score, issues := analyzer.calculateDMARCScore(&model.DNSResults{FromDomain: "example.com", DmarcRecord: rec})
+			if score != tt.score {
+				t.Errorf("score = %d, want %d", score, tt.score)
+			}
+			var types []model.IssueType
+			for _, issue := range issues {
+				types = append(types, issue.Type)
+			}
+			if !slices.Equal(types, tt.issues) {
+				t.Errorf("issues = %v, want %v", types, tt.issues)
+			}
+		})
+	}
+}
+
 func TestValidateDMARC(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -489,6 +574,26 @@ func TestValidateDMARC(t *testing.T) {
 		{
 			name:     "Valid DMARC minimal",
 			record:   "v=DMARC1; p=none",
+			expected: true,
+		},
+		{
+			name:     "Invalid DMARC - no policy and a rua= that is no URI",
+			record:   "v=DMARC1; rua=dmarc@example.com",
+			expected: false,
+		},
+		{
+			name:     "Invalid DMARC - unknown policy without rua",
+			record:   "v=DMARC1; p=rejet",
+			expected: false,
+		},
+		{
+			name:     "Invalid DMARC - unknown subdomain policy without rua",
+			record:   "v=DMARC1; p=reject; sp=foo",
+			expected: false,
+		},
+		{
+			name:     "Unknown policy saved by a valid rua",
+			record:   "v=DMARC1; p=rejet; rua=mailto:dmarc@example.com",
 			expected: true,
 		},
 		{
