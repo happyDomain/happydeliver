@@ -184,6 +184,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dkim_key_weak: [docs.dkimKeySize],
     mx_missing: [docs.mxLookup],
     mx_invalid: [docs.mxLookup],
+    mx_null: [docs.nullMx],
     domain_unreachable: [docs.mxLookup],
     helo_spf_missing: [docs.spfHelo],
     helo_spf_invalid: [docs.spfHelo],

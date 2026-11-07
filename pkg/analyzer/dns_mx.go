@@ -32,6 +32,10 @@ import (
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
+// nullMXHost is the target of a null MX, by which a domain declares that it
+// accepts no mail at all (RFC 7505).
+const nullMXHost = "."
+
 // checkMXRecords looks up MX records for a domain. A domain that publishes
 // none (NXDOMAIN, or NODATA, which Go reports as not found too) gets an empty
 // list; a lookup that failed for another reason gets nil and the failure, for
@@ -52,11 +56,16 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) (*[]model.MXRecord, string) 
 	}
 
 	for _, mx := range mxRecords {
-		results = append(results, model.MXRecord{
+		record := model.MXRecord{
 			Host:     mx.Host,
 			Priority: mx.Pref,
 			Valid:    true,
-		})
+		}
+		if mx.Host == nullMXHost {
+			record.Valid = false
+			record.Error = utils.PtrTo("Null MX: the domain accepts no mail")
+		}
+		results = append(results, record)
 	}
 
 	return &results, ""
@@ -127,6 +136,10 @@ func mxIssues(c *checkScore, domain string, records *[]model.MXRecord, reach *mo
 	publish := fmt.Sprintf("Publish an MX record for %s pointing to a server that accepts mail.", domain)
 
 	switch {
+	case records != nil && len(*records) == 1 && (*records)[0].Host == nullMXHost:
+		c.deduct(points, newIssue(model.IssueTypeMxNull, model.IssueSeverityHigh, domain,
+			fmt.Sprintf("%s publishes a null MX, declaring that it accepts no mail: %s to it are lost, and receivers may refuse mail sent from it.", domain, lost),
+			fmt.Sprintf("Replace the null MX of %s with an MX record pointing to a server that accepts mail, or send from another domain.", domain)))
 	case reach != nil && reach.Status == returnOKStatusFail:
 		c.deduct(points, newIssue(model.IssueTypeDomainUnreachable, model.IssueSeverityHigh, domain,
 			fmt.Sprintf("%s has neither MX nor A/AAAA record: %s to it are lost, and receivers treat such senders as suspicious.", domain, lost),

@@ -319,6 +319,37 @@ func TestPTRScoreIssuesByCheck(t *testing.T) {
 	}
 }
 
+func TestMXIssuesOfANullMX(t *testing.T) {
+	analyzer := NewDNSAnalyzerWithResolver(time.Second, nil, &returnOKMockResolver{
+		mx: map[string][]*net.MX{"example.com": {{Host: ".", Pref: 0}}},
+	})
+
+	records, lookupErr := analyzer.checkMXRecords("example.com")
+	if lookupErr != "" {
+		t.Fatalf("lookup failed: %s", lookupErr)
+	}
+	if len(*records) != 1 || (*records)[0].Valid {
+		t.Fatalf("records = %+v, want one invalid record", *records)
+	}
+
+	score, from, _ := analyzer.calculateMXScore(&model.DNSResults{FromDomain: "example.com", FromMxRecords: records})
+	if score != 0 || len(from) != 1 || from[0].Type != model.IssueTypeMxNull || from[0].Severity != model.IssueSeverityHigh {
+		t.Errorf("score = %d, From issues = %v, want one high mx_null costing it all", score, from)
+	}
+}
+
+func TestMXIssuesOfANullMXBesideARealOne(t *testing.T) {
+	analyzer := NewDNSAnalyzerWithResolver(time.Second, nil, &returnOKMockResolver{
+		mx: map[string][]*net.MX{"example.com": {{Host: ".", Pref: 0}, {Host: "mail.example.com", Pref: 10}}},
+	})
+
+	records, _ := analyzer.checkMXRecords("example.com")
+	score, from, _ := analyzer.calculateMXScore(&model.DNSResults{FromDomain: "example.com", FromMxRecords: records})
+	if score != 100 || len(from) != 1 || from[0].Type != model.IssueTypeMxInvalid {
+		t.Errorf("score = %d, From issues = %v, want a free mx_invalid: it is no null MX", score, from)
+	}
+}
+
 func TestMXIssuesWithoutAValidRecord(t *testing.T) {
 	analyzer := newMockAnalyzer(nil, nil)
 	results := &model.DNSResults{

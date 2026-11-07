@@ -69,6 +69,7 @@ const issueLabels: Record<Issue["type"], string> = {
     dkim_key_weak: "Weak DKIM key",
     mx_missing: "No MX record",
     mx_invalid: "Invalid MX records",
+    mx_null: "Domain declares it accepts no mail",
     domain_unreachable: "Domain cannot receive mail",
     helo_spf_missing: "HELO hostname publishes no SPF policy",
     helo_spf_invalid: "SPF policy of the HELO hostname does not validate",
