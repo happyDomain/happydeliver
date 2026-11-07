@@ -253,6 +253,16 @@ func TestParseDMARCRecordPolicy(t *testing.T) {
 			expectedPolicy: "reject",
 		},
 		{
+			name:           "Policy in upper case",
+			record:         "v=DMARC1; p=REJECT",
+			expectedPolicy: "reject",
+		},
+		{
+			name:           "Tag name in upper case",
+			record:         "v=DMARC1; P=quarantine",
+			expectedPolicy: "quarantine",
+		},
+		{
 			name:           "No policy",
 			record:         "v=DMARC1",
 			expectedPolicy: "unknown",

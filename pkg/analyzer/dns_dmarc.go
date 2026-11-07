@@ -57,9 +57,23 @@ func (d *DNSAnalyzer) lookupDMARCAt(domain string) (record string, notFound bool
 	return "", true, nil
 }
 
+// parseDMARCTags splits a DMARC record into a tag→value map. Unlike DKIM's, its
+// tag names and keywords ignore case; the reporting URIs keep theirs.
+func parseDMARCTags(record string) map[string]string {
+	tags := make(map[string]string)
+	for name, value := range parseDKIMTags(record) {
+		name = strings.ToLower(name)
+		if name != "rua" && name != "ruf" {
+			value = strings.ToLower(value)
+		}
+		tags[name] = value
+	}
+	return tags
+}
+
 // parseDMARCRecord parses a raw DMARC TXT record into a DMARCRecord model.
 func (d *DNSAnalyzer) parseDMARCRecord(foundDomain, rawRecord string) *model.DMARCRecord {
-	tags := parseDKIMTags(rawRecord)
+	tags := parseDMARCTags(rawRecord)
 
 	// Policy
 	policy := "unknown"
@@ -209,7 +223,7 @@ func (d *DNSAnalyzer) checkDMARCRecord(domain string) *model.DMARCRecord {
 // extractDMARCPSDValue returns the raw psd= value ("y", "n", "u") or "" if absent.
 // Used during DNS Tree Walk before full record parsing.
 func (d *DNSAnalyzer) extractDMARCPSDValue(record string) string {
-	v := parseDKIMTags(record)["psd"]
+	v := parseDMARCTags(record)["psd"]
 	switch v {
 	case "y", "n", "u":
 		return v
