@@ -101,6 +101,16 @@ func TestValidateSPF(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "Valid SPF in upper case",
+			record:      "v=spf1 IP4:192.0.2.1 MX -ALL",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with an upper case redirect",
+			record:      "v=spf1 REDIRECT=_spf.example.com",
+			expectError: false,
+		},
+		{
 			name:        "Invalid SPF - no version",
 			record:      "include:_spf.example.com -all",
 			expectError: true,
@@ -285,6 +295,7 @@ func TestExtractSPFAllQualifier(t *testing.T) {
 		{"no qualifier", "v=spf1 mx all", "+"},
 		{"explicit pass", "v=spf1 +all", "+"},
 		{"neutral", "v=spf1 ?all", "?"},
+		{"upper case", "v=spf1 mx -ALL", "-"},
 		{"none", "v=spf1 mx", ""},
 		{"a domain named all", "v=spf1 include:all.example.com", ""},
 	}

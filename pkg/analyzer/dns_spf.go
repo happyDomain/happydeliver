@@ -278,7 +278,7 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 func extractSPFAllQualifier(record string) *model.SPFRecordAllQualifier {
 	for _, term := range spfTerms(record) {
 		mechanism := strings.TrimLeft(term, "+-~?")
-		if mechanism != "all" {
+		if !strings.EqualFold(mechanism, "all") {
 			continue
 		}
 		if qualifier := strings.TrimSuffix(term, mechanism); qualifier != "" {
@@ -379,7 +379,7 @@ func noSPFRecordError(txtRecords []string) string {
 // extractSPFIncludes extracts all include: domains from an SPF record
 func (d *DNSAnalyzer) extractSPFIncludes(record string) []string {
 	var includes []string
-	re := regexp.MustCompile(`include:([^\s]+)`)
+	re := regexp.MustCompile(`(?i)include:([^\s]+)`)
 	matches := re.FindAllStringSubmatch(record, -1)
 	for _, match := range matches {
 		if len(match) > 1 {
@@ -392,7 +392,7 @@ func (d *DNSAnalyzer) extractSPFIncludes(record string) []string {
 // extractSPFRedirect extracts the redirect= domain from an SPF record
 // The redirect= modifier replaces the current domain's SPF policy with that of the target domain
 func (d *DNSAnalyzer) extractSPFRedirect(record string) string {
-	re := regexp.MustCompile(`redirect=([^\s]+)`)
+	re := regexp.MustCompile(`(?i)redirect=([^\s]+)`)
 	matches := re.FindStringSubmatch(record)
 	if len(matches) > 1 {
 		return matches[1]
@@ -405,8 +405,8 @@ var spfModifierName = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
 
 // isValidSPFMechanism checks if a token is a valid SPF mechanism or modifier
 func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
-	// Remove qualifier prefix if present (+, -, ~, ?)
-	mechanism := strings.TrimLeft(token, "+-~?")
+	// Remove qualifier prefix if present (+, -, ~, ?); names ignore case
+	mechanism := strings.ToLower(strings.TrimLeft(token, "+-~?"))
 
 	// Check if it's a modifier (name=value)
 	if name, _, modifier := splitSPFTerm(mechanism); modifier {
@@ -475,7 +475,7 @@ func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 		}
 
 		// Track if we have a redirect modifier
-		mechanism := strings.TrimLeft(token, "+-~?")
+		mechanism := strings.ToLower(strings.TrimLeft(token, "+-~?"))
 		if strings.HasPrefix(mechanism, "redirect=") {
 			hasRedirect = true
 		}
@@ -519,7 +519,7 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 	mainSPFIndex := 0
 	for i := 0; i < len(*results.SpfRecords); i++ {
 		spfRecord := (*results.SpfRecords)[i]
-		if spfRecord.Record != nil && strings.Contains(*spfRecord.Record, "redirect=") {
+		if spfRecord.Record != nil && d.extractSPFRedirect(*spfRecord.Record) != "" {
 			// The redirect target comes right after the record, unless it could
 			// not be fetched or was already visited: the next record is then the
 			// first include, which is no policy for the domain.
@@ -628,7 +628,7 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 	// fail the whole evaluation with a permerror. The score does not count
 	// it yet; the issue says so rather than staying silent.
 	for i, r := range *results.SpfRecords {
-		if i == mainSPFIndex || r.Valid || (r.Record != nil && strings.Contains(*r.Record, "redirect=")) {
+		if i == mainSPFIndex || r.Valid || (r.Record != nil && d.extractSPFRedirect(*r.Record) != "") {
 			continue
 		}
 		included := ""
