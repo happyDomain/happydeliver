@@ -169,6 +169,29 @@ func TestValidateSPF(t *testing.T) {
 			errorMsg:    "invalid prefix length",
 		},
 		{
+			name:        "Invalid SPF - redirect twice",
+			record:      "v=spf1 redirect=a.example.com redirect=b.example.com",
+			expectError: true,
+			errorMsg:    "redirect= modifier appears more than once",
+		},
+		{
+			name:        "Invalid SPF - exp twice",
+			record:      "v=spf1 -all exp=a.example.com exp=b.example.com",
+			expectError: true,
+			errorMsg:    "exp= modifier appears more than once",
+		},
+		{
+			name:        "Invalid SPF - empty redirect",
+			record:      "v=spf1 redirect=",
+			expectError: true,
+			errorMsg:    "redirect= modifier has no domain",
+		},
+		{
+			name:        "Valid SPF - an unknown modifier may repeat",
+			record:      "v=spf1 x-note=a x-note=b -all",
+			expectError: false,
+		},
+		{
 			name:        "Invalid SPF - no version",
 			record:      "include:_spf.example.com -all",
 			expectError: true,

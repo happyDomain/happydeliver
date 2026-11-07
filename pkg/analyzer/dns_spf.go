@@ -493,6 +493,7 @@ func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 	// Parse and validate each token in the SPF record
 	tokens := strings.Fields(record)
 	hasRedirect := false
+	seenModifiers := make(map[string]bool)
 
 	for i, token := range tokens {
 		// Skip the version tag
@@ -503,6 +504,19 @@ func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 		// Check if it's a valid mechanism
 		if err := d.isValidSPFMechanism(token); err != nil {
 			return err
+		}
+
+		// redirect= and exp= take a domain, and may only appear once
+		// (RFC 7208 section 6)
+		name, value, modifier := splitSPFTerm(strings.TrimLeft(token, "+-~?"))
+		if modifier && (name == "redirect" || name == "exp") {
+			if value == "" {
+				return fmt.Errorf("the %s= modifier has no domain", name)
+			}
+			if seenModifiers[name] {
+				return fmt.Errorf("the %s= modifier appears more than once", name)
+			}
+			seenModifiers[name] = true
 		}
 
 		// Track if we have a redirect modifier
