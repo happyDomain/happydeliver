@@ -969,6 +969,45 @@ func TestExtractSPFIncludes(t *testing.T) {
 	}
 }
 
+func TestSPFScoreOfAnInvalidRecordThatRedirects(t *testing.T) {
+	tests := []struct {
+		name   string
+		record string
+	}{
+		{"redirect twice", "v=spf1 redirect=a.example.org redirect=b.example.org"},
+		{"bad address before the redirect", "v=spf1 ip4:192.0.2.999 redirect=a.example.org"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := newMockAnalyzer(map[string][]string{
+				"example.com":   {tt.record},
+				"a.example.org": {"v=spf1 mx -all"},
+				"b.example.org": {"v=spf1 mx -all"},
+			}, nil)
+
+			records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+			score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
+			if score != 25 || len(issues) != 1 || issues[0].Type != model.IssueTypeSpfInvalid {
+				t.Errorf("score = %d, issues = %v, want 25 and spf_invalid: a sound target does not fix the record", score, issues)
+			}
+		})
+	}
+}
+
+func TestSPFScoreTakesTheIncludeNamedLikeAnIgnoredRedirectForAnInclude(t *testing.T) {
+	analyzer := newMockAnalyzer(map[string][]string{
+		"example.com":      {"v=spf1 include:_spf.example.org redirect=_spf.example.org -all"},
+		"_spf.example.org": {"v=spf1 mx ?all"},
+	}, nil)
+
+	records := analyzer.resolveSPFRecords("example.com", map[string]bool{}, 0, true)
+	score, issues := analyzer.calculateSPFScore(&model.DNSResults{FromDomain: "example.com", SpfRecords: records})
+	if score != 100 || len(issues) != 0 {
+		t.Errorf("score = %d, issues = %v, want the -all of the record to count", score, issues)
+	}
+}
+
 func TestSPFScoreTakesNoIncludeForTheRedirectTarget(t *testing.T) {
 	analyzer := newMockAnalyzer(map[string][]string{
 		"example.com":      {"v=spf1 include:_spf.example.net redirect=example.com"},

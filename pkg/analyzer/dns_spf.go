@@ -573,7 +573,10 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 	mainSPFIndex := 0
 	for i := 0; i < len(*results.SpfRecords); i++ {
 		spfRecord := (*results.SpfRecords)[i]
-		if spfRecord.Record != nil && d.extractSPFRedirect(*spfRecord.Record) != "" {
+		// Only a sound record gets to its redirect, which an all mechanism
+		// takes the place of
+		if spfRecord.Record != nil && spfRecord.Valid && d.extractSPFRedirect(*spfRecord.Record) != "" &&
+			extractSPFAllQualifier(*spfRecord.Record) == nil {
 			// The redirect target comes right after the record, unless it could
 			// not be fetched or was already visited: the next record is then the
 			// first include, which is no policy for the domain.
