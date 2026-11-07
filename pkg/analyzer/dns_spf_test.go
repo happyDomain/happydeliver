@@ -91,6 +91,16 @@ func TestValidateSPF(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "Valid SPF with a modifier after all",
+			record:      "v=spf1 ip4:192.0.2.1 -all exp=explain.example.com",
+			expectError: false,
+		},
+		{
+			name:        "Valid SPF with a mechanism after all",
+			record:      "v=spf1 -all include:_spf.example.org",
+			expectError: false,
+		},
+		{
 			name:        "Invalid SPF - no version",
 			record:      "include:_spf.example.com -all",
 			expectError: true,
@@ -249,6 +259,34 @@ func TestValidateSPF_IncludedRecords(t *testing.T) {
 				if err != nil {
 					t.Errorf("validateSPF(%q, isMainRecord=%v) unexpected error: %v", tt.record, tt.isMainRecord, err)
 				}
+			}
+		})
+	}
+}
+
+func TestExtractSPFAllQualifier(t *testing.T) {
+	tests := []struct {
+		name   string
+		record string
+		want   string
+	}{
+		{"last term", "v=spf1 mx -all", "-"},
+		{"followed by a modifier", "v=spf1 mx ~all exp=explain.example.com", "~"},
+		{"no qualifier", "v=spf1 mx all", "+"},
+		{"explicit pass", "v=spf1 +all", "+"},
+		{"neutral", "v=spf1 ?all", "?"},
+		{"none", "v=spf1 mx", ""},
+		{"a domain named all", "v=spf1 include:all.example.com", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ""
+			if q := extractSPFAllQualifier(tt.record); q != nil {
+				got = string(*q)
+			}
+			if got != tt.want {
+				t.Errorf("extractSPFAllQualifier(%q) = %q, want %q", tt.record, got, tt.want)
 			}
 		})
 	}

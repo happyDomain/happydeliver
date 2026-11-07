@@ -273,23 +273,30 @@ func (d *DNSAnalyzer) resolveSPFRecords(domain string, visited map[string]bool, 
 }
 
 // extractSPFAllQualifier returns the qualifier of the record's "all" mechanism,
-// or nil when the record ends with no such mechanism.
+// or nil when the record has no such mechanism. It may stand anywhere: exp= and
+// other modifiers often follow it, and whatever follows it is never evaluated.
 func extractSPFAllQualifier(record string) *model.SPFRecordAllQualifier {
-	switch {
-	case strings.HasSuffix(record, " -all"):
-		return utils.PtrTo(model.SPFRecordAllQualifier("-"))
-	case strings.HasSuffix(record, " ~all"):
-		return utils.PtrTo(model.SPFRecordAllQualifier("~"))
-	case strings.HasSuffix(record, " +all"):
-		return utils.PtrTo(model.SPFRecordAllQualifier("+"))
-	case strings.HasSuffix(record, " ?all"):
-		return utils.PtrTo(model.SPFRecordAllQualifier("?"))
-	case strings.HasSuffix(record, " all"):
+	for _, term := range spfTerms(record) {
+		mechanism := strings.TrimLeft(term, "+-~?")
+		if mechanism != "all" {
+			continue
+		}
+		if qualifier := strings.TrimSuffix(term, mechanism); qualifier != "" {
+			return utils.PtrTo(model.SPFRecordAllQualifier(qualifier[:1]))
+		}
 		// Implicit + qualifier (default)
 		return utils.PtrTo(model.SPFRecordAllQualifier("+"))
-	default:
+	}
+	return nil
+}
+
+// spfTerms returns the terms of a record, its version left out.
+func spfTerms(record string) []string {
+	fields := strings.Fields(record)
+	if len(fields) == 0 {
 		return nil
 	}
+	return fields[1:]
 }
 
 // isValidHostnameSyntax reports whether name has the shape of a domain name:
@@ -486,28 +493,13 @@ func (d *DNSAnalyzer) validateSPF(record string, isMainRecord bool) error {
 
 	// Only check for 'all' mechanism on the main record, not on included records
 	if isMainRecord {
-		// Check for common syntax issues
-		// Should have a final mechanism (all, +all, -all, ~all, ?all)
-		validEndings := []string{" all", " +all", " -all", " ~all", " ?all"}
-		hasValidEnding := false
-		for _, ending := range validEndings {
-			if strings.HasSuffix(record, ending) {
-				hasValidEnding = true
-				break
-			}
-		}
-
-		if !hasValidEnding {
+		// Should have an "all" mechanism (all, +all, -all, ~all, ?all)
+		if extractSPFAllQualifier(record) == nil {
 			return fmt.Errorf("SPF record should end with an 'all' mechanism (e.g., '-all', '~all') or have a 'redirect=' modifier")
 		}
 	}
 
 	return nil
-}
-
-// hasSPFStrictFail checks if SPF record has strict -all mechanism
-func (d *DNSAnalyzer) hasSPFStrictFail(record string) bool {
-	return strings.HasSuffix(record, " -all")
 }
 
 func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model.Issue) {
