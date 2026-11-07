@@ -122,6 +122,53 @@ func TestValidateSPF(t *testing.T) {
 			errorMsg:    "must start with 'v=spf1'",
 		},
 		{
+			name:        "Valid SPF with networks",
+			record:      "v=spf1 ip4:192.0.2.0/24 ip6:2001:db8::/32 ip6:2001:db8::1 -all",
+			expectError: false,
+		},
+		{
+			name:        "Invalid SPF - IPv4 address out of range",
+			record:      "v=spf1 ip4:192.0.2.999 -all",
+			expectError: true,
+			errorMsg:    "invalid address",
+		},
+		{
+			name:        "Invalid SPF - IPv6 address behind ip4:",
+			record:      "v=spf1 ip4:2001:db8::1 -all",
+			expectError: true,
+			errorMsg:    "invalid address",
+		},
+		{
+			name:        "Invalid SPF - IPv4 address behind ip6:",
+			record:      "v=spf1 ip6:192.0.2.1 -all",
+			expectError: true,
+			errorMsg:    "invalid address",
+		},
+		{
+			name:        "Invalid SPF - no address",
+			record:      "v=spf1 ip4: -all",
+			expectError: true,
+			errorMsg:    "invalid address",
+		},
+		{
+			name:        "Invalid SPF - IPv4 prefix too long",
+			record:      "v=spf1 ip4:192.0.2.0/33 -all",
+			expectError: true,
+			errorMsg:    "invalid prefix length",
+		},
+		{
+			name:        "Invalid SPF - IPv6 prefix too long",
+			record:      "v=spf1 ip6:2001:db8::/129 -all",
+			expectError: true,
+			errorMsg:    "invalid prefix length",
+		},
+		{
+			name:        "Invalid SPF - prefix is not a number",
+			record:      "v=spf1 ip4:192.0.2.0/x -all",
+			expectError: true,
+			errorMsg:    "invalid prefix length",
+		},
+		{
 			name:        "Invalid SPF - no version",
 			record:      "include:_spf.example.com -all",
 			expectError: true,

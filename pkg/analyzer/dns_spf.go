@@ -25,7 +25,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
@@ -438,14 +440,17 @@ func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 		return nil
 	}
 
+	// An address that does not parse is a permanent error for receivers
+	if strings.HasPrefix(mechanism, "ip4:") || strings.HasPrefix(mechanism, "ip6:") {
+		return validateSPFNetwork(token, mechanism[:3], mechanism[4:])
+	}
+
 	// Check mechanisms with domain/value
 	knownPrefixes := []string{
 		"include:",
 		"a:", "a/",
 		"mx:", "mx/",
 		"ptr:",
-		"ip4:",
-		"ip6:",
 		"exists:",
 	}
 
@@ -456,6 +461,25 @@ func (d *DNSAnalyzer) isValidSPFMechanism(token string) error {
 	}
 
 	return fmt.Errorf("unknown mechanism '%s'", token)
+}
+
+// validateSPFNetwork checks the address of an ip4: or ip6: mechanism and its
+// optional prefix length.
+func validateSPFNetwork(token, family, network string) error {
+	address, length, hasLength := strings.Cut(network, "/")
+
+	ip, err := netip.ParseAddr(address)
+	if err != nil || ip.Zone() != "" || (family == "ip4") != ip.Is4() {
+		return fmt.Errorf("invalid address in '%s'", token)
+	}
+
+	if hasLength {
+		bits, err := strconv.ParseUint(length, 10, 8)
+		if err != nil || int(bits) > ip.BitLen() {
+			return fmt.Errorf("invalid prefix length in '%s'", token)
+		}
+	}
+	return nil
 }
 
 // validateSPF performs basic SPF record validation
