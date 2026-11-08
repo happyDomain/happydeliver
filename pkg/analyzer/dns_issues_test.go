@@ -102,6 +102,10 @@ func TestDKIMScoreIssues(t *testing.T) {
 	key := func(selector string, size int, algorithm string) model.DKIMRecord {
 		return model.DKIMRecord{Selector: selector, Domain: "example.com", Valid: true, KeySize: utils.PtrTo(size), SigningAlgorithm: utils.PtrTo(algorithm)}
 	}
+	spaced := func(record model.DKIMRecord) model.DKIMRecord {
+		record.SpaceAfterB = utils.PtrTo(true)
+		return record
+	}
 
 	tests := []struct {
 		name    string
@@ -115,6 +119,7 @@ func TestDKIMScoreIssues(t *testing.T) {
 		{"short key", &[]model.DKIMRecord{key("s1", 512, "rsa-sha256")}, 25, []model.IssueType{model.IssueTypeDkimKeyShort}},
 		// SHA-1 caps at 60 first; the weak key's cap of 75 is already reached
 		{"sha1 and weak key", &[]model.DKIMRecord{key("s1", 1024, "rsa-sha1")}, 60, []model.IssueType{model.IssueTypeDkimSha1, model.IssueTypeDkimKeyWeak}},
+		{"space after b=", &[]model.DKIMRecord{spaced(key("s1", 2048, "rsa-sha256"))}, 100, []model.IssueType{model.IssueTypeDkimGmailIncompatible}},
 		{"only broken keys", &[]model.DKIMRecord{{Selector: "s1", Domain: "example.com", Error: utils.PtrTo("no key")}, {Selector: "s2", Domain: "example.com"}}, 25, []model.IssueType{model.IssueTypeDkimInvalid, model.IssueTypeDkimInvalid}},
 		{"broken key next to a sound one", &[]model.DKIMRecord{{Selector: "s1", Domain: "example.com"}, key("s2", 2048, "rsa-sha256")}, 100, []model.IssueType{model.IssueTypeDkimInvalid}},
 	}

@@ -166,9 +166,18 @@ func (d *DNSAnalyzer) checkDKIMRecord(h mailmsg.DKIMSignature) *model.DKIMRecord
 		KeyType:          utils.PtrTo(keyType),
 		HashAlgorithms:   &hashAlgorithms,
 		SigningAlgorithm: signingAlgorithmPtr(h.Algorithm),
+		SpaceAfterB:      spaceAfterBPtr(h.SpaceAfterB),
 		KeySize:          parseKeySize(keyType, tags["p"]),
 		Valid:            true,
 	}
+}
+
+// spaceAfterBPtr only sets space_after_b on the signatures that have it.
+func spaceAfterBPtr(spaced bool) *bool {
+	if !spaced {
+		return nil
+	}
+	return &spaced
 }
 
 func signingAlgorithmPtr(a string) *string {
@@ -242,6 +251,16 @@ func (d *DNSAnalyzer) calculateDKIMScore(results *model.DNSResults) (int, []mode
 			c.cap(60, newIssue(model.IssueTypeDkimSha1, model.IssueSeverityMedium, where,
 				fmt.Sprintf("The signature for %s uses %s, which signers must no longer use.", where, *dkim.SigningAlgorithm),
 				"Switch your signer to rsa-sha256 (or ed25519-sha256)."))
+		}
+
+		// A valid signature Gmail fails, as described on 2026-11-05 in
+		// https://people.kernel.org/monsieuricon/gmails-non-compliant-dkim-verifier
+		// The fault is Gmail's, so it only explains, at no cost. Drop this
+		// check once Gmail strips the whitespace.
+		if dkim.SpaceAfterB != nil && *dkim.SpaceAfterB {
+			c.note(newIssue(model.IssueTypeDkimGmailIncompatible, model.IssueSeverityInfo, where,
+				fmt.Sprintf("The signature for %s is valid, but Gmail currently fails it: it opens b= with whitespace (a line fold) and has a ; after it, and Gmail does not strip that whitespace before verifying, as RFC 6376 requires (seen in November 2026). Where the fold falls depends on the length of the headers before it, so other messages may be signed fine.", where),
+				"Configure your signer to leave out the ; after the signature, or to keep b= and the start of the signature on the same line. With Exim, adding the t= tag usually moves b= away from the end of the line."))
 		}
 
 		// Key size penalties apply only to RSA
