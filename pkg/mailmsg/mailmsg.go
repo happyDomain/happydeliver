@@ -582,6 +582,12 @@ type DKIMSignature struct {
 	Domain    string
 	Selector  string
 	Algorithm string // from a= tag (e.g. rsa-sha256, ed25519-sha256)
+
+	// SpaceAfterB is whitespace, typically a line fold, between b= and the
+	// signature, with a ; after it: verifiers must strip it along with the
+	// signature (RFC 6376 section 3.7), which Gmail does not, so the
+	// signature fails there.
+	SpaceAfterB bool
 }
 
 // DKIMSignatures reads what each DKIM-Signature header of the message claims:
@@ -593,7 +599,9 @@ func (e *Message) DKIMSignatures() []DKIMSignature {
 	var results []DKIMSignature
 	for _, sig := range signatures {
 		var domain, selector, algorithm string
-		for _, part := range strings.Split(sig, ";") {
+		var spaceAfterB bool
+		parts := strings.Split(sig, ";")
+		for i, part := range parts {
 			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
 			if len(kv) != 2 {
 				continue
@@ -607,10 +615,15 @@ func (e *Message) DKIMSignatures() []DKIMSignature {
 				selector = val
 			case "a":
 				algorithm = val
+			case "b":
+				// The header comes unfolded, a fold left as a space. Without
+				// a ; after the signature, the space is trimmed with the end
+				// of the header and does no harm.
+				spaceAfterB = i < len(parts)-1 && val != "" && strings.TrimLeft(kv[1], " \t") != kv[1]
 			}
 		}
 		if domain != "" && selector != "" {
-			results = append(results, DKIMSignature{Domain: domain, Selector: selector, Algorithm: algorithm})
+			results = append(results, DKIMSignature{Domain: domain, Selector: selector, Algorithm: algorithm, SpaceAfterB: spaceAfterB})
 		}
 	}
 	return results

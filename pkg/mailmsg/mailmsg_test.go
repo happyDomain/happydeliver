@@ -891,6 +891,34 @@ func TestDKIMSignatures(t *testing.T) {
 			expected: nil,
 		},
 		{
+			name: "Fold after b=, with a ; after the signature",
+			signatures: []string{
+				`v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; h=from:to; bh=hash=; b= sig==;`,
+			},
+			expected: []DKIMSignature{{Domain: "example.com", Selector: "mail", Algorithm: "rsa-sha256", SpaceAfterB: true}},
+		},
+		{
+			name: "Fold after b=, with another tag after the signature",
+			signatures: []string{
+				`v=1; a=rsa-sha256; c=relaxed/relaxed; h=from:to; bh=hash=; b=	sig==; d=example.com; s=mail`,
+			},
+			expected: []DKIMSignature{{Domain: "example.com", Selector: "mail", Algorithm: "rsa-sha256", SpaceAfterB: true}},
+		},
+		{
+			name: "Fold after b=, closing the header",
+			signatures: []string{
+				`v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; h=from:to; bh=hash=; b= sig==`,
+			},
+			expected: []DKIMSignature{{Domain: "example.com", Selector: "mail", Algorithm: "rsa-sha256"}},
+		},
+		{
+			name: "Fold within the signature, with a ; after it",
+			signatures: []string{
+				`v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=mail; h=from:to; bh=hash=; b=sig sig==;`,
+			},
+			expected: []DKIMSignature{{Domain: "example.com", Selector: "mail", Algorithm: "rsa-sha256"}},
+		},
+		{
 			name: "Mix of valid and invalid signatures",
 			signatures: []string{
 				`v=1; a=rsa-sha256; c=relaxed/relaxed; d=good.com; s=sel1; h=from:to; bh=hash=; b=sig==`,
@@ -920,6 +948,9 @@ func TestDKIMSignatures(t *testing.T) {
 				}
 				if result[i].Algorithm != tt.expected[i].Algorithm {
 					t.Errorf("result[%d].Algorithm = %q, want %q", i, result[i].Algorithm, tt.expected[i].Algorithm)
+				}
+				if result[i].SpaceAfterB != tt.expected[i].SpaceAfterB {
+					t.Errorf("result[%d].SpaceAfterB = %v, want %v", i, result[i].SpaceAfterB, tt.expected[i].SpaceAfterB)
 				}
 			}
 		})
