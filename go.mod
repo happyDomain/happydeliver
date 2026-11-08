@@ -3,7 +3,7 @@ module git.happydns.org/happyDeliver
 go 1.26.0
 
 require (
-	git.happydns.org/checker-blacklist v0.5.1
+	git.happydns.org/checker-blacklist v0.5.2
 	git.happydns.org/checker-sdk-go v1.11.1
 	git.happydns.org/happyDomain v0.8.0-rc2.0.20260922103041-4cc15a04ea07
 	git.happydns.org/svg-tiny-ps v1.0.0
