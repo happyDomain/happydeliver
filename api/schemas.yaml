@@ -453,6 +453,7 @@ components:
             - dkim_sha1
             - dkim_key_short
             - dkim_key_weak
+            - dkim_gmail_incompatible
             - mx_missing
             - mx_invalid
             - mx_null
@@ -1899,6 +1900,13 @@ components:
           type: string
           description: "Algorithm used in DKIM-Signature a= tag (e.g. rsa-sha256, ed25519-sha256)"
           example: "rsa-sha256"
+        space_after_b:
+          type: boolean
+          description: >-
+            Whether the DKIM-Signature puts whitespace, typically a line fold,
+            between b= and the signature, with a ; after it. The signature is
+            valid, but Gmail does not strip that whitespace before verifying
+            it, as RFC 6376 section 3.7 requires, and fails it.
         key_size:
           type: integer
           description: "Public key size in bits (RSA: 1024/2048/4096; Ed25519: always 256)"
