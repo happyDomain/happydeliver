@@ -29,6 +29,13 @@ export const docs = {
     spfLookupLimit: rfc(7208, "SPF DNS lookup limits", "4.6.4"),
     spfHelo: rfc(7208, "Checking the HELO identity", "2.3"),
     dkim: rfc(6376, "DomainKeys Identified Mail"),
+    dkimSignatureHash: rfc(6376, "Computing the signature without the b= value", "3.7"),
+    // A receiver's behaviour, which only this report documents.
+    gmailDkimVerifier: {
+        label: "Gmail's DKIM verifier",
+        title: "Valid signatures Gmail fails (November 2026)",
+        url: "https://people.kernel.org/monsieuricon/gmails-non-compliant-dkim-verifier",
+    },
     dkimKeySize: rfc(8301, "DKIM cryptographic algorithm and key usage update", "3.2"),
     dmarc: rfc(9989, "Domain-based Message Authentication, Reporting, and Conformance (DMARC)"),
     dmarcAlignment: rfc(9989, "DMARC identifier alignment", "4.4"),
@@ -177,6 +184,7 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     dkim_sha1: [docs.dkimKeySize],
     dkim_key_short: [docs.dkimKeySize],
     dkim_key_weak: [docs.dkimKeySize],
+    dkim_gmail_incompatible: [docs.dkimSignatureHash, docs.gmailDkimVerifier],
     mx_missing: [docs.mxLookup],
     mx_invalid: [docs.mxLookup],
     domain_unreachable: [docs.mxLookup],

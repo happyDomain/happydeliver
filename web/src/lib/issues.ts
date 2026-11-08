@@ -67,6 +67,7 @@ const issueLabels: Record<Issue["type"], string> = {
     dkim_sha1: "DKIM signs with SHA-1",
     dkim_key_short: "DKIM key too short",
     dkim_key_weak: "Weak DKIM key",
+    dkim_gmail_incompatible: "Gmail fails this DKIM signature",
     mx_missing: "No MX record",
     mx_invalid: "Invalid MX records",
     domain_unreachable: "Domain cannot receive mail",
