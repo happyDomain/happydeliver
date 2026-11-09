@@ -18,7 +18,7 @@ require (
 	github.com/tdewolff/parse/v2 v2.8.20
 	golang.org/x/image v0.46.0
 	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2
