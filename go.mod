@@ -9,7 +9,7 @@ require (
 	git.happydns.org/svg-tiny-ps v1.0.0
 	github.com/JGLTechnologies/gin-rate-limit v1.5.9
 	github.com/emersion/go-message v0.18.2
-	github.com/emersion/go-smtp v0.25.0
+	github.com/emersion/go-smtp v0.25.1
 	github.com/gabriel-vasile/mimetype v1.4.16
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-gonic/gin v1.12.0
