@@ -28,7 +28,6 @@ import (
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
-	"git.happydns.org/happyDeliver/pkg/grade"
 )
 
 // Default rspamd action thresholds (rspamd built-in defaults)
@@ -111,6 +110,13 @@ func (a *RspamdAnalyzer) AnalyzeRspamd(headers ScannerHeaders) *model.RspamdResu
 	if !hasScore && shared.hasScore {
 		result.Score = shared.score
 		hasScore = true
+	}
+
+	// Parse X-Rspamd-Action: what rspamd did with the message
+	if actionHeader, ok := headers["X-Rspamd-Action"]; ok {
+		if action := strings.TrimSpace(actionHeader); action != "" {
+			result.Action = &action
+		}
 	}
 
 	// Parse X-Rspamd-Server
@@ -206,20 +212,58 @@ func (a *RspamdAnalyzer) parseSpamdResult(header string, result *model.RspamdRes
 	return hasScore
 }
 
-// CalculateRspamdScore calculates the rspamd contribution to deliverability (0-100 scale)
+// CalculateRspamdScore calculates the rspamd contribution to deliverability
+// (0-100 scale). The action rspamd took decides the band, the score where in
+// it the message stands: see spamBand.
 func (a *RspamdAnalyzer) CalculateRspamdScore(result *model.RspamdResult) (int, string) {
 	if result == nil {
 		return 100, "" // rspamd not installed
 	}
 
-	percentage := 100 - int(math.Round(float64(result.Score*100/effectiveThreshold(result))))
+	score := float64(result.Score)
+	reject, addHeader := rspamdGradingThresholds(result)
 
-	if percentage > 100 {
-		return 100, "A+"
-	} else if percentage < 0 {
-		return 0, "F"
+	switch rspamdEffectiveAction(result, reject, addHeader) {
+	case "reject", "soft reject", "discard", "quarantine":
+		return spamBandF.at(score, reject, spamAbusiveFactor*reject)
+	case "add header", "rewrite subject":
+		return spamBandE.at(score, addHeader, reject)
+	case "greylist":
+		return spamBandD.at(score/addHeader, spamNearFraction, 1)
+	default:
+		return gradeAcceptedSpamScore(score, addHeader)
+	}
+}
+
+// rspamdGradingThresholds returns the scores at which rspamd rejects a message
+// and marks it as spam. The threshold rspamd reports is its reject one; the
+// add-header one is never reported, so its default stands in, capped by the
+// reported reject threshold.
+func rspamdGradingThresholds(result *model.RspamdResult) (reject, addHeader float64) {
+	reject = float64(rspamdDefaultRejectThreshold)
+	if result.Threshold != nil {
+		reject = float64(*result.Threshold)
+	}
+	addHeader = math.Min(float64(rspamdDefaultAddHeaderThreshold), reject)
+	return
+}
+
+// rspamdEffectiveAction returns the action rspamd announced in X-Rspamd-Action,
+// or, when it announced none, the one its score calls for.
+func rspamdEffectiveAction(result *model.RspamdResult, reject, addHeader float64) string {
+	if result.Action != nil {
+		switch action := strings.ToLower(strings.TrimSpace(*result.Action)); action {
+		case "no action", "greylist", "add header", "rewrite subject", "soft reject", "reject", "discard", "quarantine":
+			return action
+		}
 	}
 
-	// Linear scale between 0 and threshold
-	return percentage, grade.Of(percentage)
+	switch score := float64(result.Score); {
+	case score >= reject:
+		return "reject"
+	case score >= addHeader:
+		return "add header"
+	default:
+		return "no action"
+	}
 }

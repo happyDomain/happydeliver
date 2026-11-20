@@ -161,8 +161,7 @@ func TestGetSpamAssassinScore(t *testing.T) {
 		name          string
 		result        *model.SpamAssassinResult
 		expectedScore int
-		minScore      int
-		maxScore      int
+		expectedGrade string
 	}{
 		{
 			name:          "Nil result",
@@ -170,20 +169,40 @@ func TestGetSpamAssassinScore(t *testing.T) {
 			expectedScore: 100,
 		},
 		{
-			name: "Excellent score (negative)",
+			name: "Negative score",
 			result: &model.SpamAssassinResult{
 				Score:         -2.5,
 				RequiredScore: 5.0,
 			},
 			expectedScore: 100,
+			expectedGrade: "A+",
 		},
 		{
-			name: "Good score (below threshold)",
+			name: "Very low score",
+			result: &model.SpamAssassinResult{
+				Score:         0.5,
+				RequiredScore: 5.0,
+			},
+			expectedScore: 89,
+			expectedGrade: "B",
+		},
+		{
+			name: "Moderate score",
 			result: &model.SpamAssassinResult{
 				Score:         2.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 80, // 100 - round(2*100/5) = 100 - 40 = 60
+			expectedScore: 80,
+			expectedGrade: "C",
+		},
+		{
+			name: "Close to the threshold",
+			result: &model.SpamAssassinResult{
+				Score:         4.5,
+				RequiredScore: 5.0,
+			},
+			expectedScore: 68,
+			expectedGrade: "D",
 		},
 		{
 			name: "Score at threshold",
@@ -191,23 +210,26 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         5.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0, // >= threshold = 0
+			expectedScore: 64,
+			expectedGrade: "E",
 		},
 		{
-			name: "Above threshold (spam)",
+			name: "Spam near the threshold",
 			result: &model.SpamAssassinResult{
 				Score:         6.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0, // >= threshold = 0
+			expectedScore: 61,
+			expectedGrade: "E",
 		},
 		{
-			name: "High spam score",
+			name: "Spam by a wide margin",
 			result: &model.SpamAssassinResult{
 				Score:         12.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0, // >= threshold = 0
+			expectedScore: 39,
+			expectedGrade: "F",
 		},
 		{
 			name: "Very high spam score",
@@ -215,7 +237,8 @@ func TestGetSpamAssassinScore(t *testing.T) {
 				Score:         20.0,
 				RequiredScore: 5.0,
 			},
-			expectedScore: 0, // >= threshold = 0
+			expectedScore: 0,
+			expectedGrade: "F",
 		},
 	}
 
@@ -223,16 +246,13 @@ func TestGetSpamAssassinScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, _ := analyzer.CalculateSpamAssassinScore(tt.result)
+			score, grade := analyzer.CalculateSpamAssassinScore(tt.result)
 
-			if tt.minScore > 0 || tt.maxScore > 0 {
-				if score < tt.minScore || score > tt.maxScore {
-					t.Errorf("Score = %v, want between %v and %v", score, tt.minScore, tt.maxScore)
-				}
-			} else {
-				if score != tt.expectedScore {
-					t.Errorf("Score = %v, want %v", score, tt.expectedScore)
-				}
+			if score != tt.expectedScore {
+				t.Errorf("Score = %v, want %v", score, tt.expectedScore)
+			}
+			if tt.expectedGrade != "" && grade != tt.expectedGrade {
+				t.Errorf("Grade = %q, want %q", grade, tt.expectedGrade)
 			}
 		})
 	}
@@ -562,7 +582,7 @@ func TestCalculateSpamAssassinScoreWithoutThreshold(t *testing.T) {
 		{score: -1, wantScore: 100},
 		{score: 0, wantScore: 100},
 		{score: 2, wantScore: 80},
-		{score: 5, wantScore: 0},
+		{score: 5, wantScore: 64},
 	}
 
 	for _, tt := range tests {

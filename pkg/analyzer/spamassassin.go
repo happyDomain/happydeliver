@@ -22,13 +22,11 @@
 package analyzer
 
 import (
-	"math"
 	"regexp"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
-	"git.happydns.org/happyDeliver/pkg/grade"
 )
 
 // SpamAssassin's X-Spam-Status header, e.g.
@@ -224,24 +222,17 @@ func (a *SpamAssassinAnalyzer) CalculateSpamAssassinScore(result *model.SpamAssa
 		return 100, "" // No spam scan results, assume good
 	}
 
-	// SpamAssassin score typically ranges from -10 to +20
-	// Score < 0 is very likely ham (good)
-	// Score 0-5 is threshold range (configurable, usually 5.0)
-	// Score > 5 is likely spam
+	score := float64(result.Score)
+	required := float64(effectiveRequiredScore(result))
 
-	score := result.Score
-	required := effectiveRequiredScore(result)
-
-	// Convert SpamAssassin score to 0-100 scale (inverted - lower SA score is better)
-	if score < 0 {
-		return 100, "A+" // Perfect score for ham
-	} else if score == 0 {
-		return 100, "A" // Perfect score for ham
-	} else if score >= required {
-		return 0, "F" // Failed spam test
-	} else {
-		// Linear scale between 0 and required threshold
-		percentage := 100 - int(math.Round(float64(score*100/(2*required))))
-		return percentage, grade.Of(percentage - 5)
+	// At or past required_score, SpamAssassin calls the message spam: E near
+	// the limit, F once the score is way beyond it.
+	if score >= required {
+		if score >= spamAbusiveFactor*required {
+			return spamBandF.at(score, spamAbusiveFactor*required, 2*spamAbusiveFactor*required)
+		}
+		return spamBandE.at(score, required, spamAbusiveFactor*required)
 	}
+
+	return gradeAcceptedSpamScore(score, required)
 }

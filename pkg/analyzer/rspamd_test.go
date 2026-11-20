@@ -306,7 +306,7 @@ func TestCalculateRspamdScore(t *testing.T) {
 			expectedGrade: "",
 		},
 		{
-			name: "Score well below threshold",
+			name: "Negative score",
 			result: &model.RspamdResult{
 				Score:     -3.91,
 				Threshold: utils.PtrTo[float32](15.00),
@@ -320,47 +320,108 @@ func TestCalculateRspamdScore(t *testing.T) {
 				Score:     0,
 				Threshold: utils.PtrTo[float32](15.00),
 			},
-			// 100 - round(0*100/30) = 100 → hits grade.Of(100) = "A"
 			expectedScore: 100,
 			expectedGrade: "A",
 		},
 		{
-			name: "Score at threshold",
+			name: "Very low score",
 			result: &model.RspamdResult{
-				Score:     15.00,
-				Threshold: utils.PtrTo[float32](15.00),
+				Score:  0.6,
+				Action: utils.PtrTo("no action"),
 			},
-			// 100 - round(15*100/15) = 100 - 100 = 0
+			// 0.6/6 = 0.1, halfway through B (94 - round(4.5))
+			expectedScore: 89,
+			expectedGrade: "B",
+		},
+		{
+			name: "Moderate score",
+			result: &model.RspamdResult{
+				Score:  3,
+				Action: utils.PtrTo("no action"),
+			},
+			// 3/6 = 0.5 of the add-header limit
+			expectedScore: 79,
+			expectedGrade: "C",
+		},
+		{
+			name: "Delivered close to the add-header limit",
+			result: &model.RspamdResult{
+				Score:  5,
+				Action: utils.PtrTo("no action"),
+			},
+			expectedScore: 70,
+			expectedGrade: "D",
+		},
+		{
+			name: "Greylisted",
+			result: &model.RspamdResult{
+				Score:  4.2,
+				Action: utils.PtrTo("greylist"),
+			},
+			expectedScore: 74,
+			expectedGrade: "D",
+		},
+		{
+			name: "Marked as spam",
+			result: &model.RspamdResult{
+				Score:     8,
+				Threshold: utils.PtrTo[float32](15.00),
+				Action:    utils.PtrTo("add header"),
+			},
+			expectedScore: 61,
+			expectedGrade: "E",
+		},
+		{
+			name: "Rejected",
+			result: &model.RspamdResult{
+				Score:     15,
+				Threshold: utils.PtrTo[float32](15.00),
+				Action:    utils.PtrTo("reject"),
+			},
+			expectedScore: 49,
+			expectedGrade: "F",
+		},
+		{
+			name: "Rejected by a wide margin",
+			result: &model.RspamdResult{
+				Score:     31,
+				Threshold: utils.PtrTo[float32](15.00),
+				Action:    utils.PtrTo("reject"),
+			},
 			expectedScore: 0,
 			expectedGrade: "F",
 		},
 		{
-			name: "Score above 2*threshold",
+			name: "The action prevails over the score",
 			result: &model.RspamdResult{
-				Score:     31.00,
-				Threshold: utils.PtrTo[float32](15.00),
+				Score:  2,
+				Action: utils.PtrTo("Soft Reject"),
 			},
-			expectedScore: 0,
 			expectedGrade: "F",
 		},
 		{
-			name: "Score exactly at 2*threshold",
+			name: "Without an action, a score past add-header is spam",
 			result: &model.RspamdResult{
-				Score:     30.00,
+				Score:     7,
 				Threshold: utils.PtrTo[float32](15.00),
 			},
-			// 100 - round(30*100/15) = 100 - 200 = -100 → clamped to 0
-			expectedScore: 0,
+			expectedGrade: "E",
+		},
+		{
+			name: "Without an action, a score past the reported threshold is rejected",
+			result: &model.RspamdResult{
+				Score:     16,
+				Threshold: utils.PtrTo[float32](15.00),
+			},
 			expectedGrade: "F",
 		},
 		{
-			name: "Unreported threshold falls back to the add-header default of 6",
+			name: "Unreported threshold falls back to the defaults",
 			result: &model.RspamdResult{
 				Score: 3,
 			},
-			// 100 - round(3*100/6) = 100 - 50 = 50
-			expectedScore: 50,
-			expectedGrade: "E",
+			expectedScore: 79,
+			expectedGrade: "C",
 		},
 	}
 
@@ -370,13 +431,27 @@ func TestCalculateRspamdScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			score, grade := analyzer.CalculateRspamdScore(tt.result)
 
-			if score != tt.expectedScore {
+			if tt.expectedScore != 0 && score != tt.expectedScore {
 				t.Errorf("Score = %d, want %d", score, tt.expectedScore)
 			}
 			if tt.expectedGrade != "" && grade != tt.expectedGrade {
 				t.Errorf("Grade = %q, want %q", grade, tt.expectedGrade)
 			}
 		})
+	}
+}
+
+// TestAnalyzeRspamdAction checks X-Rspamd-Action makes its way to the result.
+func TestAnalyzeRspamdAction(t *testing.T) {
+	result := NewRspamdAnalyzer(nil).AnalyzeRspamd(ScannerHeaders{
+		"X-Spamd-Result":  "default: False [5.00 / 0.00]; FROM_DN_EQ_ADDR(1.00)[]",
+		"X-Rspamd-Action": "no action",
+	})
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+	if result.Action == nil || *result.Action != "no action" {
+		t.Errorf("Action = %v, want \"no action\"", result.Action)
 	}
 }
 
