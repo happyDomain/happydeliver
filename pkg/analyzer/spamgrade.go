@@ -21,7 +21,11 @@
 
 package analyzer
 
-import "math"
+import (
+	"math"
+
+	"git.happydns.org/happyDeliver/pkg/grade"
+)
 
 // A spam filter's grade follows its verdict first, its score second: a message
 // the filter let through never fails, however close it came to the limit.
@@ -66,6 +70,27 @@ func (b spamBand) at(value, from, to float64) (int, string) {
 		pos = math.Max(0, math.Min(1, (value-from)/(to-from)))
 	}
 	return b.hi - int(math.Round(pos*float64(b.hi-b.lo))), b.grade
+}
+
+// top is the band's best score, for a filter giving a verdict without a score
+// to place the message within the band.
+func (b spamBand) top() (int, string) {
+	return b.hi, b.grade
+}
+
+// capSpamGrade holds the spam category to a verdict that can only lower it, as
+// one an upstream filter wrote: the category takes the lower of the two scores
+// and of the two grades. An empty verdict grade leaves the category as it is;
+// an empty category grade, when no filter of ours ran, takes the verdict's.
+func capSpamGrade(score int, g string, capScore int, capGrade string) (int, string) {
+	switch {
+	case capGrade == "":
+		return score, g
+	case g == "":
+		return capScore, capGrade
+	default:
+		return min(score, capScore), grade.Min(g, capGrade)
+	}
 }
 
 // gradeAcceptedSpamScore grades the score of a message the filter accepted,

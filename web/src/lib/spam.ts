@@ -1,16 +1,24 @@
 import type { Report } from "#lib/api/types.gen.js";
 
+/** The spam filters' verdicts a report may carry. */
+export type SpamFilterResults = Pick<Report, "spamassassin" | "rspamd" | "upstream_spam_verdicts">;
+
 /**
- * True when no spam filter (SpamAssassin nor rspamd) produced a result for this message.
+ * True when no spam filter produced a grade for this message.
  *
  * This is not a sender problem: some receivers (Gmail, for instance) never run
  * SpamAssassin/rspamd directly, so there is nothing to grade. Whether these run depends on
- * this instance's mail infrastructure, not on the analysed email.
+ * this instance's mail infrastructure, not on the analysed email. A verdict stamped upstream,
+ * before this instance saw the message, is graded only when it counts against it.
  */
-export function hasNoSpamResults(report?: Pick<Report, "spamassassin" | "rspamd">): boolean {
+export function hasNoSpamResults(report?: SpamFilterResults): boolean {
     if (!report) return true;
 
-    return !report.spamassassin && !report.rspamd;
+    return (
+        !report.spamassassin &&
+        !report.rspamd &&
+        !report.upstream_spam_verdicts?.some((v) => v.deliverability_grade)
+    );
 }
 
 /**

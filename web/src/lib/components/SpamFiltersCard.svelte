@@ -1,13 +1,17 @@
 <script lang="ts">
-    import type { RspamdResult, SpamAssassinResult } from "#lib/api/types.gen.js";
+    import type { RspamdResult, UpstreamSpamVerdict, SpamAssassinResult } from "#lib/api/types.gen.js";
     import type { SectionStatus } from "#lib/sections.js";
     import ReportSection from "./ReportSection.svelte";
     import RspamdCard from "./RspamdCard.svelte";
+    import UpstreamSpamVerdictCard from "./UpstreamSpamVerdictCard.svelte";
+    import { upstreamSpamVerdictCards } from "./upstreamSpamVerdicts/index.js";
     import SpamAssassinCard from "./SpamAssassinCard.svelte";
 
     interface Props {
         spamassassin?: SpamAssassinResult;
         rspamd?: RspamdResult;
+        /** The verdicts stamped upstream, before this instance saw the message. */
+        upstreamSpamVerdicts?: UpstreamSpamVerdict[];
         spamGrade?: string;
         spamScore?: number;
         /** rspamd symbol to the anchor of the content check showing its advice. */
@@ -19,6 +23,7 @@
     let {
         spamassassin,
         rspamd,
+        upstreamSpamVerdicts = [],
         spamGrade,
         spamScore,
         adviceAnchors,
@@ -45,7 +50,12 @@
         {#if rspamd}
             <RspamdCard {rspamd} {adviceAnchors} />
         {/if}
-        {#if !spamassassin && !rspamd}
+        {#each upstreamSpamVerdicts as verdict (verdict.filter)}
+            <!-- The filter's own card when the interface has one, a generic one otherwise. -->
+            {@const Card = upstreamSpamVerdictCards[verdict.filter] ?? UpstreamSpamVerdictCard}
+            <Card {verdict} />
+        {/each}
+        {#if !spamassassin && !rspamd && upstreamSpamVerdicts.length === 0}
             <p class="list-group-item py-3 text-muted mb-0">
                 No spam filter produced a result for this message.
             </p>

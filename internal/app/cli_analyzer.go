@@ -599,6 +599,25 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 		}
 	}
 
+	// Verdicts stamped before this instance saw the message
+	if report.UpstreamSpamVerdicts != nil && len(*report.UpstreamSpamVerdicts) > 0 {
+		fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))
+		fmt.Fprintln(writer, "UPSTREAM SPAM VERDICTS")
+		fmt.Fprintln(writer, strings.Repeat("-", 70))
+		fmt.Fprintln(writer)
+
+		for _, verdict := range *report.UpstreamSpamVerdicts {
+			fmt.Fprintf(writer, "  %s: %s", verdict.Name, verdict.Verdict)
+			if verdict.IsSpam {
+				fmt.Fprintf(writer, " (SPAM)")
+			}
+			if verdict.DeliverabilityGrade != nil {
+				fmt.Fprintf(writer, ", caps the spam grade at %s", *verdict.DeliverabilityGrade)
+			}
+			fmt.Fprintln(writer)
+		}
+	}
+
 	// Content Analysis
 	if report.ContentAnalysis != nil {
 		fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))

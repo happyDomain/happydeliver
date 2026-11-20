@@ -2,7 +2,7 @@ import type { Issue, Report } from "#lib/api/types.gen.js";
 import { hasNoAuthenticationResults } from "#lib/authentication.js";
 import { hasNoBlacklistResults } from "#lib/blacklist.js";
 import { contentIssues, groupByChange, isActionable } from "#lib/issues.js";
-import { hasNoSpamResults } from "#lib/spam.js";
+import { hasNoSpamResults, type SpamFilterResults } from "#lib/spam.js";
 
 /**
  * The sections of a report, and what each says before it is opened.
@@ -191,10 +191,10 @@ export function sectionStatus(issues: Issue[], unavailable = false, score?: numb
  * cost points. Nothing to say when both let the message through untouched, which leaves the
  * section to the general rule.
  */
-export function spamStatus(
-    report: Pick<Report, "spamassassin" | "rspamd">,
-): SectionStatus | undefined {
-    const verdicts = [report.spamassassin, report.rspamd].filter((v) => v !== undefined);
+export function spamStatus(report: SpamFilterResults): SectionStatus | undefined {
+    const verdicts = [report.spamassassin, report.rspamd, ...(report.upstream_spam_verdicts ?? [])].filter(
+        (v) => v !== undefined,
+    );
 
     if (verdicts.some((v) => v.is_spam)) {
         return { label: "Classified as spam", tone: "danger", needsAttention: true };

@@ -91,6 +91,13 @@ components:
           $ref: '#/components/schemas/SpamAssassinResult'
         rspamd:
           $ref: '#/components/schemas/RspamdResult'
+        upstream_spam_verdicts:
+          type: array
+          description: >-
+            The verdicts spam filters stamped on the message before this instance saw it, one
+            per filter that left one
+          items:
+            $ref: '#/components/schemas/UpstreamSpamVerdict'
         dns_results:
           $ref: '#/components/schemas/DNSResults'
         domain_reputation:
@@ -1163,6 +1170,55 @@ components:
           type: string
           description: Full rspamd report (raw X-Spamd-Result header)
 
+
+    UpstreamSpamVerdict:
+      type: object
+      description: >-
+        The verdict a spam filter stamped on the message before this instance saw it: a provider
+        filtering what its users send or, on an uploaded file, what they receive. Whoever handed
+        the message over controls these headers, so a verdict against the message lowers the
+        spam grade, while one in its favour proves nothing and leaves the grade as the other
+        filters set it.
+      required:
+        - filter
+        - name
+        - is_spam
+        - verdict
+      properties:
+        filter:
+          type: string
+          description: >-
+            Key naming the filter. The web interface picks by it how to show the details.
+          example: "vade"
+        name:
+          type: string
+          description: The filter's name, as shown
+          example: "Vade"
+        is_spam:
+          type: boolean
+          description: Whether the filter classified the message as spam
+          example: false
+        verdict:
+          type: string
+          description: What the filter made of the message, in a few words
+          example: "Not spam"
+        deliverability_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: >-
+            The spam grade this verdict caps the category at (0-100, higher is better). Absent
+            when the verdict does not lower it.
+          example: 64
+        deliverability_grade:
+          type: string
+          enum: [A+, A, B, C, D, E, F]
+          description: Letter grade of deliverability_score, absent along with it
+          example: "E"
+        details:
+          description: >-
+            What the filter reported, in a shape of its own that this API leaves undescribed:
+            the web interface reads it according to filter.
 
     DNSResults:
       type: object

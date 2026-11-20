@@ -445,12 +445,13 @@
             {/if}
 
             <!-- Spam filter analysis -->
-            {#if report.spamassassin || report.rspamd}
+            {#if report.spamassassin || report.rspamd || report.upstream_spam_verdicts?.length}
                 <div class="row mb-4" id="spam">
                     <div class="col-12">
                         <SpamFiltersCard
                             spamassassin={report.spamassassin}
                             rspamd={report.rspamd}
+                            upstreamSpamVerdicts={report.upstream_spam_verdicts}
                             spamGrade={report.summary?.spam_grade}
                             spamScore={report.summary?.spam_score}
                             adviceAnchors={adviceAnchorsBySymbol(

@@ -165,15 +165,16 @@ type AnalysisResults struct {
 	// the report shows and what they cost its score. It is read once, after
 	// everything the checks look at has been observed, because a check may
 	// fetch a URL or hand a file to a scanner.
-	ContentReading   content.Reading
-	DNS              *model.DNSResults
-	Headers          *model.HeaderAnalysis
-	RBL              *DNSListResults
-	DNSWL            *DNSListResults
-	DomainReputation *model.DomainBlacklistResult
-	SpamAssassin     *model.SpamAssassinResult
-	Rspamd           *model.RspamdResult
-	Attachments      *attachment.Results
+	ContentReading       content.Reading
+	DNS                  *model.DNSResults
+	Headers              *model.HeaderAnalysis
+	RBL                  *DNSListResults
+	DNSWL                *DNSListResults
+	DomainReputation     *model.DomainBlacklistResult
+	SpamAssassin         *model.SpamAssassinResult
+	Rspamd               *model.RspamdResult
+	UpstreamSpamVerdicts []*UpstreamSpamVerdict
+	Attachments          *attachment.Results
 
 	// AttachmentReadings is what the attachment checks made of the above, one
 	// per attachment and in their order, and what the spam filter said of the
@@ -229,6 +230,7 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	spamHeaders := spamScannerHeaders(email)
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(spamHeaders.For(ScannerSpamAssassin))
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
+	results.UpstreamSpamVerdicts = analyzeUpstreamSpamVerdicts(spamHeaders)
 
 	// What the spam filter observed about the content and the files feeds
 	// the content and attachment findings. A message this instance did not
@@ -372,6 +374,10 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		spamGrade = grade.Min(saGrade, rspamdGrade)
 	}
 
+	// The filters that judged the message before this instance saw it can
+	// only lower the category: see capSpamGrade.
+	spamScore, spamGrade = capSpamGradeByUpstreamSpamVerdicts(spamScore, spamGrade, results.UpstreamSpamVerdicts)
+
 	report.Summary = &model.ScoreSummary{
 		DnsScore:            dnsScore,
 		DnsGrade:            model.ScoreSummaryDnsGrade(dnsGrade),
@@ -444,6 +450,7 @@ func (r *ReportGenerator) GenerateReport(testID uuid.UUID, results *AnalysisResu
 		results.Rspamd.DeliverabilityGrade = &rspamdGradeTyped
 	}
 	report.Rspamd = results.Rspamd
+	report.UpstreamSpamVerdicts = upstreamSpamVerdictsReport(results.UpstreamSpamVerdicts)
 
 	// Add raw headers
 	if results.Email != nil && results.Email.RawHeaders != "" {

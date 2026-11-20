@@ -61,7 +61,8 @@ const sharedSpamHeadersOwner = ScannerSpamAssassin
 
 // spamScannerProfile describes how a scanner shows itself in a message's
 // headers. Teaching happyDeliver a new filter is adding a profile here, then an
-// analyzer reading the bucket SpamScannerHeaders fills for it.
+// analyzer reading the bucket SpamScannerHeaders fills for it; an upstream
+// filter brings its profile along as it registers, see upstreamSpamVerdictFilter.
 type spamScannerProfile struct {
 	scanner SpamScanner
 
@@ -87,6 +88,9 @@ type spamScannerProfile struct {
 // spamScannerProfiles is consulted in order: the first profile whose signature
 // a value bears is credited with it, so a more specific pattern belongs before
 // a looser one.
+//
+// The upstream filters add their own profiles after these, as they register:
+// see registerUpstreamSpamVerdictFilter.
 var spamScannerProfiles = []spamScannerProfile{
 	{
 		scanner: ScannerRspamd,

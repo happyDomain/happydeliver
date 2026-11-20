@@ -7,7 +7,7 @@
     } from "#lib/authentication.js";
     import { hasNoBlacklistResults, noBlacklistResultsTitle } from "#lib/blacklist.js";
     import type { SectionKey, SectionStatus } from "#lib/sections.js";
-    import { hasNoSpamResults, noSpamResultsTitle } from "#lib/spam.js";
+    import { hasNoSpamResults, noSpamResultsTitle, type SpamFilterResults } from "#lib/spam.js";
     import GradeDisplay from "./GradeDisplay.svelte";
     import ScoreLink from "./ScoreLink.svelte";
     import TileLoader from "./TileLoader.svelte";
@@ -19,7 +19,7 @@
         summary?: ScoreSummary;
         authentication?: AuthenticationResults;
         source?: MessageSource;
-        spamFilters?: Pick<Report, "spamassassin" | "rspamd">;
+        spamFilters?: SpamFilterResults;
         blacklists?: Pick<Report, "blacklists">;
         /** What each section has to change, shown under its grade. */
         statuses?: Partial<Record<SectionKey, SectionStatus>>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRuleScore, inReportOrder } from "./spam.js";
+import { formatRuleScore, hasNoSpamResults, inReportOrder } from "./spam.js";
 
 describe("inReportOrder", () => {
     const rules = { DKIM_VALID_AU: 1, DKIM_SIGNED: 2, DKIM_VALID: 3, SPF_PASS: 4 };
@@ -37,5 +37,26 @@ describe("formatRuleScore", () => {
         expect(formatRuleScore(1.25, 2)).toBe("+1.25");
         expect(formatRuleScore(0)).toBe("0.0");
         expect(formatRuleScore(0.001, 2)).toBe("+0.001");
+    });
+});
+
+describe("hasNoSpamResults", () => {
+    const verdict = { filter: "example", name: "Example", is_spam: false, verdict: "Not spam" };
+
+    it("takes an upstream verdict only once it is graded", () => {
+        expect(hasNoSpamResults({ upstream_spam_verdicts: [verdict] })).toBe(true);
+        expect(
+            hasNoSpamResults({
+                upstream_spam_verdicts: [
+                    {
+                        ...verdict,
+                        is_spam: true,
+                        verdict: "Spam",
+                        deliverability_score: 64,
+                        deliverability_grade: "E",
+                    },
+                ],
+            }),
+        ).toBe(false);
     });
 });

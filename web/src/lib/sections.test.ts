@@ -172,6 +172,22 @@ const rspamd = (fields: Partial<RspamdResult>): RspamdResult => ({
 });
 
 describe("spamStatus", () => {
+    it("counts an upstream verdict only against the message", () => {
+        const verdict = { filter: "example", name: "Example", is_spam: false, verdict: "Not spam" };
+        expect(
+            spamStatus({
+                rspamd: rspamd({ deliverability_score: 100 }),
+                upstream_spam_verdicts: [verdict],
+            }),
+        ).toBeUndefined();
+        expect(
+            spamStatus({
+                rspamd: rspamd({ deliverability_score: 100 }),
+                upstream_spam_verdicts: [{ ...verdict, is_spam: true, deliverability_score: 64 }],
+            })?.label,
+        ).toBe("Classified as spam");
+    });
+
     it("leaves a message both filters let through to the general rule", () => {
         expect(
             spamStatus({

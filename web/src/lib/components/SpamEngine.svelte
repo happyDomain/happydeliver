@@ -13,7 +13,10 @@
         name: string;
         /** What ran the filter: its version, its server. */
         subject?: string;
-        score: number;
+        /** Absent when the filter gave a verdict without a score. */
+        score?: number;
+        /** How many decimals the score is shown with: none for a level or an integer score. */
+        digits?: number;
         /**
          * In increasing order; the last one is where the message is treated as spam. Empty
          * when the filter gave no threshold: there is then no gauge.
@@ -39,6 +42,7 @@
         name,
         subject,
         score,
+        digits = 1,
         steps,
         base,
         verdict,
@@ -91,7 +95,11 @@
         <!-- The verdict, at a glance: the score and what it means, then where it falls. -->
         <div class="d-flex flex-wrap align-items-center row-gap-1 column-gap-4 mb-2">
             <div class="d-flex align-items-center gap-3 pb-2">
-                <span class="score fw-bold lh-1 text-{tone}-emphasis">{score.toFixed(1)}</span>
+                {#if score !== undefined}
+                    <span class="score fw-bold lh-1 text-{tone}-emphasis"
+                        >{score.toFixed(digits)}</span
+                    >
+                {/if}
                 <span
                     class="badge rounded-pill border text-{tone}-emphasis bg-{tone}-subtle border-{tone}-subtle"
                 >
@@ -105,7 +113,7 @@
                     ></i>{verdict}
                 </span>
             </div>
-            {#if steps.length > 0}
+            {#if score !== undefined && steps.length > 0}
                 <div class="meter">
                     <SpamScoreGauge
                         {score}
