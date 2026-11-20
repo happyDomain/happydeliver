@@ -298,19 +298,6 @@
                     </div>
                 </CheckCard>
             {/if}
-
-            {#if at("attachments")}
-                <CheckCard
-                    id={contentAnchor("attachments")}
-                    title="Attachments"
-                    status="pass"
-                    issues={at("attachments")}
-                >
-                    <div class="card-body">
-                        <p class="check-about">What the spam filter saw in the attached files.</p>
-                    </div>
-                </CheckCard>
-            {/if}
         </CheckList>
     </div>
 </ReportSection>

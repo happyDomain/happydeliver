@@ -45,21 +45,31 @@ var attachmentCriteria = []attachmentCriterion{
 
 // Score grades what a message carries, out of a hundred. Every attachment is
 // weighed on its own, and the message takes the worst of them rather than
-// their sum: ten innocuous documents do not make up for the eleventh. A
-// message carrying nothing leaves the scale rather than earning a free
-// hundred.
-func (a *Analyzer) Score(results *Results, readings []Reading) (int, string) {
-	if results == nil || len(results.Attachments) == 0 {
+// their sum: ten innocuous documents do not make up for the eleventh. What
+// the spam filter said of the files without naming one is charged to each of
+// them, which is charging it once to the worst. A message carrying nothing,
+// and of which nothing was said, leaves the scale rather than earning a free
+// hundred; one the filter saw a file in that we did not is graded on what it
+// said.
+func (a *Analyzer) Score(results *Results, readings Readings) (int, string) {
+	if results == nil {
 		return 0, ""
+	}
+
+	if len(results.Attachments) == 0 {
+		if len(readings.Message.Issues) == 0 {
+			return 0, ""
+		}
+		return reading.Weigh(attachmentCriteria, &attachmentInput{}, readings.Message.Penalty)
 	}
 
 	score, letter := 0, ""
 	for i := range results.Attachments {
 		// A caller that did not read at all weighs the file on the criteria
 		// alone.
-		penalty := 0
-		if i < len(readings) {
-			penalty = readings[i].Penalty
+		penalty := readings.Message.Penalty
+		if i < len(readings.Files) {
+			penalty += readings.Files[i].Penalty
 		}
 
 		of, grade := reading.Weigh(attachmentCriteria, &attachmentInput{Attachment: &results.Attachments[i], MaxSize: a.maxSize}, penalty)

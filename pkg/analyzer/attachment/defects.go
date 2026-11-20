@@ -42,6 +42,7 @@ var attachmentDefects = []*reading.Defect{
 	defectNestedArchive,
 	defectScanSkipped,
 	defectScanError,
+	defectRspamdObservation,
 }
 
 var (
@@ -101,6 +102,12 @@ var (
 	// familyArchiveOpacity answers for an archive nothing can be read out of:
 	// one behind a password, or one nested inside another.
 	familyArchiveOpacity = &reading.Family{Name: "archive_opacity", Cap: 30, PerItem: 15}
+
+	// familyRspamd answers for what the spam filter saw in the files and no
+	// check of ours did. It is weighed by severity and capped low, as it is
+	// for the body: a filter having a lot to say about a file cannot decide
+	// the grade by itself.
+	familyRspamd = &reading.Family{Name: "rspamd", Cap: 10}
 )
 
 var (
@@ -149,6 +156,12 @@ var (
 		Name:      "scan_skipped",
 		Uncharged: "it reports a limit of this analysis rather than a defect of the message, and a sender cannot answer for our ceilings",
 	}
+
+	// defectRspamdObservation: something the spam filter saw in a file, or
+	// in the files of the message, that no check of ours reported. What one
+	// of ours also saw is noted on our finding instead, and costs nothing
+	// more.
+	defectRspamdObservation = &reading.Defect{Name: "rspamd_observation", Family: familyRspamd}
 
 	// defectScanError: a scanner was asked and could not answer.
 	defectScanError = &reading.Defect{

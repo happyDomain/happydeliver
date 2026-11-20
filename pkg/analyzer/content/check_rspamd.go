@@ -77,7 +77,7 @@ type rspamdFinding struct {
 
 	// Message states what was observed. A trailing "%s" is filled with the
 	// symbol's options, which several symbols need to be readable at all:
-	// MIME_BAD_ATTACHMENT without its file name says nothing.
+	// HTTP_TO_IP without the URL it saw says nothing.
 	Message string
 
 	// Advice says what to change, and the fact that says why.
@@ -343,92 +343,6 @@ var rspamdFindingCatalog = map[string]rspamdFinding{
 		Severity: model.IssueSeverityMedium,
 		Message:  "A URL has a host with no top-level domain: %s",
 		Advice:   "Write the full domain; a host without a TLD resolves only inside the network it was written in",
-	},
-
-	// --- Attachments
-	"BOGUS_ENCRYPTED_AND_TEXT": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityCritical,
-		Message:  "The message mixes an encrypted payload with plain text or HTML in a way that does not add up.",
-		Advice:   "Send either a properly signed and encrypted message or a plain one; this combination is used to put a payload past a scanner while keeping a readable part",
-	},
-	"MIME_DOUBLE_BAD_EXTENSION": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityCritical,
-		Message:  "An attachment hides its real extension behind a harmless-looking one: %s",
-		Advice:   "Name files with a single, true extension; a double extension makes an executable display as a document",
-	},
-	"MIME_BAD_UNICODE": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityCritical,
-		Message:  "An attachment's file name contains Unicode characters known for disguising it: %s",
-		Advice:   "Rename the file in plain characters; the ones flagged here reverse or hide part of the name as it is displayed",
-	},
-	"MIME_ARCHIVE_IN_ARCHIVE": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached archive contains another archive: %s",
-		Advice:   "Attach the files themselves, or link to them; an antivirus cannot see inside a nested archive, and scores it as evasion",
-	},
-	"MIME_OBFUSCATED_ARCHIVE": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached archive holds files showing clear signs of obfuscation: %s",
-		Advice:   "Repackage the archive with plain names and extensions, or link to the files instead",
-	},
-	"MIME_ENCRYPTED_ARCHIVE": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached archive is password-protected: %s",
-		Advice:   "Share the file through a link the recipient authenticates against; a password-protected archive cannot be scanned, and many gateways reject it outright",
-	},
-	"MIME_BAD_ATTACHMENT": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attachment has a MIME type that does not belong in a message: %s",
-		Advice:   "Send documents in formats a recipient can open safely, and link to anything executable rather than attaching it",
-	},
-	"MIME_BAD_EXTENSION": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attachment carries an extension gateways refuse: %s",
-		Advice:   "Link to the file instead; an attachment with this extension is usually stripped before delivery",
-	},
-	"EXE_IN_ARCHIVE": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached archive contains an executable: %s",
-		Advice:   "Distribute software through a download the recipient initiates; most gateways block an executable arriving by mail",
-	},
-	"PDF_SUSPICIOUS": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached PDF has properties associated with malicious documents: %s",
-		Advice:   "Regenerate the PDF from its source with a current tool, and check what the original was made with",
-	},
-	"PDF_JAVASCRIPT": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityHigh,
-		Message:  "An attached PDF contains JavaScript.",
-		Advice:   "Export the PDF without scripting; embedded scripts are where PDF exploits run",
-	},
-	"PDF_ENCRYPTED": {
-		Issue:    model.IssueTypeAttachmentRisk,
-		Category: reading.CategorySecurity,
-		Severity: model.IssueSeverityMedium,
-		Message:  "An attached PDF is encrypted.",
-		Advice:   "Send the document unencrypted over a channel that protects it, or link to it; an encrypted PDF cannot be scanned",
 	},
 
 	// --- What a check of our own also observes: merged, not dropped

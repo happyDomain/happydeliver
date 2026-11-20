@@ -30,13 +30,20 @@ import (
 // scanners said about it, and what the checks found in it. It takes the
 // readings rather than producing them, because the same readings answer for
 // the score.
-func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.AttachmentAnalysis {
+func (a *Analyzer) Analysis(results *Results, readings Readings) *model.AttachmentAnalysis {
 	if results == nil {
 		return nil
 	}
 
 	analysis := &model.AttachmentAnalysis{
 		HasAttachments: len(results.Attachments) > 0,
+	}
+
+	// What the filter said of the files without naming one is shown with
+	// them, even when we found none to show it beside.
+	if len(readings.Message.Issues) > 0 {
+		issues := readings.Message.Issues
+		analysis.Issues = &issues
 	}
 
 	if len(results.Attachments) == 0 {
@@ -68,8 +75,8 @@ func (a *Analyzer) Analysis(results *Results, readings []Reading) *model.Attachm
 
 		// The readings are index-aligned with the attachments; a caller that
 		// did not read at all leaves the findings out.
-		if i < len(readings) && len(readings[i].Issues) > 0 {
-			issues := readings[i].Issues
+		if i < len(readings.Files) && len(readings.Files[i].Issues) > 0 {
+			issues := readings.Files[i].Issues
 			check.Issues = &issues
 		}
 

@@ -363,11 +363,6 @@ components:
           items:
             $ref: '#/components/schemas/Issue'
           description: About markup clients block or filters read as concealment, hidden text included.
-        attachments:
-          type: array
-          items:
-            $ref: '#/components/schemas/Issue'
-          description: About the files the message carries, as the spam filter saw them.
 
     Issue:
       type: object
@@ -402,10 +397,9 @@ components:
             dns_lookup_failed says a lookup the DNS checks rely on
             did not answer. The authentication verdicts also report spf_missing,
             dkim_missing and dmarc_missing, for what the records show
-            missing. attachment_risk
-            predates the attachment reading and is kept for the reports that
-            already carry it; a finding about an attachment now names what is
-            wrong with it.
+            missing. attachment_risk is what the spam filter saw wrong with
+            the files a message carries when no type above names it more
+            precisely.
           example: "missing_alt"
         category:
           type: string
@@ -490,6 +484,14 @@ components:
           items:
             $ref: '#/components/schemas/AttachmentCheck'
           description: Analysis of each attachment found in the email
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: >-
+            About the files the message carries that could not be tied to one
+            of them: what the spam filter said of an attachment it did not
+            name, or named in a way several files, or none, answer to.
 
     AttachmentCheck:
       type: object

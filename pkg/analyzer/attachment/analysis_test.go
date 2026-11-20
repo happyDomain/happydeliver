@@ -34,7 +34,7 @@ import (
 func TestAnalysisCarriesEverythingTheEnginesSaid(t *testing.T) {
 	analyzer := newOfflineAnalyzer()
 
-	if analyzer.Analysis(nil, nil) != nil {
+	if analyzer.Analysis(nil, Readings{}) != nil {
 		t.Error("Expected no analysis of a reading that did not happen")
 	}
 
@@ -58,7 +58,7 @@ func TestAnalysisCarriesEverythingTheEnginesSaid(t *testing.T) {
 	}}}
 
 	// A caller that observed without reading leaves the findings out.
-	analysis := analyzer.Analysis(results, nil)
+	analysis := analyzer.Analysis(results, Readings{})
 	if !analysis.HasAttachments || analysis.Attachments == nil || len(*analysis.Attachments) != 1 {
 		t.Fatalf("Expected one attachment in the analysis, got %+v", analysis)
 	}

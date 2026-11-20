@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { AttachmentAnalysis, ScanResult } from "#lib/api/types.gen.js";
+    import type { AttachmentAnalysis, Issue, ScanResult } from "#lib/api/types.gen.js";
     import {
         categoryLabel,
         groupIssuesByCategory,
@@ -95,14 +95,24 @@
             : { label: "No attachments", tone: "muted", needsAttention: false })}
     {open}
 >
-    {#if !attachmentAnalysis.has_attachments}
+    {#if attachmentAnalysis.issues && attachmentAnalysis.issues.length > 0}
+        <!-- What the spam filter said of the files without naming one of them. -->
+        <div class="card-body border-bottom">
+            <p class="text-muted small mb-0">
+                The spam filter reported the following about the files this message carries, without
+                saying which one.
+            </p>
+            {@render issueList(attachmentAnalysis.issues)}
+        </div>
+    {/if}
+    {#if !attachmentAnalysis.has_attachments && !attachmentAnalysis.issues?.length}
         <div class="card-body">
             <p class="text-muted mb-0">
                 <i class="bi bi-check-circle text-success me-2"></i>
                 This email contains no attachments.
             </p>
         </div>
-    {:else}
+    {:else if attachmentAnalysis.has_attachments}
         <div class="list-group list-group-flush">
             {#each attachmentAnalysis.attachments || [] as attachment, index (attachment.sha256 + index)}
                 <div class="list-group-item">
@@ -174,37 +184,41 @@
                     </div>
 
                     {#if attachment.issues && attachment.issues.length > 0}
-                        <div class="mt-3">
-                            {#each groupIssuesByCategory(attachment.issues) as group (group.category ?? "")}
-                                <!-- A report from before the analysis recorded a reading has
-                                     no heading to show: its findings are listed as they
-                                     always were. -->
-                                {#if group.category}
-                                    <h6 class="text-muted text-uppercase small mt-3 mb-2">
-                                        {categoryLabel(group.category)}
-                                        <span class="badge bg-secondary ms-1">
-                                            {group.issues.length}
-                                        </span>
-                                    </h6>
-                                {/if}
-                                {#each group.issues as placed (placed.index)}
-                                    <IssueAlert
-                                        title={issueLabel(placed.issue.type)}
-                                        severity={placed.issue.severity}
-                                        message={placed.issue.message}
-                                        location={placed.issue.location}
-                                        advice={placed.issue.advice}
-                                        observer={issueObserver(placed.issue)}
-                                        corroboratedBy={placed.issue.corroborated_by}
-                                        docs={issueDocLinks(placed.issue.type)}
-                                        penalty={placed.issue.penalty}
-                                    />
-                                {/each}
-                            {/each}
-                        </div>
+                        {@render issueList(attachment.issues)}
                     {/if}
                 </div>
             {/each}
         </div>
     {/if}
 </ReportSection>
+
+{#snippet issueList(issues: Issue[])}
+    <div class="mt-3">
+        {#each groupIssuesByCategory(issues) as group (group.category ?? "")}
+            <!-- A report from before the analysis recorded a reading has
+                     no heading to show: its findings are listed as they
+                     always were. -->
+            {#if group.category}
+                <h6 class="text-muted text-uppercase small mt-3 mb-2">
+                    {categoryLabel(group.category)}
+                    <span class="badge bg-secondary ms-1">
+                        {group.issues.length}
+                    </span>
+                </h6>
+            {/if}
+            {#each group.issues as placed (placed.index)}
+                <IssueAlert
+                    title={issueLabel(placed.issue.type)}
+                    severity={placed.issue.severity}
+                    message={placed.issue.message}
+                    location={placed.issue.location}
+                    advice={placed.issue.advice}
+                    observer={issueObserver(placed.issue)}
+                    corroboratedBy={placed.issue.corroborated_by}
+                    docs={issueDocLinks(placed.issue.type)}
+                    penalty={placed.issue.penalty}
+                />
+            {/each}
+        {/each}
+    </div>
+{/snippet}

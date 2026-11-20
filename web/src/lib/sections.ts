@@ -122,7 +122,10 @@ export function sectionIssues(report: Report, key: SectionKey): Issue[] {
         case "content":
             return contentIssues(report.content_analysis);
         case "attachments":
-            return (report.attachment_analysis?.attachments ?? []).flatMap((a) => a.issues ?? []);
+            return [
+                ...(report.attachment_analysis?.issues ?? []),
+                ...(report.attachment_analysis?.attachments ?? []).flatMap((a) => a.issues ?? []),
+            ];
         case "spam":
             return [];
     }

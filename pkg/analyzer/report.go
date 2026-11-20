@@ -176,9 +176,10 @@ type AnalysisResults struct {
 	Attachments      *attachment.Results
 
 	// AttachmentReadings is what the attachment checks made of the above, one
-	// per attachment and in their order, held beside the observations for the
-	// same reason ContentReading is.
-	AttachmentReadings []attachment.Reading
+	// per attachment and in their order, and what the spam filter said of the
+	// files without naming one, held beside the observations for the same
+	// reason ContentReading is.
+	AttachmentReadings attachment.Readings
 }
 
 // AnalyzeEmail performs complete email analysis
@@ -229,32 +230,32 @@ func (r *ReportGenerator) AnalyzeEmail(email *mailmsg.Message, opts AnalysisOpti
 	results.SpamAssassin = r.spamAnalyzer.AnalyzeSpamAssassin(spamHeaders.For(ScannerSpamAssassin))
 	results.Rspamd = r.rspamdAnalyzer.AnalyzeRspamd(spamHeaders.For(ScannerRspamd))
 
-	results.Content = r.contentAnalyzer.Analyze(email)
-	// The content analysis reports what the spam filter observed about the
-	// content, so it needs the filter's result. It is read after AnalyzeRspamd
-	// above, and stays nil when no filter annotated the message.
-	if results.Content != nil {
-		results.Content.Rspamd = results.Rspamd
-
-		// A message this instance did not receive carries no annotation of
-		// ours, so a filter is asked directly, when the operator configured
-		// one. What comes back feeds the content findings only: it is a scan
-		// without an SMTP connection, so it says nothing worth scoring about
-		// the sender, and results.Rspamd is left as it was found. A .eml
-		// carrying some third party's X-Spamd-Result therefore keeps its spam
-		// block, and the spam grade means the same thing as before.
-		if results.Source != model.ReportSourceReceived {
-			if scanned := r.rspamdScanner.Scan(email.Raw); scanned != nil {
-				results.Content.Rspamd = scanned
-			}
+	// What the spam filter observed about the content and the files feeds
+	// the content and attachment findings. A message this instance did not
+	// receive carries no annotation of ours, so a filter is asked directly,
+	// when the operator configured one. What comes back feeds those findings
+	// only: it is a scan without an SMTP connection, so it says nothing worth
+	// scoring about the sender, and results.Rspamd is left as it was found. A
+	// .eml carrying some third party's X-Spamd-Result therefore keeps its spam
+	// block, and the spam grade means the same thing as before.
+	filter := results.Rspamd
+	if results.Source != model.ReportSourceReceived {
+		if scanned := r.rspamdScanner.Scan(email.Raw); scanned != nil {
+			filter = scanned
 		}
+	}
+
+	results.Content = r.contentAnalyzer.Analyze(email)
+	// It stays nil when no filter annotated the message.
+	if results.Content != nil {
+		results.Content.Rspamd = filter
 
 		// Everything the checks read has been observed by now, the filter's
 		// verdict included.
 		results.ContentReading = r.contentAnalyzer.Read(results.Content)
 	}
 	results.Attachments = r.attachmentAnalyzer.Analyze(email)
-	results.AttachmentReadings = r.attachmentAnalyzer.Read(results.Attachments)
+	results.AttachmentReadings = r.attachmentAnalyzer.Read(results.Attachments, filter)
 
 	return results
 }

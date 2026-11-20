@@ -24,6 +24,7 @@ package attachment
 import (
 	"context"
 
+	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/pkg/reading"
 )
 
@@ -42,34 +43,73 @@ type attachmentInput struct {
 	// reporting an attachment left unread can say what it was measured
 	// against. Zero means there was no ceiling.
 	MaxSize int64
+
+	// Rspamd is what the spam filter said about this file and our own checks
+	// did not, for rspamdFindingsCheck to report. On the reading of the
+	// message as a whole, Attachment is nil and this is all there is.
+	Rspamd []rspamdSymbol
 }
 
-// Reading is what the checks made of one attachment: the findings a report
-// shows, and what they cost its score.
+// Reading is what the checks made of one attachment, or of the files of the
+// message taken together: the findings a report shows, and what they cost
+// its score.
 type Reading = reading.Evaluation
+
+// Readings is what the checks made of the files a message carries.
+type Readings struct {
+	// Files holds one Reading per attachment, in the order Results holds
+	// them.
+	Files []Reading
+
+	// Message is what the spam filter said about the files of the message
+	// that no single one of them answers to.
+	Message Reading
+}
 
 // concernMalware keys the verdict that a file is malicious, whoever reached
 // it, so that a sample two engines recognise is reported once with the second
 // named as agreeing.
 const concernMalware = "malware"
 
-// Read runs the registry over every attachment of a message, and answers one
-// Reading per attachment, in the order Results holds them. It is called once
-// and its answer handed to both Analysis and Score.
-func (a *Analyzer) Read(observed *Results) []Reading {
-	if observed == nil || len(observed.Attachments) == 0 {
-		return nil
+// Read runs the registry over every attachment of a message, then adds what
+// the spam filter said about them, when one did. It is called once and its
+// answer handed to both Analysis and Score.
+//
+// The filter's symbols are tied to the file they name where exactly one does,
+// and noted on our own finding where one of our checks saw the same thing in
+// that file. What is left is reported on the file, or on the message when no
+// single file could be told.
+func (a *Analyzer) Read(observed *Results, filter *model.RspamdResult) Readings {
+	if observed == nil {
+		return Readings{}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), a.scanTimeout)
 	defer cancel()
 
-	readings := make([]Reading, len(observed.Attachments))
-	for i := range observed.Attachments {
-		in := &attachmentInput{Attachment: &observed.Attachments[i], MaxSize: a.maxSize}
+	perFile, message := attributeRspamd(observed.Attachments, filter)
 
-		issues, penalty := reading.Run(ctx, attachmentChecks, in)
-		readings[i] = Reading{Issues: issues, Penalty: penalty}
+	var readings Readings
+	if len(observed.Attachments) > 0 {
+		readings.Files = make([]Reading, len(observed.Attachments))
+	}
+	for i := range observed.Attachments {
+		attachment := &observed.Attachments[i]
+
+		evaluation := reading.Evaluate(ctx, attachmentChecks, &attachmentInput{Attachment: attachment, MaxSize: a.maxSize})
+
+		if leftover := corroborate(&evaluation, perFile[i]); len(leftover) > 0 {
+			extra := reading.Evaluate(ctx, rspamdChecks, &attachmentInput{Attachment: attachment, MaxSize: a.maxSize, Rspamd: leftover})
+			evaluation.Issues = append(evaluation.Issues, extra.Issues...)
+			evaluation.Findings = append(evaluation.Findings, extra.Findings...)
+			evaluation.Penalty += extra.Penalty
+		}
+
+		readings.Files[i] = evaluation
+	}
+
+	if len(message) > 0 {
+		readings.Message = reading.Evaluate(ctx, rspamdChecks, &attachmentInput{Rspamd: message})
 	}
 
 	return readings

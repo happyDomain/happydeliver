@@ -191,10 +191,10 @@ func TestRspamdFindingInterpolatesOptions(t *testing.T) {
 		},
 		{
 			name:     "a message needing no options is left alone",
-			symbol:   "PDF_JAVASCRIPT",
-			params:   "invoice.pdf",
-			contains: "contains JavaScript",
-			location: "invoice.pdf",
+			symbol:   "ZERO_FONT",
+			params:   "font-size:0",
+			contains: "font size of zero",
+			location: "font-size:0",
 		},
 	}
 
@@ -224,17 +224,28 @@ func TestRspamdFindingInterpolatesOptions(t *testing.T) {
 	}
 }
 
+// TestRspamdLeavesTheAttachmentsToTheirOwnReading checks that what the
+// filter says about the files a message carries is not reported with its
+// content: the attachment reading answers for it, and charges for it.
+func TestRspamdLeavesTheAttachmentsToTheirOwnReading(t *testing.T) {
+	for _, symbol := range []string{"MIME_BAD_ATTACHMENT", "MIME_DOUBLE_BAD_EXTENSION", "PDF_JAVASCRIPT"} {
+		if issues := runRspamdCheck(t, rspamdWith(map[string]string{symbol: "image.png"})); len(issues) != 0 {
+			t.Errorf("%s drew content findings: %+v", symbol, issues)
+		}
+	}
+}
+
 // TestRspamdFindingsAreCapped checks that a filter with a great deal to say
 // informs the reader without deciding the content grade by itself.
 func TestRspamdFindingsAreCapped(t *testing.T) {
 	// Six critical findings would be worth eighteen points uncapped.
 	symbols := map[string]string{
-		"DBL_PHISH":                 "a.example.com",
-		"DBL_SPAM":                  "b.example.com",
-		"DBL_BOTNET":                "c.example.com",
-		"URIBL_BLACK":               "d.example.com",
-		"URL_ZERO_WIDTH_SPACES":     "https://e.example.com",
-		"MIME_DOUBLE_BAD_EXTENSION": "invoice.pdf.exe",
+		"DBL_PHISH":             "a.example.com",
+		"DBL_SPAM":              "b.example.com",
+		"DBL_BOTNET":            "c.example.com",
+		"URIBL_BLACK":           "d.example.com",
+		"URL_ZERO_WIDTH_SPACES": "https://e.example.com",
+		"DBL_ABUSE_PHISH":       "f.example.com",
 	}
 
 	issues, penalty := reading.Run(context.Background(), contentChecks, &contentInput{

@@ -123,11 +123,19 @@ func speakingInputs(t *testing.T) map[string]*attachmentInput {
 // TestAttachmentRegistry holds the attachment analysis to the rules every
 // reading is made of, which live in readingtest.
 func TestAttachmentRegistry(t *testing.T) {
+	speaking := speakingInputs(t)
+	speaking["rspamd"] = &attachmentInput{
+		Attachment: observed("image.png", "image/webp", webpStub),
+		Rspamd:     []rspamdSymbol{{Symbol: "MIME_BAD_ATTACHMENT", Finding: rspamdFindingCatalog["MIME_BAD_ATTACHMENT"], Params: "png:image/webp"}},
+	}
+
 	readingtest.Registry[*attachmentInput]{
-		Checks:   attachmentChecks,
+		// The filter's check is run apart from the registry, on what our own
+		// checks left, and is held to the same rules.
+		Checks:   append(slices.Clone(attachmentChecks), rspamdFindingsCheck),
 		Defects:  attachmentDefects,
 		Criteria: attachmentCriteria,
-		Speaking: speakingInputs(t),
+		Speaking: speaking,
 		// A part carrying no name, no type and no bytes.
 		Empty: &attachmentInput{Attachment: observed("", "", nil)},
 	}.Test(t)

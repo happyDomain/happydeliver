@@ -1,4 +1,4 @@
-import type { ContentAnalysis, Issue } from "#lib/api/types.gen.js";
+import type { AttachmentAnalysis, ContentAnalysis, Issue } from "#lib/api/types.gen.js";
 
 /**
  * Readable name for an issue type.
@@ -319,14 +319,18 @@ export function contentIssues(content?: ContentAnalysis): Issue[] {
 }
 
 /**
- * Symbol to the anchor of the check of the content section carrying its advice.
+ * Symbol to the anchor of the check carrying its advice: one of the content section, or the
+ * attachments section for what the filter said of the files.
  *
  * A symbol reaches the report one of two ways: it raised a finding of its own, or it
- * corroborated one of ours. Either way advice for it sits in the content section, and the
+ * corroborated one of ours. Either way advice for it sits further down the page, and the
  * symbol table has no way of saying so: a reader seeing ZERO_FONT at +1.00 cannot tell that
- * an explanation of what to do about it is waiting further down the page.
+ * an explanation of what to do about it is waiting there.
  */
-export function adviceAnchorsBySymbol(content?: ContentAnalysis): Record<string, string> {
+export function adviceAnchorsBySymbol(
+    content?: ContentAnalysis,
+    attachments?: AttachmentAnalysis,
+): Record<string, string> {
     const anchors: Record<string, string> = {};
     const note = (issues: Issue[] | undefined, anchor: string) => {
         for (const issue of issues ?? []) {
@@ -342,6 +346,9 @@ export function adviceAnchorsBySymbol(content?: ContentAnalysis): Record<string,
     }
     for (const link of content?.links ?? []) note(link.issues, contentAnchor("links"));
     for (const image of content?.images ?? []) note(image.issues, contentAnchor("images"));
+
+    note(attachments?.issues, "attachments");
+    for (const attachment of attachments?.attachments ?? []) note(attachment.issues, "attachments");
 
     return anchors;
 }

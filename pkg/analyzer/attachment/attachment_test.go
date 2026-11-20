@@ -131,7 +131,7 @@ func buildAttachmentEmail(filename, contentType string, payload []byte) string {
 }
 
 // read observes a test message, then reads what was observed.
-func read(t *testing.T, analyzer *Analyzer, rawEmail string) (*Results, []Reading) {
+func read(t *testing.T, analyzer *Analyzer, rawEmail string) (*Results, Readings) {
 	t.Helper()
 
 	email, err := mailmsg.Parse([]byte(rawEmail))
@@ -141,7 +141,7 @@ func read(t *testing.T, analyzer *Analyzer, rawEmail string) (*Results, []Readin
 
 	results := analyzer.Analyze(email)
 
-	return results, analyzer.Read(results)
+	return results, analyzer.Read(results, nil)
 }
 
 func newOfflineAnalyzer() *Analyzer {
@@ -165,7 +165,7 @@ func TestAnalyzeAttachmentsNone(t *testing.T) {
 	if len(results.Attachments) != 0 {
 		t.Fatalf("Expected no attachments, got %d", len(results.Attachments))
 	}
-	if readings != nil {
+	if readings.Files != nil || len(readings.Message.Issues) != 0 {
 		t.Errorf("Expected no reading without attachments, got %+v", readings)
 	}
 
@@ -205,8 +205,8 @@ func TestAnalyzeAttachmentsCleanPDF(t *testing.T) {
 	if !strings.HasPrefix(att.DetectedType, "application/pdf") {
 		t.Errorf("Expected detected type application/pdf, got %q", att.DetectedType)
 	}
-	if len(readings[0].Issues) != 0 {
-		t.Errorf("Expected no findings, got %+v", readings[0].Issues)
+	if len(readings.Files[0].Issues) != 0 {
+		t.Errorf("Expected no findings, got %+v", readings.Files[0].Issues)
 	}
 
 	if score, _ := analyzer.Score(results, readings); score != 100 {
@@ -230,9 +230,9 @@ func TestAnalyzeAttachmentsZippedExecutable(t *testing.T) {
 		t.Fatalf("Expected 1 attachment, got %d", len(results.Attachments))
 	}
 
-	types := issueTypes(readings[0].Issues)
+	types := issueTypes(readings.Files[0].Issues)
 	if types[model.IssueTypeExecutableContent] == 0 || types[model.IssueTypeDoubleExtension] == 0 {
-		t.Errorf("Expected executable and double-extension findings, got %+v", readings[0].Issues)
+		t.Errorf("Expected executable and double-extension findings, got %+v", readings.Files[0].Issues)
 	}
 
 	score, grade := analyzer.Score(results, readings)
@@ -256,8 +256,8 @@ func TestAnalyzeAttachmentsWithClamAV(t *testing.T) {
 		t.Fatalf("Expected a malicious verdict from ClamAV, got %+v", scan)
 	}
 
-	if types := issueTypes(readings[0].Issues); types[model.IssueTypeMalwareDetected] == 0 {
-		t.Errorf("Expected malware_detected finding, got %+v", readings[0].Issues)
+	if types := issueTypes(readings.Files[0].Issues); types[model.IssueTypeMalwareDetected] == 0 {
+		t.Errorf("Expected malware_detected finding, got %+v", readings.Files[0].Issues)
 	}
 
 	score, grade := analyzer.Score(results, readings)
@@ -292,8 +292,8 @@ func TestAnalyzeAttachmentsOversize(t *testing.T) {
 
 	results, readings := read(t, analyzer, rawEmail)
 
-	if types := issueTypes(readings[0].Issues); types[model.IssueTypeScanSkipped] == 0 {
-		t.Errorf("Expected scan_skipped finding for oversize attachment, got %+v", readings[0].Issues)
+	if types := issueTypes(readings.Files[0].Issues); types[model.IssueTypeScanSkipped] == 0 {
+		t.Errorf("Expected scan_skipped finding for oversize attachment, got %+v", readings.Files[0].Issues)
 	}
 	if results.Attachments[0].Data != nil {
 		t.Error("An attachment too large to analyse must not be handed to the checks")
@@ -349,11 +349,11 @@ func TestAnUnnamedAttachmentIsNamedOnce(t *testing.T) {
 	sb.WriteString("\r\n--BOUNDARY--\r\n")
 
 	results, readings := read(t, analyzer, sb.String())
-	if len(readings) != 1 || len(readings[0].Issues) == 0 {
+	if len(readings.Files) != 1 || len(readings.Files[0].Issues) == 0 {
 		t.Fatalf("Expected findings about the unnamed attachment, got %+v", readings)
 	}
 
-	for _, issue := range readings[0].Issues {
+	for _, issue := range readings.Files[0].Issues {
 		if issue.Location == nil || *issue.Location != results.Attachments[0].Location {
 			t.Errorf("Finding %q names %v, want %q", issue.Type, issue.Location, results.Attachments[0].Location)
 		}

@@ -88,6 +88,25 @@ describe("adviceAnchorsBySymbol", () => {
         expect(anchors).toEqual({ ZERO_FONT: "content-details" });
     });
 
+    it("points what the filter said of the files at the attachments section", () => {
+        const anchors = adviceAnchorsBySymbol(undefined, {
+            has_attachments: true,
+            issues: [issue({ type: "attachment_risk", symbol: "BOGUS_ENCRYPTED_AND_TEXT" })],
+            attachments: [
+                {
+                    sha256: "0",
+                    size: 1,
+                    issues: [issue({ type: "type_mismatch", symbol: "MIME_BAD_ATTACHMENT" })],
+                },
+            ],
+        });
+
+        expect(anchors).toEqual({
+            BOGUS_ENCRYPTED_AND_TEXT: "attachments",
+            MIME_BAD_ATTACHMENT: "attachments",
+        });
+    });
+
     it("survives a report with no content issues at all", () => {
         expect(adviceAnchorsBySymbol(undefined)).toEqual({});
         expect(adviceAnchorsBySymbol({})).toEqual({});
@@ -239,6 +258,25 @@ describe("groupIssuesByCategory", () => {
         ]);
 
         expect(groups.map((group) => group.category)).toEqual(["content", "some_new_reading"]);
+    });
+
+    it("points what the filter said of the files at the attachments section", () => {
+        const anchors = adviceAnchorsBySymbol(undefined, {
+            has_attachments: true,
+            issues: [issue({ type: "attachment_risk", symbol: "BOGUS_ENCRYPTED_AND_TEXT" })],
+            attachments: [
+                {
+                    sha256: "0",
+                    size: 1,
+                    issues: [issue({ type: "type_mismatch", symbol: "MIME_BAD_ATTACHMENT" })],
+                },
+            ],
+        });
+
+        expect(anchors).toEqual({
+            BOGUS_ENCRYPTED_AND_TEXT: "attachments",
+            MIME_BAD_ATTACHMENT: "attachments",
+        });
     });
 
     it("survives a report with no content issues at all", () => {

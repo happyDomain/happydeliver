@@ -43,7 +43,6 @@ const (
 	shownUnsubscribe
 	shownRendering
 	shownMarkup
-	shownAttachments
 )
 
 // defectShownUnder places each defect of the vocabulary. The tests hold every
@@ -86,7 +85,6 @@ var observationShownUnder = map[model.IssueType]shownUnder{
 	model.IssueTypeExcessiveImages:  shownImages,
 	model.IssueTypeTextHtmlMismatch: shownTextAlternative,
 	model.IssueTypeClientCompat:     shownRendering,
-	model.IssueTypeAttachmentRisk:   shownAttachments,
 }
 
 // shownUnderOf is where a finding is shown when it is about no link or image
@@ -168,7 +166,6 @@ func placeIssues(findings []reading.Finding, links []model.LinkCheck, images []m
 		Unsubscribe:     listed(shownUnsubscribe),
 		Rendering:       listed(shownRendering),
 		Markup:          listed(shownMarkup),
-		Attachments:     listed(shownAttachments),
 	}
 }
 
@@ -196,7 +193,7 @@ func Issues(analysis *model.ContentAnalysis) []model.Issue {
 	if checks := analysis.Issues; checks != nil {
 		for _, list := range []*[]model.Issue{
 			checks.Structure, checks.TextAlternative, checks.Links, checks.Images,
-			checks.Unsubscribe, checks.Rendering, checks.Markup, checks.Attachments,
+			checks.Unsubscribe, checks.Rendering, checks.Markup,
 		} {
 			if list != nil {
 				all = append(all, *list...)

@@ -200,12 +200,12 @@ func TestAConfiguredScannerIsNotAskedAboutAFileNobodyRead(t *testing.T) {
 
 	// The daemon is unreachable: had it been asked, the scan would be an
 	// error rather than a skip.
-	types := issueTypes(readings[0].Issues)
+	types := issueTypes(readings.Files[0].Issues)
 	if types[model.IssueTypeScanError] != 0 {
-		t.Errorf("Expected the unreachable daemon never to be asked, got %+v", readings[0].Issues)
+		t.Errorf("Expected the unreachable daemon never to be asked, got %+v", readings.Files[0].Issues)
 	}
 	if types[model.IssueTypeScanSkipped] != 1 {
-		t.Errorf("Expected the reader told once that the file went unread, got %+v", readings[0].Issues)
+		t.Errorf("Expected the reader told once that the file went unread, got %+v", readings.Files[0].Issues)
 	}
 }
 

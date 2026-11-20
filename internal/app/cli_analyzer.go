@@ -737,12 +737,24 @@ func outputHumanReadable(result *analyzer.AnalysisResult, emailAnalyzer *analyze
 	}
 
 	// Attachment Analysis
-	if report.AttachmentAnalysis != nil && report.AttachmentAnalysis.HasAttachments {
+	if report.AttachmentAnalysis != nil && (report.AttachmentAnalysis.HasAttachments || report.AttachmentAnalysis.Issues != nil) {
 		fmt.Fprintln(writer, "\n"+strings.Repeat("-", 70))
 		fmt.Fprintln(writer, "ATTACHMENT ANALYSIS")
 		fmt.Fprintln(writer, strings.Repeat("-", 70))
 
 		attachments := report.AttachmentAnalysis
+
+		// What the spam filter said of the files without naming one.
+		if attachments.Issues != nil && len(*attachments.Issues) > 0 {
+			fmt.Fprintln(writer, "\n  Issues:")
+			for _, issue := range *attachments.Issues {
+				fmt.Fprintf(writer, "    [%s] %s: %s\n",
+					strings.ToUpper(string(issue.Severity)), issue.Type, issue.Message)
+				if issue.Advice != nil {
+					fmt.Fprintf(writer, "      Advice: %s\n", *issue.Advice)
+				}
+			}
+		}
 
 		if attachments.Attachments != nil {
 			for i, att := range *attachments.Attachments {
