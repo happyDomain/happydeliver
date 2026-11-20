@@ -225,6 +225,26 @@
                     {@const iprev = authentication.iprev}
                     {@const ptrs = sameIp ? dnsResults?.ptr_records : undefined}
                     {@const forward = sameIp ? dnsResults?.ptr_forward_records : undefined}
+                    {#snippet iprevHelp()}
+                        {#if ptrs}
+                            <FactRow
+                                label="PTR records"
+                                value={ptrs.length ? ptrs.join(", ") : "none"}
+                                mono={ptrs.length > 0}
+                            />
+                        {/if}
+                        {#if ptrs?.length && forward}
+                            <FactRow
+                                label="Which resolve to"
+                                value={forward.length ? forward.join(", ") : "nothing"}
+                                mono={forward.length > 0}
+                                ok={!!iprev.ip && forward.includes(iprev.ip)}
+                                okLabel={iprev.ip && forward.includes(iprev.ip)
+                                    ? "the sending IP"
+                                    : "not the sending IP"}
+                            />
+                        {/if}
+                    {/snippet}
                     <CheckCard
                         id="authentication-iprev"
                         title="Reverse DNS"
@@ -243,32 +263,13 @@
                                           { href: "#dns-fcrdns", label: "Forward confirmation" },
                                       ]
                                     : undefined}
+                                help={ptrs ? iprevHelp : undefined}
                             >
                                 {@render verdictRow("iprev", iprev.result)}
                                 <FactRow label="Sending IP" value={iprev.ip} mono />
                                 {#if iprev.hostname}
                                     <FactRow label="Its name" value={iprev.hostname} mono />
                                 {/if}
-                                {#snippet help()}
-                                    {#if ptrs}
-                                        <FactRow
-                                            label="PTR records"
-                                            value={ptrs.length ? ptrs.join(", ") : "none"}
-                                            mono={ptrs.length > 0}
-                                        />
-                                    {/if}
-                                    {#if ptrs?.length && forward}
-                                        <FactRow
-                                            label="Which resolve to"
-                                            value={forward.length ? forward.join(", ") : "nothing"}
-                                            mono={forward.length > 0}
-                                            ok={!!iprev.ip && forward.includes(iprev.ip)}
-                                            okLabel={iprev.ip && forward.includes(iprev.ip)
-                                                ? "the sending IP"
-                                                : "not the sending IP"}
-                                        />
-                                    {/if}
-                                {/snippet}
                             </VerdictFacts>
                             <p class="check-about">
                                 Receivers look up the name of the sending IP, and check that this
