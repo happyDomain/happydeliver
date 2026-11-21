@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { SpamTestDetail } from "#lib/api/types.gen.js";
+    import type { AdviceAnchor } from "#lib/issues.js";
     import { formatRuleScore } from "#lib/spam.js";
 
     interface Props {
@@ -7,11 +8,11 @@
         /** Decimals of the scores, as the filter reports them. */
         digits?: number;
         /**
-         * Rule to the anchor of the content check showing its advice. Without it the
+         * Rule to the anchor of the check showing its advice. Without it the
          * list is names and numbers: a reader seeing ZERO_FONT at +1.00 has no way of knowing
          * that what to do about it is written out further down the page.
          */
-        adviceAnchors?: Record<string, string>;
+        adviceAnchors?: Record<string, AdviceAnchor>;
     }
 
     let { rules, digits = 1, adviceAnchors = {} }: Props = $props();
@@ -35,12 +36,13 @@
             <span class="name font-monospace fw-semibold">
                 {name}
                 {#if adviceAnchors[name]}
+                    {@const advice = adviceAnchors[name]}
                     <!-- The name stays plain text: it is a name to read, not somewhere to
                          go. Only the lightbulb leads to the advice. -->
                     <a
                         class="ms-1"
-                        href="#{adviceAnchors[name]}"
-                        title="This rule produced a finding with advice, further down in Content Analysis"
+                        href="#{advice.id}"
+                        title="This rule produced a finding with advice, further down in {advice.section}"
                         aria-label="Read the advice for {name}"
                     >
                         <i class="bi bi-lightbulb" aria-hidden="true"></i>

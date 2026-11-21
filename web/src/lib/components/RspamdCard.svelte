@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { RspamdResult, SpamTestDetail } from "#lib/api/types.gen.js";
     import { spamFilterSites } from "#lib/docs.js";
+    import type { AdviceAnchor } from "#lib/issues.js";
     import { formatRuleScore } from "#lib/spam.js";
     import CheckCard from "./CheckCard.svelte";
     import SpamRuleList from "./SpamRuleList.svelte";
@@ -10,10 +11,10 @@
     interface Props {
         rspamd: RspamdResult;
         /**
-         * Symbol to the anchor of the content check showing its advice, for the symbols
-         * that produced one.
+         * Symbol to the anchor of the check showing its advice, for the symbols that
+         * produced one.
          */
-        adviceAnchors?: Record<string, string>;
+        adviceAnchors?: Record<string, AdviceAnchor>;
     }
 
     let { rspamd, adviceAnchors = {} }: Props = $props();

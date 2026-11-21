@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { AttachmentAnalysis, Issue, ScanResult } from "#lib/api/types.gen.js";
     import {
+        attachmentAnchor,
         categoryLabel,
         groupIssuesByCategory,
         issueLabel,
@@ -84,7 +85,7 @@
 </script>
 
 <ReportSection
-    id="attachment-details"
+    id={attachmentAnchor()}
     title="Attachment Analysis"
     icon="paperclip"
     grade={attachmentsGrade || undefined}
@@ -115,7 +116,7 @@
     {:else if attachmentAnalysis.has_attachments}
         <div class="list-group list-group-flush">
             {#each attachmentAnalysis.attachments || [] as attachment, index (attachment.sha256 + index)}
-                <div class="list-group-item">
+                <div class="list-group-item" id={attachmentAnchor(index)}>
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <h5 class="mb-1">
                             <i class="bi bi-file-earmark me-1"></i>

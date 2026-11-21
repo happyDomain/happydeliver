@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ContentAnalysis, Issue } from "#lib/api/types.gen.js";
 import {
     adviceAnchorsBySymbol,
+    attachmentAnchor,
     categoryLabel,
     contentAnchor,
     contentIssues,
@@ -34,7 +35,9 @@ describe("adviceAnchorsBySymbol", () => {
             },
         });
 
-        expect(anchors).toEqual({ ZERO_FONT: contentAnchor("markup") });
+        expect(anchors).toEqual({
+            ZERO_FONT: { id: contentAnchor("markup"), section: "Content Analysis" },
+        });
     });
 
     it("points a symbol at our finding when it only corroborated it", () => {
@@ -46,7 +49,9 @@ describe("adviceAnchorsBySymbol", () => {
             },
         });
 
-        expect(anchors).toEqual({ R_SUSPICIOUS_IMAGES: contentAnchor("images") });
+        expect(anchors).toEqual({
+            R_SUSPICIOUS_IMAGES: { id: contentAnchor("images"), section: "Content Analysis" },
+        });
     });
 
     it("points a symbol about one link at the links", () => {
@@ -63,8 +68,8 @@ describe("adviceAnchorsBySymbol", () => {
         });
 
         expect(anchors).toEqual({
-            REDIRECTOR_URL: contentAnchor("links"),
-            URL_REDIRECTOR_NESTED: contentAnchor("links"),
+            REDIRECTOR_URL: { id: contentAnchor("links"), section: "Content Analysis" },
+            URL_REDIRECTOR_NESTED: { id: contentAnchor("links"), section: "Content Analysis" },
         });
     });
 
@@ -73,7 +78,9 @@ describe("adviceAnchorsBySymbol", () => {
             images: [{ has_alt: true, issues: [issue({ symbol: "R_SUSPICIOUS_IMAGES" })] }],
         });
 
-        expect(anchors).toEqual({ R_SUSPICIOUS_IMAGES: contentAnchor("images") });
+        expect(anchors).toEqual({
+            R_SUSPICIOUS_IMAGES: { id: contentAnchor("images"), section: "Content Analysis" },
+        });
     });
 
     it("names the anchor of a check after it, dashes for underscores", () => {
@@ -85,7 +92,9 @@ describe("adviceAnchorsBySymbol", () => {
             html_issues: [issue({ type: "hidden_text", symbol: "ZERO_FONT" })],
         });
 
-        expect(anchors).toEqual({ ZERO_FONT: "content-details" });
+        expect(anchors).toEqual({
+            ZERO_FONT: { id: "content-details", section: "Content Analysis" },
+        });
     });
 
     it("points what the filter said of the files at the attachments section", () => {
@@ -102,9 +111,14 @@ describe("adviceAnchorsBySymbol", () => {
         });
 
         expect(anchors).toEqual({
-            BOGUS_ENCRYPTED_AND_TEXT: "attachments",
-            MIME_BAD_ATTACHMENT: "attachments",
+            BOGUS_ENCRYPTED_AND_TEXT: { id: "attachment-details", section: "Attachment Analysis" },
+            MIME_BAD_ATTACHMENT: { id: attachmentAnchor(0), section: "Attachment Analysis" },
         });
+    });
+
+    it("names the anchor of an attachment after its place in the list", () => {
+        expect(attachmentAnchor(0)).toBe("attachment-1");
+        expect(attachmentAnchor()).toBe("attachment-details");
     });
 
     it("survives a report with no content issues at all", () => {
@@ -274,9 +288,14 @@ describe("groupIssuesByCategory", () => {
         });
 
         expect(anchors).toEqual({
-            BOGUS_ENCRYPTED_AND_TEXT: "attachments",
-            MIME_BAD_ATTACHMENT: "attachments",
+            BOGUS_ENCRYPTED_AND_TEXT: { id: "attachment-details", section: "Attachment Analysis" },
+            MIME_BAD_ATTACHMENT: { id: attachmentAnchor(0), section: "Attachment Analysis" },
         });
+    });
+
+    it("names the anchor of an attachment after its place in the list", () => {
+        expect(attachmentAnchor(0)).toBe("attachment-1");
+        expect(attachmentAnchor()).toBe("attachment-details");
     });
 
     it("survives a report with no content issues at all", () => {

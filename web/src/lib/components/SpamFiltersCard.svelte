@@ -1,5 +1,10 @@
 <script lang="ts">
-    import type { RspamdResult, UpstreamSpamVerdict, SpamAssassinResult } from "#lib/api/types.gen.js";
+    import type {
+        RspamdResult,
+        UpstreamSpamVerdict,
+        SpamAssassinResult,
+    } from "#lib/api/types.gen.js";
+    import type { AdviceAnchor } from "#lib/issues.js";
     import type { SectionStatus } from "#lib/sections.js";
     import ReportSection from "./ReportSection.svelte";
     import RspamdCard from "./RspamdCard.svelte";
@@ -14,8 +19,8 @@
         upstreamSpamVerdicts?: UpstreamSpamVerdict[];
         spamGrade?: string;
         spamScore?: number;
-        /** rspamd symbol to the anchor of the content check showing its advice. */
-        adviceAnchors?: Record<string, string>;
+        /** rspamd symbol to the anchor of the check showing its advice. */
+        adviceAnchors?: Record<string, AdviceAnchor>;
         status?: SectionStatus;
         open?: boolean;
     }

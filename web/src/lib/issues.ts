@@ -319,8 +319,23 @@ export function contentIssues(content?: ContentAnalysis): Issue[] {
 }
 
 /**
+ * Anchor of an attachment of the attachments section, by its index in the analysis. Without
+ * one, the section itself: what the filter said of the files without naming one of them is
+ * shown at its top.
+ */
+export function attachmentAnchor(index?: number): string {
+    return index === undefined ? "attachment-details" : `attachment-${index + 1}`;
+}
+
+/** Where the advice for a symbol is shown: the anchor, and the section it is in. */
+export interface AdviceAnchor {
+    id: string;
+    section: string;
+}
+
+/**
  * Symbol to the anchor of the check carrying its advice: one of the content section, or the
- * attachments section for what the filter said of the files.
+ * attachment the filter said it of.
  *
  * A symbol reaches the report one of two ways: it raised a finding of its own, or it
  * corroborated one of ours. Either way advice for it sits further down the page, and the
@@ -330,25 +345,31 @@ export function contentIssues(content?: ContentAnalysis): Issue[] {
 export function adviceAnchorsBySymbol(
     content?: ContentAnalysis,
     attachments?: AttachmentAnalysis,
-): Record<string, string> {
-    const anchors: Record<string, string> = {};
-    const note = (issues: Issue[] | undefined, anchor: string) => {
+): Record<string, AdviceAnchor> {
+    const anchors: Record<string, AdviceAnchor> = {};
+    const note = (issues: Issue[] | undefined, id: string, section: string) => {
         for (const issue of issues ?? []) {
-            if (issue.symbol) anchors[issue.symbol] = anchor;
-            for (const other of issue.corroborated_by ?? []) anchors[other] = anchor;
+            if (issue.symbol) anchors[issue.symbol] = { id, section };
+            for (const other of issue.corroborated_by ?? []) anchors[other] = { id, section };
         }
     };
+    const inContent = (issues: Issue[] | undefined, id: string) =>
+        note(issues, id, "Content Analysis");
+    const inAttachments = (issues: Issue[] | undefined, id: string) =>
+        note(issues, id, "Attachment Analysis");
 
     // A report from before the issues were listed by check shows them all on the section.
-    note(content?.html_issues, "content-details");
+    inContent(content?.html_issues, "content-details");
     for (const [check, issues] of Object.entries(content?.issues ?? {})) {
-        note(issues, contentAnchor(check));
+        inContent(issues, contentAnchor(check));
     }
-    for (const link of content?.links ?? []) note(link.issues, contentAnchor("links"));
-    for (const image of content?.images ?? []) note(image.issues, contentAnchor("images"));
+    for (const link of content?.links ?? []) inContent(link.issues, contentAnchor("links"));
+    for (const image of content?.images ?? []) inContent(image.issues, contentAnchor("images"));
 
-    note(attachments?.issues, "attachments");
-    for (const attachment of attachments?.attachments ?? []) note(attachment.issues, "attachments");
+    inAttachments(attachments?.issues, attachmentAnchor());
+    (attachments?.attachments ?? []).forEach((attachment, index) =>
+        inAttachments(attachment.issues, attachmentAnchor(index)),
+    );
 
     return anchors;
 }
