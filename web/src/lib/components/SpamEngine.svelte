@@ -21,16 +21,19 @@
          * In increasing order; the last one is where the message is treated as spam. Empty
          * when the filter gave no threshold: there is then no gauge.
          */
-        steps: GaugeStep[];
+        steps?: GaugeStep[];
         /** What becomes of the message below the first step. */
-        base: string;
+        base?: string;
         /** What the filter makes of the message, said on the score. */
         verdict: string;
         isSpam: boolean;
         deliverabilityScore?: number;
         deliverabilityGrade?: string;
-        /** How the filter decides, for a reader who does not know. */
-        about: string;
+        /**
+         * How the filter decides, for a reader who does not know. A filter without a score
+         * leaves it to the check saying its verdict.
+         */
+        about?: string;
         /** The filter's own site, linked at the end of what it does. */
         site?: DocLink;
         /** The rules behind the verdict, as rows of checks. */
@@ -43,8 +46,8 @@
         subject,
         score,
         digits = 1,
-        steps,
-        base,
+        steps = [],
+        base = "",
         verdict,
         isSpam,
         deliverabilityScore,
@@ -91,49 +94,55 @@
         </span>
     </header>
 
-    <div class="engine-body px-3 pt-3 pb-2">
-        <!-- The verdict, at a glance: the score and what it means, then where it falls. -->
-        <div class="d-flex flex-wrap align-items-center row-gap-1 column-gap-4 mb-2">
-            <div class="d-flex align-items-center gap-3 pb-2">
-                {#if score !== undefined}
-                    <span class="score fw-bold lh-1 text-{tone}-emphasis"
-                        >{score.toFixed(digits)}</span
+    <div class={["engine-body px-3 pt-3 pb-2", score === undefined && !about && "bare"]}>
+        <!-- The verdict, at a glance: the score and what it means, then where it falls. A
+             verdict without a score is said by the check below, once. -->
+        {#if score !== undefined}
+            <div class="d-flex flex-wrap align-items-center row-gap-1 column-gap-4 mb-2">
+                <div class="d-flex align-items-center gap-3 pb-2">
+                    {#if score !== undefined}
+                        <span class="score fw-bold lh-1 text-{tone}-emphasis"
+                            >{score.toFixed(digits)}</span
+                        >
+                    {/if}
+                    <span
+                        class="badge rounded-pill border text-{tone}-emphasis bg-{tone}-subtle border-{tone}-subtle"
+                    >
+                        <i
+                            class="bi {tone === 'success'
+                                ? 'bi-check-circle-fill'
+                                : tone === 'warning'
+                                  ? 'bi-arrow-up-circle-fill'
+                                  : 'bi-x-circle-fill'} me-1"
+                            aria-hidden="true"
+                        ></i>{verdict}
+                    </span>
+                </div>
+                {#if score !== undefined && steps.length > 0}
+                    <div class="meter">
+                        <SpamScoreGauge
+                            {score}
+                            {steps}
+                            {base}
+                            {tone}
+                            label="{name} score against its thresholds"
+                        />
+                    </div>
+                {/if}
+            </div>
+        {/if}
+        {#if about}
+            <p class="check-about mb-3">
+                {about}
+                {#if site}
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external site -->
+                    <a class="text-nowrap" href={site.url} target="_blank" rel="noopener noreferrer"
+                        >{site.label}<i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"
+                        ></i></a
                     >
                 {/if}
-                <span
-                    class="badge rounded-pill border text-{tone}-emphasis bg-{tone}-subtle border-{tone}-subtle"
-                >
-                    <i
-                        class="bi {tone === 'success'
-                            ? 'bi-check-circle-fill'
-                            : tone === 'warning'
-                              ? 'bi-arrow-up-circle-fill'
-                              : 'bi-x-circle-fill'} me-1"
-                        aria-hidden="true"
-                    ></i>{verdict}
-                </span>
-            </div>
-            {#if score !== undefined && steps.length > 0}
-                <div class="meter">
-                    <SpamScoreGauge
-                        {score}
-                        {steps}
-                        {base}
-                        {tone}
-                        label="{name} score against its thresholds"
-                    />
-                </div>
-            {/if}
-        </div>
-        <p class="check-about mb-3">
-            {about}
-            {#if site}
-                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external site -->
-                <a class="text-nowrap" href={site.url} target="_blank" rel="noopener noreferrer"
-                    >{site.label}<i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i></a
-                >
-            {/if}
-        </p>
+            </p>
+        {/if}
 
         <CheckList>
             {@render children()}
@@ -158,6 +167,15 @@
         /* The list group's rule follows: one of its own under the last row would double it */
         :global(details.check-row:last-child) {
             border-bottom: 0;
+        }
+
+        /* Nothing above the rows to set them apart from: the header's own rule does */
+        &.bare {
+            padding-block: 0 !important;
+
+            :global(details.check-row:first-child) {
+                border-top: 0;
+            }
         }
     }
 

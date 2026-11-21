@@ -24,13 +24,10 @@
 <SpamEngine
     id="{verdict.filter}-details"
     name={verdict.name}
-    steps={[]}
-    base="Not spam"
     verdict={verdict.verdict}
     isSpam={verdict.is_spam}
     deliverabilityScore={verdict.deliverability_score}
     deliverabilityGrade={verdict.deliverability_grade}
-    about="{verdict.name} wrote this verdict before this instance saw the message, whichever side of the exchange it filters: one against the message lowers the spam grade, one in its favour proves nothing and leaves the grade to the other filters."
 >
     <CheckCard
         title="{verdict.name}'s verdict"
@@ -45,6 +42,11 @@
                     <FactRow label={fact.key} value={fact.value} mono />
                 {/each}
             </VerdictFacts>
+            <p class="check-about">
+                {verdict.name} filtered this message and left its verdict in the headers, before it reached
+                this instance. A verdict against the message lowers the spam grade; a favourable one leaves
+                the grade to the other filters.
+            </p>
         </div>
     </CheckCard>
 </SpamEngine>
