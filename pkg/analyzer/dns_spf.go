@@ -640,44 +640,46 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 
 	// Deduct points based on the all mechanism qualifier
 	endStrict := "End the record with -all."
-	if mainSPF.AllQualifier == nil {
-		// No 'all' mechanism qualifier extracted - severe penalty
-		c.cap(50, newIssue(model.IssueTypeSpfAllMissing, model.IssueSeverityMedium, domain,
-			fmt.Sprintf("The SPF record of %s ends with no all mechanism, so unlisted servers are neither accepted nor rejected.", domain),
-			endStrict))
-	} else {
-		switch *mainSPF.AllQualifier {
-		case "-":
-			// Strict fail - no deduction, this is the recommended policy
-		case "~":
-			// Softfail - if DMARC is quarantine or reject, treat it mostly like strict fail
-			advice := "End the record with -all once you are sure it lists every server that sends your mail."
-			if dmarcStrict {
-				c.cap(95, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
-					"Mail from unlisted servers only soft-fails; your enforced DMARC policy does most of the rejecting.", advice))
-			} else {
-				c.cap(75, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
-					"Mail from unlisted servers only soft-fails, and no enforcing DMARC policy backs it up.", advice))
-			}
-		case "+":
-			// Pass - severe penalty, unless DMARC catches what it lets through
-			message := fmt.Sprintf("The SPF record of %s ends with +all: anyone on the Internet may send mail in its name.", domain)
-			advice := "End the record with -all, after listing the servers that actually send your mail."
-			if dmarcStrict {
-				c.cap(75, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain,
-					message+" Your enforced DMARC policy limits the damage.", advice))
-			} else {
-				c.cap(50, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain, message, advice))
-			}
-		case "?":
-			// Neutral - severe penalty, unless DMARC catches what it lets through
-			message := fmt.Sprintf("The SPF record of %s ends with ?all, so unlisted servers are neither accepted nor rejected.", domain)
-			if dmarcStrict {
-				c.cap(75, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityLow, domain,
-					message+" Your enforced DMARC policy does the rejecting instead.", endStrict))
-			} else {
-				c.cap(50, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityMedium, domain, message, endStrict))
-			}
+	// A record without an all mechanism ends neutral, as ?all does
+	// (RFC 7208, 4.7): it is read the same.
+	qualifier := "?"
+	if mainSPF.AllQualifier != nil {
+		qualifier = string(*mainSPF.AllQualifier)
+	}
+	switch qualifier {
+	case "-":
+		// Strict fail - no deduction, this is the recommended policy
+	case "~":
+		// Softfail - if DMARC is quarantine or reject, treat it mostly like strict fail
+		advice := "End the record with -all once you are sure it lists every server that sends your mail."
+		if dmarcStrict {
+			c.cap(95, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
+				"Mail from unlisted servers only soft-fails; your enforced DMARC policy does most of the rejecting.", advice))
+		} else {
+			c.cap(75, newIssue(model.IssueTypeSpfAllSoftfail, model.IssueSeverityLow, domain,
+				"Mail from unlisted servers only soft-fails, and no enforcing DMARC policy backs it up.", advice))
+		}
+	case "+":
+		// Pass - severe penalty, unless DMARC catches what it lets through
+		message := fmt.Sprintf("The SPF record of %s ends with +all: anyone on the Internet may send mail in its name.", domain)
+		advice := "End the record with -all, after listing the servers that actually send your mail."
+		if dmarcStrict {
+			c.cap(75, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain,
+				message+" Your enforced DMARC policy limits the damage.", advice))
+		} else {
+			c.cap(50, newIssue(model.IssueTypeSpfAllPass, model.IssueSeverityHigh, domain, message, advice))
+		}
+	case "?":
+		// Neutral - severe penalty, unless DMARC catches what it lets through
+		message := fmt.Sprintf("The SPF record of %s ends with ?all, so unlisted servers are neither accepted nor rejected.", domain)
+		if mainSPF.AllQualifier == nil {
+			message = fmt.Sprintf("The SPF record of %s ends with no all mechanism, so unlisted servers are neither accepted nor rejected.", domain)
+		}
+		if dmarcStrict {
+			c.cap(75, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityLow, domain,
+				message+" Your enforced DMARC policy does the rejecting instead.", endStrict))
+		} else {
+			c.cap(50, newIssue(model.IssueTypeSpfAllNeutral, model.IssueSeverityMedium, domain, message, endStrict))
 		}
 	}
 

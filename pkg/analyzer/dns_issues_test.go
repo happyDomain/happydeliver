@@ -74,7 +74,8 @@ func TestSPFScoreIssues(t *testing.T) {
 		{"pass", utils.PtrTo(record("+")), nil, 50, []model.IssueType{model.IssueTypeSpfAllPass}, model.IssueSeverityHigh},
 		{"pass behind DMARC", utils.PtrTo(record("+")), enforced, 75, []model.IssueType{model.IssueTypeSpfAllPass}, model.IssueSeverityHigh},
 		{"neutral", utils.PtrTo(record("?")), nil, 50, []model.IssueType{model.IssueTypeSpfAllNeutral}, model.IssueSeverityMedium},
-		{"no all", utils.PtrTo(record("")), nil, 50, []model.IssueType{model.IssueTypeSpfAllMissing}, model.IssueSeverityMedium},
+		{"no all", utils.PtrTo(record("")), nil, 50, []model.IssueType{model.IssueTypeSpfAllNeutral}, model.IssueSeverityMedium},
+		{"no all behind DMARC", utils.PtrTo(record("")), enforced, 75, []model.IssueType{model.IssueTypeSpfAllNeutral}, model.IssueSeverityLow},
 		{"invalid", &[]model.SPFRecord{{Domain: utils.PtrTo("example.com"), Record: utils.PtrTo("v=spf1 foo"), Error: utils.PtrTo("unknown mechanism")}}, nil, 25, []model.IssueType{model.IssueTypeSpfInvalid}, model.IssueSeverityHigh},
 		{"broken include", utils.PtrTo(append(record("-"), model.SPFRecord{Domain: utils.PtrTo("spf.example.net"), Error: utils.PtrTo("Failed to lookup TXT records")})), nil, 100, []model.IssueType{model.IssueTypeSpfIncludeInvalid}, model.IssueSeverityHigh},
 	}

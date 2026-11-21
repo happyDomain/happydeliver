@@ -175,7 +175,6 @@ const issueDocs: Partial<Record<string, DocLink[]>> = {
     spf_too_many_lookups: [docs.spfLookupLimit],
     spf_all_pass: [docs.spfAll],
     spf_all_neutral: [docs.spfAll],
-    spf_all_missing: [docs.spfAll],
     spf_all_softfail: [docs.spfAll],
     dkim_missing: [docs.dkim, docs.googleSenders],
     dkim_invalid: [docs.dkim],
