@@ -912,6 +912,14 @@ components:
         x_ptr:
           $ref: '#/components/schemas/XPtrResult'
           description: X-Ptr result (HELO hostname vs reverse DNS consistency check)
+        x_return_mx:
+          type: array
+          items:
+            $ref: '#/components/schemas/XReturnMXResult'
+          description: >-
+            Whether the receiver found the sender domains able to receive replies and
+            bounces (x-return-mx, authentication_milter's ReturnOK): one verdict per
+            domain it checked. Informational: the DNS section scores the same check.
         x_tls:
           $ref: '#/components/schemas/AuthResult'
           description: >-
@@ -1025,6 +1033,41 @@ components:
           type: string
           description: Additional details about the x-ptr check
           example: "smtp.helo=relay.example.org policy.ptr=mail.example.com"
+
+    XReturnMXResult:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum: [pass, warn, fail, none, temperror, permerror]
+          description: >-
+            pass = the domain has MX records, warn = only A/AAAA records (implicit MX),
+            fail = neither
+          example: "warn"
+        domain:
+          type: string
+          description: Domain that was checked
+          example: "example.com"
+        identity:
+          type: string
+          enum: [smtp, header]
+          description: >-
+            Where the domain was read: the envelope sender (smtp.domain), where bounces
+            go, or the From header (header.domain), where replies go.
+          example: "header"
+        org_domain:
+          type: string
+          description: Organizational domain of the checked domain (policy.org_domain)
+          example: "example.com"
+        is_org:
+          type: boolean
+          description: Whether the checked domain is its own organizational domain (policy.is_org)
+        details:
+          type: string
+          description: Additional details about the x-return-mx check
+          example: "header.domain=example.com policy.is_org=yes (A Records found: 192.0.2.1)"
 
     SpamAssassinResult:
       type: object

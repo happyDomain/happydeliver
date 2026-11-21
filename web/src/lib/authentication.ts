@@ -172,6 +172,7 @@ export type VerdictMechanism =
     | "x_ptr"
     | "x_tls"
     | "x_aligned_from"
+    | "x_return_mx"
     | "bimi"
     | "arc";
 
@@ -224,6 +225,12 @@ const verdictMeanings: Record<VerdictMechanism, Record<string, string>> = {
         none: "The message travelled over a plain, unencrypted connection.",
         fail: "The message travelled over a plain, unencrypted connection.",
     },
+    x_return_mx: {
+        pass: "The domain publishes MX records: replies or bounces to it have somewhere to go.",
+        warn: "The domain publishes no MX record, only an A/AAAA record, which serves as an implicit MX.",
+        fail: "The domain has neither MX nor A/AAAA record: replies or bounces to it are lost.",
+        temperror: "A temporary DNS error prevented the check.",
+    },
     x_aligned_from: {
         pass: "The envelope sender and the From address are in the same domain.",
         domain_pass: "The envelope sender and the From address are in the same domain.",
@@ -273,6 +280,7 @@ export function verdictStatus(result: string | undefined, required: boolean): Ch
         case "softfail":
         case "neutral":
         case "temperror":
+        case "warn":
             return "warn";
         case "declined":
         case "skipped":

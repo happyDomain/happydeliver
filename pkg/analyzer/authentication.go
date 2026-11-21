@@ -93,6 +93,7 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 	// while a header below it was already in the message when that hop received
 	// it, and must never supersede the verdict it gave.
 	var headerSpf *model.AuthResult
+	var returnMX []model.XReturnMXResult
 
 	for _, method := range field.Methods {
 		switch method.Name {
@@ -159,7 +160,17 @@ func (a *AuthenticationAnalyzer) parseAuthenticationResultsHeader(header string,
 			if results.XTls == nil {
 				results.XTls = a.parseXTLSResult(method)
 			}
+
+		// One verdict per domain checked, the envelope sender's and the From's
+		case "x-return-mx":
+			returnMX = append(returnMX, *a.parseXReturnMXResult(method))
 		}
+	}
+
+	// The verdicts of one header go together: the topmost header carrying
+	// any is the receiver's
+	if results.XReturnMx == nil && len(returnMX) > 0 {
+		results.XReturnMx = &returnMX
 	}
 
 	// First verdict on the envelope sender wins, whichever header carried it

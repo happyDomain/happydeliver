@@ -760,6 +760,54 @@
             </CheckCard>
         </CheckList>
 
+        <!-- Whether the receiver found that replies and bounces can reach the sender domains.
+             Scored in the DNS section, which runs the same check: shown here, not charged. -->
+        {#if authentication.x_return_mx?.length}
+            <CheckList title="Reply and bounce domains">
+                {#each authentication.x_return_mx as rmx, i (i)}
+                    {@const envelope = rmx.identity === "smtp"}
+                    {@const mxAnchor =
+                        envelope && !sameDomain(rmx.domain, dnsResults?.from_domain)
+                            ? "#dns-mx-return-path"
+                            : "#dns-mx-from"}
+                    <CheckCard
+                        id="authentication-x-return-mx-{rmx.identity ?? i}"
+                        title={envelope ? "Envelope domain" : "From domain"}
+                        tag="Return MX"
+                        status={verdictStatus(rmx.result, false)}
+                        summary={verdict(rmx.result, rmx.domain)}
+                        docs={[docs.mxLookup]}
+                    >
+                        <div class="card-body">
+                            <VerdictFacts
+                                raw={rawVerdict("x-return-mx", rmx.result, rmx.details)}
+                                links={dnsResults
+                                    ? [{ href: mxAnchor, label: "Mail exchangers" }]
+                                    : undefined}
+                            >
+                                {@render verdictRow("x_return_mx", rmx.result, false)}
+                                <FactRow label="Domain" value={rmx.domain} mono />
+                                {#if rmx.org_domain && !rmx.is_org}
+                                    <FactRow
+                                        label="Organizational domain"
+                                        value={rmx.org_domain}
+                                        mono
+                                    />
+                                {/if}
+                            </VerdictFacts>
+                            <p class="check-about">
+                                {envelope
+                                    ? "Bounces go to the domain of the envelope sender."
+                                    : "Replies go to the domain of the From address."}
+                                The receiver checked that it can receive mail; the score counts it with
+                                the <a href={mxAnchor}>DNS records</a>.
+                            </p>
+                        </div>
+                    </CheckCard>
+                {/each}
+            </CheckList>
+        {/if}
+
         <!-- What happened between the sender and the receiver: Google seals what it routes,
              a list or a forwarder seals what it passes on. Not the sender domain's doing. -->
         {#if authentication.x_google_dkim || authentication.arc}
