@@ -22,7 +22,9 @@
 package analyzer
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -335,13 +337,71 @@ func TestMXIssuesWithoutAValidRecord(t *testing.T) {
 func TestMXIssueOfAnImplicitMX(t *testing.T) {
 	analyzer := newMockAnalyzer(nil, nil)
 	results := &model.DNSResults{
+		FromDomain:    "example.com",
+		FromMxRecords: &[]model.MXRecord{},
+		ReturnOk:      &model.ReturnOK{From: &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusWarn}},
+	}
+	score, from, _ := analyzer.calculateMXScore(results)
+	if len(from) != 1 || from[0].Type != model.IssueTypeMxMissing || from[0].Severity != model.IssueSeverityLow || !strings.Contains(from[0].Message, "implicit MX") {
+		t.Errorf("From issues = %v, want a low mx_missing about the implicit MX", from)
+	}
+	// Mail still reaches the domain: a quarter of the points only
+	if score != 75 || *from[0].Penalty != 25 {
+		t.Errorf("score = %d, penalty = %d, want 75 and 25", score, *from[0].Penalty)
+	}
+}
+
+// A domain without MX but with an address, which Go's resolver answers as not
+// found, publishes no MX: it is not one with MX records leading nowhere.
+func TestCheckMXRecordsOfADomainWithoutMX(t *testing.T) {
+	analyzer := NewDNSAnalyzerWithResolver(5*time.Second, nil, &returnOKMockResolver{
+		hosts: map[string][]string{"example.com": {"192.0.2.1"}},
+	}).WithDomainInfo(nil, 0)
+
+	records, failure := analyzer.checkMXRecords("example.com")
+	if records == nil || len(*records) != 0 || failure != "" {
+		t.Fatalf("records = %v, failure = %q, want an empty list and no failure", records, failure)
+	}
+
+	results := &model.DNSResults{
+		FromDomain:    "example.com",
+		FromMxRecords: records,
+		ReturnOk:      &model.ReturnOK{From: analyzer.checkReturnOKDomain("example.com", "")},
+	}
+	_, from, _ := analyzer.calculateMXScore(results)
+	if len(from) != 1 || from[0].Type != model.IssueTypeMxMissing || from[0].Severity != model.IssueSeverityLow {
+		t.Errorf("From issues = %v, want a low mx_missing", from)
+	}
+}
+
+// An MX lookup that failed is told under lookups, and charges nothing: what
+// the domain publishes is unknown.
+func TestCheckMXRecordsLookupFailure(t *testing.T) {
+	analyzer := NewDNSAnalyzerWithResolver(5*time.Second, nil, &failingMXResolver{}).WithDomainInfo(nil, 0)
+
+	records, failure := analyzer.checkMXRecords("example.com")
+	if records != nil || !strings.Contains(failure, "example.com") {
+		t.Fatalf("records = %v, failure = %q, want no records and the failure", records, failure)
+	}
+
+	results := &model.DNSResults{
 		FromDomain: "example.com",
 		ReturnOk:   &model.ReturnOK{From: &model.ReturnOKDomain{Domain: "example.com", Status: returnOKStatusWarn}},
 	}
-	_, from, _ := analyzer.calculateMXScore(results)
-	if len(from) != 1 || from[0].Type != model.IssueTypeMxMissing || !strings.Contains(from[0].Message, "implicit MX") {
-		t.Errorf("From issues = %v, want mx_missing about the implicit MX", from)
+	addLookupFailure(results, failure)
+	score, from, _ := analyzer.calculateMXScore(results)
+	if score != 100 || len(from) != 0 {
+		t.Errorf("score = %d, From issues = %v, want 100 and none", score, from)
 	}
+	if results.Errors == nil || len(*results.Errors) != 1 {
+		t.Errorf("errors = %v, want the failure", results.Errors)
+	}
+}
+
+type failingMXResolver struct{ returnOKMockResolver }
+
+func (*failingMXResolver) LookupMX(_ context.Context, name string) ([]*net.MX, error) {
+	return nil, &net.DNSError{Err: "i/o timeout", Name: name, IsTimeout: true}
 }
 
 func TestUnreachableDomainsChargedApart(t *testing.T) {
@@ -397,6 +457,7 @@ func TestMXIssuesOfAnotherReturnPath(t *testing.T) {
 		FromDomain:    "example.com",
 		FromMxRecords: &[]model.MXRecord{{Host: "mx.example.com", Valid: true}, {Host: "old.example.com", Error: utils.PtrTo("no address")}},
 		RpDomain:      utils.PtrTo("bounces.example.net"),
+		RpMxRecords:   &[]model.MXRecord{},
 	}
 
 	score, from, rp := analyzer.calculateMXScore(results)

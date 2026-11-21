@@ -186,12 +186,15 @@ func (d *DNSAnalyzer) AnalyzeDNS(email *mailmsg.Message, headersResults *model.H
 	domainInfoWG.Wait()
 
 	// Check MX records for From domain (where replies would go)
-	results.FromMxRecords = d.checkMXRecords(fromDomain)
+	var failure string
+	results.FromMxRecords, failure = d.checkMXRecords(fromDomain)
+	addLookupFailure(results, failure)
 
 	// Check MX records for Return-Path domain (where bounces would go)
 	// Only check if Return-Path domain is different from From domain
 	if results.RpDomain != nil && *results.RpDomain != fromDomain {
-		results.RpMxRecords = d.checkMXRecords(*results.RpDomain)
+		results.RpMxRecords, failure = d.checkMXRecords(*results.RpDomain)
+		addLookupFailure(results, failure)
 	}
 
 	// Verify the sender domains can actually receive replies/bounces (MX, with
@@ -284,7 +287,9 @@ func (d *DNSAnalyzer) AnalyzeDomainOnly(domain string) *model.DNSResults {
 	results.FromDomainInfo = d.checkDomainInfo(domain, "")
 
 	// Check MX records
-	results.FromMxRecords = d.checkMXRecords(domain)
+	var failure string
+	results.FromMxRecords, failure = d.checkMXRecords(domain)
+	addLookupFailure(results, failure)
 
 	// Check SPF records
 	results.SpfRecords = d.checkSPFRecords(domain)
@@ -510,4 +515,16 @@ func issuesOfType(issues []model.Issue, types ...model.IssueType) []model.Issue 
 		}
 	}
 	return kept
+}
+
+// addLookupFailure records a lookup that could not be made, if there was one,
+// for the report to tell under lookups.
+func addLookupFailure(results *model.DNSResults, failure string) {
+	if failure == "" {
+		return
+	}
+	if results.Errors == nil {
+		results.Errors = &[]string{}
+	}
+	*results.Errors = append(*results.Errors, failure)
 }

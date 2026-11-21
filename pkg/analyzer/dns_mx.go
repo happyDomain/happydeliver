@@ -23,38 +23,34 @@ package analyzer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"git.happydns.org/happyDeliver/internal/model"
 	"git.happydns.org/happyDeliver/internal/utils"
 )
 
-// checkMXRecords looks up MX records for a domain
-func (d *DNSAnalyzer) checkMXRecords(domain string) *[]model.MXRecord {
+// checkMXRecords looks up MX records for a domain. A domain that publishes
+// none (NXDOMAIN, or NODATA, which Go reports as not found too) gets an empty
+// list; a lookup that failed for another reason gets nil and the failure, for
+// the report to tell under lookups rather than charge to the sender.
+func (d *DNSAnalyzer) checkMXRecords(domain string) (*[]model.MXRecord, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout)
 	defer cancel()
 
+	results := []model.MXRecord{}
+
 	mxRecords, err := d.resolver.LookupMX(ctx, domain)
 	if err != nil {
-		return &[]model.MXRecord{
-			{
-				Valid: false,
-				Error: utils.PtrTo(fmt.Sprintf("Failed to lookup MX records: %s", formatDNSError(err))),
-			},
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			return &results, ""
 		}
+		return nil, fmt.Sprintf("Failed to lookup MX records of %s: %s", domain, formatDNSError(err))
 	}
 
-	if len(mxRecords) == 0 {
-		return &[]model.MXRecord{
-			{
-				Valid: false,
-				Error: utils.PtrTo("No MX records found"),
-			},
-		}
-	}
-
-	var results []model.MXRecord
 	for _, mx := range mxRecords {
 		results = append(results, model.MXRecord{
 			Host:     mx.Host,
@@ -63,7 +59,7 @@ func (d *DNSAnalyzer) checkMXRecords(domain string) *[]model.MXRecord {
 		})
 	}
 
-	return &results
+	return &results, ""
 }
 
 // calculateMXScore scores where replies and bounces to the sender domains go,
@@ -122,6 +118,12 @@ func mxIssues(c *checkScore, domain string, records *[]model.MXRecord, reach *mo
 	if valid {
 		points = 0
 	}
+	// The lookup failed: what the domain publishes is unknown, and the failure
+	// is told under lookups. Only a domain found with no way to receive mail
+	// at all is still charged, on the lookups of its own check.
+	if records == nil && (reach == nil || reach.Status != returnOKStatusFail) {
+		return
+	}
 	publish := fmt.Sprintf("Publish an MX record for %s pointing to a server that accepts mail.", domain)
 
 	switch {
@@ -133,6 +135,9 @@ func mxIssues(c *checkScore, domain string, records *[]model.MXRecord, reach *mo
 		message := fmt.Sprintf("%s publishes no MX record, so %s to it have nowhere to go.", domain, lost)
 		if reach != nil && reach.Status == returnOKStatusWarn {
 			message = fmt.Sprintf("%s publishes no MX record and relies on its A/AAAA record as an implicit MX for %s.", domain, lost)
+			// Mail still finds its way there, as receivers accept an implicit
+			// MX: only the missing record is charged, a quarter of the points.
+			points /= 4
 		}
 		c.deduct(points, newIssue(model.IssueTypeMxMissing, model.IssueSeverityLow, domain, message, publish))
 	case !valid:
