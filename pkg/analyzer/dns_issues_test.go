@@ -567,3 +567,23 @@ func TestDNSLookupFailuresAreReportedForFree(t *testing.T) {
 		t.Errorf("lookups = %v without any failure, want none", *results.Issues.Lookups)
 	}
 }
+
+// Only a HELO hostname that was checked and publishes no valid policy keeps
+// the section from A+.
+func TestHeloSPFLacking(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		helo *[]model.SPFRecord
+		want bool
+	}{
+		{"not checked", nil, false},
+		{"no hostname", &[]model.SPFRecord{{}}, false},
+		{"missing", &[]model.SPFRecord{{Domain: utils.PtrTo("mail.example.com")}}, true},
+		{"invalid", &[]model.SPFRecord{{Domain: utils.PtrTo("mail.example.com"), Record: utils.PtrTo("v=spf1 foo")}}, true},
+		{"valid", &[]model.SPFRecord{{Domain: utils.PtrTo("mail.example.com"), Valid: true}}, false},
+	} {
+		if got := heloSPFLacking(&model.DNSResults{FromDomain: "example.com", HeloSpfRecords: tt.helo}); got != tt.want {
+			t.Errorf("%s: heloSPFLacking = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}

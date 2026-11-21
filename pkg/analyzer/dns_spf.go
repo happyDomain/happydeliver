@@ -661,8 +661,9 @@ func (d *DNSAnalyzer) calculateSPFScore(results *model.DNSResults) (int, []model
 }
 
 // heloSPFIssues is what the policy of the HELO hostname calls for, which
-// costs nothing: it is never scored. Most relays publish no policy for their
-// own hostname, which is not a misconfiguration; publishing one lets receivers
+// costs nothing: it is never scored, it only keeps the section from A+ (see
+// heloSPFLacking). Most relays publish no policy for their own hostname,
+// which is not a misconfiguration; publishing one lets receivers
 // authenticate the HELO identity too, which matters for bounces, where the
 // envelope sender is empty and HELO is all SPF can check. Who can publish it
 // depends on whose hostname it is.
@@ -709,8 +710,19 @@ func heloSPFIssues(results *model.DNSResults) (issues []model.Issue) {
 			advice = fmt.Sprintf("Ask your email provider to publish %s: the hostname belongs to their infrastructure, not to your domain.", suggested)
 		}
 		c.note(newIssue(model.IssueTypeHeloSpfMissing, model.IssueSeverityInfo, host,
-			fmt.Sprintf("Receivers could authenticate %s on top of the envelope sender, and it is the only identity SPF can check on a bounce. Optional: it does not affect the score.", host),
+			fmt.Sprintf("Receivers could authenticate %s on top of the envelope sender, and it is the only identity SPF can check on a bounce. Optional: it does not affect the score, but the DNS section only grades A+ with it.", host),
 			advice))
 	}
 	return c.issues
+}
+
+// heloSPFLacking tells whether the HELO hostname was checked and publishes no
+// valid SPF policy. A HELO that could not be checked, as for an uploaded
+// message, lacks nothing: it was never testable.
+func heloSPFLacking(results *model.DNSResults) bool {
+	if results.HeloSpfRecords == nil || len(*results.HeloSpfRecords) == 0 {
+		return false
+	}
+	helo := (*results.HeloSpfRecords)[0]
+	return helo.Domain != nil && *helo.Domain != "" && !helo.Valid
 }

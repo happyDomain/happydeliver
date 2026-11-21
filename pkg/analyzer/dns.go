@@ -427,8 +427,10 @@ func (d *DNSAnalyzer) CalculateDNSScore(results *model.DNSResults, senderIP stri
 	score += calculateDomainInfoPenalty(results)
 
 	// BIMI Record
-	// BIMI is optional but indicates advanced email branding
-	if results.BimiRecord != nil && results.BimiRecord.Valid {
+	// BIMI is optional but indicates advanced email branding. So does an
+	// SPF policy for the HELO hostname, which costs nothing when missing
+	// but is wanted for the top grade.
+	if results.BimiRecord != nil && results.BimiRecord.Valid && !heloSPFLacking(results) {
 		if score >= 100 {
 			return 100, "A+"
 		}
