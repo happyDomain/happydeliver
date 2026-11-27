@@ -28,6 +28,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -162,6 +163,10 @@ func buildIndexTemplate(raw []byte) *template.Template {
 }
 
 func init() {
+	// Go's built-in table lacks .webmanifest; without this it would be
+	// served as text/plain.
+	mime.AddExtensionType(".webmanifest", "application/manifest+json")
+
 	flag.StringVar(&CustomHeadHTML, "custom-head-html", CustomHeadHTML, "Add custom HTML right before </head>")
 	flag.StringVar(&CustomBodyHTML, "custom-body-html", CustomBodyHTML, "Add custom HTML right before </body>")
 }
@@ -180,7 +185,7 @@ const (
 	// given URL never changes and may be cached forever.
 	cacheImmutable = "public, max-age=604800, immutable"
 	// cacheStatic applies to embedded assets that are NOT content-hashed
-	// (e.g. /img/*, /favicon.png). Their URL is stable across deploys, so they
+	// (e.g. /img/*, /manifest.webmanifest). Their URL is stable across deploys, so they
 	// are cacheable, but only briefly so an in-place change propagates within
 	// the hour. They cannot be served no-cache cheaply: embed.FS files carry a
 	// zero modtime, so http.ServeContent emits no Last-Modified and can never
@@ -278,7 +283,7 @@ func DeclareRoutes(cfg *config.Config, router *gin.Engine) {
 	router.GET("/test/", serveOrReverse("/", cfg))
 	router.GET("/test/:testid", serveOrReverse("/", cfg))
 	router.GET("/history/", serveOrReverse("/", cfg))
-	router.GET("/favicon.png", serveOrReverse("", cfg))
+	router.GET("/manifest.webmanifest", serveOrReverse("", cfg))
 	router.GET("/img/*path", serveOrReverse("", cfg))
 
 	router.NoRoute(func(c *gin.Context) {

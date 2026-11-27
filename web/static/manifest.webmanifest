@@ -1,0 +1,17 @@
+{
+    "name": "happyDeliver",
+    "short_name": "happyDeliver",
+    "description": "Test your email deliverability: authentication, spam score, blacklists and more.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#f4f5f5",
+    "theme_color": "#f4f5f5",
+    "icons": [
+        { "src": "/img/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/img/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/img/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+        { "src": "/img/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "/img/happyDeliver-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
